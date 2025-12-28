@@ -6,5 +6,9 @@ public class LlamaNative {
         System.loadLibrary("llama_jni");
     }
 
-    public native String test(String prompt);
+    // ① モデル初期化用（今はダミーで OK）
+    public native String init(String modelPath);
+
+    // ② 推論用（プロンプトを渡してレスポンスをもらう）
+    public native String generate(String prompt);
 }
