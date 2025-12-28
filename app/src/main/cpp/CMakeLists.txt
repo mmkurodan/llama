@@ -15,6 +15,7 @@ add_library(
 # third_party include
 include_directories(
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
+    ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
 )
 
 # libcurl (mbedTLS version)
@@ -23,10 +24,29 @@ set_target_properties(curl PROPERTIES IMPORTED_LOCATION
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/lib/libcurl.a
 )
 
+# mbedTLS
+add_library(mbedtls STATIC IMPORTED)
+set_target_properties(mbedtls PROPERTIES IMPORTED_LOCATION
+    ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedtls.a
+)
+
+add_library(mbedcrypto STATIC IMPORTED)
+set_target_properties(mbedcrypto PROPERTIES IMPORTED_LOCATION
+    ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedcrypto.a
+)
+
+add_library(mbedx509 STATIC IMPORTED)
+set_target_properties(mbedx509 PROPERTIES IMPORTED_LOCATION
+    ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedx509.a
+)
+
 target_link_libraries(
     llama_jni
     PRIVATE
     curl
+    mbedtls
+    mbedcrypto
+    mbedx509
     log
     android
     jnigraphics
