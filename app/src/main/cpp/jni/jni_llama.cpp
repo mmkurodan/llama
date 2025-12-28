@@ -75,4 +75,4 @@ Java_com_example_ollama_LlamaNative_init(
 
     env->ReleaseStringUTFChars(jpath, path);
     return env->NewStringUTF(msg.c_str());
-}}
+}
