@@ -38,7 +38,9 @@ jobs:
           cd openssl
           git checkout openssl-3.3.1
 
-          ./Configure android-arm64 no-shared --prefix=$PWD/build/arm64
+          ./Configure android-arm64 no-shared \
+            --prefix=$PWD/build/arm64 \
+            --cross-compile-prefix=$TOOLCHAIN/bin/aarch64-linux-android-
 
           make -j"$(nproc)"
           make install_sw
