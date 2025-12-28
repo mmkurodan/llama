@@ -1,30 +1,135 @@
-name: Android CI
+name: Build native libs and APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  # ============================
+  # ① OpenSSL (arm64) をビルド
+  # ============================
+  build-openssl:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Download Gradle 8.2.1
-      run: |
-        wget https://services.gradle.org/distributions/gradle-8.2.1-bin.zip
-        unzip gradle-8.2.1-bin.zip
-        echo "$PWD/gradle-8.2.1/bin" >> $GITHUB_PATH
+      - name: Install build deps
+        run: |
+          sudo apt update
+          sudo apt install -y autoconf automake libtool pkg-config build-essential git
 
-    - name: Generate Gradle Wrapper (8.2.1)
-      run: gradle wrapper --gradle-version 8.2.1
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
 
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug
+      - name: Build OpenSSL for arm64
+        run: |
+          set -e
+          export API=24
+          export HOST_TAG=linux-x86_64
+          export TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG
+          export CC=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+          git clone https://github.com/openssl/openssl.git
+          cd openssl
+          git checkout OpenSSL_1_1_1w
+
+          ./Configure android-arm64 no-shared no-unit-test no-ui --prefix=$PWD/build/arm64
+          make -j"$(nproc)"
+          make install_sw
+
+      - name: Upload OpenSSL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-arm64
+          path: openssl/build/arm64
+
+  # ============================
+  # ② libcurl (arm64) をビルド
+  # ============================
+  build-libcurl:
+    runs-on: ubuntu-latest
+    needs: build-openssl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt update
+          sudo apt install -y autoconf automake libtool pkg-config build-essential git
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+
+      - name: Download OpenSSL artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-arm64
+          path: openssl-arm64
+
+      - name: Build libcurl for arm64
+        run: |
+          set -e
+          git clone https://github.com/curl/curl.git
+          cd curl
+          git checkout curl-8_5_0
+
+          autoreconf -fi
+
+          export API=24
+          export HOST_TAG=linux-x86_64
+          export TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG
+          export CC=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang
+          export CXX=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang++
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+
+          ./configure \
+            --host=aarch64-linux-android \
+            --with-ssl=$GITHUB_WORKSPACE/openssl-arm64 \
+            --disable-shared \
+            --enable-static \
+            --without-zstd \
+            --without-brotli \
+            --prefix=$PWD/build/arm64
+
+          make -j"$(nproc)"
+          make install
+
+      - name: Upload libcurl artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libcurl-arm64
+          path: curl/build/arm64
+
+  # ============================
+  # ③ APK ビルド（libcurl + OpenSSL を取り込む）
+  # ============================
+  build-apk:
+    runs-on: ubuntu-latest
+    needs: build-libcurl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download OpenSSL artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-arm64
+          path: app/src/main/cpp/third_party/openssl
+
+      - name: Download libcurl artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libcurl-arm64
+          path: app/src/main/cpp/third_party/libcurl
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
