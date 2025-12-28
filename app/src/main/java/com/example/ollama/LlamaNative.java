@@ -1,4 +1,4 @@
-package com.example.PROJECTNAME;
+package com.example.ollama;
 
 public class LlamaNative {
 
