@@ -14,25 +14,25 @@ add_library(
 
 # third_party include
 include_directories(
-    ${CMAKE_SOURCE_DIR}/app/src/main/cpp/third_party/libcurl/include
-    ${CMAKE_SOURCE_DIR}/app/src/main/cpp/third_party/openssl/include
+    ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
+    ${CMAKE_SOURCE_DIR}/third_party/openssl/include
 )
 
 # libcurl
 add_library(curl STATIC IMPORTED)
 set_target_properties(curl PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_SOURCE_DIR}/app/src/main/cpp/third_party/libcurl/lib/libcurl.a
+    ${CMAKE_SOURCE_DIR}/third_party/libcurl/lib/libcurl.a
 )
 
 # OpenSSL
 add_library(ssl STATIC IMPORTED)
 set_target_properties(ssl PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_SOURCE_DIR}/app/src/main/cpp/third_party/openssl/lib/libssl.a
+    ${CMAKE_SOURCE_DIR}/third_party/openssl/lib/libssl.a
 )
 
 add_library(crypto STATIC IMPORTED)
 set_target_properties(crypto PROPERTIES IMPORTED_LOCATION
-    ${CMAKE_SOURCE_DIR}/app/src/main/cpp/third_party/openssl/lib/libcrypto.a
+    ${CMAKE_SOURCE_DIR}/third_party/openssl/lib/libcrypto.a
 )
 
 target_link_libraries(
