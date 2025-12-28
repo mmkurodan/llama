@@ -122,8 +122,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Debug: show workspace structure
+      - name: Debug
         run: |
           echo "=== WORKSPACE ==="
           ls -al $GITHUB_WORKSPACE
