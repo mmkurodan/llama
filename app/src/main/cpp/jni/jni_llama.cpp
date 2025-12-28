@@ -40,9 +40,15 @@ Java_com_example_ollama_LlamaNative_download(
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
 
-    // ★ HTTPS 証明書検証を無効化（動作確認用）
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    // ----------------------------------------------------
+    // huggingface.co のときだけ SSL 検証を無効化
+    // ----------------------------------------------------
+    std::string surl(url);
+
+    if (surl.rfind("https://huggingface.co/", 0) == 0) {
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
 
     curl_easy_setopt(curl, CURLOPT_USERAGENT,
         "Mozilla/5.0 (Linux; Android 14; Mobile) "
