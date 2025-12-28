@@ -6,27 +6,42 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -std=c++17")
 
-# llama.cpp のパス（光男のプロジェクト構成に合わせて調整）
-set(LLAMA_DIR ${CMAKE_SOURCE_DIR}/llama)
+# llama.cpp のルート
+set(LLAMA_SRC_DIR ${CMAKE_SOURCE_DIR}/llama/src)
+set(LLAMA_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/llama/include)
 
-# llama.cpp / ggml.c / ggml-alloc.c / ggml-backend.c を追加
+# ggml のルート
+set(GGML_SRC_DIR  ${CMAKE_SOURCE_DIR}/llama/ggml/src)
+set(GGML_CPU_DIR  ${CMAKE_SOURCE_DIR}/llama/ggml/src/ggml-cpu)
+
 add_library(
     llama_jni
     SHARED
     jni/jni_llama.cpp
-    ${LLAMA_DIR}/llama.cpp
-    ${LLAMA_DIR}/ggml.c
-    ${LLAMA_DIR}/ggml-alloc.c
-    ${LLAMA_DIR}/ggml-backend.c
+
+    # llama.cpp 本体
+    ${LLAMA_SRC_DIR}/llama.cpp
+    ${LLAMA_SRC_DIR}/models/llama.cpp
+
+    # ggml core
+    ${GGML_SRC_DIR}/ggml.c
+    ${GGML_SRC_DIR}/ggml-alloc.c
+    ${GGML_SRC_DIR}/ggml-quants.c
+
+    # ggml CPU backend
+    ${GGML_CPU_DIR}/ggml-cpu.c
 )
 
-# include path に llama ディレクトリを追加
 target_include_directories(
     llama_jni
     PRIVATE
+    ${LLAMA_INCLUDE_DIR}
+    ${LLAMA_SRC_DIR}
+    ${LLAMA_SRC_DIR}/models
+    ${GGML_SRC_DIR}
+    ${GGML_CPU_DIR}
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
-    ${LLAMA_DIR}
 )
 
 # libcurl (mbedTLS version)
