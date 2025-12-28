@@ -40,6 +40,10 @@ Java_com_example_ollama_LlamaNative_download(
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
 
+    // ★ HTTPS 証明書検証を無効化（動作確認用）
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
     curl_easy_setopt(curl, CURLOPT_USERAGENT,
         "Mozilla/5.0 (Linux; Android 14; Mobile) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -71,4 +75,4 @@ Java_com_example_ollama_LlamaNative_init(
 
     env->ReleaseStringUTFChars(jpath, path);
     return env->NewStringUTF(msg.c_str());
-}
+}}
