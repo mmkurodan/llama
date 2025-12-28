@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import java.io.File;
+
 public class MainActivity extends Activity {
 
     @Override
@@ -20,30 +22,24 @@ public class MainActivity extends Activity {
                 "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v0.3-GGUF/resolve/main/"
                 + "tinyllama-1.1b-chat-v0.3.Q4_K_M.gguf";
 
-            String fileName = "tinyllama.gguf";
+            File dir = getFilesDir();
+            File modelFile = new File(dir, "tinyllama.gguf");
+            String modelPath = modelFile.getAbsolutePath();
 
-            String modelPath = downloadFileToInternalStorage(url, fileName);
+            LlamaNative llama = new LlamaNative();
+
+            String dlResult = llama.download(url, modelPath);
 
             String result;
-            if (modelPath == null) {
-                result = "Download failed";
+            if (!"ok".equals(dlResult)) {
+                result = "Download failed: " + dlResult;
             } else {
-                LlamaNative llama = new LlamaNative();
                 result = llama.init(modelPath);
             }
 
             String finalResult = result;
-
-            runOnUiThread(() -> {
-                tv.setText(finalResult);
-            });
+            runOnUiThread(() -> tv.setText(finalResult));
 
         }).start();
-    }
-
-    // ★ downloadFileToInternalStorage() もクラスの中に入れる必要がある
-    private String downloadFileToInternalStorage(String urlStr, String fileName) {
-        // 光男が前に使っていたダウンロード関数をここに入れる
-        return null; // 仮
     }
 }
