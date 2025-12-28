@@ -1,4 +1,4 @@
-package com.example.PROJECTNAME;
+package com.example.ollama;
 
 import android.app.Activity;
 import android.os.Bundle;
