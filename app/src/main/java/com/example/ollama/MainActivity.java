@@ -35,6 +35,10 @@ public class MainActivity extends Activity {
                 result = "Download failed: " + dlResult;
             } else {
                 result = llama.init(modelPath);
+
+                // 推論テスト
+                String gen = llama.generate("Hello!");
+                result = result + "\n\nGenerated:\n" + gen;
             }
 
             String finalResult = result;
