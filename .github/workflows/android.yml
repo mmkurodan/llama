@@ -82,7 +82,7 @@ jobs:
           name: mbedtls-arm64
           path: mbedtls-arm64
 
-      - name: Build libcurl for arm64 (mbedTLS)
+      - name: Build libcurl for arm64 (mbedTLS, no zlib)
         run: |
           set -e
           git clone https://github.com/curl/curl.git
@@ -104,6 +104,7 @@ jobs:
             --with-mbedtls=$GITHUB_WORKSPACE/mbedtls-arm64 \
             --disable-shared \
             --enable-static \
+            --without-zlib \
             --without-zstd \
             --without-brotli \
             --prefix=$PWD/build/arm64
