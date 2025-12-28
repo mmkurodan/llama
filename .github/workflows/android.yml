@@ -124,13 +124,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: mbedtls-arm64
-          path: app/src/main/cpp/third_party/mbedtls
+          path: app/src/main/cpp/third_party
 
       - name: Download libcurl artifact
         uses: actions/download-artifact@v4
         with:
           name: libcurl-arm64
-          path: app/src/main/cpp/third_party/libcurl
+          path: app/src/main/cpp/third_party
 
       - name: Download Gradle 8.2.1
         run: |
