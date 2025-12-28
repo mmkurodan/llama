@@ -11,8 +11,8 @@ set(LLAMA_SRC_DIR ${CMAKE_SOURCE_DIR}/llama/src)
 set(LLAMA_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/llama/include)
 
 # ggml のルート
-set(GGML_SRC_DIR  ${CMAKE_SOURCE_DIR}/llama/ggml/src)
-set(GGML_CPU_DIR  ${CMAKE_SOURCE_DIR}/llama/ggml/src/ggml-cpu)
+set(GGML_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/llama/ggml/include)
+set(GGML_SRC_DIR     ${CMAKE_SOURCE_DIR}/llama/ggml/src)
 
 add_library(
     llama_jni
@@ -29,17 +29,22 @@ add_library(
     ${GGML_SRC_DIR}/ggml-quants.c
 
     # ggml CPU backend
-    ${GGML_CPU_DIR}/ggml-cpu.c
+    ${GGML_SRC_DIR}/ggml-cpu/ggml-cpu.c
 )
 
 target_include_directories(
     llama_jni
     PRIVATE
+    # llama
     ${LLAMA_INCLUDE_DIR}
     ${LLAMA_SRC_DIR}
     ${LLAMA_SRC_DIR}/models
+
+    # ggml（公開ヘッダ + 内部ヘッダ）
+    ${GGML_INCLUDE_DIR}
     ${GGML_SRC_DIR}
-    ${GGML_CPU_DIR}
+
+    # third_party
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
 )
