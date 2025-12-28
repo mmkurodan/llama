@@ -11,11 +11,16 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         LlamaNative llama = new LlamaNative();
-        String result = llama.test("Hello JNI");
+
+        // ① init のテスト（今はダミー）
+        String initResult = llama.init("models/dummy.gguf");
+
+        // ② generate のテスト（今はダミー）
+        String genResult = llama.generate("Hello from Java");
 
         TextView tv = new TextView(this);
-        tv.setText(result);
-        tv.setTextSize(24);
+        tv.setText(initResult + "\n" + genResult);
+        tv.setTextSize(18);
 
         setContentView(tv);
     }
