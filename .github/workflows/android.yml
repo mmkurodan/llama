@@ -8,7 +8,7 @@ on:
 
 jobs:
   # ============================
-  # ① OpenSSL (arm64) を CMake でビルド
+  # ① OpenSSL (arm64) をビルド（公式 Configure）
   # ============================
   build-openssl:
     runs-on: ubuntu-latest
@@ -19,47 +19,37 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt update
-          sudo apt install -y git build-essential perl cmake
+          sudo apt install -y perl build-essential git
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26b
 
-      - name: Build OpenSSL 3.3.1 for arm64 (CMake)
+      - name: Build OpenSSL 3.3.1 for arm64
         run: |
           set -e
           export API=24
           export HOST_TAG=linux-x86_64
           export TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG
+          export ANDROID_NDK_HOME=$ANDROID_NDK
 
           git clone https://github.com/openssl/openssl.git
           cd openssl
           git checkout openssl-3.3.1
 
-          mkdir build
-          cd build
-
-          cmake .. \
-            -DCMAKE_SYSTEM_NAME=Android \
-            -DCMAKE_SYSTEM_VERSION=$API \
-            -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
-            -DCMAKE_ANDROID_NDK=$ANDROID_NDK \
-            -DCMAKE_ANDROID_STL_TYPE=c++_static \
-            -DCMAKE_C_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang \
-            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang++ \
-            -DOPENSSL_USE_STATIC_LIBS=ON \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install
+          perl Configure android-arm64 no-shared \
+            --prefix=$PWD/build/arm64 \
+            --cross-compile-prefix=$TOOLCHAIN/bin/aarch64-linux-android-
 
           make -j"$(nproc)"
-          make install
+          make install_sw
 
       - name: Upload OpenSSL artifact
         uses: actions/upload-artifact@v4
         with:
           name: openssl-arm64
-          path: openssl/build/install
+          path: openssl/build/arm64
 
   # ============================
   # ② libcurl (arm64) をビルド
