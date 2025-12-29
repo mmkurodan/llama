@@ -53,18 +53,7 @@ public class MainActivity extends Activity {
             }
         };
 
-        // Ensure JavaVM is registered in native: call init("") on UI thread and display result
-        try {
-            appendMessage("Calling pre-init to register JVM...");
-            String preInit = llama.init(""); // modelPath empty; purpose: register JavaVM
-            appendMessage("pre-init result: " + preInit);
-        } catch (Throwable t) {
-            appendException("pre-init threw", t);
-            showToast("pre-init error: " + t.getMessage());
-            // proceed anyway to attempt download; native may still work
-        }
-
-        // Start download+init+generate sequence in background
+        // Start download+init+generate sequence in background (no pre-init)
         new Thread(() -> {
             try {
                 Thread.sleep(100); // allow UI to update
