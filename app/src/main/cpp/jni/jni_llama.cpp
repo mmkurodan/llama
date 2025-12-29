@@ -12,7 +12,10 @@
 #include "llama.h"
 #include <curl/curl.h>
 
-// ---------------- グローバル ----------------
+// ---------------- 
+
+
+グローバル ----------------
 static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
