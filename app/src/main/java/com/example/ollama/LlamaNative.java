@@ -13,6 +13,7 @@ public class LlamaNative {
     public native String download(String url, String path);
     public native String init(String modelPath);
     public native String generate(String prompt);
+    public native void free();
 
     // 新しく追加したネイティブ: JNI 側のログファイルパスを設定する
     public native void setLogPath(String path);
