@@ -5,19 +5,19 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 最適化・ポータビリティ
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fPIC")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -std=c++17")
+# 最適化
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
 
 # llama.cpp のルート
-set(LLAMA_ROOT_DIR        ${CMAKE_SOURCE_DIR}/llama)
-set(LLAMA_INCLUDE_DIR     ${LLAMA_ROOT_DIR}/include)
-set(LLAMA_SRC_DIR         ${LLAMA_ROOT_DIR}/src)
+set(LLAMA_ROOT_DIR    ${CMAKE_SOURCE_DIR}/llama)
+set(LLAMA_INCLUDE_DIR ${LLAMA_ROOT_DIR}/include)
+set(LLAMA_SRC_DIR     ${LLAMA_ROOT_DIR}/src)
 
 # ggml のルート
-set(GGML_ROOT_DIR         ${LLAMA_ROOT_DIR}/ggml)
-set(GGML_INCLUDE_DIR      ${GGML_ROOT_DIR}/include)
-set(GGML_SRC_DIR          ${GGML_ROOT_DIR}/src)
+set(GGML_ROOT_DIR     ${LLAMA_ROOT_DIR}/ggml)
+set(GGML_INCLUDE_DIR  ${GGML_ROOT_DIR}/include)
+set(GGML_SRC_DIR      ${GGML_ROOT_DIR}/src)
 
 add_library(
     llama_jni
@@ -57,7 +57,7 @@ target_include_directories(
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
 )
 
-# libcurl (mbedTLS 版を想定)
+# libcurl
 add_library(curl STATIC IMPORTED)
 set_target_properties(curl PROPERTIES
     IMPORTED_LOCATION
