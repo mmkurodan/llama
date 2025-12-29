@@ -21,11 +21,9 @@ add_library(
     # llama core
     ${LLAMA_ROOT_DIR}/llama.cpp
 
-    # ggml core
+    # ggml core (0.4.4 に存在するファイルのみ)
     ${LLAMA_ROOT_DIR}/ggml.c
     ${LLAMA_ROOT_DIR}/ggml-alloc.c
-    ${LLAMA_ROOT_DIR}/ggml-quants.c
-    ${LLAMA_ROOT_DIR}/ggml-cpu.c
 
     # quant kernels
     ${LLAMA_ROOT_DIR}/k_quants.c
