@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <fstream>
 
 #include <android/log.h>
 #define LOG_TAG "LLAMA_JNI"
@@ -11,7 +12,7 @@
 #include "llama.h"
 #include <curl/curl.h>
 
-// ---------------- グローバル ----------------
+// ---------------- OK グローバル ----------------
 static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
@@ -39,38 +40,10 @@ static void throw_java_exception(JNIEnv *env, const char *msg) {
 }
 
 // ---------------- download() 用 ----------------
-static size_t write_file(void *ptr, size_t size, size_t nmemb, void *stream) {
-    FILE *fp = (FILE *) stream;
-    return fwrite(ptr, size, nmemb, fp);
-}
-
-static std::string http_download(const std::string &url, const std::string &path) {
-    CURL *curl = curl_easy_init();
-    if (!curl) return "curl init failed";
-
-    FILE *fp = fopen(path.c_str(), "wb");
-    if (!fp) {
-        curl_easy_cleanup(curl);
-        return "file open failed";
-    }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/8.0");
-    
-    CURLcode res = curl_easy_perform(curl);
-    fclose(fp);
-    curl_easy_cleanup(curl);
-
-    if (res != CURLE_OK) {
-        return "download failed";
-    }
-    return "ok";
+static size_t write_data(void* ptr, size_t size, size_t nmemb, void* userdata) {
+    std::ofstream* ofs = reinterpret_cast<std::ofstream*>(userdata);
+    ofs->write(reinterpret_cast<const char*>(ptr), size * nmemb);
+    return size * nmemb;
 }
 
 // ---------------- 解放 ----------------
@@ -96,15 +69,67 @@ static void llama_jni_free() {
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_example_ollama_LlamaNative_download(
-        JNIEnv *env, jobject /*thiz*/,
-        jstring jUrl,
-        jstring jPath
-) {
-    std::string url  = jstring_to_std(env, jUrl);
-    std::string path = jstring_to_std(env, jPath);
+        JNIEnv* env,
+        jobject /*thiz*/,
+        jstring jurl,
+        jstring jpath) {
 
-    std::string result = http_download(url, path);
-    return env->NewStringUTF(result.c_str());
+    const char* url  = env->GetStringUTFChars(jurl,  nullptr);
+    const char* path = env->GetStringUTFChars(jpath, nullptr);
+
+    if (!url || !path) {
+        if (url)  env->ReleaseStringUTFChars(jurl, url);
+        if (path) env->ReleaseStringUTFChars(jpath, path);
+        return env->NewStringUTF("invalid args");
+    }
+
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        env->ReleaseStringUTFChars(jurl,  url);
+        env->ReleaseStringUTFChars(jpath, path);
+        return env->NewStringUTF("curl init failed");
+    }
+
+    std::ofstream ofs(path, std::ios::binary);
+    if (!ofs) {
+        env->ReleaseStringUTFChars(jurl,  url);
+        env->ReleaseStringUTFChars(jpath, path);
+        curl_easy_cleanup(curl);
+        return env->NewStringUTF("file open failed");
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
+
+    // ----------------------------------------------------
+    // huggingface.co のときだけ SSL 検証を無効化
+    // ----------------------------------------------------
+    std::string surl(url);
+
+    if (surl.rfind("https://huggingface.co/", 0) == 0) {
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
+
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,
+        "Mozilla/5.0 (Linux; Android 14; Mobile) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Mobile Safari/537.36");
+
+    CURLcode res = curl_easy_perform(curl);
+
+    env->ReleaseStringUTFChars(jurl,  url);
+    env->ReleaseStringUTFChars(jpath, path);
+    curl_easy_cleanup(curl);
+    ofs.close();
+
+    if (res != CURLE_OK) {
+        return env->NewStringUTF("curl download failed");
+    }
+
+    return env->NewStringUTF("ok");
 }
 
 // ---------------- JNI: init ----------------
