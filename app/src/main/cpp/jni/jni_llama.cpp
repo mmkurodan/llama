@@ -146,8 +146,8 @@ static void llama_jni_free() {
         log_to_file("Context freed");
     }
     if (g_model) {
-        // free model
-        llama_free_model(g_model);
+        // free model (use new API: llama_model_free)
+        llama_model_free(g_model);
         g_model = nullptr;
         log_to_file("Model freed");
     }
@@ -372,17 +372,17 @@ Java_com_example_ollama_LlamaNative_init(
         log_to_file("init: JavaVM stored");
     }
 
-    // llama_backend_init requires a bool numa parameter in this header
-    llama_backend_init(false);
+    // llama_backend_init no longer takes parameters in gguf-0.17.1
+    llama_backend_init();
     log_to_file("init: backend init");
 
     llama_model_params mparams = llama_model_default_params();
 
-    // time the model load
+    // time the model load (use new API: llama_model_load_from_file)
     {
         using namespace std::chrono;
         auto t0 = high_resolution_clock::now();
-        g_model = llama_load_model_from_file(model_path.c_str(), mparams);
+        g_model = llama_model_load_from_file(model_path.c_str(), mparams);
         auto t1 = high_resolution_clock::now();
         auto ms = duration_cast<milliseconds>(t1 - t0).count();
 
@@ -403,11 +403,11 @@ Java_com_example_ollama_LlamaNative_init(
     cparams.n_batch         = g_n_batch;
     cparams.n_threads_batch = g_n_threads;
 
-    // create context with model (time it as well)
+    // create context with model (time it as well, use new API: llama_init_from_model)
     {
         using namespace std::chrono;
         auto t0 = high_resolution_clock::now();
-        g_ctx = llama_new_context_with_model(g_model, cparams);
+        g_ctx = llama_init_from_model(g_model, cparams);
         auto t1 = high_resolution_clock::now();
         auto ms = duration_cast<milliseconds>(t1 - t0).count();
 
@@ -458,17 +458,21 @@ Java_com_example_ollama_LlamaNative_generate(
     llama_kv_cache_tokens_rm(g_ctx, 0, -1);
     log_to_file("generate: kv cache cleared");
 
-    // ---- トークナイズ（ヘッダ仕様）----
+    // ---- トークナイズ（ヘッダ仕様、vocab-based API）----
     std::vector<llama_token> tokens;
     tokens.resize(g_n_ctx);
 
+    // Get vocab from model (new API requirement)
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    
     int32_t n_tokens = llama_tokenize(
-            g_model,
+            vocab,
             prompt.c_str(),
             (int)prompt.size(),
             tokens.data(),
             (int)tokens.size(),
-            true
+            true,  // add_special
+            false  // parse_special
     );
 
     if (n_tokens <= 0) {
@@ -484,84 +488,68 @@ Java_com_example_ollama_LlamaNative_generate(
 
     tokens.resize(n_tokens);
 
-    int n_past = 0;
     std::string output;
     output.reserve(max_tokens * 4);
 
-    // ---- プロンプト投入（1トークンずつ llama_eval を使用）----
-    for (int i = 0; i < n_tokens; ++i) {
-        llama_token tok = tokens[i];
-        // llama_eval is available (deprecated in header but present)
-        if (llama_eval(g_ctx, &tok, 1, n_past) != 0) {
-            log_to_file("generate: eval failed (prompt)");
-            return env->NewStringUTF("eval failed (prompt)");
+    // ---- プロンプト投入（batch API を使用）----
+    // Process prompt tokens using batch API
+    {
+        llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
+        if (llama_decode(g_ctx, batch) != 0) {
+            log_to_file("generate: decode failed (prompt)");
+            return env->NewStringUTF("decode failed (prompt)");
         }
-        ++n_past;
-
-        // ログ：進捗（プロンプト投入）
-        {
-            std::ostringstream ss;
-            ss << "generate: prompt token " << i << " id=" << (int)tok << " n_past=" << n_past;
-            log_to_file(ss.str());
-        }
+        
+        log_to_file("generate: prompt processed with batch decode");
     }
 
-    // ---- 生成ループ ----
+    // ---- 生成ループ（新しいsampler APIを使用）----
+    // Get vocab for token operations
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    const int n_vocab = llama_vocab_n_tokens(vocab);
+    
+    // Create sampler chain for generation
+    llama_sampler * smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_top_k));
+    llama_sampler_chain_add(smpl, llama_sampler_init_top_p(g_top_p, 1));
+    llama_sampler_chain_add(smpl, llama_sampler_init_temp(g_temp));
+    llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    
+    log_to_file("generate: sampler chain initialized");
+    
     for (int i = 0; i < max_tokens; ++i) {
-        // After last eval, get logits for last token
-        float * logits = llama_get_logits(g_ctx);
-        if (!logits) {
-            log_to_file("generate: no logits");
-            return env->NewStringUTF("no logits");
-        }
-
-        const int n_vocab = llama_n_vocab(g_model);
-        if (n_vocab <= 0) {
-            log_to_file("generate: invalid vocab size");
-            return env->NewStringUTF("invalid vocab size");
-        }
-
-        // build candidates
-        std::vector<llama_token_data> cand_data;
-        cand_data.resize((size_t)n_vocab);
-        for (int t = 0; t < n_vocab; ++t) {
-            cand_data[(size_t)t].id = (llama_token)t;
-            cand_data[(size_t)t].logit = logits[t];
-            cand_data[(size_t)t].p = 0.0f;
-        }
-        llama_token_data_array candidates = { cand_data.data(), (size_t)n_vocab, false };
-
-        // apply sampling steps (softmax -> top_k -> top_p -> temp)
-        llama_sample_softmax(g_ctx, &candidates);
-        llama_sample_top_k(g_ctx, &candidates, g_top_k, 1);
-        llama_sample_top_p(g_ctx, &candidates, g_top_p, 1);
-        llama_sample_temp(g_ctx, &candidates, g_temp);
-
-        // pick token
-        llama_token id = llama_sample_token(g_ctx, &candidates);
+        // Get logits for the last token (index -1 means last position)
+        const llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
+        
+        // Accept the token
+        llama_sampler_accept(smpl, id);
 
         // check eos
-        if (id == llama_token_eos(g_ctx)) {
+        if (llama_vocab_is_eog(vocab, id)) {
             log_to_file("generate: reached EOS");
             break;
         }
 
-        // token -> piece (ヘッダのシグニチャに合わせる)
+        // token -> piece (vocab-based API with lstrip parameter)
         int32_t n_chars = llama_token_to_piece(
-                g_model,
+                vocab,
                 id,
                 nullptr,
-                0
+                0,
+                0,      // lstrip
+                false   // special
         );
 
         if (n_chars > 0) {
             std::string piece;
             piece.resize(n_chars);
             llama_token_to_piece(
-                    g_model,
+                    vocab,
                     id,
                     piece.data(),
-                    n_chars
+                    n_chars,
+                    0,      // lstrip
+                    false   // special
             );
             output += piece;
 
@@ -577,13 +565,17 @@ Java_com_example_ollama_LlamaNative_generate(
             log_to_file(ss.str());
         }
 
-        // feed token into model for next step
-        if (llama_eval(g_ctx, &id, 1, n_past) != 0) {
-            log_to_file("generate: eval failed (generation)");
-            return env->NewStringUTF("eval failed (generation)");
+        // feed token into model for next step using batch API
+        llama_batch batch = llama_batch_get_one(&id, 1);
+        if (llama_decode(g_ctx, batch) != 0) {
+            log_to_file("generate: decode failed (generation)");
+            llama_sampler_free(smpl);
+            return env->NewStringUTF("decode failed (generation)");
         }
-        ++n_past;
     }
+    
+    // Free the sampler chain
+    llama_sampler_free(smpl);
 
     {
         std::ostringstream ss;
@@ -594,7 +586,8 @@ Java_com_example_ollama_LlamaNative_generate(
     return env->NewStringUTF(output.c_str());
 }
 
-// ---------------- JNI: free ----------------nextern "C"
+// ---------------- JNI: free ----------------
+extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ollama_LlamaNative_free(
         JNIEnv *env, jobject /*thiz*/
