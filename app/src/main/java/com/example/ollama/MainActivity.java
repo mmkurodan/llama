@@ -37,9 +37,8 @@ public class MainActivity extends AppCompatActivity {
         // Register download progress listener before starting download
         progressListener = new LlamaNative.DownloadProgressListener() {
             @Override
-            public void onProgress(final long downloaded, final long total) {
-                // Calculate percent safely
-                final int percent = (total > 0) ? (int) ((downloaded * 100) / total) : 0;
+            public void onProgress(float progress) {
+                final int percent = (int) (progress * 100);
 
                 // Update TextView on UI thread
                 runOnUiThread(new Runnable() {
@@ -60,16 +59,19 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 try {
-                    // Assuming LlamaNative.downloadModel blocks until complete
-                    LlamaNative.downloadModel(modelName);
+                    // Call the Java wrapper that delegates to the native download function
+                    int status = LlamaNative.downloadModel(modelName);
 
-                    // On successful completion ensure UI shows 100%
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (tv != null) tv.setText("100%");
-                        }
-                    });
+                    if (status == 0) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (tv != null) tv.setText("100%");
+                            }
+                        });
+                    } else {
+                        throw new RuntimeException("downloadModel returned status " + status);
+                    }
                 } catch (final Exception e) {
                     Log.e(TAG, "Download failed", e);
                     runOnUiThread(new Runnable() {
