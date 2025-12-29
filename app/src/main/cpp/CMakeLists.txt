@@ -10,7 +10,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
 
 # llama.cpp のルート（gguf-0.17.1）
 set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
-set(GGML_ROOT_DIR ${CMAKE_SOURCE_DIR}/ggml)
+set(GGML_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama/ggml)
 
 # Collect all llama source files from src directory
 file(GLOB LLAMA_SOURCES
