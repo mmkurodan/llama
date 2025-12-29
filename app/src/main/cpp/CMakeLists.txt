@@ -8,8 +8,25 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
 
-# llama.cpp のルート（gguf-v0.4.4）
+# llama.cpp のルート（gguf-0.17.1）
 set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
+
+# Collect all llama source files from src directory
+file(GLOB LLAMA_SOURCES
+    ${LLAMA_ROOT_DIR}/src/*.cpp
+)
+
+# Collect ggml source files
+set(GGML_SOURCES
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml.c
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-alloc.c
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-backend.cpp
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-quants.c
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-cpu/ggml-cpu.cpp
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-cpu/ggml-cpu-traits.cpp
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-cpu/ggml-cpu-aarch64.cpp
+    ${LLAMA_ROOT_DIR}/ggml/src/ggml-cpu/quants.c
+)
 
 add_library(
     llama_jni
@@ -18,21 +35,20 @@ add_library(
     # JNI
     jni/jni_llama.cpp
 
-    # llama core
-    ${LLAMA_ROOT_DIR}/llama.cpp
-
-    # ggml core (0.4.4 に存在するファイルのみ)
-    ${LLAMA_ROOT_DIR}/ggml.c
-    ${LLAMA_ROOT_DIR}/ggml-alloc.c
-
-    # quant kernels
-    ${LLAMA_ROOT_DIR}/k_quants.c
+    # llama core sources
+    ${LLAMA_SOURCES}
+    
+    # ggml core sources
+    ${GGML_SOURCES}
 )
 
 target_include_directories(
     llama_jni
     PRIVATE
-    ${LLAMA_ROOT_DIR}
+    ${LLAMA_ROOT_DIR}/include
+    ${LLAMA_ROOT_DIR}/src
+    ${LLAMA_ROOT_DIR}/ggml/include
+    ${LLAMA_ROOT_DIR}/ggml/src
 
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
@@ -55,7 +71,7 @@ set_target_properties(mbedtls PROPERTIES
 add_library(mbedcrypto STATIC IMPORTED)
 set_target_properties(mbedcrypto PROPERTIES
     IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedcrypto.a
+        ${CMAKE_SOURCE_DIR}/third_party/mbedcrypto/lib/libmbedcrypto.a
 )
 
 add_library(mbedx509 STATIC IMPORTED)
