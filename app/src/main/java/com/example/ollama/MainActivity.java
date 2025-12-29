@@ -8,11 +8,13 @@ import java.io.File;
 
 public class MainActivity extends Activity {
 
+    private TextView tv;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        TextView tv = new TextView(this);
+        tv = new TextView(this);
         tv.setText("Starting...");
         tv.setTextSize(16);
         setContentView(tv);
@@ -26,7 +28,19 @@ public class MainActivity extends Activity {
             File modelFile = new File(dir, "tinyllama.gguf");
             String modelPath = modelFile.getAbsolutePath();
 
-            LlamaNative llama = new LlamaNative();
+            // Use a subclass so we can receive onDownloadProgress callbacks
+            LlamaNative llama = new LlamaNative() {
+                @Override
+                public void onDownloadProgress(final int percent) {
+                    runOnUiThread(() -> tv.setText("Download progress: " + percent + "%"));
+                }
+            };
+
+            // Call init("") to register JavaVM in native code (native init stores JavaVM).
+            // The return value will be ignored here because model isn't available yet.
+            llama.init("");
+
+            runOnUiThread(() -> tv.setText("Starting download..."));
 
             String dlResult = llama.download(url, modelPath);
 
@@ -34,6 +48,7 @@ public class MainActivity extends Activity {
             if (!"ok".equals(dlResult)) {
                 result = "Download failed: " + dlResult;
             } else {
+                // After download, initialize with actual model path to load the model
                 result = llama.init(modelPath);
 
                 // 推論テスト
