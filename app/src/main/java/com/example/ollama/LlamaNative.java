@@ -14,6 +14,9 @@ public class LlamaNative {
     public native String init(String modelPath);
     public native String generate(String prompt);
 
+    // 新しく追加したネイティブ: JNI 側のログファイルパスを設定する
+    public native void setLogPath(String path);
+
     // Called from native code to deliver download progress (0-100)
     // Implement UI dispatching here if needed (e.g. post to main thread)
     public void onDownloadProgress(int percent) {
