@@ -5,8 +5,6 @@
 #include "ggml.h"
 #include <limits> // For std::numeric_limits
 
-#define SYCL_GLU_BLOCK_SIZE 256
-
 template <typename T>
 T neg_infinity() {
     return -std::numeric_limits<T>::infinity();
@@ -43,8 +41,6 @@ void ggml_sycl_silu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_gelu_quick(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
-void ggml_sycl_swiglu_oai(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-
 void ggml_sycl_gelu_erf(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_tanh(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
@@ -71,6 +67,8 @@ void ggml_sycl_sqr(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_upscale(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
+void ggml_sycl_pad(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
+
 void ggml_sycl_clamp(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 void ggml_sycl_sgn(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
@@ -82,13 +80,5 @@ void ggml_sycl_elu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 void ggml_sycl_geglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 void ggml_sycl_reglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 void ggml_sycl_swiglu(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-void ggml_sycl_geglu_erf(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-void ggml_sycl_geglu_quick(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-void ggml_sycl_floor(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-void ggml_sycl_ceil(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-void ggml_sycl_round(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-void ggml_sycl_trunc(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
-
-void ggml_sycl_arange(ggml_backend_sycl_context & ctx, ggml_tensor * dst);
 
 #endif // GGML_SYCL_ELEMENTWISE_HPP
