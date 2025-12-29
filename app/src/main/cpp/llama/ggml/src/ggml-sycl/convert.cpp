@@ -2,13 +2,6 @@
 #include "dequantize.hpp"
 #include "presets.hpp"
 
-#if defined(__INTEL_LLVM_COMPILER)
-    #if __has_include(<sycl/ext/oneapi/bfloat16.hpp>)
-        #include <sycl/ext/oneapi/bfloat16.hpp>
-        #define GGML_SYCL_HAS_BF16
-    #endif
-#endif
-
 template <int qk, int qr, dequantize_kernel_t dequantize_kernel, typename dst_t>
 static void dequantize_block(const void * __restrict__ vx, dst_t * __restrict__ y, const int64_t k,
                              const sycl::nd_item<3> &item_ct1) {
@@ -40,14 +33,11 @@ static void dequantize_block_sycl(const void *__restrict__ vx,
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
-        stream->parallel_for(
-            sycl::nd_range<3>(
-                sycl::range<3>(1, 1, num_blocks) *
-                    sycl::range<3>(1, 1, SYCL_DEQUANTIZE_BLOCK_SIZE),
-                sycl::range<3>(1, 1, SYCL_DEQUANTIZE_BLOCK_SIZE)),
-            [=](sycl::nd_item<3> item_ct1) {
-                dequantize_block<qk, qr, dequantize_kernel>(vx, y, k, item_ct1);
-            });
+        sycl_parallel_for(
+            stream,
+            sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) * sycl::range<3>(1, 1, SYCL_DEQUANTIZE_BLOCK_SIZE),
+                              sycl::range<3>(1, 1, SYCL_DEQUANTIZE_BLOCK_SIZE)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block<qk, qr, dequantize_kernel>(vx, y, k, item_ct1); });
     }
 }
 
@@ -60,24 +50,18 @@ static void dequantize_row_q2_K_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 64),
-                                               sycl::range<3>(1, 1, 64)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q2_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 64), sycl::range<3>(1, 1, 64)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q2_K(vx, y, item_ct1); });
     }
 #else
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q2_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q2_K(vx, y, item_ct1); });
     }
 
 #endif
@@ -92,24 +76,18 @@ static void dequantize_row_q3_K_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 64),
-                                               sycl::range<3>(1, 1, 64)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q3_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 64), sycl::range<3>(1, 1, 64)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q3_K(vx, y, item_ct1); });
     }
 #else
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q3_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q3_K(vx, y, item_ct1); });
     }
 #endif
 }
@@ -123,12 +101,9 @@ static void dequantize_row_q4_0_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q4_0(vx, y, nb32, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q4_0(vx, y, nb32, item_ct1); });
     }
 }
 
@@ -142,13 +117,12 @@ static void dequantize_row_q4_0_sycl_reorder(const void *vx, dst_t *y, const int
     int constexpr WARP_K = WARP_SIZE * QK4_0;
     const int n_warp = (k + WARP_K - 1) / WARP_K;
     GGML_ASSERT(k % 2 == 0);
-    stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, n_warp) *
-        sycl::range<3>(1, 1, WARP_SIZE),
-        sycl::range<3>(1, 1, WARP_SIZE)),
-        [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]]{
-            dequantize_block_q4_0_reorder(vx, y, k, item_ct1);
-        });
-
+    sycl_parallel_for(stream,
+                      sycl::nd_range<3>(sycl::range<3>(1, 1, n_warp) * sycl::range<3>(1, 1, WARP_SIZE),
+                                        sycl::range<3>(1, 1, WARP_SIZE)),
+                      [=](sycl::nd_item<3> item_ct1) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+                          dequantize_block_q4_0_reorder(vx, y, k, item_ct1);
+                      });
 }
 
 template <typename dst_t>
@@ -160,12 +134,9 @@ static void dequantize_row_q4_1_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q4_1(vx, y, nb32, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q4_1(vx, y, nb32, item_ct1); });
     }
 }
 
@@ -178,14 +149,13 @@ static void dequantize_row_q4_K_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
+        sycl_launch(stream, [&](sycl::handler & cgh) {
             sycl::local_accessor<uint8_t, 1> scale_local_acc(sycl::range<1>(12), cgh);
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q4_K(vx, y, get_pointer(scale_local_acc), item_ct1);
-                             });
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) {
+                    dequantize_block_q4_K(vx, y, get_pointer(scale_local_acc), item_ct1);
+                });
         });
     }
 }
@@ -198,13 +168,13 @@ static void dequantize_row_q4_K_sycl_reorder(const void * vx, dst_t * y, const i
 
     dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
 
-    stream->submit([&](sycl::handler & cgh) {
+    sycl_launch(stream, [&](sycl::handler & cgh) {
         sycl::local_accessor<uint8_t, 1> scale_local_acc(sycl::range<1>(12), cgh);
 
-        cgh.parallel_for(sycl::nd_range<1>(sycl::range<1>(global_size), sycl::range<1>(local_size)),
-                         [=](sycl::nd_item<1> item_ct1) {
-                             dequantize_block_q4_K_reorder(vx, y, get_pointer(scale_local_acc), item_ct1, nb);
-                         });
+        sycl_parallel_for<1>(cgh, sycl::nd_range<1>(sycl::range<1>(global_size), sycl::range<1>(local_size)),
+                             [=](sycl::nd_item<1> item_ct1) {
+                                 dequantize_block_q4_K_reorder(vx, y, get_pointer(scale_local_acc), item_ct1, nb);
+                             });
     });
 }
 
@@ -217,24 +187,18 @@ static void dequantize_row_q5_K_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 64),
-                                               sycl::range<3>(1, 1, 64)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q5_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 64), sycl::range<3>(1, 1, 64)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q5_K(vx, y, item_ct1); });
     }
 #else
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q5_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q5_K(vx, y, item_ct1); });
     }
 
 #endif
@@ -249,24 +213,18 @@ static void dequantize_row_q6_K_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 64),
-                                               sycl::range<3>(1, 1, 64)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q6_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 64), sycl::range<3>(1, 1, 64)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q6_K(vx, y, item_ct1); });
     }
 #else
     {
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_q6_K(vx, y, item_ct1);
-                             });
+        sycl_parallel_for(
+            stream, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+            [=](sycl::nd_item<3> item_ct1) { dequantize_block_q6_K(vx, y, item_ct1); });
     }
 
 #endif
@@ -278,9 +236,9 @@ static void dequantize_row_q6_K_sycl_reorder(const void * vx, dst_t * y, const i
 
     dpct::has_capability_or_fail(stream->get_device(), { sycl::aspect::fp16 });
 
-    stream->parallel_for(
-        sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 64), sycl::range<3>(1, 1, 64)),
-        [=](sycl::nd_item<3> item_ct1) { dequantize_block_q6_K_reorder(vx, y, item_ct1, nb); });
+    sycl_parallel_for(stream,
+                      sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 64), sycl::range<3>(1, 1, 64)),
+                      [=](sycl::nd_item<3> item_ct1) { dequantize_block_q6_K_reorder(vx, y, item_ct1, nb); });
 }
 
 template <typename dst_t>
@@ -291,15 +249,10 @@ static void dequantize_row_iq1_s_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq1_s(
-                                     vx, y, item_ct1, iq1s_grid_gpu
-                                     );
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) { dequantize_block_iq1_s(vx, y, item_ct1, iq1s_grid_gpu); });
         });
     }
 }
@@ -312,15 +265,10 @@ static void dequantize_row_iq1_m_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq1_m(
-                                     vx, y, item_ct1, iq1s_grid_gpu
-                                     );
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) { dequantize_block_iq1_m(vx, y, item_ct1, iq1s_grid_gpu); });
         });
     }
 }
@@ -333,15 +281,12 @@ static void dequantize_row_iq2_xxs_sycl(const void *vx, dst_t *y, const int64_t 
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq2_xxs(
-                                     vx, y, item_ct1, iq2xxs_grid,
-                                     ksigns_iq2xs, kmask_iq2xs);
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) {
+                    dequantize_block_iq2_xxs(vx, y, item_ct1, iq2xxs_grid, ksigns_iq2xs, kmask_iq2xs);
+                });
         });
     }
 }
@@ -354,15 +299,12 @@ static void dequantize_row_iq2_xs_sycl(const void *vx, dst_t *y, const int64_t k
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq2_xs(
-                                     vx, y, item_ct1, iq2xs_grid,
-                                     ksigns_iq2xs, kmask_iq2xs);
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) {
+                    dequantize_block_iq2_xs(vx, y, item_ct1, iq2xs_grid, ksigns_iq2xs, kmask_iq2xs);
+                });
         });
     }
 }
@@ -375,13 +317,10 @@ static void dequantize_row_iq2_s_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq2_s(vx, y, item_ct1);
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) { dequantize_block_iq2_s(vx, y, item_ct1); });
         });
     }
 }
@@ -395,15 +334,12 @@ static void dequantize_row_iq3_xxs_sycl(const void *vx, dst_t *y, const int64_t 
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq3_xxs(
-                                     vx, y, item_ct1, iq3xxs_grid,
-                                     ksigns_iq2xs, kmask_iq2xs);
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) {
+                    dequantize_block_iq3_xxs(vx, y, item_ct1, iq3xxs_grid, ksigns_iq2xs, kmask_iq2xs);
+                });
         });
     }
 }
@@ -416,14 +352,10 @@ static void dequantize_row_iq3_s_sycl(const void *vx, dst_t *y, const int64_t k,
         dpct::has_capability_or_fail(stream->get_device(),
                                      {sycl::aspect::fp16});
 
-        stream->submit([&](sycl::handler &cgh) {
-            cgh.parallel_for(sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                                   sycl::range<3>(1, 1, 32),
-                                               sycl::range<3>(1, 1, 32)),
-                             [=](sycl::nd_item<3> item_ct1) {
-                                 dequantize_block_iq3_s(
-                                     vx, y, item_ct1, kmask_iq2xs, iq3s_grid);
-                             });
+        sycl_launch(stream, [&](sycl::handler & cgh) {
+            sycl_parallel_for(
+                cgh, sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                [=](sycl::nd_item<3> item_ct1) { dequantize_block_iq3_s(vx, y, item_ct1, kmask_iq2xs, iq3s_grid); });
         });
     }
 }
@@ -439,14 +371,11 @@ static void dequantize_row_iq4_xs_sycl(const void *vx, dst_t *y, const int64_t k
             dpct::has_capability_or_fail(stream->get_device(),
                                          {sycl::aspect::fp16});
 
-            stream->submit([&](sycl::handler &cgh) {
-                  cgh.parallel_for(
-                      sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                            sycl::range<3>(1, 1, 32),
-                                        sycl::range<3>(1, 1, 32)),
-                      [=](sycl::nd_item<3> item_ct1) {
-                            dequantize_block_iq4_xs(vx, y, item_ct1);
-                      });
+            sycl_launch(stream, [&](sycl::handler & cgh) {
+                sycl_parallel_for(
+                    cgh,
+                    sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                    [=](sycl::nd_item<3> item_ct1) { dequantize_block_iq4_xs(vx, y, item_ct1); });
             });
       }
 #endif
@@ -460,26 +389,13 @@ static void dequantize_row_iq4_nl_sycl(const void *vx, dst_t *y, const int64_t k
             dpct::has_capability_or_fail(stream->get_device(),
                                          {sycl::aspect::fp16});
 
-            stream->submit([&](sycl::handler &cgh) {
-                  cgh.parallel_for(
-                      sycl::nd_range<3>(sycl::range<3>(1, 1, nb) *
-                                            sycl::range<3>(1, 1, 32),
-                                        sycl::range<3>(1, 1, 32)),
-                      [=](sycl::nd_item<3> item_ct1) {
-                            dequantize_block_iq4_nl(vx, y, item_ct1);
-                      });
+            sycl_launch(stream, [&](sycl::handler & cgh) {
+                sycl_parallel_for(
+                    cgh,
+                    sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
+                    [=](sycl::nd_item<3> item_ct1) { dequantize_block_iq4_nl(vx, y, item_ct1); });
             });
       }
-}
-
-template <typename dst_t>
-static void dequantize_row_mxfp4_sycl(const void * vx, dst_t * y, const int64_t k, dpct::queue_ptr stream) {
-    const int nb = (k + QK_K - 1) / QK_K;
-    stream->parallel_for(
-        sycl::nd_range<3>(sycl::range<3>(1, 1, nb) * sycl::range<3>(1, 1, 32), sycl::range<3>(1, 1, 32)),
-        [=](sycl::nd_item<3> item_ct1) {
-            dequantize_block_mxfp4(vx, y, item_ct1);
-        });
 }
 
 template <typename src_t, typename dst_t>
@@ -527,7 +443,6 @@ template <typename src_t, typename dst_t>
 static void convert_unary_sycl(const void * vx, dst_t * y, const int64_t k, dpct::queue_ptr queue) {
     convert_unary_nc_sycl<src_t>(vx, y, k, 1, 1, 1, k, k, k, queue);
 }
-
 
 to_fp16_sycl_t ggml_get_to_fp16_sycl(ggml_type type, ggml_tensor * dst) {
     switch (type) {
@@ -582,14 +497,8 @@ to_fp16_sycl_t ggml_get_to_fp16_sycl(ggml_type type, ggml_tensor * dst) {
             return dequantize_row_iq4_xs_sycl;
         case GGML_TYPE_IQ4_NL:
             return dequantize_row_iq4_nl_sycl;
-        case GGML_TYPE_MXFP4:
-            return dequantize_row_mxfp4_sycl;
         case GGML_TYPE_F32:
             return convert_unary_sycl<float>;
-#ifdef GGML_SYCL_HAS_BF16
-        case GGML_TYPE_BF16:
-            return convert_unary_sycl<sycl::ext::oneapi::bfloat16>;
-#endif
         default:
             return nullptr;
     }
@@ -649,14 +558,8 @@ to_fp32_sycl_t ggml_get_to_fp32_sycl(ggml_type type, ggml_tensor *dst) {
             return dequantize_row_iq4_xs_sycl;
         case GGML_TYPE_IQ4_NL:
             return dequantize_row_iq4_nl_sycl;
-        case GGML_TYPE_MXFP4:
-            return dequantize_row_mxfp4_sycl;
         case GGML_TYPE_F16:
             return convert_unary_sycl<sycl::half>;
-#ifdef GGML_SYCL_HAS_BF16
-        case GGML_TYPE_BF16:
-            return convert_unary_sycl<sycl::ext::oneapi::bfloat16>;
-#endif
         default:
             return nullptr;
     }
@@ -666,10 +569,6 @@ to_fp16_nc_sycl_t get_to_fp16_nc_sycl(ggml_type type) {
     switch (type) {
         case GGML_TYPE_F32:
             return convert_unary_nc_sycl<float>;
-#ifdef GGML_SYCL_HAS_BF16
-        case GGML_TYPE_BF16:
-            return convert_unary_nc_sycl<sycl::ext::oneapi::bfloat16>;
-#endif
         default:
             return nullptr;
     }
