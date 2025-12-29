@@ -5,19 +5,11 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 最適化
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
 
-# llama.cpp のルート
-set(LLAMA_ROOT_DIR    ${CMAKE_SOURCE_DIR}/llama)
-set(LLAMA_INCLUDE_DIR ${LLAMA_ROOT_DIR}/include)
-set(LLAMA_SRC_DIR     ${LLAMA_ROOT_DIR}/src)
-
-# ggml のルート
-set(GGML_ROOT_DIR     ${LLAMA_ROOT_DIR}/ggml)
-set(GGML_INCLUDE_DIR  ${GGML_ROOT_DIR}/include)
-set(GGML_SRC_DIR      ${GGML_ROOT_DIR}/src)
+# llama.cpp のルート（0.4.4）
+set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
 
 add_library(
     llama_jni
@@ -27,32 +19,25 @@ add_library(
     jni/jni_llama.cpp
 
     # llama.cpp 本体
-    ${LLAMA_SRC_DIR}/llama.cpp
-    ${LLAMA_SRC_DIR}/models/llama.cpp
+    ${LLAMA_ROOT_DIR}/llama.cpp
+    ${LLAMA_ROOT_DIR}/models/llama.cpp
 
     # ggml core
-    ${GGML_SRC_DIR}/ggml.c
-    ${GGML_SRC_DIR}/ggml-alloc.c
-    ${GGML_SRC_DIR}/ggml-quants.c
+    ${LLAMA_ROOT_DIR}/ggml.c
+    ${LLAMA_ROOT_DIR}/ggml-alloc.c
+    ${LLAMA_ROOT_DIR}/ggml-quants.c
+    ${LLAMA_ROOT_DIR}/ggml-cpu.c
 
-    # ggml CPU backend
-    ${GGML_SRC_DIR}/ggml-cpu/ggml-cpu.c
+    # quantization
+    ${LLAMA_ROOT_DIR}/k_quants.c
 )
 
 target_include_directories(
     llama_jni
     PRIVATE
+    ${LLAMA_ROOT_DIR}
+    ${LLAMA_ROOT_DIR}/models
 
-    # llama.cpp
-    ${LLAMA_INCLUDE_DIR}
-    ${LLAMA_SRC_DIR}
-    ${LLAMA_SRC_DIR}/models
-
-    # ggml
-    ${GGML_INCLUDE_DIR}
-    ${GGML_SRC_DIR}
-
-    # third_party
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
 )
