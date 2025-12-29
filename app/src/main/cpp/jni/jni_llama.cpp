@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <cerrno>
 #include <cstring>
+#include <cctype>
 
 #include <android/log.h>
 #define LOG_TAG "LLAMA_JNI"
@@ -337,6 +338,32 @@ Java_com_example_ollama_LlamaNative_init(
         }
     }
 
+    // Dump first up to 64 bytes of file header (hex + ascii) for debugging
+    {
+        std::ifstream ifh(model_path, std::ios::binary);
+        if (ifh) {
+            char hdr_buf[64];
+            ifh.read(hdr_buf, sizeof(hdr_buf));
+            std::streamsize got = ifh.gcount();
+            std::ostringstream ss;
+            ss << "init: header(" << got << "):";
+            ss << std::hex << std::setfill('0');
+            for (std::streamsize i = 0; i < got; ++i) {
+                ss << ' ' << std::setw(2) << (static_cast<unsigned int>(static_cast<unsigned char>(hdr_buf[i])));
+            }
+            ss << " | ";
+            for (std::streamsize i = 0; i < got; ++i) {
+                unsigned char c = static_cast<unsigned char>(hdr_buf[i]);
+                ss << (std::isprint(c) ? static_cast<char>(c) : '.');
+            }
+            log_to_file(ss.str());
+        } else {
+            std::ostringstream ss;
+            ss << "init: header dump failed to open file: " << model_path;
+            log_to_file(ss.str());
+        }
+    }
+
     // store JavaVM for progress callback threads
     if (env->GetJavaVM(&g_jvm) != JNI_OK) {
         g_jvm = nullptr;
@@ -567,8 +594,7 @@ Java_com_example_ollama_LlamaNative_generate(
     return env->NewStringUTF(output.c_str());
 }
 
-// ---------------- JNI: free ----------------
-extern "C"
+// ---------------- JNI: free ----------------nextern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ollama_LlamaNative_free(
         JNIEnv *env, jobject /*thiz*/
