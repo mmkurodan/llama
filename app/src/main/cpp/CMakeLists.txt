@@ -8,29 +8,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
 
-# LLAMA_ROOT_DIR (points to app/src/main/cpp/llama)
+# llama.cpp root
 set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
-set(GGML_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama/ggml)
+set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 
-# ------------------------------------------------------------------
-# Collect only the implementation files that actually exist in the
-# repository layout under app/src/main/cpp/llama.
-# We intentionally ignore any previous (incorrect) file lists.
-# If additional implementation files are required by build errors,
-# add them explicitly here.
-# ------------------------------------------------------------------
-
-# Root-level llama implementation files (e.g. llama.cpp)
+# ---------------------------------------------------------
+# llama core sources
+# ---------------------------------------------------------
 file(GLOB LLAMA_ROOT_FILES
     ${LLAMA_ROOT_DIR}/*.cpp
 )
 
-# common implementation files used by core
 file(GLOB LLAMA_COMMON_FILES
     ${LLAMA_ROOT_DIR}/common/*.cpp
 )
 
-# src implementations (if present)
 file(GLOB LLAMA_SRC_FILES
     ${LLAMA_ROOT_DIR}/src/*.cpp
 )
@@ -41,49 +33,56 @@ set(LLAMA_SOURCES
     ${LLAMA_SRC_FILES}
 )
 
-# ------------------------------------------------------------------
-# Collect ggml sources that exist under llama/ggml/src
-# Allow both .c and .cpp files and cpu/ subdir implementations.
-# ------------------------------------------------------------------
-file(GLOB GGML_C_SOURCES
-    ${GGML_ROOT_DIR}/src/*.c
-    ${GGML_ROOT_DIR}/src/ggml-*.c
-)
-
-file(GLOB GGML_CPP_SOURCES
-    ${GGML_ROOT_DIR}/src/*.cpp
-    ${GGML_ROOT_DIR}/src/ggml-*.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/*.cpp
-)
-
+# ---------------------------------------------------------
+# GGML sources (gguf-v0.17.x 完全対応)
+# ---------------------------------------------------------
 set(GGML_SOURCES
-    ${GGML_C_SOURCES}
-    ${GGML_CPP_SOURCES}
+    ${GGML_ROOT_DIR}/src/ggml.c
+    ${GGML_ROOT_DIR}/src/ggml-quants.c
+    ${GGML_ROOT_DIR}/src/ggml-alloc.c
+    ${GGML_ROOT_DIR}/src/ggml-backend.c
+
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu-impl.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu-quants.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu-gemm.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu-gemv.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu-opt.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu-quantize.c
 )
 
+# ---------------------------------------------------------
+# vendor sources (xxhash など)
+# ---------------------------------------------------------
+file(GLOB VENDOR_SOURCES
+    ${LLAMA_ROOT_DIR}/vendor/xxhash/*.c
+)
+
+# ---------------------------------------------------------
 # JNI shared library
+# ---------------------------------------------------------
 add_library(
     llama_jni
     SHARED
 
-    # JNI
     jni/jni_llama.cpp
 
-    # llama core sources (only those found above)
     ${LLAMA_SOURCES}
-
-    # ggml core sources (only those found above)
     ${GGML_SOURCES}
+    ${VENDOR_SOURCES}
 )
 
-# Include directories required by JNI and llama.h
+# ---------------------------------------------------------
+# include directories
+# ---------------------------------------------------------
 target_include_directories(
     llama_jni
     PRIVATE
-    ${LLAMA_ROOT_DIR}/include    # <- important: solves #include "llama.h"
+    ${LLAMA_ROOT_DIR}/include
     ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/common
     ${LLAMA_ROOT_DIR}/vendor
+
     ${GGML_ROOT_DIR}/include
     ${GGML_ROOT_DIR}/src
     ${GGML_ROOT_DIR}/src/ggml-cpu
@@ -92,7 +91,9 @@ target_include_directories(
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
 )
 
-# Link prebuilt third-party libraries
+# ---------------------------------------------------------
+# third-party libraries
+# ---------------------------------------------------------
 add_library(curl STATIC IMPORTED)
 set_target_properties(curl PROPERTIES
     IMPORTED_LOCATION
@@ -111,12 +112,16 @@ set_target_properties(mbedcrypto PROPERTIES
         ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedcrypto.a
 )
 
+# ★ 修正：mbedx509 は libmbedx509.a を指す（以前は libmbedtls.a で誤り）
 add_library(mbedx509 STATIC IMPORTED)
 set_target_properties(mbedx509 PROPERTIES
     IMPORTED_LOCATION
-        ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedtls.a
+        ${CMAKE_SOURCE_DIR}/third_party/mbedtls/lib/libmbedx509.a
 )
 
+# ---------------------------------------------------------
+# link
+# ---------------------------------------------------------
 target_link_libraries(
     llama_jni
     PRIVATE
