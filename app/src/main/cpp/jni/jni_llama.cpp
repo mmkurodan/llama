@@ -458,7 +458,7 @@ Java_com_example_ollama_LlamaNative_generate(
             (int)prompt.size(),
             tokens.data(),
             (int)tokens.size(),
-            true,
+            false,
             false
     );
 
