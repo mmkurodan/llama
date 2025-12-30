@@ -58,8 +58,14 @@ static void log_to_file(const std::string& msg) {
     }
     if (!g_log_ofs) return;
     g_log_ofs << current_time_str() << " [JNI] " << msg << std::endl;
-    // flush immediately so logs appear even if app crashes
     g_log_ofs.flush();
+}
+
+// ---------------- llama.cpp ログコールバック ----------------
+static void llama_log_callback(enum llama_log_level level, const char * text, void * user_data) {
+    std::string msg = text ? text : "";
+    LOGI("[llama.cpp] %s", msg.c_str());
+    log_to_file(std::string("llama.cpp: ") + msg);
 }
 
 // ---------------- 既存ユーティリティ ----------------
@@ -89,9 +95,7 @@ struct ProgressData {
     int last_percent;
 };
 
-// curl transfer progress callback (libcurl >= 7.32.0 uses xferinfo)
-// signature: int func(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
-static int xferinfo(void* p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) {
+static int xferinfo(void* p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t, curl_off_t) {
     ProgressData* pd = reinterpret_cast<ProgressData*>(p);
     if (!pd) return 0;
     if (dltotal <= 0) return 0;
@@ -100,7 +104,6 @@ static int xferinfo(void* p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t /*
     if (percent == pd->last_percent) return 0;
     pd->last_percent = percent;
 
-    // Obtain JNIEnv for this thread
     if (!g_jvm) return 0;
 
     JNIEnv* env = nullptr;
@@ -114,22 +117,16 @@ static int xferinfo(void* p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t /*
 
     if (env && pd->thiz_global && pd->onProgressMethod) {
         env->CallVoidMethod(pd->thiz_global, pd->onProgressMethod, (jint)percent);
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-        }
+        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
-    // ログへ出力（スレッドからでも書き込める）
     {
         std::ostringstream ss;
         ss << "Download progress: " << percent << "%";
         log_to_file(ss.str());
     }
 
-    if (attached) {
-        g_jvm->DetachCurrentThread();
-    }
-
+    if (attached) g_jvm->DetachCurrentThread();
     return 0;
 }
 
@@ -140,37 +137,31 @@ static void llama_jni_free() {
     log_to_file("llama_jni_free: freeing resources (explicit)");
 
     if (g_ctx) {
-        // free context
         llama_free(g_ctx);
         g_ctx = nullptr;
         log_to_file("Context freed");
     }
     if (g_model) {
-        // free model (use new API: llama_model_free)
         llama_model_free(g_model);
         g_model = nullptr;
         log_to_file("Model freed");
     }
 
-    // backend cleanup
     llama_backend_free();
     log_to_file("Backend freed");
 
-    // close log file if open
     std::lock_guard<std::mutex> llog(g_log_mutex);
     if (g_log_ofs.is_open()) {
         g_log_ofs << current_time_str() << " [JNI] Log closed" << std::endl;
         g_log_ofs.close();
     }
-    // Note: we keep g_log_path so setLogPath can re-open if needed
 }
 
 // ---------------- JNI: setLogPath ----------------
-// call from Java with app-specific external directory path (recommended): e.g. context.getExternalFilesDir(null).getAbsolutePath() + "/ollama.log"
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ollama_LlamaNative_setLogPath(
-        JNIEnv *env, jobject /*thiz*/, jstring jLogPath) {
+        JNIEnv *env, jobject, jstring jLogPath) {
 
     std::string path = jstring_to_std(env, jLogPath);
     {
@@ -238,17 +229,14 @@ Java_com_example_ollama_LlamaNative_download(
         return env->NewStringUTF("file open failed");
     }
 
-    // Prepare progress callback data
     ProgressData pd;
     pd.last_percent = -1;
     pd.thiz_global = env->NewGlobalRef(thiz);
     pd.onProgressMethod = nullptr;
 
-    // Try to get method ID for onDownloadProgress(int)
     jclass cls = env->GetObjectClass(thiz);
     if (cls) {
         pd.onProgressMethod = env->GetMethodID(cls, "onDownloadProgress", "(I)V");
-        // cls is a local ref and will be released by JVM automatically when returning
     }
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -256,16 +244,11 @@ Java_com_example_ollama_LlamaNative_download(
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
 
-    // Enable progress callbacks (use xferinfo if available)
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo);
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &pd);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
-    // ----------------------------------------------------
-    // huggingface.co のときだけ SSL 検証を無効化
-    // ----------------------------------------------------
     std::string surl(url);
-
     if (surl.rfind("https://huggingface.co/", 0) == 0) {
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -284,9 +267,7 @@ Java_com_example_ollama_LlamaNative_download(
     curl_easy_cleanup(curl);
     ofs.close();
 
-    if (pd.thiz_global) {
-        env->DeleteGlobalRef(pd.thiz_global);
-    }
+    if (pd.thiz_global) env->DeleteGlobalRef(pd.thiz_global);
 
     if (res != CURLE_OK) {
         std::ostringstream ss;
@@ -303,15 +284,16 @@ Java_com_example_ollama_LlamaNative_download(
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_example_ollama_LlamaNative_init(
-        JNIEnv *env, jobject /*thiz*/,
+        JNIEnv *env, jobject,
         jstring jModelPath
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
 
     log_to_file("init: start");
 
-    // Do NOT automatically free existing resources here.
-    // The user requested that llama_jni_free be run only when explicitly called.
+    // llama.cpp ログコールバック登録
+    llama_log_set(llama_log_callback, nullptr);
+    log_to_file("init: llama_log_callback registered");
 
     std::string model_path = jstring_to_std(env, jModelPath);
 
@@ -321,12 +303,12 @@ Java_com_example_ollama_LlamaNative_init(
         log_to_file(ss.str());
     }
 
-    // --- model file existence + size check ---
     {
         std::ifstream ifs(model_path, std::ios::binary | std::ios::ate);
         if (!ifs) {
             std::ostringstream ss;
-            ss << "init: model file cannot be opened: " << model_path << " errno=" << errno << " strerror=" << std::strerror(errno);
+            ss << "init: model file cannot be opened: " << model_path
+               << " errno=" << errno << " strerror=" << std::strerror(errno);
             log_to_file(ss.str());
             return env->NewStringUTF("model file open failed");
         } else {
@@ -338,7 +320,6 @@ Java_com_example_ollama_LlamaNative_init(
         }
     }
 
-    // Dump first up to 64 bytes of file header (hex + ascii) for debugging
     {
         std::ifstream ifh(model_path, std::ios::binary);
         if (ifh) {
@@ -349,7 +330,8 @@ Java_com_example_ollama_LlamaNative_init(
             ss << "init: header(" << got << "):";
             ss << std::hex << std::setfill('0');
             for (std::streamsize i = 0; i < got; ++i) {
-                ss << ' ' << std::setw(2) << (static_cast<unsigned int>(static_cast<unsigned char>(hdr_buf[i])));
+                ss << ' ' << std::setw(2)
+                   << (static_cast<unsigned int>(static_cast<unsigned char>(hdr_buf[i])));
             }
             ss << " | ";
             for (std::streamsize i = 0; i < got; ++i) {
@@ -364,7 +346,6 @@ Java_com_example_ollama_LlamaNative_init(
         }
     }
 
-    // store JavaVM for progress callback threads
     if (env->GetJavaVM(&g_jvm) != JNI_OK) {
         g_jvm = nullptr;
         log_to_file("init: GetJavaVM failed");
@@ -372,13 +353,11 @@ Java_com_example_ollama_LlamaNative_init(
         log_to_file("init: JavaVM stored");
     }
 
-    // llama_backend_init no longer takes parameters in gguf-0.17.1
     llama_backend_init();
     log_to_file("init: backend init");
 
     llama_model_params mparams = llama_model_default_params();
 
-    // time the model load (use new API: llama_model_load_from_file)
     {
         using namespace std::chrono;
         auto t0 = high_resolution_clock::now();
@@ -388,7 +367,8 @@ Java_com_example_ollama_LlamaNative_init(
 
         std::ostringstream ss;
         if (!g_model) {
-            ss << "init: failed to load model (returned null) after " << ms << " ms. path_len=" << model_path.size();
+            ss << "init: failed to load model (returned null) after "
+               << ms << " ms. path_len=" << model_path.size();
             log_to_file(ss.str());
             return env->NewStringUTF("failed to load model");
         } else {
@@ -403,7 +383,6 @@ Java_com_example_ollama_LlamaNative_init(
     cparams.n_batch         = g_n_batch;
     cparams.n_threads_batch = g_n_threads;
 
-    // create context with model (time it as well, use new API: llama_init_from_model)
     {
         using namespace std::chrono;
         auto t0 = high_resolution_clock::now();
@@ -413,9 +392,9 @@ Java_com_example_ollama_LlamaNative_init(
 
         std::ostringstream ss;
         if (!g_ctx) {
-            ss << "init: failed to create context (returned null) after " << ms << " ms";
+            ss << "init: failed to create context (returned null) after "
+               << ms << " ms";
             log_to_file(ss.str());
-            // Do not free g_model here; explicit free only as requested.
             return env->NewStringUTF("failed to create context");
         } else {
             ss << "init: context created successfully in " << ms << " ms";
@@ -432,7 +411,7 @@ Java_com_example_ollama_LlamaNative_init(
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_example_ollama_LlamaNative_generate(
-        JNIEnv *env, jobject /*thiz*/,
+        JNIEnv *env, jobject,
         jstring jPrompt
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -451,17 +430,13 @@ Java_com_example_ollama_LlamaNative_generate(
 
     const int max_tokens = 128;
 
-    // ---- KV キャッシュクリア ----
-    // Use new memory API to clear all tokens: [0, inf)
     llama_memory_t mem = llama_get_memory(g_ctx);
     llama_memory_seq_rm(mem, -1, 0, -1);
     log_to_file("generate: kv cache cleared");
 
-    // ---- トークナイズ（ヘッダ仕様、vocab-based API）----
     std::vector<llama_token> tokens;
     tokens.resize(g_n_ctx);
 
-    // Get vocab from model (new API requirement)
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
     
     int32_t n_tokens = llama_tokenize(
@@ -470,8 +445,8 @@ Java_com_example_ollama_LlamaNative_generate(
             (int)prompt.size(),
             tokens.data(),
             (int)tokens.size(),
-            true,  // add_special
-            false  // parse_special
+            true,
+            false
     );
 
     if (n_tokens <= 0) {
@@ -490,8 +465,6 @@ Java_com_example_ollama_LlamaNative_generate(
     std::string output;
     output.reserve(max_tokens * 4);
 
-    // ---- プロンプト投入（batch API を使用）----
-    // Process prompt tokens using batch API
     {
         llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
         if (llama_decode(g_ctx, batch) != 0) {
@@ -502,11 +475,8 @@ Java_com_example_ollama_LlamaNative_generate(
         log_to_file("generate: prompt processed with batch decode");
     }
 
-    // ---- 生成ループ（新しいsampler APIを使用）----
-    // Get vocab for token operations (reuse vocab from line 466)
     const int n_vocab = llama_vocab_n_tokens(vocab);
     
-    // Create sampler chain for generation
     auto sparams = llama_sampler_chain_default_params();
     llama_sampler * smpl = llama_sampler_chain_init(sparams);
     llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_top_k));
@@ -517,81 +487,10 @@ Java_com_example_ollama_LlamaNative_generate(
     log_to_file("generate: sampler chain initialized");
     
     for (int i = 0; i < max_tokens; ++i) {
-        // Get logits for the last token (index -1 means last position)
         const llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
         
-        // Accept the token
         llama_sampler_accept(smpl, id);
 
-        // check eos
         if (llama_vocab_is_eog(vocab, id)) {
             log_to_file("generate: reached EOS");
-            break;
-        }
-
-        // token -> piece (vocab-based API with lstrip parameter)
-        int32_t n_chars = llama_token_to_piece(
-                vocab,
-                id,
-                nullptr,
-                0,
-                0,      // lstrip
-                false   // special
-        );
-
-        if (n_chars > 0) {
-            std::string piece;
-            piece.resize(n_chars);
-            llama_token_to_piece(
-                    vocab,
-                    id,
-                    piece.data(),
-                    n_chars,
-                    0,      // lstrip
-                    false   // special
-            );
-            output += piece;
-
-            // ログ：生成トークン情報
-            {
-                std::ostringstream ss;
-                ss << "generate: output token id=" << (int)id << " piece=\"" << piece << "\" i=" << i;
-                log_to_file(ss.str());
-            }
-        } else {
-            std::ostringstream ss;
-            ss << "generate: token_to_piece returned n_chars=" << n_chars << " id=" << (int)id;
-            log_to_file(ss.str());
-        }
-
-        // feed token into model for next step using batch API
-        llama_token id_mut = id; // llama_batch_get_one expects non-const pointer
-        llama_batch batch = llama_batch_get_one(&id_mut, 1);
-        if (llama_decode(g_ctx, batch) != 0) {
-            log_to_file("generate: decode failed (generation)");
-            llama_sampler_free(smpl);
-            return env->NewStringUTF("decode failed (generation)");
-        }
-    }
-    
-    // Free the sampler chain
-    llama_sampler_free(smpl);
-
-    {
-        std::ostringstream ss;
-        ss << "generate: finished, output_len=" << output.size();
-        log_to_file(ss.str());
-    }
-
-    return env->NewStringUTF(output.c_str());
-}
-
-// ---------------- JNI: free ----------------
-extern "C"
-JNIEXPORT void JNICALL
-Java_com_example_ollama_LlamaNative_free(
-        JNIEnv *env, jobject /*thiz*/
-) {
-    log_to_file("Java_com_example_ollama_LlamaNative_free called");
-    llama_jni_free();
-}
+            break
