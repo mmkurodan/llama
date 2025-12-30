@@ -83,6 +83,7 @@ target_include_directories(
     ${LLAMA_ROOT_DIR}/include    # <- important: solves #include "llama.h"
     ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/common
+    ${LLAMA_ROOT_DIR}/vendor
     ${GGML_ROOT_DIR}/include
     ${GGML_ROOT_DIR}/src
 
