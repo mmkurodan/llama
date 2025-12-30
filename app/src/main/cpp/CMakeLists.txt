@@ -86,6 +86,7 @@ target_include_directories(
     ${LLAMA_ROOT_DIR}/vendor
     ${GGML_ROOT_DIR}/include
     ${GGML_ROOT_DIR}/src
+    ${GGML_ROOT_DIR}/src/ggml-cpu
 
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
