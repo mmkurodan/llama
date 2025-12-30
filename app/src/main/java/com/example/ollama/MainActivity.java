@@ -107,7 +107,7 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            // ★ ChatML 形式のプロンプトを生成
+            // ★ ChatML 形式のプロンプトを生成（公式テンプレート準拠）
             String chatPrompt = toChatML("Hello!");
 
             appendMessage("Running test generate(ChatML) ...");
@@ -122,10 +122,10 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    // ★ ChatML 形式に変換する関数
+    // ★ ChatML 形式に変換する関数（公式テンプレート準拠）
     private String toChatML(String userInput) {
-        return "<|system|>\nYou are a helpful assistant.\n"
-             + "<|user|>\n" + userInput + "\n"
+        return "<|system|>\nYou are a helpful assistant.\n\n"
+             + "<|user|>\n" + userInput + "\n\n"
              + "<|assistant|>\n";
     }
 
