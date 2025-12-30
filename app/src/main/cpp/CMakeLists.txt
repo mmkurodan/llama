@@ -80,6 +80,15 @@ add_library(
 )
 
 # ---------------------------------------------------------
+# compile definitions (enable K-quant support)
+# ---------------------------------------------------------
+target_compile_definitions(
+    llama_jni
+    PRIVATE
+    GGML_USE_K_QUANTS
+)
+
+# ---------------------------------------------------------
 # include directories
 # ---------------------------------------------------------
 target_include_directories(
