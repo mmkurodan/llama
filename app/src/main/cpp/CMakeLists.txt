@@ -16,9 +16,15 @@ set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
 set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 
 # ---------------------------------------------------------
-# build-info.cmake を読み込み（BUILD_NUMBER/COMMIT を生成）
+# build-info 用の値を CMake 側で定義（★ここがポイント）
 # ---------------------------------------------------------
-include(${LLAMA_ROOT_DIR}/cmake/build-info.cmake)
+# ここで設定した値が build-info.cpp.in の
+#   @BUILD_NUMBER@, @BUILD_COMMIT@, @BUILD_TARGET@, @BUILD_COMPILER@
+# にそのまま入る。
+set(BUILD_NUMBER   0)
+set(BUILD_COMMIT   "unknown")
+set(BUILD_TARGET   "android")
+set(BUILD_COMPILER "Clang")
 
 # ---------------------------------------------------------
 # build-info.cpp を生成
