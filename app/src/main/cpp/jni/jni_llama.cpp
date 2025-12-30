@@ -519,7 +519,7 @@ Java_com_example_ollama_LlamaNative_generate(
                 nullptr,
                 0,
                 0,      // lstrip
-                false   // special
+                true   // special
         );
 
         if (n_chars > 0) {
@@ -531,7 +531,7 @@ Java_com_example_ollama_LlamaNative_generate(
                     piece.data(),
                     n_chars,
                     0,      // lstrip
-                    false   // special
+                    true   // special
             );
             output += piece;
 
