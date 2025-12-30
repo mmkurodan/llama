@@ -85,6 +85,7 @@ set(GGML_SOURCES
 
     # ★ 旧構造 GGML：ARM は quants.c のみ存在
     ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/quants.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/repack.cpp
 )
 
 # ---------------------------------------------------------
