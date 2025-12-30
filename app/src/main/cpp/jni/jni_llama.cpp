@@ -459,7 +459,7 @@ Java_com_example_ollama_LlamaNative_generate(
             tokens.data(),
             (int)tokens.size(),
             false,
-            false
+            true
     );
 
     if (n_tokens <= 0) {
