@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("llama_jni")
 
-set(GGML_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../llm/llama.cpp)
+set(GGML_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/llama)
 
 add_library(llama_jni SHARED
         jni/jni_llama.cpp)
