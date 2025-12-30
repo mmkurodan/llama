@@ -53,7 +53,7 @@ public class MainActivity extends Activity {
             }
         };
 
-        // Set log path for JNI logging (use app-specific external files dir -> no runtime storage permission required)
+        // Set log path for JNI logging
         File logFile = new File(getExternalFilesDir(null), "ollama.log");
         final String logPath = logFile.getAbsolutePath();
         try {
@@ -63,11 +63,9 @@ public class MainActivity extends Activity {
             appendMessage("Failed to call setLogPath(): " + t.getMessage());
         }
 
-        // Start download+init+generate sequence in background (no pre-init)
+        // Start download+init+generate sequence in background
         new Thread(() -> {
-            try {
-                Thread.sleep(100); // allow UI to update
-            } catch (InterruptedException ignored) {}
+            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
 
             final String url =
                 "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/"
@@ -87,8 +85,6 @@ public class MainActivity extends Activity {
             } catch (Throwable t) {
                 appendException("download() threw", t);
                 showToast("Download error: " + t.getMessage());
-                // stop flow
-                runOnUiThread(() -> tv.append("\nOperation aborted due to download exception.\n"));
                 return;
             }
 
@@ -111,16 +107,26 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            appendMessage("Running test generate(\"Hello!\") ...");
+            // ★ ChatML 形式のプロンプトを生成
+            String chatPrompt = toChatML("Hello!");
+
+            appendMessage("Running test generate(ChatML) ...");
             String gen = null;
             try {
-                gen = llama.generate("Hello!");
-                appendMessage("generate() returned: " + gen);
+                gen = llama.generate(chatPrompt);
+                appendMessage("generate() returned:\n" + gen);
             } catch (Throwable t) {
                 appendException("generate() threw", t);
                 showToast("Generate error: " + t.getMessage());
             }
         }).start();
+    }
+
+    // ★ ChatML 形式に変換する関数
+    private String toChatML(String userInput) {
+        return "<|system|>\nYou are a helpful assistant.\n"
+             + "<|user|>\n" + userInput + "\n"
+             + "<|assistant|>\n";
     }
 
     private void appendMessage(final String msg) {
