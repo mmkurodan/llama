@@ -107,7 +107,7 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            // ★ ChatML 形式のプロンプトを生成（公式テンプレート準拠）
+            // ★ ChatML（EOS 付き）テンプレートでプロンプト生成
             String chatPrompt = toChatML("Hello!");
 
             appendMessage("Running test generate(ChatML) ...");
@@ -121,15 +121,16 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
-    
+
+    // ★ ChatML（EOS 付き）テンプレート
     private String toChatML(String userInput) {
-    return "<s>[INST] <<SYS>>\n"
-         + "You are a helpful assistant.\n"
-         + "<</SYS>>\n\n"
-         + userInput + "\n"
-         + "[/INST]\n";
+        return "<|system|>\n"
+             + "You are a helpful assistant.</s>\n"
+             + "<|user|>\n"
+             + userInput + "</s>\n"
+             + "<|assistant|>\n";
     }
-    
+
     private void appendMessage(final String msg) {
         runOnUiThread(() -> {
             tv.append(msg + "\n");
