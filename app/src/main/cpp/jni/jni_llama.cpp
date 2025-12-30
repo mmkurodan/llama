@@ -17,6 +17,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #include "llama.h"
+#include "ggml-backend.h"
 #include <curl/curl.h>
 
 // ---------------- グローバル ----------------
@@ -356,6 +357,8 @@ Java_com_example_ollama_LlamaNative_init(
 
     llama_backend_init();
     log_to_file("init: backend init");
+    ggml_backend_load_all(nullptr);                 // ★ 追加
+    log_to_file("init: ggml_backend_load_all called");  // ★ 追加
 
     llama_model_params mparams = llama_model_default_params();
 
