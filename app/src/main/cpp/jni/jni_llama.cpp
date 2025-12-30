@@ -359,13 +359,13 @@ Java_com_example_ollama_LlamaNative_init(
     llama_backend_init();
     log_to_file("init: backend init");
 
-// ★ CPU backend を手動で登録
-    ggml_backend_t cpu_backend = ggml_backend_cpu_init();
-    if (cpu_backend) {
-       ggml_backend_register(cpu_backend);
-       log_to_file("init: CPU backend registered manually");
+// ★ CPU backend をレジストリ経由で登録
+    ggml_backend_reg_t cpu_reg = ggml_backend_cpu_reg();
+    if (cpu_reg) {
+        ggml_backend_register(cpu_reg);
+        log_to_file("init: CPU backend registered via reg");
     } else {
-       log_to_file("init: CPU backend init failed");
+        log_to_file("init: CPU backend_reg() returned null");
     }
     
     llama_model_params mparams = llama_model_default_params();
