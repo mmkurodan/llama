@@ -423,9 +423,7 @@ Java_com_example_ollama_LlamaNative_init(
         }
     }
 
-    // set RNG seed if desired
-    llama_set_rng_seed(g_ctx, (uint32_t)LLAMA_DEFAULT_SEED);
-    log_to_file("init: context created and RNG seed set");
+    log_to_file("init: context created");
 
     return env->NewStringUTF("ok");
 }
@@ -454,8 +452,9 @@ Java_com_example_ollama_LlamaNative_generate(
     const int max_tokens = 128;
 
     // ---- KV キャッシュクリア ----
-    // Use kv cache removal to clear all tokens: [0, inf)
-    llama_kv_cache_tokens_rm(g_ctx, 0, -1);
+    // Use new memory API to clear all tokens: [0, inf)
+    llama_memory_t mem = llama_get_memory(g_ctx);
+    llama_memory_seq_rm(mem, -1, 0, -1);
     log_to_file("generate: kv cache cleared");
 
     // ---- トークナイズ（ヘッダ仕様、vocab-based API）----
@@ -504,8 +503,7 @@ Java_com_example_ollama_LlamaNative_generate(
     }
 
     // ---- 生成ループ（新しいsampler APIを使用）----
-    // Get vocab for token operations
-    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    // Get vocab for token operations (reuse vocab from line 466)
     const int n_vocab = llama_vocab_n_tokens(vocab);
     
     // Create sampler chain for generation
