@@ -507,7 +507,8 @@ Java_com_example_ollama_LlamaNative_generate(
     const int n_vocab = llama_vocab_n_tokens(vocab);
     
     // Create sampler chain for generation
-    llama_sampler * smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    auto sparams = llama_sampler_chain_default_params();
+    llama_sampler * smpl = llama_sampler_chain_init(sparams);
     llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_top_k));
     llama_sampler_chain_add(smpl, llama_sampler_init_top_p(g_top_p, 1));
     llama_sampler_chain_add(smpl, llama_sampler_init_temp(g_temp));
@@ -564,7 +565,8 @@ Java_com_example_ollama_LlamaNative_generate(
         }
 
         // feed token into model for next step using batch API
-        llama_batch batch = llama_batch_get_one(&id, 1);
+        llama_token id_mut = id; // llama_batch_get_one expects non-const pointer
+        llama_batch batch = llama_batch_get_one(&id_mut, 1);
         if (llama_decode(g_ctx, batch) != 0) {
             log_to_file("generate: decode failed (generation)");
             llama_sampler_free(smpl);
