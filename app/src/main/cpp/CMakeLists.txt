@@ -16,12 +16,17 @@ set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
 set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 
 # ---------------------------------------------------------
-# build-info 用の値を CMake 側で定義（CACHE が重要）
+# build-info 用の値を CMake 側で定義（テンプレートに合わせる）
+# build-info.cpp.in の中身：
+#   @LLAMA_BUILD_NUMBER@
+#   @LLAMA_BUILD_COMMIT@
+#   @BUILD_COMPILER@
+#   @BUILD_TARGET@
 # ---------------------------------------------------------
-set(BUILD_NUMBER   0         CACHE STRING "")
-set(BUILD_COMMIT   "unknown" CACHE STRING "")
-set(BUILD_TARGET   "android" CACHE STRING "")
-set(BUILD_COMPILER "Clang"   CACHE STRING "")
+set(LLAMA_BUILD_NUMBER 0         CACHE STRING "")
+set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "")
+set(BUILD_COMPILER     "Clang"   CACHE STRING "")
+set(BUILD_TARGET       "android" CACHE STRING "")
 
 # ---------------------------------------------------------
 # build-info.cpp を生成
