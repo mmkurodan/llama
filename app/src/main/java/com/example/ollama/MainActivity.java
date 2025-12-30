@@ -121,14 +121,15 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
-
-    // ★ ChatML 形式に変換する関数（公式テンプレート準拠）
+    
     private String toChatML(String userInput) {
-        return "<|system|>\nYou are a helpful assistant.\n\n"
-             + "<|user|>\n" + userInput + "\n\n"
-             + "<|assistant|>\n";
+    return "<s>[INST] <<SYS>>\n"
+         + "You are a helpful assistant.\n"
+         + "<</SYS>>\n\n"
+         + userInput + "\n"
+         + "[/INST]\n";
     }
-
+    
     private void appendMessage(final String msg) {
         runOnUiThread(() -> {
             tv.append(msg + "\n");
