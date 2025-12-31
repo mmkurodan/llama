@@ -525,6 +525,11 @@ Java_com_example_ollama_LlamaNative_generate(
         // ★ 生成トークンを累積
         out_tokens.push_back(id);
 
+        // ★ ctx の残量チェック（安全マージン 32）
+        if ((int)out_tokens.size() >= g_n_ctx - 32) {
+          log_to_file("generate: reached ctx safety limit, stopping early");
+      .  .break;
+        }
         // ★ 累積トークン列を detokenize して全文を得る
         char buf[4096];
         int n_chars = llama_detokenize(
