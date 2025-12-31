@@ -68,7 +68,7 @@ public class MainActivity extends Activity {
         urlInput = new EditText(this);
         urlInput.setHint("Model download URL (https://...)");
         urlInput.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        urlInput.setText("https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v0.3-GGUF/resolve/main/tinyllama-1.1b-chat-v0.3.Q4_K_M.gguf");
+        urlInput.setText("https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf");
 
         loadButton = new Button(this);
         loadButton.setText("Load Model");
