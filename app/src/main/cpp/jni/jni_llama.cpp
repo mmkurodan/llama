@@ -503,9 +503,11 @@ Java_com_example_ollama_LlamaNative_generate(
 
     log_to_file("generate: sampler chain initialized");
 
-    // detokenize 用にトークン列を保持
-//    std::vector<llama_token> out_tokens;
-//    out_tokens.reserve(max_tokens);
+// detokenize 用にトークン列を保持
+    std::vector<llama_token> out_tokens;
+    out_tokens.reserve(max_tokens);
+
+    std::string prev_text;   // ★ 差分抽出用
 
     for (int i = 0; i < max_tokens; ++i) {
         // Get logits for the last token (index -1 means last position)
@@ -520,39 +522,46 @@ Java_com_example_ollama_LlamaNative_generate(
             break;
         }
 
-// ★ out_tokens.push_back(id); は削除（累積しない）
+        // ★ 生成トークンを累積
+        out_tokens.push_back(id);
 
-// ★ 1 トークンだけ detokenize する
-       char buf[4096];
-       llama_token tok = id;
-
-       int n_chars = llama_detokenize(
-            vocab,
-            &tok,      // ★ 1 トークンだけ渡す
-            1,         // ★ トークン数は 1
-            buf,
-            sizeof(buf),
-            true,      // special tokens allowed
-            false
+        // ★ 累積トークン列を detokenize して全文を得る
+        char buf[4096];
+        int n_chars = llama_detokenize(
+                vocab,
+                out_tokens.data(),
+                (int)out_tokens.size(),
+                buf,
+                sizeof(buf),
+                true,
+                false
         );
 
         if (n_chars > 0) {
-            output.append(buf, n_chars);
+            std::string full(buf, n_chars);
 
-         {
-            std::ostringstream ss;
-            ss << "generate: output token id=" << (int)id
-               << " piece=\"" << std::string(buf, n_chars) << "\" i=" << i
-               << " n_chars=" << n_chars;
-            log_to_file(ss.str());
-         }
+            // ★ 前回との差分だけを output に追加（スペースも含めて正しく復元）
+            if (full.size() > prev_text.size()) {
+                output += full.substr(prev_text.size());
+            }
+
+            prev_text = full;
+
+            {
+                std::ostringstream ss;
+                ss << "generate: output token id=" << (int)id
+                   << " piece=\"" << full << "\" i=" << i
+                   << " n_chars=" << n_chars;
+                log_to_file(ss.str());
+            }
         } else {
-             std::ostringstream ss;
-             ss << "generate: detokenize returned n_chars=" << n_chars
-             << " id=" << (int)id;
-             log_to_file(ss.str());
+            std::ostringstream ss;
+            ss << "generate: detokenize returned n_chars=" << n_chars
+               << " id=" << (int)id
+               << " out_tokens_size=" << out_tokens.size();
+            log_to_file(ss.str());
         }
-        
+
         // feed token into model for next step using batch API
         llama_token id_mut = id; // llama_batch_get_one expects non-const pointer
         llama_batch batch = llama_batch_get_one(&id_mut, 1);
