@@ -527,8 +527,8 @@ Java_com_example_ollama_LlamaNative_generate(
 
         // ★ ctx の残量チェック（安全マージン 32）
         if ((int)out_tokens.size() >= g_n_ctx - 32) {
-          log_to_file("generate: reached ctx safety limit, stopping early");
-      .  .break;
+            log_to_file("generate: reached ctx safety limit, stopping early");
+            break;
         }
         // ★ 累積トークン列を detokenize して全文を得る
         char buf[4096];
