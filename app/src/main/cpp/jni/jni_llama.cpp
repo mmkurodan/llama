@@ -34,7 +34,7 @@ static std::string g_log_path;
 static std::ofstream g_log_ofs;
 
 // 設定
-static int   g_n_ctx      = 512;
+static int   g_n_ctx      = 2048;
 static int   g_n_threads  = 2;
 static int   g_n_batch    = 16;
 static float g_temp       = 0.7f;
