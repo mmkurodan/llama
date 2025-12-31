@@ -14,46 +14,133 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import android.widget.EditText;
+import android.widget.Button;
+import android.view.View;
+import android.widget.ProgressBar;
+import android.text.InputType;
+
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
-    private TextView tv;
+    private TextView tv;           // log view (append-only)
     private ScrollView scrollView;
+
+    // New UI elements
+    private EditText urlInput;
+    private Button loadButton;
+    private TextView fileInfo;
+    private ProgressBar progressBar;
+
+    private EditText promptInput;
+    private Button sendButton;
+    private TextView outputView;
+
+    // Llama native instance (field so callbacks can update UI)
+    private LlamaNative llama;
+
+    // Model tracking
+    private volatile boolean modelLoaded = false;
+    private String currentModelPath = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Layout: ScrollView containing a TextView so we can append logs and auto-scroll
+        // Root layout
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int padding = dpToPx(8);
+        root.setPadding(padding, padding, padding, padding);
+
+        // Log area: ScrollView + TextView
         scrollView = new ScrollView(this);
         tv = new TextView(this);
         tv.setText("Starting...\n");
         tv.setTextSize(14);
-        int padding = dpToPx(12);
-        tv.setPadding(padding, padding, padding, padding);
-
+        int logPadding = dpToPx(12);
+        tv.setPadding(logPadding, logPadding, logPadding, logPadding);
         scrollView.addView(tv, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.addView(scrollView, new LinearLayout.LayoutParams(
+        // URL input + Load button + file info + progress
+        urlInput = new EditText(this);
+        urlInput.setHint("Model download URL (https://...)\");
+        urlInput.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        urlInput.setText("https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v0.3-GGUF/resolve/main/tinyllama-1.1b-chat-v0.3.Q4_K_M.gguf");
+
+        loadButton = new Button(this);
+        loadButton.setText("Load Model");
+
+        fileInfo = new TextView(this);
+        fileInfo.setText("Model file: (none)");
+
+        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progressBar.setMax(100);
+        progressBar.setProgress(0);
+
+        // Prompt input + send button + output
+        promptInput = new EditText(this);
+        promptInput.setHint("Enter prompt");
+        promptInput.setMinLines(2);
+        promptInput.setMaxLines(6);
+
+        sendButton = new Button(this);
+        sendButton.setText("Send");
+        sendButton.setEnabled(false); // disabled until model loaded
+
+        outputView = new TextView(this);
+        outputView.setText("Output will appear here");
+        outputView.setPadding(logPadding, logPadding, logPadding, logPadding);
+
+        // Add views to root in order
+        root.addView(urlInput, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(loadButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(fileInfo, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(progressBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        root.addView(promptInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(sendButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(outputView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // Finally add log area at bottom (fill)
+        LinearLayout.LayoutParams lpLog = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0);
+        lpLog.weight = 1.0f;
+        root.addView(scrollView, lpLog);
+
         setContentView(root);
 
         appendMessage("UI ready.");
 
-        // LlamaNative anonymous subclass to receive progress callbacks
-        final LlamaNative llama = new LlamaNative() {
+        // Instantiate LlamaNative with overridden onDownloadProgress to update UI
+        llama = new LlamaNative() {
             @Override
             public void onDownloadProgress(final int percent) {
-                appendMessage("Download progress: " + percent + "%");
+                runOnUiThread(() -> {
+                    progressBar.setProgress(percent);
+                    appendMessage("Download progress: " + percent + "%");
+                });
             }
         };
 
-        // Set log path for JNI logging
+        // Set JNI log path (external files dir)
         File logFile = new File(getExternalFilesDir(null), "ollama.log");
         final String logPath = logFile.getAbsolutePath();
         try {
@@ -63,63 +150,155 @@ public class MainActivity extends Activity {
             appendMessage("Failed to call setLogPath(): " + t.getMessage());
         }
 
-        // Start download+init+generate sequence in background
+        // Load button behavior
+        loadButton.setOnClickListener(v -> {
+            final String url = urlInput.getText().toString().trim();
+            if (url.isEmpty()) {
+                showToast("Please enter a download URL");
+                return;
+            }
+
+            // Extract filename from URL
+            final String filename = extractFilenameFromUrl(url);
+            if (filename == null || filename.isEmpty()) {
+                showToast("Cannot determine filename from URL");
+                return;
+            }
+
+            final File destFile = new File(getFilesDir(), filename);
+            final String modelPath = destFile.getAbsolutePath();
+
+            fileInfo.setText("Model file: " + filename + " (checking...)");
+            progressBar.setProgress(0);
+            appendMessage("Selected model file: " + modelPath);
+
+            // If exists, skip download and init
+            if (destFile.exists() && destFile.length() > 0) {
+                appendMessage("Model file already exists: " + destFile.length() + " bytes");
+                fileInfo.setText("Model file: " + filename + " (" + destFile.length() + " bytes, exists)");
+                // Init model in background
+                initModelInBackground(modelPath);
+            } else {
+                // Download then init
+                appendMessage("Starting download: " + url);
+                appendMessage("Saving to: " + modelPath);
+                new Thread(() -> {
+                    String dlResult = null;
+                    try {
+                        dlResult = llama.download(url, modelPath);
+                        appendMessage("download() returned: " + dlResult);
+                    } catch (Throwable t) {
+                        appendException("download() threw", t);
+                        showToast("Download error: " + t.getMessage());
+                        return;
+                    }
+
+                    if (!"ok".equals(dlResult)) {
+                        appendMessage("Download failed: " + dlResult);
+                        showToast("Download failed: " + dlResult);
+                        return;
+                    }
+
+                    File f = new File(modelPath);
+                    appendMessage("Model file size: " + f.length() + " bytes");
+                    runOnUiThread(() -> fileInfo.setText("Model file: " + filename + " (" + f.length() + " bytes, downloaded)"));
+
+                    // init model
+                    initModelInBackground(modelPath);
+                }).start();
+            }
+        });
+
+        // Send button behavior
+        sendButton.setOnClickListener(v -> {
+            final String userPrompt = promptInput.getText().toString();
+            if (userPrompt == null || userPrompt.trim().isEmpty()) {
+                showToast("Please enter a prompt");
+                return;
+            }
+            if (!modelLoaded) {
+                showToast("Model not loaded yet");
+                return;
+            }
+
+            // Convert to ChatML template (as original)
+            final String chatPrompt = toChatML(userPrompt);
+
+            appendMessage("Running generate...");
+            outputView.setText("");
+            new Thread(() -> {
+                String gen = null;
+                try {
+                    gen = llama.generate(chatPrompt);
+                    final String finalGen = gen;
+                    runOnUiThread(() -> {
+                        appendMessage("generate() returned.");
+                        outputView.setText(finalGen);
+                    });
+                } catch (Throwable t) {
+                    appendException("generate() threw", t);
+                    showToast("Generate error: " + t.getMessage());
+                }
+            }).start();
+        });
+    }
+
+    private void initModelInBackground(final String modelPath) {
+        runOnUiThread(() -> {
+            appendMessage("Initializing model...");
+            fileInfo.setText("Initializing model...");
+            progressBar.setProgress(0);
+            loadButton.setEnabled(false);
+        });
+
         new Thread(() -> {
-            try { Thread.sleep(100); } catch (InterruptedException ignored) {}
-
-            final String url =
-                "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v0.3-GGUF/resolve/main/"
-                + "tinyllama-1.1b-chat-v0.3.Q4_K_M.gguf";
-
-            File dir = getFilesDir();
-            File modelFile = new File(dir, "tinyllama.gguf");
-            final String modelPath = modelFile.getAbsolutePath();
-
-            appendMessage("Starting download: " + url);
-            appendMessage("Saving to: " + modelPath);
-
-            String dlResult = null;
-            try {
-                dlResult = llama.download(url, modelPath);
-                appendMessage("download() returned: " + dlResult);
-            } catch (Throwable t) {
-                appendException("download() threw", t);
-                showToast("Download error: " + t.getMessage());
-                return;
-            }
-
-            if (!"ok".equals(dlResult)) {
-                appendMessage("Download failed: " + dlResult);
-                showToast("Download failed: " + dlResult);
-                return;
-            }
-
-            appendMessage("Model file size: " + modelFile.length() + " bytes");
-            appendMessage("Download finished successfully. Calling init(modelPath) to load model...");
-
             String initResult = null;
             try {
                 initResult = llama.init(modelPath);
                 appendMessage("init(modelPath) returned: " + initResult);
             } catch (Throwable t) {
                 appendException("init(modelPath) threw", t);
-                showToast("Model init error: " + t.getMessage());
+                runOnUiThread(() -> {
+                    showToast("Model init error: " + t.getMessage());
+                    fileInfo.setText("Model init failed");
+                    loadButton.setEnabled(true);
+                });
                 return;
             }
 
-            // ★ ChatML（EOS 付き）テンプレートでプロンプト生成
-            String chatPrompt = toChatML("Hello!");
-
-            appendMessage("Running test generate(ChatML) ...");
-            String gen = null;
-            try {
-                gen = llama.generate(chatPrompt);
-                appendMessage("generate() returned:\n" + gen);
-            } catch (Throwable t) {
-                appendException("generate() threw", t);
-                showToast("Generate error: " + t.getMessage());
+            if (!"ok".equals(initResult)) {
+                appendMessage("Model init failed: " + initResult);
+                runOnUiThread(() -> {
+                    showToast("Model init failed: " + initResult);
+                    fileInfo.setText("Model init failed: " + initResult);
+                    loadButton.setEnabled(true);
+                });
+                return;
             }
+
+            // Mark loaded
+            modelLoaded = true;
+            currentModelPath = modelPath;
+            runOnUiThread(() -> {
+                appendMessage("Model initialized successfully.");
+                fileInfo.setText("Model loaded: " + (new File(modelPath).getName()));
+                sendButton.setEnabled(true);
+                loadButton.setEnabled(true);
+                progressBar.setProgress(100);
+            });
         }).start();
+    }
+
+    // Extract filename from URL (simple heuristic)
+    private String extractFilenameFromUrl(String url) {
+        if (url == null) return null;
+        int q = url.indexOf('?');
+        String pure = (q >= 0) ? url.substring(0, q) : url;
+        int slash = pure.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < pure.length()) {
+            return pure.substring(slash + 1);
+        }
+        return null;
     }
 
     // ★ ChatML（EOS 付き）テンプレート
