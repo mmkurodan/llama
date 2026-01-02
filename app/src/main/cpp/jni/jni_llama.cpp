@@ -196,6 +196,16 @@ Java_com_example_ollama_LlamaNative_download(
         jstring jurl,
         jstring jpath) {
 
+    // Ensure we have a stored JavaVM for callbacks even if init() has not been called yet
+    if (!g_jvm) {
+        if (env->GetJavaVM(&g_jvm) != JNI_OK) {
+            g_jvm = nullptr;
+            log_to_file("download: GetJavaVM failed");
+        } else {
+            log_to_file("download: JavaVM stored");
+        }
+    }
+
     const char* url  = env->GetStringUTFChars(jurl,  nullptr);
     const char* path = env->GetStringUTFChars(jpath, nullptr);
 
