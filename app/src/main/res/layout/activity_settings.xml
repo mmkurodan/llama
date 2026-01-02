@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Configuration Management Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Configuration Management"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Configuration Name:"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/configNameInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter configuration name"
+            android:inputType="text" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="8dp">
+
+            <Button
+                android:id="@+id/saveConfigButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Save Config"
+                android:layout_marginEnd="4dp" />
+
+            <Button
+                android:id="@+id/deleteConfigButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Delete Config"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Load Configuration:"
+            android:paddingTop="8dp" />
+
+        <Spinner
+            android:id="@+id/configSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+
+        <Button
+            android:id="@+id/loadConfigButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Load Selected Config" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Model Selection Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model Selection"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model Download URL:" />
+
+        <EditText
+            android:id="@+id/modelUrlInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="https://..."
+            android:inputType="textUri"
+            android:minLines="2" />
+
+        <Button
+            android:id="@+id/loadModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Load Model" />
+
+        <TextView
+            android:id="@+id/modelFileInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model file: (none)"
+            android:paddingTop="8dp" />
+
+        <ProgressBar
+            android:id="@+id/modelProgressBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:max="100"
+            android:progress="0" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Model Parameters Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model Parameters"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Context Size (n_ctx):" />
+
+        <EditText
+            android:id="@+id/nCtxInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 2048"
+            android:inputType="number"
+            android:text="2048" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Threads (n_threads):"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/nThreadsInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 2"
+            android:inputType="number"
+            android:text="2" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Batch Size (n_batch):"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/nBatchInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 16"
+            android:inputType="number"
+            android:text="16" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Temperature (temp):"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/tempInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 0.7"
+            android:inputType="numberDecimal"
+            android:text="0.7" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Top-p (top_p):"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/topPInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 0.9"
+            android:inputType="numberDecimal"
+            android:text="0.9" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Top-k (top_k):"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/topKInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 40"
+            android:inputType="number"
+            android:text="40" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Prompt Template Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Prompt Template"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Template (use {USER_INPUT} as placeholder):"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/promptTemplateInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter prompt template"
+            android:inputType="textMultiLine"
+            android:minLines="4"
+            android:gravity="top|start" />
+
+        <!-- Back Button -->
+        <Button
+            android:id="@+id/backButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Back to Main"
+            android:layout_marginTop="16dp" />
+
+    </LinearLayout>
+</ScrollView>
