@@ -131,9 +131,13 @@ public class MainActivity extends Activity {
         topKInput.setHint("Default: 40");
         
         // Separator between parameters and model loading
-        TextView separator = new TextView(this);
-        separator.setText("─────────────────────────");
-        separator.setPadding(0, dpToPx(8), 0, dpToPx(8));
+        View separator = new View(this);
+        separator.setBackgroundColor(0xFFCCCCCC); // Light gray separator
+        LinearLayout.LayoutParams separatorParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dpToPx(1));
+        separatorParams.topMargin = dpToPx(8);
+        separatorParams.bottomMargin = dpToPx(8);
 
         // URL input + Load button + file info + progress
         urlInput = new EditText(this);
@@ -166,71 +170,29 @@ public class MainActivity extends Activity {
         outputView.setPadding(logPadding, logPadding, logPadding, logPadding);
 
         // Add views to root in order
-        root.addView(paramsHeader, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(nCtxLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(nCtxInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(nThreadsLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(nThreadsInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(nBatchLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(nBatchInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(tempLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(tempInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(topPLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(topPInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(topKLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(topKInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(separator, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(paramsHeader, createMatchParentWrapContentParams());
+        root.addView(nCtxLabel, createMatchParentWrapContentParams());
+        root.addView(nCtxInput, createMatchParentWrapContentParams());
+        root.addView(nThreadsLabel, createMatchParentWrapContentParams());
+        root.addView(nThreadsInput, createMatchParentWrapContentParams());
+        root.addView(nBatchLabel, createMatchParentWrapContentParams());
+        root.addView(nBatchInput, createMatchParentWrapContentParams());
+        root.addView(tempLabel, createMatchParentWrapContentParams());
+        root.addView(tempInput, createMatchParentWrapContentParams());
+        root.addView(topPLabel, createMatchParentWrapContentParams());
+        root.addView(topPInput, createMatchParentWrapContentParams());
+        root.addView(topKLabel, createMatchParentWrapContentParams());
+        root.addView(topKInput, createMatchParentWrapContentParams());
+        root.addView(separator, separatorParams);
         
-        root.addView(urlInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(loadButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(fileInfo, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(progressBar, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(urlInput, createMatchParentWrapContentParams());
+        root.addView(loadButton, createMatchParentWrapContentParams());
+        root.addView(fileInfo, createMatchParentWrapContentParams());
+        root.addView(progressBar, createMatchParentWrapContentParams());
 
-        root.addView(promptInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(sendButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(outputView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(promptInput, createMatchParentWrapContentParams());
+        root.addView(sendButton, createMatchParentWrapContentParams());
+        root.addView(outputView, createMatchParentWrapContentParams());
 
         // Finally add log area at bottom (fill)
         LinearLayout.LayoutParams lpLog = new LinearLayout.LayoutParams(
@@ -453,5 +415,11 @@ public class MainActivity extends Activity {
     private int dpToPx(int dp) {
         float density = getResources().getDisplayMetrics().density;
         return Math.round(dp * density);
+    }
+
+    private LinearLayout.LayoutParams createMatchParentWrapContentParams() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 }
