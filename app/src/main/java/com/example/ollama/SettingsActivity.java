@@ -21,6 +21,7 @@ import java.util.List;
 
 public class SettingsActivity extends Activity {
     private static final String TAG = "SettingsActivity";
+    private static final String DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
     
     public static final String EXTRA_CONFIG_NAME = "config_name";
     public static final String EXTRA_MODEL_PATH = "model_path";
@@ -391,7 +392,7 @@ public class SettingsActivity extends Activity {
         
         config.drySequenceBreakers = drySequenceBreakersInput.getText().toString();
         if (config.drySequenceBreakers.isEmpty()) {
-            config.drySequenceBreakers = "\\n,:,\",*";
+            config.drySequenceBreakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
         }
         
         return config;

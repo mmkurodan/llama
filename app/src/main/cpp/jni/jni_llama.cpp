@@ -41,6 +41,9 @@ static float g_temp       = 0.7f;
 static float g_top_p      = 0.9f;
 static int   g_top_k      = 40;
 
+// DRY sequence breakers default - must match Java default
+static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
+
 // Penalty parameters
 static int   g_penalty_last_n    = 64;
 static float g_penalty_repeat    = 1.0f;
@@ -66,7 +69,7 @@ static float g_dry_multiplier       = 0.0f;
 static float g_dry_base             = 1.75f;
 static int   g_dry_allowed_length   = 2;
 static int   g_dry_penalty_last_n   = -1;
-static std::string g_dry_sequence_breakers = "\\n,:,\",*";
+static std::string g_dry_sequence_breakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
 
 // ---------------- ログユーティリティ ----------------
 static std::string current_time_str() {
@@ -111,6 +114,27 @@ static std::string jstring_to_std(JNIEnv *env, jstring jstr) {
 static void throw_java_exception(JNIEnv *env, const char *msg) {
     jclass exClass = env->FindClass("java/lang/RuntimeException");
     if (exClass) env->ThrowNew(exClass, msg);
+}
+
+// Helper function to process escape sequences in a string
+// Converts user-friendly escape sequences like "\n" (backslash+n) to actual characters (newline)
+static std::string process_escape_sequences(const std::string& input) {
+    std::string result;
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (input[i] == '\\' && i + 1 < input.size()) {
+            switch (input[i + 1]) {
+                case 'n': result += '\n'; i++; break;
+                case 't': result += '\t'; i++; break;
+                case 'r': result += '\r'; i++; break;
+                case '\\': result += '\\'; i++; break;
+                case '"': result += '"'; i++; break;
+                default: result += input[i]; break;
+            }
+        } else {
+            result += input[i];
+        }
+    }
+    return result;
 }
 
 // ---------------- download() 用 ----------------
@@ -636,44 +660,13 @@ Java_com_example_ollama_LlamaNative_generate(
         while ((pos = temp.find(',')) != std::string::npos) {
             std::string token = temp.substr(0, pos);
             if (!token.empty()) {
-                // Convert escape sequences to actual characters
-                std::string processed;
-                for (size_t i = 0; i < token.size(); ++i) {
-                    if (token[i] == '\\' && i + 1 < token.size()) {
-                        switch (token[i + 1]) {
-                            case 'n': processed += '\n'; i++; break;
-                            case 't': processed += '\t'; i++; break;
-                            case 'r': processed += '\r'; i++; break;
-                            case '\\': processed += '\\'; i++; break;
-                            case '"': processed += '"'; i++; break;
-                            default: processed += token[i]; break;
-                        }
-                    } else {
-                        processed += token[i];
-                    }
-                }
-                breaker_strings.push_back(processed);
+                breaker_strings.push_back(process_escape_sequences(token));
             }
             temp.erase(0, pos + 1);
         }
         // Don't forget the last token
         if (!temp.empty()) {
-            std::string processed;
-            for (size_t i = 0; i < temp.size(); ++i) {
-                if (temp[i] == '\\' && i + 1 < temp.size()) {
-                    switch (temp[i + 1]) {
-                        case 'n': processed += '\n'; i++; break;
-                        case 't': processed += '\t'; i++; break;
-                        case 'r': processed += '\r'; i++; break;
-                        case '\\': processed += '\\'; i++; break;
-                        case '"': processed += '"'; i++; break;
-                        default: processed += temp[i]; break;
-                    }
-                } else {
-                    processed += temp[i];
-                }
-            }
-            breaker_strings.push_back(processed);
+            breaker_strings.push_back(process_escape_sequences(temp));
         }
         
         // Convert to const char* array
