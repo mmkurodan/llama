@@ -18,12 +18,14 @@ public class ConfigurationManager {
     private static final String TAG = "ConfigurationManager";
     private static final String CONFIG_DIR = "configs";
     private static final String DEFAULT_CONFIG_NAME = "default";
-    private static final String DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
     
     private final Context context;
     private final File configDir;
     
     public static class Configuration {
+        // Default constant for DRY sequence breakers (must match C++ DEFAULT_DRY_SEQUENCE_BREAKERS)
+        public static final String DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
+        
         public String name;
         public String modelUrl;
         public int nCtx;

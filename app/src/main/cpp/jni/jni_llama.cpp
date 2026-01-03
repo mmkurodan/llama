@@ -41,7 +41,7 @@ static float g_temp       = 0.7f;
 static float g_top_p      = 0.9f;
 static int   g_top_k      = 40;
 
-// DRY sequence breakers default - must match Java default
+// DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
 
 // Penalty parameters
