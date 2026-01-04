@@ -6,7 +6,8 @@
 
     <application
         android:label="llama"
-        android:theme="@android:style/Theme.Material.Light">
+        android:theme="@android:style/Theme.Material.Light"
+        android:icon="@mipmap/ic_launcher">
 
         <activity
             android:name=".MainActivity"
