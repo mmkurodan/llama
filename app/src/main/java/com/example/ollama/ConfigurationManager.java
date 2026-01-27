@@ -64,20 +64,20 @@ public class ConfigurationManager {
         public String drySequenceBreakers;
         
         public Configuration() {
-            // Default values
+            // Default values - Gemma 1B Japanese assistant
             name = DEFAULT_CONFIG_NAME;
-            modelUrl = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
+            modelUrl = "https://huggingface.co/vinhnx90/gemma-3-1b-thinking-v2-Q4_K_M-GGUF/resolve/main/gemma-3-1b-thinking-v2-q4_k_m.gguf?download=true";
             nCtx = 2048;
-            nThreads = 2;
+            nThreads = 4;
             nBatch = 16;
             temp = 0.7;
             topP = 0.9;
             topK = 40;
-            promptTemplate = "<|system|>\nYou are a helpful assistant.\n<|user|>\n{USER_INPUT}\n<|assistant|>\n";
+            promptTemplate = "<start_of_turn>system\nあなたは日本語で丁寧かつ自然に応答するアシスタントです。簡潔で分かりやすく答えてください。\n<end_of_turn>\n<start_of_turn>user\n{USER_INPUT}\n<end_of_turn>\n<start_of_turn>model";
             
             // Penalty parameters defaults
             penaltyLastN = 64;
-            penaltyRepeat = 1.0;
+            penaltyRepeat = 1.15;
             penaltyFreq = 0.0;
             penaltyPresent = 0.0;
             
