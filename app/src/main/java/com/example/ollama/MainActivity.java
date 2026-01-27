@@ -1,6 +1,9 @@
 package com.example.ollama;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -43,6 +46,8 @@ public class MainActivity extends Activity {
     private Button viewLogButton;
     private Button clearLogButton;
     private Button apiServerButton;
+    private Button copyOutputButton;
+    private Button copyLogButton;
     private TextView apiServerStatusMain;
 
     // Llama native instance (field so callbacks can update UI)
@@ -88,6 +93,8 @@ public class MainActivity extends Activity {
         viewLogButton = findViewById(R.id.viewLogButton);
         clearLogButton = findViewById(R.id.clearLogButton);
         apiServerButton = findViewById(R.id.apiServerButton);
+        copyOutputButton = findViewById(R.id.copyOutputButton);
+        copyLogButton = findViewById(R.id.copyLogButton);
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
 
         appendMessage("UI ready.");
@@ -111,6 +118,8 @@ public class MainActivity extends Activity {
         viewLogButton.setOnClickListener(v -> viewLogFile());
         clearLogButton.setOnClickListener(v -> clearLogFile());
         apiServerButton.setOnClickListener(v -> toggleApiServer());
+        copyOutputButton.setOnClickListener(v -> copyToClipboard("Output", outputView.getText().toString()));
+        copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
         
         // Initialize API server
         initApiServer();
@@ -340,6 +349,13 @@ public class MainActivity extends Activity {
             toast.setGravity(Gravity.CENTER, 0, 0);
             toast.show();
         });
+    }
+    
+    private void copyToClipboard(String label, String text) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText(label, text);
+        clipboard.setPrimaryClip(clip);
+        showToast(label + " copied to clipboard");
     }
     
     private void initApiServer() {
