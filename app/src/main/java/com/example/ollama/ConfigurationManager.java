@@ -77,7 +77,7 @@ public class ConfigurationManager {
             
             // Penalty parameters defaults
             penaltyLastN = 64;
-            penaltyRepeat = 1.15;
+            penaltyRepeat = 1.1;
             penaltyFreq = 0.0;
             penaltyPresent = 0.0;
             
@@ -87,7 +87,7 @@ public class ConfigurationManager {
             mirostatEta = 0.1;
             
             // Additional sampling parameters defaults
-            minP = 0.05;
+            minP = 0.01;
             typicalP = 1.0;
             dynatempRange = 0.0;
             dynatempExponent = 1.0;
@@ -164,7 +164,7 @@ public class ConfigurationManager {
             
             // Penalty parameters (with defaults for backward compatibility)
             config.penaltyLastN = json.optInt("penaltyLastN", 64);
-            config.penaltyRepeat = json.optDouble("penaltyRepeat", 1.0);
+            config.penaltyRepeat = json.optDouble("penaltyRepeat", 1.1);
             config.penaltyFreq = json.optDouble("penaltyFreq", 0.0);
             config.penaltyPresent = json.optDouble("penaltyPresent", 0.0);
             
@@ -174,7 +174,7 @@ public class ConfigurationManager {
             config.mirostatEta = json.optDouble("mirostatEta", 0.1);
             
             // Additional sampling parameters (with defaults for backward compatibility)
-            config.minP = json.optDouble("minP", 0.05);
+            config.minP = json.optDouble("minP", 0.01);
             config.typicalP = json.optDouble("typicalP", 1.0);
             config.dynatempRange = json.optDouble("dynatempRange", 0.0);
             config.dynatempExponent = json.optDouble("dynatempExponent", 1.0);
