@@ -363,16 +363,9 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         apiPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         
-        // Create API server with a new LlamaNative instance for independent operation
-        LlamaNative apiLlama = new LlamaNative();
-        File logFile = new File(getExternalFilesDir(null), "ollama_api.log");
-        try {
-            apiLlama.setLogPath(logFile.getAbsolutePath());
-        } catch (Throwable t) {
-            Log.e(TAG, "Failed to set API log path", t);
-        }
-        
-        apiServer = new OllamaApiServer(this, apiLlama);
+        // Share the same LlamaNative instance with API server to avoid redundant model loading
+        // This ensures that if the model is already loaded in the main UI, API requests can reuse it
+        apiServer = new OllamaApiServer(this, llama);
         apiServer.setPort(apiPort);
         apiServer.setListener(new OllamaApiServer.ServerListener() {
             @Override

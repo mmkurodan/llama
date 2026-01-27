@@ -40,6 +40,7 @@ public class OllamaApiServer {
     
     private ServerSocket serverSocket;
     private ExecutorService executorService;
+    private ExecutorService generateExecutor; // Single-threaded executor for serialized generation
     private final AtomicBoolean running = new AtomicBoolean(false);
     private int port = DEFAULT_PORT;
     
@@ -87,6 +88,7 @@ public class OllamaApiServer {
         }
         
         executorService = Executors.newCachedThreadPool();
+        generateExecutor = Executors.newSingleThreadExecutor(); // Serialize generate() calls to prevent contention
         executorService.submit(() -> {
             try {
                 serverSocket = new ServerSocket(port);
@@ -129,6 +131,10 @@ public class OllamaApiServer {
         
         if (executorService != null) {
             executorService.shutdownNow();
+        }
+        
+        if (generateExecutor != null) {
+            generateExecutor.shutdownNow();
         }
         
         Log.i(TAG, "Ollama API server stopped");
@@ -240,13 +246,31 @@ public class OllamaApiServer {
                 listener.onGenerating(model);
             }
             
-            // Generate response
-            String response = llama.generate(prompt);
+            // Use serialized executor to prevent concurrent generate() calls which cause high load
+            final String finalModel = model;
+            final String finalPrompt = prompt;
+            final boolean finalStream = stream;
             
-            if (stream) {
+            java.util.concurrent.Future<String> future = generateExecutor.submit(() -> llama.generate(finalPrompt));
+            
+            String response;
+            try {
+                response = future.get(120, java.util.concurrent.TimeUnit.SECONDS); // 120 second timeout
+            } catch (java.util.concurrent.TimeoutException e) {
+                Log.e(TAG, "Generate timed out", e);
+                sendErrorResponse(outputStream, 504, "Generation timed out");
+                future.cancel(true);
+                return;
+            } catch (Exception e) {
+                Log.e(TAG, "Generate failed", e);
+                sendErrorResponse(outputStream, 500, "Generation failed: " + e.getMessage());
+                return;
+            }
+            
+            if (finalStream) {
                 // Streaming response (single chunk for simplicity)
                 JSONObject chunk = new JSONObject();
-                chunk.put("model", model);
+                chunk.put("model", finalModel);
                 chunk.put("created_at", getTimestamp());
                 chunk.put("response", response);
                 chunk.put("done", true);
@@ -255,7 +279,7 @@ public class OllamaApiServer {
             } else {
                 // Non-streaming response
                 JSONObject result = new JSONObject();
-                result.put("model", model);
+                result.put("model", finalModel);
                 result.put("created_at", getTimestamp());
                 result.put("response", response);
                 result.put("done", true);
@@ -293,13 +317,31 @@ public class OllamaApiServer {
             // Build prompt from messages
             String prompt = buildPromptFromMessages(messages, model);
             
-            // Generate response
-            String response = llama.generate(prompt);
+            // Use serialized executor to prevent concurrent generate() calls which cause high load
+            final String finalModel = model;
+            final String finalPrompt = prompt;
+            final boolean finalStream = stream;
             
-            if (stream) {
+            java.util.concurrent.Future<String> future = generateExecutor.submit(() -> llama.generate(finalPrompt));
+            
+            String response;
+            try {
+                response = future.get(120, java.util.concurrent.TimeUnit.SECONDS); // 120 second timeout
+            } catch (java.util.concurrent.TimeoutException e) {
+                Log.e(TAG, "Chat generate timed out", e);
+                sendErrorResponse(outputStream, 504, "Generation timed out");
+                future.cancel(true);
+                return;
+            } catch (Exception e) {
+                Log.e(TAG, "Chat generate failed", e);
+                sendErrorResponse(outputStream, 500, "Generation failed: " + e.getMessage());
+                return;
+            }
+            
+            if (finalStream) {
                 // Streaming response
                 JSONObject chunk = new JSONObject();
-                chunk.put("model", model);
+                chunk.put("model", finalModel);
                 chunk.put("created_at", getTimestamp());
                 
                 JSONObject message = new JSONObject();
@@ -312,7 +354,7 @@ public class OllamaApiServer {
             } else {
                 // Non-streaming response
                 JSONObject result = new JSONObject();
-                result.put("model", model);
+                result.put("model", finalModel);
                 result.put("created_at", getTimestamp());
                 
                 JSONObject message = new JSONObject();
