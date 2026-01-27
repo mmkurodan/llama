@@ -585,6 +585,44 @@
             android:minLines="4"
             android:gravity="top|start" />
 
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Ollama API Server Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ollama API Server"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Server Port (default: 11434):" />
+
+        <EditText
+            android:id="@+id/apiPortInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: 11434"
+            android:inputType="number"
+            android:text="11434" />
+
+        <TextView
+            android:id="@+id/apiServerStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Server: Stopped"
+            android:paddingTop="8dp"
+            android:textStyle="italic" />
+
         <!-- Back Button -->
         <Button
             android:id="@+id/backButton"

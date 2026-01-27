@@ -2,6 +2,7 @@ package com.example.ollama;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
@@ -27,6 +28,10 @@ public class SettingsActivity extends Activity {
     public static final String EXTRA_CONFIG_NAME = "config_name";
     public static final String EXTRA_MODEL_PATH = "model_path";
     public static final String EXTRA_MODEL_LOADED = "model_loaded";
+    public static final String EXTRA_API_PORT = "api_port";
+    
+    private static final String PREFS_NAME = "ollama_prefs";
+    private static final String PREF_API_PORT = "api_port";
     
     private ConfigurationManager configManager;
     private LlamaNative llama;
@@ -72,6 +77,10 @@ public class SettingsActivity extends Activity {
     private EditText dryAllowedLengthInput;
     private EditText dryPenaltyLastNInput;
     private EditText drySequenceBreakersInput;
+    
+    // API Server settings
+    private EditText apiPortInput;
+    private TextView apiServerStatus;
     
     private ConfigurationManager.Configuration currentConfig;
     private ArrayAdapter<String> configAdapter;
@@ -155,6 +164,15 @@ public class SettingsActivity extends Activity {
         dryAllowedLengthInput = findViewById(R.id.dryAllowedLengthInput);
         dryPenaltyLastNInput = findViewById(R.id.dryPenaltyLastNInput);
         drySequenceBreakersInput = findViewById(R.id.drySequenceBreakersInput);
+        
+        // API Server settings
+        apiPortInput = findViewById(R.id.apiPortInput);
+        apiServerStatus = findViewById(R.id.apiServerStatus);
+        
+        // Load saved API port
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int savedPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
+        apiPortInput.setText(String.valueOf(savedPort));
         
         Button saveConfigButton = findViewById(R.id.saveConfigButton);
         Button loadConfigButton = findViewById(R.id.loadConfigButton);
@@ -596,6 +614,16 @@ public class SettingsActivity extends Activity {
     
     @Override
     public void finish() {
+        // Save API port to preferences
+        int apiPort = OllamaApiServer.DEFAULT_PORT;
+        try {
+            apiPort = Integer.parseInt(apiPortInput.getText().toString());
+        } catch (NumberFormatException e) {
+            // Use default
+        }
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().putInt(PREF_API_PORT, apiPort).apply();
+        
         // Return the current configuration name and model info to MainActivity
         Intent resultIntent = new Intent();
         if (currentConfig != null) {
@@ -605,6 +633,7 @@ public class SettingsActivity extends Activity {
             resultIntent.putExtra(EXTRA_MODEL_PATH, loadedModelPath);
             resultIntent.putExtra(EXTRA_MODEL_LOADED, modelLoadedSuccessfully);
         }
+        resultIntent.putExtra(EXTRA_API_PORT, apiPort);
         setResult(RESULT_OK, resultIntent);
         super.finish();
     }

@@ -2,6 +2,7 @@ package com.example.ollama;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ScrollView;
@@ -27,6 +28,8 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_SETTINGS = 1;
+    private static final String PREFS_NAME = "ollama_prefs";
+    private static final String PREF_API_PORT = "api_port";
     
     private TextView logView;           // log view (append-only)
     private ScrollView logScrollView;
@@ -39,6 +42,8 @@ public class MainActivity extends Activity {
     private Button initModelButton;
     private Button viewLogButton;
     private Button clearLogButton;
+    private Button apiServerButton;
+    private TextView apiServerStatusMain;
 
     // Llama native instance (field so callbacks can update UI)
     private LlamaNative llama;
@@ -50,6 +55,10 @@ public class MainActivity extends Activity {
     // Model tracking
     private volatile boolean modelLoaded = false;
     private String currentModelPath = null;
+    
+    // API Server
+    private OllamaApiServer apiServer;
+    private int apiPort = OllamaApiServer.DEFAULT_PORT;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +87,8 @@ public class MainActivity extends Activity {
         initModelButton = findViewById(R.id.initModelButton);
         viewLogButton = findViewById(R.id.viewLogButton);
         clearLogButton = findViewById(R.id.clearLogButton);
+        apiServerButton = findViewById(R.id.apiServerButton);
+        apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
 
         appendMessage("UI ready.");
 
@@ -99,6 +110,10 @@ public class MainActivity extends Activity {
         initModelButton.setOnClickListener(v -> reinitializeModel());
         viewLogButton.setOnClickListener(v -> viewLogFile());
         clearLogButton.setOnClickListener(v -> clearLogFile());
+        apiServerButton.setOnClickListener(v -> toggleApiServer());
+        
+        // Initialize API server
+        initApiServer();
 
         // Send button behavior
         sendButton.setOnClickListener(v -> {
@@ -195,6 +210,19 @@ public class MainActivity extends Activity {
                 modelLoaded = true;
                 sendButton.setEnabled(true);
                 appendMessage("Model loaded from Settings: " + new File(modelPath).getName());
+            }
+            
+            // Update API port if changed
+            int newPort = data.getIntExtra(SettingsActivity.EXTRA_API_PORT, OllamaApiServer.DEFAULT_PORT);
+            if (newPort != apiPort) {
+                apiPort = newPort;
+                appendMessage("API port changed to: " + apiPort);
+                // Restart server if running
+                if (apiServer != null && apiServer.isRunning()) {
+                    apiServer.stop();
+                    apiServer.setPort(apiPort);
+                    apiServer.start();
+                }
             }
         }
     }
@@ -312,5 +340,100 @@ public class MainActivity extends Activity {
             toast.setGravity(Gravity.CENTER, 0, 0);
             toast.show();
         });
+    }
+    
+    private void initApiServer() {
+        // Load saved port from preferences
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        apiPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
+        
+        // Create API server with a new LlamaNative instance for independent operation
+        LlamaNative apiLlama = new LlamaNative();
+        File logFile = new File(getExternalFilesDir(null), "ollama_api.log");
+        try {
+            apiLlama.setLogPath(logFile.getAbsolutePath());
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to set API log path", t);
+        }
+        
+        apiServer = new OllamaApiServer(this, apiLlama);
+        apiServer.setPort(apiPort);
+        apiServer.setListener(new OllamaApiServer.ServerListener() {
+            @Override
+            public void onServerStarted(int port) {
+                runOnUiThread(() -> {
+                    apiServerButton.setText("Stop API Server");
+                    apiServerStatusMain.setText("API: Running on port " + port);
+                    appendMessage("Ollama API server started on port " + port);
+                });
+            }
+            
+            @Override
+            public void onServerStopped() {
+                runOnUiThread(() -> {
+                    apiServerButton.setText("Start API Server");
+                    apiServerStatusMain.setText("API: Stopped");
+                    appendMessage("Ollama API server stopped");
+                });
+            }
+            
+            @Override
+            public void onServerError(String error) {
+                runOnUiThread(() -> {
+                    appendMessage("API Server Error: " + error);
+                    showToast("API Server Error: " + error);
+                });
+            }
+            
+            @Override
+            public void onRequest(String method, String path) {
+                runOnUiThread(() -> {
+                    appendMessage("API Request: " + method + " " + path);
+                });
+            }
+            
+            @Override
+            public void onModelLoading(String configName) {
+                runOnUiThread(() -> {
+                    appendMessage("API: Loading configuration: " + configName);
+                });
+            }
+            
+            @Override
+            public void onModelLoaded(String configName) {
+                runOnUiThread(() -> {
+                    appendMessage("API: Model loaded for configuration: " + configName);
+                });
+            }
+            
+            @Override
+            public void onGenerating(String configName) {
+                runOnUiThread(() -> {
+                    appendMessage("API: Generating with configuration: " + configName);
+                });
+            }
+        });
+        
+        appendMessage("API server initialized (port: " + apiPort + ")");
+    }
+    
+    private void toggleApiServer() {
+        if (apiServer == null) {
+            initApiServer();
+        }
+        
+        if (apiServer.isRunning()) {
+            apiServer.stop();
+        } else {
+            apiServer.start();
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (apiServer != null && apiServer.isRunning()) {
+            apiServer.stop();
+        }
     }
 }
