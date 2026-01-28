@@ -96,9 +96,25 @@ static void log_to_file(const std::string& msg) {
 
 // ---------------- llama.cpp ログコールバック ----------------
 // 0.17.1 は llama_log_level ではなく ggml_log_level を使う
+// Filter out DEBUG level logs to reduce noise (e.g., "Not marked as EOG" messages)
 static void llama_log_callback(enum ggml_log_level level, const char * text, void * user_data) {
+    // Skip DEBUG level logs to avoid flooding with "Not marked as EOG" etc.
+    if (level == GGML_LOG_LEVEL_DEBUG) {
+        return;
+    }
     std::string msg = text ? text : "";
-    LOGI("[llama.cpp] %s", msg.c_str());
+    // Skip empty messages and continuation messages
+    if (msg.empty() || msg == "\n") {
+        return;
+    }
+    // Only log INFO, WARN, ERROR levels
+    if (level == GGML_LOG_LEVEL_ERROR) {
+        LOGE("[llama.cpp] %s", msg.c_str());
+    } else if (level == GGML_LOG_LEVEL_WARN) {
+        LOGI("[llama.cpp WARN] %s", msg.c_str());
+    } else if (level == GGML_LOG_LEVEL_INFO || level == GGML_LOG_LEVEL_NONE) {
+        LOGI("[llama.cpp] %s", msg.c_str());
+    }
     log_to_file(std::string("llama.cpp: ") + msg);
 }
 
@@ -797,20 +813,14 @@ Java_com_example_ollama_LlamaNative_generate(
             }
 
             prev_text = full;
-
-            {
+            // Verbose per-token logging removed to reduce log noise
+        } else {
+            // Only log if detokenize fails (unusual case)
+            if (n_chars < 0) {
                 std::ostringstream ss;
-                ss << "generate: output token id=" << (int)id
-                   << " piece=\"" << full << "\" i=" << i
-                   << " n_chars=" << n_chars;
+                ss << "generate: detokenize error n_chars=" << n_chars;
                 log_to_file(ss.str());
             }
-        } else {
-            std::ostringstream ss;
-            ss << "generate: detokenize returned n_chars=" << n_chars
-               << " id=" << (int)id
-               << " out_tokens_size=" << out_tokens.size();
-            log_to_file(ss.str());
         }
 
         // feed token into model for next step using batch API
