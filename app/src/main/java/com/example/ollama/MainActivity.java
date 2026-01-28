@@ -6,6 +6,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ScrollView;
@@ -49,17 +50,13 @@ public class MainActivity extends Activity {
     private Button copyOutputButton;
     private Button copyLogButton;
     private TextView apiServerStatusMain;
-
-    // Llama native instance (field so callbacks can update UI)
-    private LlamaNative llama;
+    
+    // Model Manager (singleton)
+    private ModelManager modelManager;
     
     // Configuration
     private ConfigurationManager configManager;
     private ConfigurationManager.Configuration currentConfig;
-
-    // Model tracking
-    private volatile boolean modelLoaded = false;
-    private String currentModelPath = null;
     
     // API Server
     private OllamaApiServer apiServer;
@@ -99,18 +96,8 @@ public class MainActivity extends Activity {
 
         appendMessage("UI ready.");
 
-        // Instantiate LlamaNative
-        llama = new LlamaNative();
-
-        // Set JNI log path (external files dir)
-        File logFile = new File(getExternalFilesDir(null), "ollama.log");
-        final String logPath = logFile.getAbsolutePath();
-        try {
-            llama.setLogPath(logPath);
-            appendMessage("Set JNI log path: " + logPath);
-        } catch (Throwable t) {
-            appendMessage("Failed to call setLogPath(): " + t.getMessage());
-        }
+        // Initialize ModelManager singleton
+        modelManager = ModelManager.getInstance(this);
 
         // Set up button listeners
         settingsButton.setOnClickListener(v -> openSettings());
@@ -131,39 +118,15 @@ public class MainActivity extends Activity {
                 showToast("Please enter a prompt");
                 return;
             }
-            if (!modelLoaded) {
+            if (!modelManager.isModelLoaded()) {
                 showToast("Model not loaded yet. Please load a model in Settings.");
                 return;
             }
-
-            // Set parameters before generating
-            if (currentConfig != null) {
-                try {
-                    llama.setParameters(
-                        currentConfig.penaltyLastN,
-                        (float)currentConfig.penaltyRepeat,
-                        (float)currentConfig.penaltyFreq,
-                        (float)currentConfig.penaltyPresent,
-                        currentConfig.mirostat,
-                        (float)currentConfig.mirostatTau,
-                        (float)currentConfig.mirostatEta,
-                        (float)currentConfig.minP,
-                        (float)currentConfig.typicalP,
-                        (float)currentConfig.dynatempRange,
-                        (float)currentConfig.dynatempExponent,
-                        (float)currentConfig.xtcProbability,
-                        (float)currentConfig.xtcThreshold,
-                        (float)currentConfig.topNSigma,
-                        (float)currentConfig.dryMultiplier,
-                        (float)currentConfig.dryBase,
-                        currentConfig.dryAllowedLength,
-                        currentConfig.dryPenaltyLastN,
-                        currentConfig.drySequenceBreakers
-                    );
-                } catch (Throwable t) {
-                    Log.e(TAG, "Failed to set parameters", t);
-                    appendMessage("Warning: Failed to set parameters: " + t.getMessage());
-                }
+            
+            // Check if busy
+            if (!modelManager.tryAcquire()) {
+                showToast("Model is busy processing another request");
+                return;
             }
 
             // Apply prompt template
@@ -172,9 +135,13 @@ public class MainActivity extends Activity {
             appendMessage("Running generate...");
             outputView.setText("");
             new Thread(() -> {
-                String gen = null;
                 try {
-                    gen = llama.generate(chatPrompt);
+                    // Set parameters before generating
+                    if (currentConfig != null) {
+                        modelManager.applyConfiguration(currentConfig);
+                    }
+                    
+                    String gen = modelManager.generate(chatPrompt);
                     final String finalGen = gen;
                     runOnUiThread(() -> {
                         appendMessage("generate() returned.");
@@ -183,6 +150,8 @@ public class MainActivity extends Activity {
                 } catch (Throwable t) {
                     appendException("generate() threw", t);
                     showToast("Generate error: " + t.getMessage());
+                } finally {
+                    modelManager.release();
                 }
             }).start();
         });
@@ -215,9 +184,6 @@ public class MainActivity extends Activity {
             String modelPath = data.getStringExtra(SettingsActivity.EXTRA_MODEL_PATH);
             boolean wasModelLoaded = data.getBooleanExtra(SettingsActivity.EXTRA_MODEL_LOADED, false);
             if (modelPath != null && wasModelLoaded) {
-                currentModelPath = modelPath;
-                modelLoaded = true;
-                sendButton.setEnabled(true);
                 appendMessage("Model loaded from Settings: " + new File(modelPath).getName());
             }
             
@@ -237,6 +203,7 @@ public class MainActivity extends Activity {
     }
     
     private void reinitializeModel() {
+        String currentModelPath = modelManager.getCurrentModelPath();
         if (currentModelPath == null || currentModelPath.isEmpty()) {
             showToast("No model path available. Please load a model in Settings first.");
             return;
@@ -245,31 +212,33 @@ public class MainActivity extends Activity {
         appendMessage("Freeing current model...");
         new Thread(() -> {
             try {
-                llama.free();
+                modelManager.free();
                 runOnUiThread(() -> {
                     appendMessage("Model freed.");
-                    modelLoaded = false;
-                    sendButton.setEnabled(false);
                 });
                 
                 // Small delay to ensure cleanup
                 Thread.sleep(500);
                 
-                // Re-initialize
-                appendMessage("Re-initializing model...");
-                String initResult = llama.init(currentModelPath);
-                
-                final String finalInitResult = initResult;
-                runOnUiThread(() -> {
-                    appendMessage("init() returned: " + finalInitResult);
-                    if ("ok".equals(finalInitResult)) {
-                        modelLoaded = true;
-                        sendButton.setEnabled(true);
-                        showToast("Model re-initialized successfully");
-                    } else {
-                        showToast("Model re-initialization failed: " + finalInitResult);
+                // Re-initialize via loading default config
+                if (modelManager.tryAcquire()) {
+                    try {
+                        appendMessage("Re-initializing model...");
+                        boolean success = modelManager.loadConfiguration("default");
+                        
+                        runOnUiThread(() -> {
+                            if (success) {
+                                appendMessage("Model re-initialized successfully");
+                                showToast("Model re-initialized successfully");
+                            } else {
+                                appendMessage("Model re-initialization failed");
+                                showToast("Model re-initialization failed");
+                            }
+                        });
+                    } finally {
+                        modelManager.release();
                     }
-                });
+                }
             } catch (Throwable t) {
                 appendException("Model re-initialization error", t);
                 showToast("Error: " + t.getMessage());
@@ -363,9 +332,8 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         apiPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         
-        // Share the same LlamaNative instance with API server to avoid redundant model loading
-        // This ensures that if the model is already loaded in the main UI, API requests can reuse it
-        apiServer = new OllamaApiServer(this, llama);
+        // Use ModelManager for API server
+        apiServer = new OllamaApiServer(this, modelManager);
         apiServer.setPort(apiPort);
         apiServer.setListener(new OllamaApiServer.ServerListener() {
             @Override

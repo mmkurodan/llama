@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Ollama-compatible API server that provides /api/chat and /api/generate endpoints.
  * Uses registered Configurations as model names.
+ * Uses ModelManager for unified model management with busy state.
  */
 public class OllamaApiServer {
     private static final String TAG = "OllamaApiServer";
@@ -36,16 +37,12 @@ public class OllamaApiServer {
     
     private final Context context;
     private final ConfigurationManager configManager;
-    private final LlamaNative llama;
+    private final ModelManager modelManager;
     
     private ServerSocket serverSocket;
     private ExecutorService executorService;
-    private ExecutorService generateExecutor; // Single-threaded executor for serialized generation
     private final AtomicBoolean running = new AtomicBoolean(false);
     private int port = DEFAULT_PORT;
-    
-    private String currentLoadedConfig = null;
-    private String currentModelPath = null;
     
     public interface ServerListener {
         void onServerStarted(int port);
@@ -59,10 +56,10 @@ public class OllamaApiServer {
     
     private ServerListener listener;
     
-    public OllamaApiServer(Context context, LlamaNative llama) {
+    public OllamaApiServer(Context context, ModelManager modelManager) {
         this.context = context;
         this.configManager = new ConfigurationManager(context);
-        this.llama = llama;
+        this.modelManager = modelManager;
     }
     
     public void setListener(ServerListener listener) {
@@ -88,7 +85,6 @@ public class OllamaApiServer {
         }
         
         executorService = Executors.newCachedThreadPool();
-        generateExecutor = Executors.newSingleThreadExecutor(); // Serialize generate() calls to prevent contention
         executorService.submit(() -> {
             try {
                 serverSocket = new ServerSocket(port);
@@ -99,16 +95,20 @@ public class OllamaApiServer {
                     listener.onServerStarted(port);
                 }
                 
-                // Preload default configuration/model in background so API calls respond quickly
+                // Preload default configuration in background
                 executorService.submit(() -> {
-                    try {
-                        if (loadConfiguration("default")) {
-                            Log.i(TAG, "Preloaded default configuration");
-                        } else {
-                            Log.w(TAG, "Preload default configuration failed");
+                    if (modelManager.tryAcquire()) {
+                        try {
+                            if (modelManager.loadConfiguration("default")) {
+                                Log.i(TAG, "Preloaded default configuration");
+                            } else {
+                                Log.w(TAG, "Preload default configuration failed");
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "Preload exception", e);
+                        } finally {
+                            modelManager.release();
                         }
-                    } catch (Exception e) {
-                        Log.w(TAG, "Preload exception", e);
                     }
                 });
                 
@@ -144,10 +144,6 @@ public class OllamaApiServer {
         
         if (executorService != null) {
             executorService.shutdownNow();
-        }
-        
-        if (generateExecutor != null) {
-            generateExecutor.shutdownNow();
         }
         
         Log.i(TAG, "Ollama API server stopped");
@@ -249,55 +245,48 @@ public class OllamaApiServer {
             String prompt = request.optString("prompt", "");
             boolean stream = request.optBoolean("stream", true);
             
-            // Load model/configuration if needed
-            if (!loadConfiguration(model)) {
-                sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+            // Try to acquire busy lock - return 503 if busy
+            if (!modelManager.tryAcquire()) {
+                Log.w(TAG, "Model is busy, rejecting request");
+                sendErrorResponse(outputStream, 503, "Model is busy processing another request");
                 return;
             }
             
-            if (listener != null) {
-                listener.onGenerating(model);
-            }
-            
-            // Use serialized executor to prevent concurrent generate() calls which cause high load
-            final String finalModel = model;
-            final String finalPrompt = prompt;
-            final boolean finalStream = stream;
-            
-            java.util.concurrent.Future<String> future = generateExecutor.submit(() -> llama.generate(finalPrompt));
-            
-            String response;
             try {
-                response = future.get(600, java.util.concurrent.TimeUnit.SECONDS); // 600 second timeout
-            } catch (java.util.concurrent.TimeoutException e) {
-                Log.e(TAG, "Generate timed out", e);
-                sendErrorResponse(outputStream, 504, "Generation timed out");
-                future.cancel(true);
-                return;
-            } catch (Exception e) {
-                Log.e(TAG, "Generate failed", e);
-                sendErrorResponse(outputStream, 500, "Generation failed: " + e.getMessage());
-                return;
-            }
-            
-            if (finalStream) {
-                // Streaming response (single chunk for simplicity)
-                JSONObject chunk = new JSONObject();
-                chunk.put("model", finalModel);
-                chunk.put("created_at", getTimestamp());
-                chunk.put("response", response);
-                chunk.put("done", true);
+                // Load model/configuration if needed (will be fast if same config already loaded)
+                if (!modelManager.loadConfiguration(model)) {
+                    sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+                    return;
+                }
                 
-                sendStreamingResponse(outputStream, chunk.toString());
-            } else {
-                // Non-streaming response
-                JSONObject result = new JSONObject();
-                result.put("model", finalModel);
-                result.put("created_at", getTimestamp());
-                result.put("response", response);
-                result.put("done", true);
+                if (listener != null) {
+                    listener.onGenerating(model);
+                }
                 
-                sendJsonResponse(outputStream, 200, result.toString());
+                // Generate directly - same code path as UI
+                String response = modelManager.generate(prompt);
+                
+                if (stream) {
+                    // Streaming response (single chunk for simplicity)
+                    JSONObject chunk = new JSONObject();
+                    chunk.put("model", model);
+                    chunk.put("created_at", getTimestamp());
+                    chunk.put("response", response);
+                    chunk.put("done", true);
+                    
+                    sendStreamingResponse(outputStream, chunk.toString());
+                } else {
+                    // Non-streaming response
+                    JSONObject result = new JSONObject();
+                    result.put("model", model);
+                    result.put("created_at", getTimestamp());
+                    result.put("response", response);
+                    result.put("done", true);
+                    
+                    sendJsonResponse(outputStream, 200, result.toString());
+                }
+            } finally {
+                modelManager.release();
             }
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in generate request", e);
@@ -317,66 +306,59 @@ public class OllamaApiServer {
                 return;
             }
             
-            // Load model/configuration if needed
-            if (!loadConfiguration(model)) {
-                sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+            // Try to acquire busy lock - return 503 if busy
+            if (!modelManager.tryAcquire()) {
+                Log.w(TAG, "Model is busy, rejecting request");
+                sendErrorResponse(outputStream, 503, "Model is busy processing another request");
                 return;
             }
             
-            if (listener != null) {
-                listener.onGenerating(model);
-            }
-            
-            // Build prompt from messages
-            String prompt = buildPromptFromMessages(messages, model);
-            
-            // Use serialized executor to prevent concurrent generate() calls which cause high load
-            final String finalModel = model;
-            final String finalPrompt = prompt;
-            final boolean finalStream = stream;
-            
-            java.util.concurrent.Future<String> future = generateExecutor.submit(() -> llama.generate(finalPrompt));
-            
-            String response;
             try {
-                response = future.get(600, java.util.concurrent.TimeUnit.SECONDS); // 600 second timeout
-            } catch (java.util.concurrent.TimeoutException e) {
-                Log.e(TAG, "Chat generate timed out", e);
-                sendErrorResponse(outputStream, 504, "Generation timed out");
-                future.cancel(true);
-                return;
-            } catch (Exception e) {
-                Log.e(TAG, "Chat generate failed", e);
-                sendErrorResponse(outputStream, 500, "Generation failed: " + e.getMessage());
-                return;
-            }
-            
-            if (finalStream) {
-                // Streaming response
-                JSONObject chunk = new JSONObject();
-                chunk.put("model", finalModel);
-                chunk.put("created_at", getTimestamp());
+                // Load model/configuration if needed (will be fast if same config already loaded)
+                if (!modelManager.loadConfiguration(model)) {
+                    sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+                    return;
+                }
                 
-                JSONObject message = new JSONObject();
-                message.put("role", "assistant");
-                message.put("content", response);
-                chunk.put("message", message);
-                chunk.put("done", true);
+                if (listener != null) {
+                    listener.onGenerating(model);
+                }
                 
-                sendStreamingResponse(outputStream, chunk.toString());
-            } else {
-                // Non-streaming response
-                JSONObject result = new JSONObject();
-                result.put("model", finalModel);
-                result.put("created_at", getTimestamp());
+                // Build prompt from messages
+                String prompt = buildPromptFromMessages(messages, model);
                 
-                JSONObject message = new JSONObject();
-                message.put("role", "assistant");
-                message.put("content", response);
-                result.put("message", message);
-                result.put("done", true);
+                // Generate directly - same code path as UI
+                String response = modelManager.generate(prompt);
                 
-                sendJsonResponse(outputStream, 200, result.toString());
+                if (stream) {
+                    // Streaming response
+                    JSONObject chunk = new JSONObject();
+                    chunk.put("model", model);
+                    chunk.put("created_at", getTimestamp());
+                    
+                    JSONObject message = new JSONObject();
+                    message.put("role", "assistant");
+                    message.put("content", response);
+                    chunk.put("message", message);
+                    chunk.put("done", true);
+                    
+                    sendStreamingResponse(outputStream, chunk.toString());
+                } else {
+                    // Non-streaming response
+                    JSONObject result = new JSONObject();
+                    result.put("model", model);
+                    result.put("created_at", getTimestamp());
+                    
+                    JSONObject message = new JSONObject();
+                    message.put("role", "assistant");
+                    message.put("content", response);
+                    result.put("message", message);
+                    result.put("done", true);
+                    
+                    sendJsonResponse(outputStream, 200, result.toString());
+                }
+            } finally {
+                modelManager.release();
             }
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in chat request", e);
@@ -425,90 +407,6 @@ public class OllamaApiServer {
             "\r\n";
         outputStream.write(response.getBytes(StandardCharsets.UTF_8));
         outputStream.flush();
-    }
-    
-    private synchronized boolean loadConfiguration(String configName) {
-        // If same config is already loaded, skip
-        if (configName.equals(currentLoadedConfig) && currentModelPath != null) {
-            return true;
-        }
-        
-        try {
-            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
-            
-            if (listener != null) {
-                listener.onModelLoading(configName);
-            }
-            
-            // Extract filename from URL
-            String filename = extractFilenameFromUrl(config.modelUrl);
-            if (filename == null || filename.isEmpty()) {
-                Log.e(TAG, "Cannot determine filename from URL: " + config.modelUrl);
-                return false;
-            }
-            
-            java.io.File destFile = new java.io.File(context.getFilesDir(), filename);
-            String modelPath = destFile.getAbsolutePath();
-            
-            // Download if not exists
-            if (!destFile.exists() || destFile.length() == 0) {
-                Log.i(TAG, "Downloading model from: " + config.modelUrl);
-                String dlResult = llama.download(config.modelUrl, modelPath);
-                if (!"ok".equals(dlResult)) {
-                    Log.e(TAG, "Download failed: " + dlResult);
-                    return false;
-                }
-            }
-            
-            // Initialize model if path changed
-            if (!modelPath.equals(currentModelPath)) {
-                if (currentModelPath != null) {
-                    llama.free();
-                }
-                
-                String initResult = llama.init(modelPath);
-                if (!"ok".equals(initResult)) {
-                    Log.e(TAG, "Model init failed: " + initResult);
-                    return false;
-                }
-                
-                currentModelPath = modelPath;
-            }
-            
-            // Set parameters
-            llama.setParameters(
-                config.penaltyLastN,
-                (float)config.penaltyRepeat,
-                (float)config.penaltyFreq,
-                (float)config.penaltyPresent,
-                config.mirostat,
-                (float)config.mirostatTau,
-                (float)config.mirostatEta,
-                (float)config.minP,
-                (float)config.typicalP,
-                (float)config.dynatempRange,
-                (float)config.dynatempExponent,
-                (float)config.xtcProbability,
-                (float)config.xtcThreshold,
-                (float)config.topNSigma,
-                (float)config.dryMultiplier,
-                (float)config.dryBase,
-                config.dryAllowedLength,
-                config.dryPenaltyLastN,
-                config.drySequenceBreakers
-            );
-            
-            currentLoadedConfig = configName;
-            
-            if (listener != null) {
-                listener.onModelLoaded(configName);
-            }
-            
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load configuration: " + configName, e);
-            return false;
-        }
     }
     
     private String buildPromptFromMessages(JSONArray messages, String configName) throws JSONException {
@@ -568,20 +466,9 @@ public class OllamaApiServer {
         return sb.toString();
     }
     
-    private String extractFilenameFromUrl(String url) {
-        if (url == null) return null;
-        int q = url.indexOf('?');
-        String pure = (q >= 0) ? url.substring(0, q) : url;
-        int slash = pure.lastIndexOf('/');
-        if (slash >= 0 && slash + 1 < pure.length()) {
-            return pure.substring(slash + 1);
-        }
-        return null;
-    }
-    
     private void sendJsonResponse(OutputStream outputStream, int statusCode, String body) throws IOException {
         String status = statusCode == 200 ? "OK" : (statusCode == 400 ? "Bad Request" : 
-                        (statusCode == 404 ? "Not Found" : "Error"));
+                        (statusCode == 404 ? "Not Found" : (statusCode == 503 ? "Service Unavailable" : "Error")));
         
         String response = "HTTP/1.1 " + statusCode + " " + status + "\r\n" +
             "Content-Type: application/json\r\n" +

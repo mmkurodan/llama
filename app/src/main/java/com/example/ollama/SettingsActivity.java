@@ -34,7 +34,7 @@ public class SettingsActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     
     private ConfigurationManager configManager;
-    private LlamaNative llama;
+    private ModelManager modelManager;
     
     // UI elements
     private EditText configNameInput;
@@ -94,23 +94,8 @@ public class SettingsActivity extends Activity {
         
         configManager = new ConfigurationManager(this);
         
-        // Initialize LlamaNative for model loading
-        llama = new LlamaNative() {
-            @Override
-            public void onDownloadProgress(final int percent) {
-                runOnUiThread(() -> {
-                    modelProgressBar.setProgress(percent);
-                });
-            }
-        };
-        
-        // Set JNI log path
-        File logFile = new File(getExternalFilesDir(null), "ollama.log");
-        try {
-            llama.setLogPath(logFile.getAbsolutePath());
-        } catch (Throwable t) {
-            Log.e(TAG, "Failed to set log path", t);
-        }
+        // Get ModelManager singleton
+        modelManager = ModelManager.getInstance(this);
         
         initViews();
         loadConfigList();
@@ -491,7 +476,13 @@ public class SettingsActivity extends Activity {
         modelFileInfo.setText("Model file: " + filename + " (checking...)");
         modelProgressBar.setProgress(0);
         
-        // If exists, skip download and init
+        // Check if model manager is busy
+        if (modelManager.isBusy()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
+        
+        // If exists, skip download and init via config loading
         if (destFile.exists() && destFile.length() > 0) {
             modelFileInfo.setText("Model file: " + filename + " (" + destFile.length() + " bytes, exists)");
             showToast("Model file already exists");
@@ -499,6 +490,7 @@ public class SettingsActivity extends Activity {
         } else {
             // Download then init
             new Thread(() -> {
+                LlamaNative llama = modelManager.getLlama();
                 String dlResult = null;
                 try {
                     dlResult = llama.download(url, modelPath);
@@ -530,9 +522,40 @@ public class SettingsActivity extends Activity {
         });
         
         new Thread(() -> {
-            String initResult = null;
+            // Try to acquire the lock
+            if (!modelManager.tryAcquire()) {
+                runOnUiThread(() -> {
+                    showToast("Model is busy");
+                    loadModelButton.setEnabled(true);
+                });
+                return;
+            }
+            
             try {
-                initResult = llama.init(modelPath);
+                LlamaNative llama = modelManager.getLlama();
+                String initResult = llama.init(modelPath);
+                
+                if (!"ok".equals(initResult)) {
+                    runOnUiThread(() -> {
+                        showToast("Model init failed: " + initResult);
+                        modelFileInfo.setText("Model init failed: " + initResult);
+                        loadModelButton.setEnabled(true);
+                    });
+                    return;
+                }
+                
+                // Set parameters after successful model initialization
+                ConfigurationManager.Configuration config = getConfigFromUI();
+                modelManager.applyConfiguration(config);
+                
+                runOnUiThread(() -> {
+                    loadedModelPath = modelPath;
+                    modelLoadedSuccessfully = true;
+                    modelFileInfo.setText("Model loaded: " + (new File(modelPath).getName()));
+                    loadModelButton.setEnabled(true);
+                    modelProgressBar.setProgress(100);
+                    showToast("Model initialized successfully");
+                });
             } catch (Throwable t) {
                 Log.e(TAG, "Model init error", t);
                 runOnUiThread(() -> {
@@ -540,56 +563,9 @@ public class SettingsActivity extends Activity {
                     modelFileInfo.setText("Model init failed");
                     loadModelButton.setEnabled(true);
                 });
-                return;
+            } finally {
+                modelManager.release();
             }
-            
-            final String finalInitResult = initResult;
-            
-            if (!"ok".equals(finalInitResult)) {
-                runOnUiThread(() -> {
-                    showToast("Model init failed: " + finalInitResult);
-                    modelFileInfo.setText("Model init failed: " + finalInitResult);
-                    loadModelButton.setEnabled(true);
-                });
-                return;
-            }
-            
-            runOnUiThread(() -> {
-                loadedModelPath = modelPath;
-                modelLoadedSuccessfully = true;
-                modelFileInfo.setText("Model loaded: " + (new File(modelPath).getName()));
-                loadModelButton.setEnabled(true);
-                modelProgressBar.setProgress(100);
-                showToast("Model initialized successfully");
-                
-                // Set parameters after successful model initialization
-                ConfigurationManager.Configuration config = getConfigFromUI();
-                try {
-                    llama.setParameters(
-                        config.penaltyLastN,
-                        (float)config.penaltyRepeat,
-                        (float)config.penaltyFreq,
-                        (float)config.penaltyPresent,
-                        config.mirostat,
-                        (float)config.mirostatTau,
-                        (float)config.mirostatEta,
-                        (float)config.minP,
-                        (float)config.typicalP,
-                        (float)config.dynatempRange,
-                        (float)config.dynatempExponent,
-                        (float)config.xtcProbability,
-                        (float)config.xtcThreshold,
-                        (float)config.topNSigma,
-                        (float)config.dryMultiplier,
-                        (float)config.dryBase,
-                        config.dryAllowedLength,
-                        config.dryPenaltyLastN,
-                        config.drySequenceBreakers
-                    );
-                } catch (Throwable t) {
-                    Log.e(TAG, "Failed to set parameters", t);
-                }
-            });
         }).start();
     }
     
