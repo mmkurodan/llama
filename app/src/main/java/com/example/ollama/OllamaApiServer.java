@@ -255,7 +255,7 @@ public class OllamaApiServer {
             
             String response;
             try {
-                response = future.get(120, java.util.concurrent.TimeUnit.SECONDS); // 120 second timeout
+                response = future.get(600, java.util.concurrent.TimeUnit.SECONDS); // 600 second timeout
             } catch (java.util.concurrent.TimeoutException e) {
                 Log.e(TAG, "Generate timed out", e);
                 sendErrorResponse(outputStream, 504, "Generation timed out");
@@ -326,7 +326,7 @@ public class OllamaApiServer {
             
             String response;
             try {
-                response = future.get(120, java.util.concurrent.TimeUnit.SECONDS); // 120 second timeout
+                response = future.get(600, java.util.concurrent.TimeUnit.SECONDS); // 600 second timeout
             } catch (java.util.concurrent.TimeoutException e) {
                 Log.e(TAG, "Chat generate timed out", e);
                 sendErrorResponse(outputStream, 504, "Generation timed out");
