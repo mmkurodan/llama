@@ -27,6 +27,8 @@ static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
 static JavaVM *g_jvm = nullptr;
+// Keep track of currently loaded model path to avoid redundant inits
+static std::string g_current_model_path;
 
 // ログ用
 static std::mutex g_log_mutex;
@@ -215,6 +217,7 @@ static void llama_jni_free() {
     if (g_model) {
         llama_model_free(g_model);
         g_model = nullptr;
+        g_current_model_path.clear();
         log_to_file("Model freed");
     }
 
@@ -397,6 +400,14 @@ Java_com_example_ollama_LlamaNative_init(
         log_to_file(ss.str());
     }
 
+    // If the same model is already loaded in JNI, skip re-initialization to avoid heavy work
+    if (!g_current_model_path.empty() && g_current_model_path == model_path && g_model && g_ctx) {
+        std::ostringstream ss;
+        ss << "init: model already initialized at path=" << model_path << "; skipping init";
+        log_to_file(ss.str());
+        return env->NewStringUTF("ok");
+    }
+
     {
         std::ifstream ifs(model_path, std::ios::binary | std::ios::ate);
         if (!ifs) {
@@ -505,6 +516,7 @@ Java_com_example_ollama_LlamaNative_init(
         }
     }
 
+    g_current_model_path = model_path;
     log_to_file("init: context created");
 
     return env->NewStringUTF("ok");
