@@ -420,10 +420,13 @@ public class OllamaApiServer {
     
 
     private String applyPromptTemplate(String userInput, ConfigurationManager.Configuration config) {
+        // Strip any existing template markers from user input to prevent double-templating
+        String cleanInput = stripTemplateMarkers(userInput);
+        
         if (config != null && config.promptTemplate != null && !config.promptTemplate.isEmpty()) {
-            return config.promptTemplate.replace("{USER_INPUT}", userInput);
+            return config.promptTemplate.replace("{USER_INPUT}", cleanInput);
         }
-        return "<|system|>\nYou are a helpful assistant.\n<|user|>\n" + userInput + "\n<|assistant|>\n";
+        return "<|system|>\nYou are a helpful assistant.\n<|user|>\n" + cleanInput + "\n<|assistant|>\n";
     }
 
     private String buildPromptFromMessages(JSONArray messages, String configName) throws JSONException {
@@ -446,6 +449,9 @@ public class OllamaApiServer {
             JSONObject msg = messages.getJSONObject(i);
             String role = msg.optString("role", "");
             String content = msg.optString("content", "");
+            
+            // Strip any existing template markers from content to avoid double-templating
+            content = stripTemplateMarkers(content);
             
             if ("system".equals(role)) {
                 systemPrompt = content;
@@ -481,6 +487,35 @@ public class OllamaApiServer {
         sb.append("<|assistant|>\n");
         
         return sb.toString();
+    }
+    
+    /**
+     * Strip common prompt template markers from content to prevent double-templating.
+     * This handles cases where the client sends content that already contains template markers.
+     */
+    private String stripTemplateMarkers(String content) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        
+        // Common template markers to strip
+        String[] markers = {
+            "<start_of_turn>system", "<end_of_turn>", "<start_of_turn>user", 
+            "<start_of_turn>model", "<start_of_turn>assistant",
+            "<|system|>", "<|user|>", "<|assistant|>", "<|model|>",
+            "<|im_start|>system", "<|im_start|>user", "<|im_start|>assistant", "<|im_end|>",
+            "[INST]", "[/INST]", "<<SYS>>", "<</SYS>>"
+        };
+        
+        String result = content;
+        for (String marker : markers) {
+            result = result.replace(marker, "");
+        }
+        
+        // Clean up extra whitespace/newlines left behind
+        result = result.replaceAll("\\n{3,}", "\n\n").trim();
+        
+        return result;
     }
     
     private void sendJsonResponse(OutputStream outputStream, int statusCode, String body) throws IOException {
