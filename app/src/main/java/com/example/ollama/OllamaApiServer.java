@@ -332,7 +332,7 @@ public class OllamaApiServer {
                 } catch (Exception e) {
                     Log.w(TAG, "Could not load config for template", e);
                 }
-                String promptToUse = applyPromptTemplate(prompt, config);
+                String promptToUse = applyPromptTemplate(prompt, config != null ? config : configManager.loadConfiguration(model));
 
                 // Generate directly - same code path as UI
                 String response = modelManager.generate(promptToUse);
