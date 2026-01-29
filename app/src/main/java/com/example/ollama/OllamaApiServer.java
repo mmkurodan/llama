@@ -326,11 +326,19 @@ public class OllamaApiServer {
                 
                 // Build prompt from messages
                 String prompt = buildPromptFromMessages(messages, model);
-                
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not load config for template", e);
+                }
+                String promptToUse = applyPromptTemplate(prompt, config);
+
                 // Generate directly - same code path as UI
-                String response = modelManager.generate(prompt);
-                
+                String response = modelManager.generate(promptToUse);
+
                 if (stream) {
+
                     // Streaming response
                     JSONObject chunk = new JSONObject();
                     chunk.put("model", model);
