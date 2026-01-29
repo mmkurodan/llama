@@ -783,9 +783,20 @@ Java_com_example_ollama_LlamaNative_generate(
 
     std::string prev_text;   // ★ 差分抽出用
 
+    log_to_file("generate: entering decode loop");
     for (int i = 0; i < max_tokens; ++i) {
+        {
+            std::ostringstream ss;
+            ss << "generate: step=" << i << " out_tokens=" << out_tokens.size();
+            log_to_file(ss.str());
+        }
         // Get logits for the last token (index -1 means last position)
         const llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
+        {
+            std::ostringstream ss;
+            ss << "generate: sampled token id=" << id;
+            log_to_file(ss.str());
+        }
 
         // Accept the token
         llama_sampler_accept(smpl, id);
@@ -838,6 +849,11 @@ Java_com_example_ollama_LlamaNative_generate(
         // feed token into model for next step using batch API
         llama_token id_mut = id; // llama_batch_get_one expects non-const pointer
         llama_batch batch = llama_batch_get_one(&id_mut, 1);
+        {
+            std::ostringstream ss;
+            ss << "generate: calling decode for next token, batch id=" << id_mut;
+            log_to_file(ss.str());
+        }
         if (llama_decode(g_ctx, batch) != 0) {
             log_to_file("generate: decode failed (generation)");
             llama_sampler_free(smpl);
