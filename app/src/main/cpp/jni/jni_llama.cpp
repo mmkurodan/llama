@@ -678,10 +678,16 @@ Java_com_example_ollama_LlamaNative_generate(
         }
         if (rc_prompt != 0) {
             log_to_file("generate: decode failed (prompt)");
+            if (g_log_ofs.is_open()) g_log_ofs.flush();
             return env->NewStringUTF("decode failed (prompt)");
         }
         
         log_to_file("generate: prompt processed with batch decode");
+        if (g_log_ofs.is_open()) g_log_ofs.flush();
+            // Flush to ensure logs are written immediately for debugging
+            if (g_log_ofs.is_open()) {
+                g_log_ofs.flush();
+            }
     }
 
     const int n_vocab = llama_vocab_n_tokens(vocab);
@@ -897,6 +903,7 @@ Java_com_example_ollama_LlamaNative_generate(
         }
         if (rc_step != 0) {
             log_to_file("generate: decode failed (generation)");
+            if (g_log_ofs.is_open()) g_log_ofs.flush();
             llama_sampler_free(smpl);
             return env->NewStringUTF("decode failed (generation)");
         }
