@@ -619,7 +619,11 @@ Java_com_example_ollama_LlamaNative_generate(
 
     llama_memory_t mem = llama_get_memory(g_ctx);
     llama_memory_seq_rm(mem, -1, 0, -1);
-    log_to_file("generate: kv cache cleared");
+    {
+        std::ostringstream ss;
+        ss << "generate: kv cache cleared; ctx=" << g_n_ctx;
+        log_to_file(ss.str());
+    }
 
     std::vector<llama_token> tokens;
     tokens.resize(g_n_ctx);
@@ -647,13 +651,22 @@ Java_com_example_ollama_LlamaNative_generate(
         log_to_file(ss.str());
     }
 
+    if (n_tokens >= g_n_ctx) {
+        std::ostringstream ss;
+        ss << "generate: n_tokens(" << n_tokens << ") exceeds ctx(" << g_n_ctx << ")";
+        log_to_file(ss.str());
+        return env->NewStringUTF("token count exceeds context");
+    }
+
     tokens.resize(n_tokens);
 
     std::string output;
     output.reserve(max_tokens * 4);
 
     {
+        log_to_file("generate: building prompt batch");
         llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
+        log_to_file("generate: calling decode for prompt batch");
         if (llama_decode(g_ctx, batch) != 0) {
             log_to_file("generate: decode failed (prompt)");
             return env->NewStringUTF("decode failed (prompt)");
