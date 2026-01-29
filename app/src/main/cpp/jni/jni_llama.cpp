@@ -858,7 +858,14 @@ Java_com_example_ollama_LlamaNative_generate(
             }
 
             prev_text = full;
-            // Verbose per-token logging removed to reduce log noise
+            {
+                std::ostringstream ss;
+                ss << "generate: detok chars=" << n_chars
+                   << " output_len=" << output.size()
+                   << " full_len=" << full.size()
+                   << " step=" << i;
+                log_to_file(ss.str());
+            }
         } else {
             // Only log if detokenize fails (unusual case)
             if (n_chars < 0) {
