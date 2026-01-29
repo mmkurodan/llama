@@ -259,12 +259,20 @@ public class OllamaApiServer {
                     return;
                 }
                 
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not load config for template", e);
+                }
+                
                 if (listener != null) {
                     listener.onGenerating(model);
                 }
                 
+                String promptToUse = applyPromptTemplate(prompt, config);
                 // Generate directly - same code path as UI
-                String response = modelManager.generate(prompt);
+                String response = modelManager.generate(promptToUse);
                 
                 if (stream) {
                     // Streaming response (single chunk for simplicity)
@@ -417,6 +425,14 @@ public class OllamaApiServer {
         outputStream.flush();
     }
     
+
+    private String applyPromptTemplate(String userInput, ConfigurationManager.Configuration config) {
+        if (config != null && config.promptTemplate != null && !config.promptTemplate.isEmpty()) {
+            return config.promptTemplate.replace("{USER_INPUT}", userInput);
+        }
+        return "<|system|>\nYou are a helpful assistant.\n<|user|>\n" + userInput + "\n<|assistant|>\n";
+    }
+
     private String buildPromptFromMessages(JSONArray messages, String configName) throws JSONException {
         StringBuilder sb = new StringBuilder();
         
