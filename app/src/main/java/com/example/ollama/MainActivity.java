@@ -98,6 +98,9 @@ public class MainActivity extends Activity {
 
         // Initialize ModelManager singleton
         modelManager = ModelManager.getInstance(this);
+        // Ensure UI buttons start enabled
+        sendButton.setEnabled(true);
+        initModelButton.setEnabled(true);
 
         // Set up button listeners
         settingsButton.setOnClickListener(v -> openSettings());
