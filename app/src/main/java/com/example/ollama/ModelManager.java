@@ -225,7 +225,18 @@ public class ModelManager {
             listener.onGenerating(currentConfigName);
         }
         
-        String result = llama.generate(prompt);
+        String result;
+        try {
+            result = llama.generate(prompt);
+        } catch (Throwable t) {
+            // Log full stack trace and notify listener so the server can respond gracefully
+            Log.e(TAG, "Exception during generate", t);
+            if (listener != null) {
+                listener.onError("Generation exception: " + t.toString());
+            }
+            // Return a clear error string so API layer can send a proper error response
+            return "generate failed: " + t.toString();
+        }
         
         if (listener != null) {
             listener.onGenerationComplete(currentConfigName, result);
