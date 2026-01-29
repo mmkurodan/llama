@@ -878,9 +878,15 @@ Java_com_example_ollama_LlamaNative_generate(
         // feed token into model for next step using batch API
         llama_token id_mut = id; // llama_batch_get_one expects non-const pointer
         llama_batch batch = llama_batch_get_one(&id_mut, 1);
+        // Advance position to continue the sequence; llama_batch_get_one sets pos=0 by default.
+        // Use n_tokens (prompt length) + current step to keep positions monotonic.
+        batch.pos[0] = n_tokens + i;
+        batch.seq_id[0] = 0;
+        batch.logits[0] = true;
         {
             std::ostringstream ss;
-            ss << "generate: calling decode for next token, batch id=" << id_mut;
+            ss << "generate: calling decode for next token, batch id=" << id_mut
+               << " pos=" << batch.pos[0];
             log_to_file(ss.str());
         }
         auto t_step0 = std::chrono::high_resolution_clock::now();
