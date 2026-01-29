@@ -667,7 +667,16 @@ Java_com_example_ollama_LlamaNative_generate(
         log_to_file("generate: building prompt batch");
         llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
         log_to_file("generate: calling decode for prompt batch");
-        if (llama_decode(g_ctx, batch) != 0) {
+        auto t_decode0 = std::chrono::high_resolution_clock::now();
+        int rc_prompt = llama_decode(g_ctx, batch);
+        auto t_decode1 = std::chrono::high_resolution_clock::now();
+        auto ms_prompt = std::chrono::duration_cast<std::chrono::milliseconds>(t_decode1 - t_decode0).count();
+        {
+            std::ostringstream ss;
+            ss << "generate: prompt decode rc=" << rc_prompt << " ms=" << ms_prompt;
+            log_to_file(ss.str());
+        }
+        if (rc_prompt != 0) {
             log_to_file("generate: decode failed (prompt)");
             return env->NewStringUTF("decode failed (prompt)");
         }
@@ -867,7 +876,16 @@ Java_com_example_ollama_LlamaNative_generate(
             ss << "generate: calling decode for next token, batch id=" << id_mut;
             log_to_file(ss.str());
         }
-        if (llama_decode(g_ctx, batch) != 0) {
+        auto t_step0 = std::chrono::high_resolution_clock::now();
+        int rc_step = llama_decode(g_ctx, batch);
+        auto t_step1 = std::chrono::high_resolution_clock::now();
+        auto ms_step = std::chrono::duration_cast<std::chrono::milliseconds>(t_step1 - t_step0).count();
+        {
+            std::ostringstream ss;
+            ss << "generate: decode rc=" << rc_step << " ms=" << ms_step << " step=" << i;
+            log_to_file(ss.str());
+        }
+        if (rc_step != 0) {
             log_to_file("generate: decode failed (generation)");
             llama_sampler_free(smpl);
             return env->NewStringUTF("decode failed (generation)");
