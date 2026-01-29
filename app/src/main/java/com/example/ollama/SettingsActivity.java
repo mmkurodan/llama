@@ -457,61 +457,61 @@ public class SettingsActivity extends Activity {
     }
     
     private void loadModel() {
-        final String url = modelUrlInput.getText().toString().trim();
-        if (url.isEmpty()) {
-            showToast("Please enter a download URL");
+        // Persist current UI config so ModelManager can load by name
+        ConfigurationManager.Configuration config = getConfigFromUI();
+        try {
+            configManager.saveConfiguration(config);
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to save configuration before loading model", e);
+            showToast("Failed to save configuration: " + e.getMessage());
             return;
         }
         
-        // Extract filename from URL
-        final String filename = extractFilenameFromUrl(url);
-        if (filename == null || filename.isEmpty()) {
-            showToast("Cannot determine filename from URL");
-            return;
+        // Show quick file info from URL (if present)
+        final String filename = extractFilenameFromUrl(config.modelUrl);
+        if (filename != null && !filename.isEmpty()) {
+            File destFile = new File(getFilesDir(), filename);
+            modelFileInfo.setText("Model file: " + filename + (destFile.exists() ? " (" + destFile.length() + " bytes)" : " (checking...)"));
+        } else {
+            modelFileInfo.setText("Model file: (unknown)");
         }
-        
-        final File destFile = new File(getFilesDir(), filename);
-        final String modelPath = destFile.getAbsolutePath();
-        
-        modelFileInfo.setText("Model file: " + filename + " (checking...)");
         modelProgressBar.setProgress(0);
         
-        // Check if model manager is busy
         if (modelManager.isBusy()) {
             showToast("Model is busy processing another request");
             return;
         }
         
-        // If exists, skip download and init via config loading
-        if (destFile.exists() && destFile.length() > 0) {
-            modelFileInfo.setText("Model file: " + filename + " (" + destFile.length() + " bytes, exists)");
-            showToast("Model file already exists");
-            initModelInBackground(modelPath);
-        } else {
-            // Download then init
-            new Thread(() -> {
-                LlamaNative llama = modelManager.getLlama();
-                String dlResult = null;
-                try {
-                    dlResult = llama.download(url, modelPath);
-                } catch (Throwable t) {
-                    Log.e(TAG, "Download error", t);
-                    showToast("Download error: " + t.getMessage());
-                    return;
-                }
-                
-                if (!"ok".equals(dlResult)) {
-                    showToast("Download failed: " + dlResult);
-                    return;
-                }
-                
-                File f = new File(modelPath);
-                runOnUiThread(() -> modelFileInfo.setText("Model file: " + filename + " (" + f.length() + " bytes, downloaded)"));
-                
-                // init model
-                initModelInBackground(modelPath);
-            }).start();
-        }
+        new Thread(() -> {
+            // Acquire busy lock for load
+            if (!modelManager.tryAcquire()) {
+                runOnUiThread(() -> showToast("Model is busy"));
+                return;
+            }
+            
+            try {
+                boolean success = modelManager.loadConfiguration(config.name);
+                runOnUiThread(() -> {
+                    loadedModelPath = modelManager.getCurrentModelPath();
+                    modelLoadedSuccessfully = success;
+                    modelFileInfo.setText(success
+                        ? "Model loaded: " + (loadedModelPath == null ? config.name : new File(loadedModelPath).getName())
+                        : "Model load failed");
+                    modelProgressBar.setProgress(success ? 100 : 0);
+                    loadModelButton.setEnabled(true);
+                    showToast(success ? "Model initialized successfully" : "Model initialization failed");
+                });
+            } catch (Throwable t) {
+                Log.e(TAG, "Model load error", t);
+                runOnUiThread(() -> {
+                    showToast("Model load error: " + t.getMessage());
+                    modelFileInfo.setText("Model init failed");
+                    loadModelButton.setEnabled(true);
+                });
+            } finally {
+                modelManager.release();
+            }
+        }).start();
     }
     
     private void initModelInBackground(final String modelPath) {
