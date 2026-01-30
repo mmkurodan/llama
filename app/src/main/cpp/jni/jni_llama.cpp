@@ -664,41 +664,56 @@ Java_com_example_ollama_LlamaNative_generate(
     output.reserve(max_tokens * 4);
 
     {
-        log_to_file("generate: building prompt batch with llama_batch_init");
-        // Use llama_batch_init instead of llama_batch_get_one for proper batch handling
-        llama_batch batch = llama_batch_init(n_tokens, 0, 1);
-        batch.n_tokens = n_tokens;
-        for (int i = 0; i < n_tokens; i++) {
-            batch.token[i] = tokens[i];
-            batch.pos[i] = i;
-            batch.n_seq_id[i] = 1;
-            batch.seq_id[i][0] = 0;
-            batch.logits[i] = (i == n_tokens - 1) ? 1 : 0; // Only compute logits for last token
-        }
-        {
-            std::ostringstream ss;
-            ss << "generate: batch initialized n_tokens=" << n_tokens;
-            log_to_file(ss.str());
-        }
-        log_to_file("generate: calling decode for prompt batch");
+        log_to_file("generate: processing prompt in batches");
         if (g_log_ofs.is_open()) g_log_ofs.flush();
+        
         auto t_decode0 = std::chrono::high_resolution_clock::now();
-        int rc_prompt = llama_decode(g_ctx, batch);
+        
+        // Process prompt in chunks of g_n_batch size to avoid OOM on Android
+        for (int i = 0; i < n_tokens; i += g_n_batch) {
+            int batch_size = std::min(g_n_batch, n_tokens - i);
+            
+            {
+                std::ostringstream ss;
+                ss << "generate: processing batch " << (i / g_n_batch + 1) 
+                   << " (tokens " << i << "-" << (i + batch_size - 1) << ")";
+                log_to_file(ss.str());
+            }
+            
+            llama_batch batch = llama_batch_init(batch_size, 0, 1);
+            batch.n_tokens = batch_size;
+            
+            for (int j = 0; j < batch_size; j++) {
+                batch.token[j] = tokens[i + j];
+                batch.pos[j] = i + j;
+                batch.n_seq_id[j] = 1;
+                batch.seq_id[j][0] = 0;
+                // Only compute logits for the last token of the entire prompt
+                batch.logits[j] = (i + j == n_tokens - 1) ? 1 : 0;
+            }
+            
+            int rc = llama_decode(g_ctx, batch);
+            llama_batch_free(batch);
+            
+            if (rc != 0) {
+                std::ostringstream ss;
+                ss << "generate: decode failed at batch " << (i / g_n_batch + 1) 
+                   << " (rc=" << rc << ")";
+                log_to_file(ss.str());
+                if (g_log_ofs.is_open()) g_log_ofs.flush();
+                return env->NewStringUTF("decode failed (prompt)");
+            }
+        }
+        
         auto t_decode1 = std::chrono::high_resolution_clock::now();
         auto ms_prompt = std::chrono::duration_cast<std::chrono::milliseconds>(t_decode1 - t_decode0).count();
         {
             std::ostringstream ss;
-            ss << "generate: prompt decode rc=" << rc_prompt << " ms=" << ms_prompt;
+            ss << "generate: prompt decode complete, ms=" << ms_prompt;
             log_to_file(ss.str());
         }
-        llama_batch_free(batch);
-        if (rc_prompt != 0) {
-            log_to_file("generate: decode failed (prompt)");
-            if (g_log_ofs.is_open()) g_log_ofs.flush();
-            return env->NewStringUTF("decode failed (prompt)");
-        }
         
-        log_to_file("generate: prompt processed with batch decode");
+        log_to_file("generate: prompt processed with chunked batch decode");
         if (g_log_ofs.is_open()) g_log_ofs.flush();
     }
 
