@@ -3,7 +3,9 @@ package com.example.ollama;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.app.ActivityManager;
+import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -35,6 +37,7 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_SETTINGS = 1;
+    private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     
@@ -118,6 +121,9 @@ public class MainActivity extends Activity {
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
 
         appendMessage("UI ready.");
+
+        // Request notification permission for Android 13+
+        requestNotificationPermission();
 
         // Initialize ModelManager singleton
         modelManager = ModelManager.getInstance(this);
@@ -378,7 +384,35 @@ public class MainActivity extends Activity {
         if (isServiceRunning) {
             stopApiService();
         } else {
+            // Check notification permission before starting service
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    showToast("Notification permission required for background service");
+                    requestNotificationPermission();
+                    return;
+                }
+            }
             startApiService();
+        }
+    }
+    
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATION_PERMISSION);
+            }
+        }
+    }
+    
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                appendMessage("Notification permission granted");
+            } else {
+                appendMessage("Notification permission denied - background service may not show notifications");
+            }
         }
     }
     
