@@ -1,6 +1,9 @@
 package com.example.ollama;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.app.ActivityManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -58,9 +61,9 @@ public class MainActivity extends Activity {
     private ConfigurationManager configManager;
     private ConfigurationManager.Configuration currentConfig;
     
-    // API Server
-    private OllamaApiServer apiServer;
+    // API Server (via Foreground Service)
     private int apiPort = OllamaApiServer.DEFAULT_PORT;
+    private boolean isServiceRunning = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,8 +114,12 @@ public class MainActivity extends Activity {
         copyOutputButton.setOnClickListener(v -> copyToClipboard("Output", outputView.getText().toString()));
         copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
         
-        // Initialize API server
+        // Initialize API server via Foreground Service
         initApiServer();
+        
+        // Check if service is already running
+        isServiceRunning = isServiceRunning(OllamaForegroundService.class);
+        updateApiServerUI();
 
         // Send button behavior
         sendButton.setOnClickListener(v -> {
@@ -195,11 +202,10 @@ public class MainActivity extends Activity {
             if (newPort != apiPort) {
                 apiPort = newPort;
                 appendMessage("API port changed to: " + apiPort);
-                // Restart server if running
-                if (apiServer != null && apiServer.isRunning()) {
-                    apiServer.stop();
-                    apiServer.setPort(apiPort);
-                    apiServer.start();
+                // Restart service if running
+                if (isServiceRunning) {
+                    stopApiService();
+                    startApiService();
                 }
             }
         }
@@ -335,85 +341,74 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         apiPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         
-        // Use ModelManager for API server
-        apiServer = new OllamaApiServer(this, modelManager);
-        apiServer.setPort(apiPort);
-        apiServer.setListener(new OllamaApiServer.ServerListener() {
-            @Override
-            public void onServerStarted(int port) {
-                runOnUiThread(() -> {
-                    apiServerButton.setText("Stop API Server");
-                    apiServerStatusMain.setText("API: Running on port " + port);
-                    appendMessage("Ollama API server started on port " + port);
-                });
-            }
-            
-            @Override
-            public void onServerStopped() {
-                runOnUiThread(() -> {
-                    apiServerButton.setText("Start API Server");
-                    apiServerStatusMain.setText("API: Stopped");
-                    appendMessage("Ollama API server stopped");
-                });
-            }
-            
-            @Override
-            public void onServerError(String error) {
-                runOnUiThread(() -> {
-                    appendMessage("API Server Error: " + error);
-                    showToast("API Server Error: " + error);
-                });
-            }
-            
-            @Override
-            public void onRequest(String method, String path) {
-                runOnUiThread(() -> {
-                    appendMessage("API Request: " + method + " " + path);
-                });
-            }
-            
-            @Override
-            public void onModelLoading(String configName) {
-                runOnUiThread(() -> {
-                    appendMessage("API: Loading configuration: " + configName);
-                });
-            }
-            
-            @Override
-            public void onModelLoaded(String configName) {
-                runOnUiThread(() -> {
-                    appendMessage("API: Model loaded for configuration: " + configName);
-                });
-            }
-            
-            @Override
-            public void onGenerating(String configName) {
-                runOnUiThread(() -> {
-                    appendMessage("API: Generating with configuration: " + configName);
-                });
-            }
-        });
-        
         appendMessage("API server initialized (port: " + apiPort + ")");
     }
     
+    private void updateApiServerUI() {
+        if (isServiceRunning) {
+            apiServerButton.setText("Stop API Server");
+            apiServerStatusMain.setText("API: Running on port " + apiPort);
+        } else {
+            apiServerButton.setText("Start API Server");
+            apiServerStatusMain.setText("API: Stopped");
+        }
+    }
+    
     private void toggleApiServer() {
-        if (apiServer == null) {
-            initApiServer();
+        if (isServiceRunning) {
+            stopApiService();
+        } else {
+            startApiService();
+        }
+    }
+    
+    private void startApiService() {
+        Intent serviceIntent = new Intent(this, OllamaForegroundService.class);
+        serviceIntent.setAction(OllamaForegroundService.ACTION_START);
+        serviceIntent.putExtra("port", apiPort);
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
         }
         
-        if (apiServer.isRunning()) {
-            apiServer.stop();
-        } else {
-            apiServer.start();
+        isServiceRunning = true;
+        updateApiServerUI();
+        appendMessage("Starting API server service on port " + apiPort);
+    }
+    
+    private void stopApiService() {
+        Intent serviceIntent = new Intent(this, OllamaForegroundService.class);
+        serviceIntent.setAction(OllamaForegroundService.ACTION_STOP);
+        startService(serviceIntent);
+        
+        isServiceRunning = false;
+        updateApiServerUI();
+        appendMessage("Stopping API server service");
+    }
+    
+    private boolean isServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
         }
+        return false;
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Update service status when returning to the activity
+        isServiceRunning = isServiceRunning(OllamaForegroundService.class);
+        updateApiServerUI();
     }
     
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (apiServer != null && apiServer.isRunning()) {
-            apiServer.stop();
-        }
+        // Service continues running in background - don't stop it here
     }
 }
