@@ -23,6 +23,13 @@ public class OllamaForegroundService extends Service {
     public static final String ACTION_START = "com.example.ollama.START_SERVICE";
     public static final String ACTION_STOP = "com.example.ollama.STOP_SERVICE";
     
+    // Broadcast actions for communicating with MainActivity
+    public static final String ACTION_LOG = "com.example.ollama.LOG";
+    public static final String ACTION_STATUS_CHANGED = "com.example.ollama.STATUS_CHANGED";
+    public static final String EXTRA_LOG_MESSAGE = "log_message";
+    public static final String EXTRA_STATUS = "status";
+    public static final String EXTRA_PORT = "port";
+    
     private OllamaApiServer apiServer;
     private ModelManager modelManager;
     private int port = OllamaApiServer.DEFAULT_PORT;
@@ -141,42 +148,64 @@ public class OllamaForegroundService extends Service {
             public void onServerStarted(int port) {
                 Log.i(TAG, "API server started on port " + port);
                 updateNotification("Running on port " + port);
+                sendLog("API server started on port " + port);
+                sendStatusChanged("running", port);
             }
             
             @Override
             public void onServerStopped() {
                 Log.i(TAG, "API server stopped");
                 updateNotification("Stopped");
+                sendLog("API server stopped");
+                sendStatusChanged("stopped", port);
             }
             
             @Override
             public void onServerError(String error) {
                 Log.e(TAG, "API server error: " + error);
                 updateNotification("Error: " + error);
+                sendLog("API Server Error: " + error);
             }
             
             @Override
             public void onRequest(String method, String path) {
                 Log.d(TAG, "Request: " + method + " " + path);
+                sendLog("API Request: " + method + " " + path);
             }
             
             @Override
             public void onModelLoading(String configName) {
                 updateNotification("Loading: " + configName);
+                sendLog("API: Loading configuration: " + configName);
             }
             
             @Override
             public void onModelLoaded(String configName) {
                 updateNotification("Ready: " + configName);
+                sendLog("API: Model loaded for configuration: " + configName);
             }
             
             @Override
             public void onGenerating(String configName) {
                 updateNotification("Generating...");
+                sendLog("API: Generating with configuration: " + configName);
             }
         });
         
         apiServer.start();
+    }
+    
+    private void sendLog(String message) {
+        Intent intent = new Intent(ACTION_LOG);
+        intent.putExtra(EXTRA_LOG_MESSAGE, message);
+        sendBroadcast(intent);
+    }
+    
+    private void sendStatusChanged(String status, int port) {
+        Intent intent = new Intent(ACTION_STATUS_CHANGED);
+        intent.putExtra(EXTRA_STATUS, status);
+        intent.putExtra(EXTRA_PORT, port);
+        sendBroadcast(intent);
     }
     
     private void stopApiServer() {

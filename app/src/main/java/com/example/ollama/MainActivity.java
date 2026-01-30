@@ -64,6 +64,26 @@ public class MainActivity extends Activity {
     // API Server (via Foreground Service)
     private int apiPort = OllamaApiServer.DEFAULT_PORT;
     private boolean isServiceRunning = false;
+    
+    // Broadcast receiver for service logs
+    private BroadcastReceiver serviceReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (OllamaForegroundService.ACTION_LOG.equals(action)) {
+                String message = intent.getStringExtra(OllamaForegroundService.EXTRA_LOG_MESSAGE);
+                if (message != null) {
+                    appendMessage(message);
+                }
+            } else if (OllamaForegroundService.ACTION_STATUS_CHANGED.equals(action)) {
+                String status = intent.getStringExtra(OllamaForegroundService.EXTRA_STATUS);
+                int port = intent.getIntExtra(OllamaForegroundService.EXTRA_PORT, apiPort);
+                isServiceRunning = "running".equals(status);
+                apiPort = port;
+                updateApiServerUI();
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -401,9 +421,26 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Register broadcast receiver
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(OllamaForegroundService.ACTION_LOG);
+        filter.addAction(OllamaForegroundService.ACTION_STATUS_CHANGED);
+        registerReceiver(serviceReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        
         // Update service status when returning to the activity
         isServiceRunning = isServiceRunning(OllamaForegroundService.class);
         updateApiServerUI();
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Unregister broadcast receiver
+        try {
+            unregisterReceiver(serviceReceiver);
+        } catch (IllegalArgumentException e) {
+            // Receiver not registered
+        }
     }
     
     @Override
