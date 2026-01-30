@@ -664,9 +664,24 @@ Java_com_example_ollama_LlamaNative_generate(
     output.reserve(max_tokens * 4);
 
     {
-        log_to_file("generate: building prompt batch");
-        llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
+        log_to_file("generate: building prompt batch with llama_batch_init");
+        // Use llama_batch_init instead of llama_batch_get_one for proper batch handling
+        llama_batch batch = llama_batch_init(n_tokens, 0, 1);
+        batch.n_tokens = n_tokens;
+        for (int i = 0; i < n_tokens; i++) {
+            batch.token[i] = tokens[i];
+            batch.pos[i] = i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = (i == n_tokens - 1) ? 1 : 0; // Only compute logits for last token
+        }
+        {
+            std::ostringstream ss;
+            ss << "generate: batch initialized n_tokens=" << n_tokens;
+            log_to_file(ss.str());
+        }
         log_to_file("generate: calling decode for prompt batch");
+        if (g_log_ofs.is_open()) g_log_ofs.flush();
         auto t_decode0 = std::chrono::high_resolution_clock::now();
         int rc_prompt = llama_decode(g_ctx, batch);
         auto t_decode1 = std::chrono::high_resolution_clock::now();
@@ -676,6 +691,7 @@ Java_com_example_ollama_LlamaNative_generate(
             ss << "generate: prompt decode rc=" << rc_prompt << " ms=" << ms_prompt;
             log_to_file(ss.str());
         }
+        llama_batch_free(batch);
         if (rc_prompt != 0) {
             log_to_file("generate: decode failed (prompt)");
             if (g_log_ofs.is_open()) g_log_ofs.flush();
@@ -684,10 +700,6 @@ Java_com_example_ollama_LlamaNative_generate(
         
         log_to_file("generate: prompt processed with batch decode");
         if (g_log_ofs.is_open()) g_log_ofs.flush();
-            // Flush to ensure logs are written immediately for debugging
-            if (g_log_ofs.is_open()) {
-                g_log_ofs.flush();
-            }
     }
 
     const int n_vocab = llama_vocab_n_tokens(vocab);
@@ -881,21 +893,25 @@ Java_com_example_ollama_LlamaNative_generate(
             }
         }
 
-        // feed token into model for next step using batch API
-        // Note: llama_batch_get_one returns a batch with pos/seq_id/logits all nullptr
-        // Position management is handled internally by llama_decode when these are null
-        llama_token id_mut = id;
-        llama_batch batch = llama_batch_get_one(&id_mut, 1);
+        // feed token into model for next step using llama_batch_init
+        llama_batch batch = llama_batch_init(1, 0, 1);
+        batch.n_tokens = 1;
+        batch.token[0] = id;
+        batch.pos[0] = n_tokens + i;  // position = prompt length + step
+        batch.n_seq_id[0] = 1;
+        batch.seq_id[0][0] = 0;
+        batch.logits[0] = 1;  // compute logits for this token
         {
             std::ostringstream ss;
-            ss << "generate: calling decode for next token, batch id=" << id_mut
-               << " step=" << i;
+            ss << "generate: calling decode for next token, id=" << id
+               << " pos=" << (n_tokens + i) << " step=" << i;
             log_to_file(ss.str());
         }
         auto t_step0 = std::chrono::high_resolution_clock::now();
         int rc_step = llama_decode(g_ctx, batch);
         auto t_step1 = std::chrono::high_resolution_clock::now();
         auto ms_step = std::chrono::duration_cast<std::chrono::milliseconds>(t_step1 - t_step0).count();
+        llama_batch_free(batch);
         {
             std::ostringstream ss;
             ss << "generate: decode rc=" << rc_step << " ms=" << ms_step << " step=" << i;
