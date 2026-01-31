@@ -593,11 +593,11 @@
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
-        <!-- Ollama API Server Section -->
+        <!-- Llama API Server Section -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Ollama API Server"
+            android:text="Llama API Server"
             android:textSize="18sp"
             android:textStyle="bold"
             android:paddingBottom="8dp" />

@@ -86,6 +86,8 @@ public class SettingsActivity extends Activity {
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
     private boolean modelLoadedSuccessfully = false;
+    
+    private volatile int lastDownloadProgress = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,6 +98,16 @@ public class SettingsActivity extends Activity {
         
         // Get ModelManager singleton
         modelManager = ModelManager.getInstance(this);
+        modelManager.getLlama().setDownloadProgressListener(percent -> {
+            if (percent == lastDownloadProgress) {
+                return;
+            }
+            lastDownloadProgress = percent;
+            runOnUiThread(() -> {
+                modelProgressBar.setProgress(percent);
+                modelFileInfo.setText("Downloading model... " + percent + "%");
+            });
+        });
         
         initViews();
         loadConfigList();
@@ -476,6 +488,7 @@ public class SettingsActivity extends Activity {
             modelFileInfo.setText("Model file: (unknown)");
         }
         modelProgressBar.setProgress(0);
+        lastDownloadProgress = 0;
         
         if (modelManager.isBusy()) {
             showToast("Model is busy processing another request");
@@ -498,6 +511,7 @@ public class SettingsActivity extends Activity {
                         ? "Model loaded: " + (loadedModelPath == null ? config.name : new File(loadedModelPath).getName())
                         : "Model load failed");
                     modelProgressBar.setProgress(success ? 100 : 0);
+                    lastDownloadProgress = success ? 100 : 0;
                     loadModelButton.setEnabled(true);
                     showToast(success ? "Model initialized successfully" : "Model initialization failed");
                 });
@@ -506,6 +520,8 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> {
                     showToast("Model load error: " + t.getMessage());
                     modelFileInfo.setText("Model init failed");
+                    modelProgressBar.setProgress(0);
+                    lastDownloadProgress = 0;
                     loadModelButton.setEnabled(true);
                 });
             } finally {

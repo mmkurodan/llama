@@ -89,7 +89,7 @@ public class OllamaApiServer {
             try {
                 serverSocket = new ServerSocket(port);
                 running.set(true);
-                Log.i(TAG, "Ollama API server started on port " + port);
+                Log.i(TAG, "Llama API server started on port " + port);
                 
                 if (listener != null) {
                     listener.onServerStarted(port);
@@ -146,7 +146,7 @@ public class OllamaApiServer {
             executorService.shutdownNow();
         }
         
-        Log.i(TAG, "Ollama API server stopped");
+        Log.i(TAG, "Llama API server stopped");
         if (listener != null) {
             listener.onServerStopped();
         }

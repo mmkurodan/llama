@@ -11,7 +11,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 /**
- * Foreground service that keeps the Ollama API server running in the background.
+ * Foreground service that keeps the Llama API server running in the background.
  * Uses a persistent notification to maintain the service.
  */
 public class OllamaForegroundService extends Service {
@@ -58,7 +58,7 @@ public class OllamaForegroundService extends Service {
         }
         
         // Start foreground with notification
-        Notification notification = createNotification("Ollama API Server", "Starting...");
+        Notification notification = createNotification("Llama API Server", "Starting...");
         startForeground(NOTIFICATION_ID, notification);
         
         // Start API server
@@ -83,10 +83,10 @@ public class OllamaForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Ollama API Server",
+                "Llama API Server",
                 NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Keeps the Ollama API server running in the background");
+            channel.setDescription("Keeps the Llama API server running in the background");
             channel.setShowBadge(false);
             
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -128,7 +128,7 @@ public class OllamaForegroundService extends Service {
     }
     
     private void updateNotification(String content) {
-        Notification notification = createNotification("Ollama API Server", content);
+        Notification notification = createNotification("Llama API Server", content);
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {
             manager.notify(NOTIFICATION_ID, notification);
