@@ -64,7 +64,7 @@ public class ConfigurationManager {
         public String drySequenceBreakers;
         
         public Configuration() {
-            // Default values - Gemma 1B Japanese assistant
+            // Default values - Gemma 1B assistant
             name = DEFAULT_CONFIG_NAME;
             modelUrl = "https://huggingface.co/vinhnx90/gemma-3-1b-thinking-v2-Q4_K_M-GGUF/resolve/main/gemma-3-1b-thinking-v2-q4_k_m.gguf?download=true";
             nCtx = 2048;
@@ -73,7 +73,7 @@ public class ConfigurationManager {
             temp = 0.7;
             topP = 0.9;
             topK = 40;
-            promptTemplate = "<start_of_turn>system\nあなたは日本語で丁寧かつ自然に応答するアシスタントです。簡潔で分かりやすく答えてください。\n<end_of_turn>\n<start_of_turn>user\n{USER_INPUT}\n<end_of_turn>\n<start_of_turn>model";
+            promptTemplate = "<start_of_turn>system\nYou are a helpful assistant. Please respond in the user's language.\n<end_of_turn>\n<start_of_turn>user\n{USER_INPUT}\n<end_of_turn>\n<start_of_turn>model";
             
             // Penalty parameters defaults
             penaltyLastN = 64;
