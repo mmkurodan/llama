@@ -665,6 +665,13 @@
             android:layout_height="wrap_content"
             android:text="Show License" />
 
+        <Button
+            android:id="@+id/documentsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Documents"
+            android:layout_marginTop="8dp" />
+
         <!-- Back Button -->
         <Button
             android:id="@+id/backButton"

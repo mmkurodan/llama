@@ -27,6 +27,11 @@
             android:name=".SettingsActivity"
             android:label="Settings"
             android:exported="false" />
+
+        <activity
+            android:name=".DocumentsActivity"
+            android:label="Documents"
+            android:exported="false" />
             
         <service
             android:name=".OllamaForegroundService"
