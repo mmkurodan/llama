@@ -23,6 +23,7 @@ public class LlamaNative {
 
     // 新しく追加したネイティブ: JNI 側のログファイルパスを設定する
     public native void setLogPath(String path);
+    public native void setLogLevel(int level);
     
     // Set sampling parameters
     public native void setParameters(

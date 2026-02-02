@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <fstream>
 #include <chrono>
 #include <ctime>
@@ -34,6 +35,7 @@ static std::string g_current_model_path;
 static std::mutex g_log_mutex;
 static std::string g_log_path;
 static std::ofstream g_log_ofs;
+static std::atomic<int> g_log_level(GGML_LOG_LEVEL_INFO);
 
 // 設定
 static int   g_n_ctx      = 2048;
@@ -85,7 +87,18 @@ static std::string current_time_str() {
     return ss.str();
 }
 
-static void log_to_file(const std::string& msg) {
+static ggml_log_level normalize_log_level(ggml_log_level level) {
+    return level == GGML_LOG_LEVEL_NONE ? GGML_LOG_LEVEL_INFO : level;
+}
+
+static bool should_log(ggml_log_level level) {
+    const int threshold = g_log_level.load();
+    const ggml_log_level effective = normalize_log_level(level);
+    return effective >= threshold;
+}
+
+static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO) {
+    if (!should_log(level)) return;
     std::lock_guard<std::mutex> lock(g_log_mutex);
     if (g_log_path.empty()) return;
     if (!g_log_ofs.is_open()) {
@@ -98,26 +111,25 @@ static void log_to_file(const std::string& msg) {
 
 // ---------------- llama.cpp ログコールバック ----------------
 // 0.17.1 は llama_log_level ではなく ggml_log_level を使う
-// Filter out DEBUG level logs to reduce noise (e.g., "Not marked as EOG" messages)
 static void llama_log_callback(enum ggml_log_level level, const char * text, void * user_data) {
-    // Skip DEBUG level logs to avoid flooding with "Not marked as EOG" etc.
-    if (level == GGML_LOG_LEVEL_DEBUG) {
-        return;
-    }
+    const ggml_log_level effective = normalize_log_level(level);
+    if (!should_log(effective)) return;
     std::string msg = text ? text : "";
     // Skip empty messages and continuation messages
     if (msg.empty() || msg == "\n") {
         return;
     }
     // Only log INFO, WARN, ERROR levels
-    if (level == GGML_LOG_LEVEL_ERROR) {
+    if (effective == GGML_LOG_LEVEL_ERROR) {
         LOGE("[llama.cpp] %s", msg.c_str());
-    } else if (level == GGML_LOG_LEVEL_WARN) {
+    } else if (effective == GGML_LOG_LEVEL_WARN) {
         LOGI("[llama.cpp WARN] %s", msg.c_str());
-    } else if (level == GGML_LOG_LEVEL_INFO || level == GGML_LOG_LEVEL_NONE) {
+    } else if (effective == GGML_LOG_LEVEL_DEBUG) {
+        LOGI("[llama.cpp DEBUG] %s", msg.c_str());
+    } else {
         LOGI("[llama.cpp] %s", msg.c_str());
     }
-    log_to_file(std::string("llama.cpp: ") + msg);
+    log_to_file(std::string("llama.cpp: ") + msg, effective);
 }
 
 // ---------------- 既存ユーティリティ ----------------
@@ -257,6 +269,18 @@ Java_com_example_ollama_LlamaNative_setLogPath(
     }
 }
 
+// ---------------- JNI: setLogLevel ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ollama_LlamaNative_setLogLevel(
+        JNIEnv *, jobject, jint level) {
+    int sanitized = level;
+    if (sanitized < GGML_LOG_LEVEL_NONE) sanitized = GGML_LOG_LEVEL_NONE;
+    if (sanitized > GGML_LOG_LEVEL_ERROR) sanitized = GGML_LOG_LEVEL_ERROR;
+    g_log_level.store(sanitized);
+    log_to_file(std::string("log level set to ") + std::to_string(sanitized));
+}
+
 // ---------------- JNI: download ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -270,7 +294,7 @@ Java_com_example_ollama_LlamaNative_download(
     if (!g_jvm) {
         if (env->GetJavaVM(&g_jvm) != JNI_OK) {
             g_jvm = nullptr;
-            log_to_file("download: GetJavaVM failed");
+            log_to_file("download: GetJavaVM failed", GGML_LOG_LEVEL_WARN);
         } else {
             log_to_file("download: JavaVM stored");
         }
@@ -282,7 +306,7 @@ Java_com_example_ollama_LlamaNative_download(
     if (!url || !path) {
         if (url)  env->ReleaseStringUTFChars(jurl, url);
         if (path) env->ReleaseStringUTFChars(jpath, path);
-        log_to_file("download: invalid args");
+        log_to_file("download: invalid args", GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("invalid args");
     }
 
@@ -296,7 +320,7 @@ Java_com_example_ollama_LlamaNative_download(
     if (!curl) {
         env->ReleaseStringUTFChars(jurl,  url);
         env->ReleaseStringUTFChars(jpath, path);
-        log_to_file("download: curl init failed");
+        log_to_file("download: curl init failed", GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("curl init failed");
     }
 
@@ -308,7 +332,7 @@ Java_com_example_ollama_LlamaNative_download(
         {
             std::ostringstream ss;
             ss << "download: file open failed path=" << path;
-            log_to_file(ss.str());
+            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
         }
         return env->NewStringUTF("file open failed");
     }
@@ -369,7 +393,7 @@ Java_com_example_ollama_LlamaNative_download(
     if (res != CURLE_OK) {
         std::ostringstream ss;
         ss << "download: curl download failed res=" << res << " msg=" << curl_easy_strerror(res);
-        log_to_file(ss.str());
+        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("curl download failed");
     }
 
@@ -414,7 +438,7 @@ Java_com_example_ollama_LlamaNative_init(
             std::ostringstream ss;
             ss << "init: model file cannot be opened: " << model_path
                << " errno=" << errno << " strerror=" << std::strerror(errno);
-            log_to_file(ss.str());
+            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
             return env->NewStringUTF("model file open failed");
         } else {
             auto sz = ifs.tellg();
@@ -447,13 +471,13 @@ Java_com_example_ollama_LlamaNative_init(
         } else {
             std::ostringstream ss;
             ss << "init: header dump failed to open file: " << model_path;
-            log_to_file(ss.str());
+            log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
         }
     }
 
     if (env->GetJavaVM(&g_jvm) != JNI_OK) {
         g_jvm = nullptr;
-        log_to_file("init: GetJavaVM failed");
+        log_to_file("init: GetJavaVM failed", GGML_LOG_LEVEL_WARN);
     } else {
         log_to_file("init: JavaVM stored");
     }
@@ -483,7 +507,7 @@ Java_com_example_ollama_LlamaNative_init(
         if (!g_model) {
             ss << "init: failed to load model (returned null) after "
                << ms << " ms. path_len=" << model_path.size();
-            log_to_file(ss.str());
+            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
             return env->NewStringUTF("failed to load model");
         } else {
             ss << "init: model loaded successfully in " << ms << " ms";
@@ -508,7 +532,7 @@ Java_com_example_ollama_LlamaNative_init(
         if (!g_ctx) {
             ss << "init: failed to create context (returned null) after "
                << ms << " ms";
-            log_to_file(ss.str());
+            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
             return env->NewStringUTF("failed to create context");
         } else {
             ss << "init: context created successfully in " << ms << " ms";
@@ -600,7 +624,7 @@ Java_com_example_ollama_LlamaNative_generate(
     std::lock_guard<std::mutex> lock(g_mutex);
 
     if (!g_ctx || !g_model) {
-        log_to_file("generate: not initialized");
+        log_to_file("generate: not initialized", GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("not initialized");
     }
 
@@ -641,7 +665,7 @@ Java_com_example_ollama_LlamaNative_generate(
     );
 
     if (n_tokens <= 0) {
-        log_to_file("generate: tokenize failed");
+        log_to_file("generate: tokenize failed", GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("tokenize failed");
     }
 
@@ -654,7 +678,7 @@ Java_com_example_ollama_LlamaNative_generate(
     if (n_tokens >= g_n_ctx) {
         std::ostringstream ss;
         ss << "generate: n_tokens(" << n_tokens << ") exceeds ctx(" << g_n_ctx << ")";
-        log_to_file(ss.str());
+        log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
         return env->NewStringUTF("token count exceeds context");
     }
 
@@ -699,7 +723,7 @@ Java_com_example_ollama_LlamaNative_generate(
                 std::ostringstream ss;
                 ss << "generate: decode failed at batch " << (i / g_n_batch + 1) 
                    << " (rc=" << rc << ")";
-                log_to_file(ss.str());
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
                 if (g_log_ofs.is_open()) g_log_ofs.flush();
                 return env->NewStringUTF("decode failed (prompt)");
             }
@@ -933,7 +957,7 @@ Java_com_example_ollama_LlamaNative_generate(
             log_to_file(ss.str());
         }
         if (rc_step != 0) {
-            log_to_file("generate: decode failed (generation)");
+            log_to_file("generate: decode failed (generation)", GGML_LOG_LEVEL_ERROR);
             if (g_log_ofs.is_open()) g_log_ofs.flush();
             llama_sampler_free(smpl);
             return env->NewStringUTF("decode failed (generation)");
