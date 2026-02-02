@@ -172,6 +172,7 @@ public class SettingsActivity extends Activity {
         apiServerStatus = findViewById(R.id.apiServerStatus);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
         licenseButton = findViewById(R.id.licenseButton);
+        Button documentsButton = findViewById(R.id.documentsButton);
         
         // Load saved API port
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -191,6 +192,12 @@ public class SettingsActivity extends Activity {
         loadModelButton.setOnClickListener(v -> loadModel());
         backButton.setOnClickListener(v -> finish());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
+        documentsButton.setOnClickListener(v -> openDocuments());
+    }
+
+    private void openDocuments() {
+        Intent intent = new Intent(this, DocumentsActivity.class);
+        startActivity(intent);
     }
 
     private void setupLogLevelSpinner(int savedLogLevel) {
