@@ -144,14 +144,14 @@ jobs:
           name: libcurl-arm64
           path: app/src/main/cpp/third_party/libcurl
 
-      - name: Download Gradle 8.2.1
+      - name: Download Gradle 8.4
         run: |
-          wget https://services.gradle.org/distributions/gradle-8.2.1-bin.zip
-          unzip gradle-8.2.1-bin.zip
-          echo "$PWD/gradle-8.2.1/bin" >> $GITHUB_PATH
+          wget https://services.gradle.org/distributions/gradle-8.4-bin.zip
+          unzip gradle-8.4-bin.zip
+          echo "$PWD/gradle-8.4/bin" >> $GITHUB_PATH
 
-      - name: Generate Gradle Wrapper (8.2.1)
-        run: gradle wrapper --gradle-version 8.2.1
+      - name: Generate Gradle Wrapper (8.4)
+        run: gradle wrapper --gradle-version 8.4
 
       - name: Build debug APK
         run: |
