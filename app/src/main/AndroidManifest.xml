@@ -13,7 +13,7 @@
         android:icon="@mipmap/ic_launcher">
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.micklab.llama.MainActivity"
             android:exported="true">
 
             <intent-filter>
@@ -24,17 +24,17 @@
         </activity>
 
         <activity
-            android:name=".SettingsActivity"
+            android:name="com.micklab.llama.SettingsActivity"
             android:label="Settings"
             android:exported="false" />
 
         <activity
-            android:name=".DocumentsActivity"
+            android:name="com.micklab.llama.DocumentsActivity"
             android:label="Documents"
             android:exported="false" />
             
         <service
-            android:name=".OllamaForegroundService"
+            android:name="com.micklab.llama.OllamaForegroundService"
             android:foregroundServiceType="specialUse"
             android:exported="false">
             <property
