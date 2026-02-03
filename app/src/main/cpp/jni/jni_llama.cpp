@@ -246,7 +246,7 @@ static void llama_jni_free() {
 // ---------------- JNI: setLogPath ----------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_ollama_LlamaNative_setLogPath(
+Java_com_micklab_llama_LlamaNative_setLogPath(
         JNIEnv *env, jobject, jstring jLogPath) {
 
     std::string path = jstring_to_std(env, jLogPath);
@@ -272,7 +272,7 @@ Java_com_example_ollama_LlamaNative_setLogPath(
 // ---------------- JNI: setLogLevel ----------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_ollama_LlamaNative_setLogLevel(
+Java_com_micklab_llama_LlamaNative_setLogLevel(
         JNIEnv *, jobject, jint level) {
     int sanitized = level;
     if (sanitized < GGML_LOG_LEVEL_NONE) sanitized = GGML_LOG_LEVEL_NONE;
@@ -284,7 +284,7 @@ Java_com_example_ollama_LlamaNative_setLogLevel(
 // ---------------- JNI: download ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_example_ollama_LlamaNative_download(
+Java_com_micklab_llama_LlamaNative_download(
         JNIEnv* env,
         jobject thiz,
         jstring jurl,
@@ -404,7 +404,7 @@ Java_com_example_ollama_LlamaNative_download(
 // ---------------- JNI: init ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_example_ollama_LlamaNative_init(
+Java_com_micklab_llama_LlamaNative_init(
         JNIEnv *env, jobject,
         jstring jModelPath
 ) {
@@ -549,7 +549,7 @@ Java_com_example_ollama_LlamaNative_init(
 // ---------------- JNI: setParameters ----------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_ollama_LlamaNative_setParameters(
+Java_com_micklab_llama_LlamaNative_setParameters(
         JNIEnv *env, jobject,
         jint penaltyLastN, jfloat penaltyRepeat, jfloat penaltyFreq, jfloat penaltyPresent,
         jint mirostat, jfloat mirostatTau, jfloat mirostatEta,
@@ -617,7 +617,7 @@ Java_com_example_ollama_LlamaNative_setParameters(
 // ---------------- JNI: generate ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_example_ollama_LlamaNative_generate(
+Java_com_micklab_llama_LlamaNative_generate(
         JNIEnv *env, jobject,
         jstring jPrompt
 ) {
@@ -979,9 +979,9 @@ Java_com_example_ollama_LlamaNative_generate(
 // ---------------- JNI: free ----------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_ollama_LlamaNative_free(
+Java_com_micklab_llama_LlamaNative_free(
         JNIEnv *env, jobject /*thiz*/
 ) {
-    log_to_file("Java_com_example_ollama_LlamaNative_free called");
+    log_to_file("Java_com_micklab_llama_LlamaNative_free called");
     llama_jni_free();
 }
