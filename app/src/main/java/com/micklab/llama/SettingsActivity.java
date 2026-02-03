@@ -1,4 +1,4 @@
-package com.example.ollama;
+package com.micklab.llama;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import static com.example.ollama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
+import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
 
 public class SettingsActivity extends Activity {
     private static final String TAG = "SettingsActivity";
