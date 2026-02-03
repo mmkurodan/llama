@@ -1,4 +1,4 @@
-package com.example.ollama;
+package com.micklab.llama;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;

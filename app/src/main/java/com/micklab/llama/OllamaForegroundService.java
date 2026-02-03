@@ -1,4 +1,4 @@
-package com.example.ollama;
+package com.micklab.llama;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -20,12 +20,12 @@ public class OllamaForegroundService extends Service {
     public static final String CHANNEL_ID = "ollama_service_channel";
     public static final int NOTIFICATION_ID = 1;
     
-    public static final String ACTION_START = "com.example.ollama.START_SERVICE";
-    public static final String ACTION_STOP = "com.example.ollama.STOP_SERVICE";
+    public static final String ACTION_START = "com.micklab.llama.START_SERVICE";
+    public static final String ACTION_STOP = "com.micklab.llama.STOP_SERVICE";
     
     // Broadcast actions for communicating with MainActivity
-    public static final String ACTION_LOG = "com.example.ollama.LOG";
-    public static final String ACTION_STATUS_CHANGED = "com.example.ollama.STATUS_CHANGED";
+    public static final String ACTION_LOG = "com.micklab.llama.LOG";
+    public static final String ACTION_STATUS_CHANGED = "com.micklab.llama.STATUS_CHANGED";
     public static final String EXTRA_LOG_MESSAGE = "log_message";
     public static final String EXTRA_STATUS = "status";
     public static final String EXTRA_PORT = "port";

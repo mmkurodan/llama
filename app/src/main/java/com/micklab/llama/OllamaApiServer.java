@@ -1,4 +1,4 @@
-package com.example.ollama;
+package com.micklab.llama;
 
 import android.content.Context;
 import android.util.Log;
