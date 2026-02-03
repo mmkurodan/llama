@@ -103,6 +103,11 @@ public class SettingsActivity extends Activity {
         
         // Get ModelManager singleton
         modelManager = ModelManager.getInstance(this);
+        
+        initViews();
+
+        // Register download progress listener after views are initialized to avoid NPE if native
+        // code emits progress immediately.
         modelManager.getLlama().setDownloadProgressListener(percent -> {
             if (percent == lastDownloadProgress) {
                 return;
@@ -114,7 +119,6 @@ public class SettingsActivity extends Activity {
             });
         });
         
-        initViews();
         loadConfigList();
         
         // Load configuration from intent or default
