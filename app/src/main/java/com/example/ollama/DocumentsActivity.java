@@ -120,7 +120,7 @@ public class DocumentsActivity extends Activity {
         sb.append("[日本語]\n");
         sb.append("権利・ライセンス\n\n");
         sb.append("本アプリ（llama Tester）は、作者が著作権を保有します。\n");
-        sb.append(\n");"本アプリの利用・複製・改変・再配布は、アプリ内のライセンス表示に従っecho
+        sb.append("本アプリの利用・複製・改変・再配布は、アプリ内のライセンス表示に従います。\n");
         sb.append("商用利用は作者の事前の書面による許可が必要です。\n");
         sb.append("ライセンス本文は「Settings > Show License」で確認できます。\n\n");
         sb.append("[English]\n");
@@ -138,12 +138,12 @@ public class DocumentsActivity extends Activity {
         sb.append("操作マニュアル\n\n");
         sb.append("1. アプリ概要\n");
         sb.append("本アプリは端末上でLLMを実行し、プロンプトに対する回答を生成します。\n");
-        sb.append(\n\n");"必要に応じてOllama互換APIサーバーを起動できまecho
+        sb.append("必要に応じてOllama互換APIサーバーを起動できます。\n\n");
         sb.append("2. 初期設定（推奨手順）\n");
         sb.append("1) メイン画面で「Settings」を開きます。\n");
         sb.append("2) モデルURLを入力し「Load Model」を押してモデルを読み込みます。\n");
         sb.append("3) パラメータを調整する場合は各項目を編集し「Save Config」で保存します。\n\n");
-        "3. メ(sb.append;\n");
+        sb.append("3. メイン画面\n");
         sb.append("- Enter Prompt: プロンプトを入力します。\n");
         sb.append("- Send: 生成を開始します（モデル未読み込み時はエラー表示）。\n");
         sb.append("- Re-init Model: 現在のモデルを解放して再初期化します。\n");
@@ -152,7 +152,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Start/Stop API Server: APIサーバーを起動/停止します。\n");
         sb.append("- Copy: 出力/ログをクリップボードへコピーします。\n\n");
         sb.append("4. 設定画面の操作\n");
-        sb.append(\n");"- Configuration Management: 設定の保存/削除/読み込みをecho
+        sb.append("- Configuration Management: 設定の保存/削除/読み込みを行います。\n");
         sb.append("- Model Selection: モデルURLを指定し読み込みます。\n");
         sb.append("- Model Parameters: 生成パラメータを設定します。\n");
         sb.append("- Prompt Template: {USER_INPUT} で入力を差し込みます。\n");
@@ -163,7 +163,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. APIサーバー（任意）\n");
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags を提供します。\n");
         sb.append("- 同時生成は1件のみです（ビジー時は503を返します）。\n");
-        sb.append(- Android \n\n");13以echo
+        sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("[English]\n");
         sb.append("User Manual\n\n");
         sb.append("1. Overview\n");
@@ -203,9 +203,7 @@ public class DocumentsActivity extends Activity {
         sb.append("プライバシーポリシー\n\n");
         sb.append("1. 収集する情報\n");
         sb.append("本アプリは、個人情報を外部サーバーへ送信しません。\n");
-        sb.append(\n");収集する情報\n");
-        sb.append("本アプリは、個人情報を外部サーバーへ送信しません。\n");
-echo
+        sb.append("以下の情報を端末内に保存します。\n");
         sb.append("- 設定情報（モデルURL、各種パラメータ、APIポート、ログレベル）\n");
         sb.append("- 構成ファイル（configs/*.json）\n");
         sb.append("- ダウンロードしたモデルファイル\n");
@@ -215,7 +213,7 @@ echo
         sb.append("- APIサーバーを有効にした場合、端末のポートでリクエストを受け付けます。\n");
         sb.append("  入力内容は端末内で処理され、アプリが外部サーバーへ送信することはありません。\n\n");
         sb.append("3. 利用目的\n");
-        \n\n");"上記データはアプリの動作、生成機能、表示のために使(sb.appendecho
+        sb.append("上記データはアプリの動作、生成機能、表示のために使用します。\n\n");
         sb.append("4. ログ\n");
         sb.append("ログにはアプリの動作状況やAPIリクエスト情報が記録される場合があります。\n\n");
         sb.append("5. 保存期間\n");
