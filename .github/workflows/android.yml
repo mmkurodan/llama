@@ -124,10 +124,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ★ keystore 復元（Secrets 必須）
+      # ★ keystore を app/ に復元（これが最重要）
       - name: Restore keystore
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+          mkdir -p app
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
