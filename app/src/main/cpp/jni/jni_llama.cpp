@@ -556,8 +556,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_micklab_llama_LlamaNative_setParameters(
         JNIEnv *env, jobject,
-        jint nCtx, jint nThreads, jint nBatch,
-        jfloat temp, jfloat topP, jint topK,
         jint penaltyLastN, jfloat penaltyRepeat, jfloat penaltyFreq, jfloat penaltyPresent,
         jint mirostat, jfloat mirostatTau, jfloat mirostatEta,
         jfloat minP, jfloat typicalP,
@@ -568,14 +566,6 @@ Java_com_micklab_llama_LlamaNative_setParameters(
         jstring jDrySequenceBreakers
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    
-    // Core parameters
-    g_n_ctx = nCtx;
-    g_n_threads = nThreads;
-    g_n_batch = nBatch;
-    g_temp = temp;
-    g_top_p = topP;
-    g_top_k = topK;
     
     // Penalty parameters
     g_penalty_last_n = penaltyLastN;
@@ -606,13 +596,7 @@ Java_com_micklab_llama_LlamaNative_setParameters(
     
     {
         std::ostringstream ss;
-        ss << "setParameters: n_ctx=" << g_n_ctx
-           << " n_threads=" << g_n_threads
-           << " n_batch=" << g_n_batch
-           << " temp=" << g_temp
-           << " top_p=" << g_top_p
-           << " top_k=" << g_top_k
-           << " penalty_last_n=" << g_penalty_last_n
+        ss << "setParameters: penalty_last_n=" << g_penalty_last_n
            << " penalty_repeat=" << g_penalty_repeat
            << " penalty_freq=" << g_penalty_freq
            << " penalty_present=" << g_penalty_present

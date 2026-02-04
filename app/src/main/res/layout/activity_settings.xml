@@ -610,12 +610,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Template (use {USER_INPUT} as placeholder):"
-            android:paddingBottom="2dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Note: /api/chat uses raw message text and ignores templates; /api/chat and /api/generate apply model parameters."
             android:paddingBottom="4dp" />
 
         <EditText
