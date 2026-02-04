@@ -150,6 +150,7 @@ public class MainActivity extends Activity {
         copyOutputButton.setOnClickListener(v -> copyToClipboard("Output", outputView.getText().toString()));
         updateLogButton.setOnClickListener(v -> { if (isViewingLog) { refreshLogView(); } });
         copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
+        updateLogButton.setVisibility(Button.GONE);
         
         // Initialize API server via Foreground Service
         initApiServer();
@@ -164,6 +165,13 @@ public class MainActivity extends Activity {
             if (userPrompt == null || userPrompt.trim().isEmpty()) {
                 showToast("Please enter a prompt");
                 return;
+            }
+
+            if (isViewingLog) {
+                isViewingLog = false;
+                viewLogButton.setText("View Log");
+                updateLogButton.setEnabled(false);
+                updateLogButton.setVisibility(Button.GONE);
             }
             
             // Check if busy
@@ -228,7 +236,9 @@ public class MainActivity extends Activity {
 
                             @Override
                             public void onError(String error) {
-                                runOnUiThread(() -> appendMessage("streaming error: " + error));
+                                final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
+                                        ? "unknown error" : error;
+                                runOnUiThread(() -> appendMessage("streaming error: " + safeError));
                             }
                         };
                         modelManager.getLlama().setTokenListener(tListener);
@@ -257,6 +267,12 @@ public class MainActivity extends Activity {
         final String chatPrompt = applyPromptTemplate(userPrompt);
         
         runOnUiThread(() -> {
+            if (isViewingLog) {
+                isViewingLog = false;
+                viewLogButton.setText("View Log");
+                updateLogButton.setEnabled(false);
+                updateLogButton.setVisibility(Button.GONE);
+            }
             appendMessage("Running generate...");
             outputView.setText("");
         });
@@ -280,11 +296,13 @@ public class MainActivity extends Activity {
                         runOnUiThread(() -> appendMessage("streaming complete"));
                     }
 
-                    @Override
-                    public void onError(String error) {
-                        runOnUiThread(() -> appendMessage("streaming error: " + error));
-                    }
-                };
+                        @Override
+                        public void onError(String error) {
+                            final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
+                                    ? "unknown error" : error;
+                            runOnUiThread(() -> appendMessage("streaming error: " + safeError));
+                        }
+                    };
                 modelManager.getLlama().setTokenListener(tListener);
             } else {
                 modelManager.getLlama().setTokenListener(null);
@@ -411,12 +429,14 @@ public class MainActivity extends Activity {
             isViewingLog = true;
             viewLogButton.setText("Hide Log");
             updateLogButton.setEnabled(true);
+            updateLogButton.setVisibility(Button.VISIBLE);
             refreshLogView();
         } else {
             // Restore output view
             isViewingLog = false;
             viewLogButton.setText("View Log");
             updateLogButton.setEnabled(false);
+            updateLogButton.setVisibility(Button.GONE);
             if (savedOutputText != null) {
                 outputView.setText(savedOutputText);
             }
