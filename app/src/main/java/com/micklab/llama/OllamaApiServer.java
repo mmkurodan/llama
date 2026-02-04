@@ -47,7 +47,7 @@ public class OllamaApiServer {
 
     private static class TokenError {
         final String error;
-        TokenError(String error) { this.error = error; }
+        TokenError(String error) { this.error = (error == null) ? "unknown error" : error; }
     }
 
     private int port = DEFAULT_PORT;
