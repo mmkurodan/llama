@@ -271,26 +271,103 @@ public class OllamaApiServer {
                 }
                 
                 String promptToUse = applyPromptTemplate(prompt, config);
-                // Generate directly - same code path as UI
-                String response = modelManager.generate(promptToUse);
-                
+
                 if (stream) {
-                    // Streaming response (single chunk for simplicity)
-                    JSONObject chunk = new JSONObject();
-                    chunk.put("model", model);
-                    chunk.put("created_at", getTimestamp());
-                    chunk.put("response", response);
-                    chunk.put("done", true);
-                    
-                    sendStreamingResponse(outputStream, chunk.toString());
+                    // Start chunked response
+                    String header = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: application/x-ndjson\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "Transfer-Encoding: chunked\r\n" +
+                            "\r\n";
+                    outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
+
+                    final Object writeLock = new Object();
+
+                    modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
+                        @Override
+                        public void onToken(String token) {
+                            try {
+                                JSONObject chunk = new JSONObject();
+                                chunk.put("model", model);
+                                chunk.put("created_at", getTimestamp());
+                                chunk.put("response", token);
+                                chunk.put("done", false);
+                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                synchronized (writeLock) {
+                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write(chunkBytes);
+                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.flush();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error writing streaming chunk", e);
+                            }
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            try {
+                                JSONObject chunk = new JSONObject();
+                                chunk.put("model", model);
+                                chunk.put("created_at", getTimestamp());
+                                chunk.put("response", "");
+                                chunk.put("done", true);
+                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                synchronized (writeLock) {
+                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write(chunkBytes);
+                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                    // End chunked stream
+                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.flush();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error writing final streaming chunk", e);
+                            } finally {
+                                modelManager.getLlama().setTokenListener(null);
+                            }
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            try {
+                                JSONObject err = new JSONObject();
+                                err.put("error", error);
+                                byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                synchronized (writeLock) {
+                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write(chunkBytes);
+                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.flush();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error writing error chunk", e);
+                            } finally {
+                                modelManager.getLlama().setTokenListener(null);
+                            }
+                        }
+                    });
+
+                    try {
+                        // This will trigger token callbacks
+                        modelManager.generate(promptToUse);
+                    } finally {
+                        modelManager.getLlama().setTokenListener(null);
+                    }
                 } else {
                     // Non-streaming response
+                    String response = modelManager.generate(promptToUse);
                     JSONObject result = new JSONObject();
                     result.put("model", model);
                     result.put("created_at", getTimestamp());
                     result.put("response", response);
                     result.put("done", true);
-                    
+
                     sendJsonResponse(outputStream, 200, result.toString());
                 }
             } finally {
@@ -335,35 +412,116 @@ public class OllamaApiServer {
                 // Build prompt from messages (already applies template if available)
                 String promptToUse = buildPromptFromMessages(messages, model);
 
-                // Generate directly - same code path as UI
-                String response = modelManager.generate(promptToUse);
-
                 if (stream) {
+                    // Start chunked response
+                    String header = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: application/x-ndjson\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "Transfer-Encoding: chunked\r\n" +
+                            "\r\n";
+                    outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
 
-                    // Streaming response
-                    JSONObject chunk = new JSONObject();
-                    chunk.put("model", model);
-                    chunk.put("created_at", getTimestamp());
-                    
-                    JSONObject message = new JSONObject();
-                    message.put("role", "assistant");
-                    message.put("content", response);
-                    chunk.put("message", message);
-                    chunk.put("done", true);
-                    
-                    sendStreamingResponse(outputStream, chunk.toString());
+                    final Object writeLock = new Object();
+
+                    modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
+                        @Override
+                        public void onToken(String token) {
+                            try {
+                                JSONObject chunk = new JSONObject();
+                                chunk.put("model", model);
+                                chunk.put("created_at", getTimestamp());
+
+                                JSONObject message = new JSONObject();
+                                message.put("role", "assistant");
+                                message.put("content", token);
+                                chunk.put("message", message);
+                                chunk.put("done", false);
+
+                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                synchronized (writeLock) {
+                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write(chunkBytes);
+                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.flush();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error writing streaming chunk", e);
+                            }
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            try {
+                                JSONObject chunk = new JSONObject();
+                                chunk.put("model", model);
+                                chunk.put("created_at", getTimestamp());
+
+                                JSONObject message = new JSONObject();
+                                message.put("role", "assistant");
+                                message.put("content", "");
+                                chunk.put("message", message);
+                                chunk.put("done", true);
+
+                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                synchronized (writeLock) {
+                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write(chunkBytes);
+                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                    // End chunked stream
+                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.flush();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error writing final streaming chunk", e);
+                            } finally {
+                                modelManager.getLlama().setTokenListener(null);
+                            }
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            try {
+                                JSONObject err = new JSONObject();
+                                err.put("error", error);
+                                byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                synchronized (writeLock) {
+                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write(chunkBytes);
+                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                    outputStream.flush();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error writing error chunk", e);
+                            } finally {
+                                modelManager.getLlama().setTokenListener(null);
+                            }
+                        }
+                    });
+
+                    try {
+                        modelManager.generate(promptToUse);
+                    } finally {
+                        modelManager.getLlama().setTokenListener(null);
+                    }
                 } else {
                     // Non-streaming response
+                    String response = modelManager.generate(promptToUse);
+
                     JSONObject result = new JSONObject();
                     result.put("model", model);
                     result.put("created_at", getTimestamp());
-                    
+
                     JSONObject message = new JSONObject();
                     message.put("role", "assistant");
                     message.put("content", response);
                     result.put("message", message);
                     result.put("done", true);
-                    
+
                     sendJsonResponse(outputStream, 200, result.toString());
                 }
             } finally {

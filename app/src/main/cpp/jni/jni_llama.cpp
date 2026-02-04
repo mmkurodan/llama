@@ -28,6 +28,11 @@ static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
 static JavaVM *g_jvm = nullptr;
+// Token listener global ref and method IDs
+static jobject g_token_listener = nullptr;
+static jmethodID g_token_onToken = nullptr;
+static jmethodID g_token_onComplete = nullptr;
+static jmethodID g_token_onError = nullptr;
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 
@@ -614,6 +619,43 @@ Java_com_micklab_llama_LlamaNative_setParameters(
     }
 }
 
+// ---------------- JNI: setTokenListener ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setTokenListener(
+        JNIEnv *env, jobject /*thiz*/, jobject listener) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    // Ensure JavaVM stored
+    if (!g_jvm) {
+        if (env->GetJavaVM(&g_jvm) != JNI_OK) {
+            g_jvm = nullptr;
+            log_to_file("setTokenListener: GetJavaVM failed", GGML_LOG_LEVEL_WARN);
+        } else {
+            log_to_file("setTokenListener: JavaVM stored");
+        }
+    }
+    // Delete previous global ref if exists
+    if (g_token_listener) {
+        env->DeleteGlobalRef(g_token_listener);
+        g_token_listener = nullptr;
+        g_token_onToken = nullptr;
+        g_token_onComplete = nullptr;
+        g_token_onError = nullptr;
+    }
+    if (listener == nullptr) {
+        log_to_file("setTokenListener: cleared listener");
+        return;
+    }
+    g_token_listener = env->NewGlobalRef(listener);
+    jclass cls = env->GetObjectClass(listener);
+    if (cls) {
+        g_token_onToken = env->GetMethodID(cls, "onToken", "(Ljava/lang/String;)V");
+        g_token_onComplete = env->GetMethodID(cls, "onComplete", "()V");
+        g_token_onError = env->GetMethodID(cls, "onError", "(Ljava/lang/String;)V");
+    }
+    log_to_file("setTokenListener: listener registered");
+}
+
 // ---------------- JNI: generate ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -725,6 +767,25 @@ Java_com_micklab_llama_LlamaNative_generate(
                    << " (rc=" << rc << ")";
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
                 if (g_log_ofs.is_open()) g_log_ofs.flush();
+                // Notify Java listener about error
+                if (g_jvm && g_token_listener && g_token_onError) {
+                    JNIEnv* env = nullptr;
+                    bool attached = false;
+                    if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+                        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+                            attached = true;
+                        } else {
+                            env = nullptr;
+                        }
+                    }
+                    if (env) {
+                        jstring jerr = env->NewStringUTF("decode failed (prompt)");
+                        env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        env->DeleteLocalRef(jerr);
+                    }
+                    if (attached) g_jvm->DetachCurrentThread();
+                }
                 return env->NewStringUTF("decode failed (prompt)");
             }
         }
@@ -909,9 +970,31 @@ Java_com_micklab_llama_LlamaNative_generate(
         if (n_chars > 0) {
             std::string full(buf, n_chars);
 
-            // ★ 前回との差分だけを output に追加（スペースも含めて正しく復元）
+            // Compute delta from previous text
+            std::string delta;
             if (full.size() > prev_text.size()) {
-                output += full.substr(prev_text.size());
+                delta = full.substr(prev_text.size());
+                output += delta;
+            }
+
+            // Call token listener with delta if available
+            if (!delta.empty() && g_token_listener && g_token_onToken && g_jvm) {
+                JNIEnv* env = nullptr;
+                bool attached = false;
+                if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+                    if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+                        attached = true;
+                    } else {
+                        env = nullptr;
+                    }
+                }
+                if (env) {
+                    jstring jdelta = env->NewStringUTF(delta.c_str());
+                    env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
+                    if (env->ExceptionCheck()) env->ExceptionClear();
+                    env->DeleteLocalRef(jdelta);
+                }
+                if (attached) g_jvm->DetachCurrentThread();
             }
 
             prev_text = full;
@@ -959,9 +1042,46 @@ Java_com_micklab_llama_LlamaNative_generate(
         if (rc_step != 0) {
             log_to_file("generate: decode failed (generation)", GGML_LOG_LEVEL_ERROR);
             if (g_log_ofs.is_open()) g_log_ofs.flush();
+            // Notify Java listener about error
+            if (g_jvm && g_token_listener && g_token_onError) {
+                JNIEnv* env = nullptr;
+                bool attached = false;
+                if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+                    if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+                        attached = true;
+                    } else {
+                        env = nullptr;
+                    }
+                }
+                if (env) {
+                    jstring jerr = env->NewStringUTF("decode failed (generation)");
+                    env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
+                    if (env->ExceptionCheck()) env->ExceptionClear();
+                    env->DeleteLocalRef(jerr);
+                }
+                if (attached) g_jvm->DetachCurrentThread();
+            }
             llama_sampler_free(smpl);
             return env->NewStringUTF("decode failed (generation)");
         }
+    }
+
+    // Notify Java listener that generation is complete
+    if (g_jvm && g_token_listener && g_token_onComplete) {
+        JNIEnv* env = nullptr;
+        bool attached = false;
+        if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+            if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+                attached = true;
+            } else {
+                env = nullptr;
+            }
+        }
+        if (env) {
+            env->CallVoidMethod(g_token_listener, g_token_onComplete);
+            if (env->ExceptionCheck()) env->ExceptionClear();
+        }
+        if (attached) g_jvm->DetachCurrentThread();
     }
 
     // Free the sampler chain

@@ -202,12 +202,35 @@ public class MainActivity extends Activity {
             appendMessage("Running generate...");
             outputView.setText("");
             new Thread(() -> {
+                LlamaNative.TokenListener tListener = null;
                 try {
                     // Set parameters before generating
                     if (currentConfig != null) {
                         modelManager.applyConfiguration(currentConfig);
                     }
-                    
+
+                    if (currentConfig != null && currentConfig.streaming) {
+                        tListener = new LlamaNative.TokenListener() {
+                            @Override
+                            public void onToken(String token) {
+                                runOnUiThread(() -> outputView.append(token));
+                            }
+
+                            @Override
+                            public void onComplete() {
+                                runOnUiThread(() -> appendMessage("streaming complete"));
+                            }
+
+                            @Override
+                            public void onError(String error) {
+                                runOnUiThread(() -> appendMessage("streaming error: " + error));
+                            }
+                        };
+                        modelManager.getLlama().setTokenListener(tListener);
+                    } else {
+                        modelManager.getLlama().setTokenListener(null);
+                    }
+
                     String gen = modelManager.generate(chatPrompt);
                     final String finalGen = gen;
                     runOnUiThread(() -> {
@@ -218,6 +241,7 @@ public class MainActivity extends Activity {
                     appendException("generate() threw", t);
                     showToast("Generate error: " + t.getMessage());
                 } finally {
+                    modelManager.getLlama().setTokenListener(null);
                     modelManager.release();
                 }
             }).start();
@@ -232,10 +256,33 @@ public class MainActivity extends Activity {
             outputView.setText("");
         });
         
+        LlamaNative.TokenListener tListener = null;
         try {
             // Set parameters before generating
             if (currentConfig != null) {
                 modelManager.applyConfiguration(currentConfig);
+            }
+
+            if (currentConfig != null && currentConfig.streaming) {
+                tListener = new LlamaNative.TokenListener() {
+                    @Override
+                    public void onToken(String token) {
+                        runOnUiThread(() -> outputView.append(token));
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        runOnUiThread(() -> appendMessage("streaming complete"));
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        runOnUiThread(() -> appendMessage("streaming error: " + error));
+                    }
+                };
+                modelManager.getLlama().setTokenListener(tListener);
+            } else {
+                modelManager.getLlama().setTokenListener(null);
             }
             
             String gen = modelManager.generate(chatPrompt);
@@ -248,6 +295,7 @@ public class MainActivity extends Activity {
             appendException("generate() threw", t);
             showToast("Generate error: " + t.getMessage());
         } finally {
+            modelManager.getLlama().setTokenListener(null);
             modelManager.release();
         }
     }
