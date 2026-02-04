@@ -779,10 +779,17 @@ Java_com_micklab_llama_LlamaNative_generate(
                         }
                     }
                     if (env) {
-                        jstring jerr = env->NewStringUTF("decode failed (prompt)");
-                        env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
-                        if (env->ExceptionCheck()) env->ExceptionClear();
-                        env->DeleteLocalRef(jerr);
+                        const char *errmsg = "decode failed (prompt)";
+                        jstring jerr = env->NewStringUTF(errmsg);
+                        if (!jerr) {
+                            if (env->ExceptionCheck()) env->ExceptionClear();
+                            jerr = env->NewStringUTF("unknown error");
+                        }
+                        if (jerr) {
+                            env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
+                            if (env->ExceptionCheck()) env->ExceptionClear();
+                            env->DeleteLocalRef(jerr);
+                        }
                     }
                     if (attached) g_jvm->DetachCurrentThread();
                 }
@@ -1054,10 +1061,17 @@ Java_com_micklab_llama_LlamaNative_generate(
                     }
                 }
                 if (env) {
-                    jstring jerr = env->NewStringUTF("decode failed (generation)");
-                    env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
-                    if (env->ExceptionCheck()) env->ExceptionClear();
-                    env->DeleteLocalRef(jerr);
+                    const char *errmsg = "decode failed (generation)";
+                    jstring jerr = env->NewStringUTF(errmsg);
+                    if (!jerr) {
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        jerr = env->NewStringUTF("unknown error");
+                    }
+                    if (jerr) {
+                        env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        env->DeleteLocalRef(jerr);
+                    }
                 }
                 if (attached) g_jvm->DetachCurrentThread();
             }
