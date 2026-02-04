@@ -405,6 +405,15 @@ public class OllamaApiServer {
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
                     }
+                    try {
+                        writerThread.join(5000);
+                        if (writerThread.isAlive()) {
+                            Log.w(TAG, "Writer thread did not finish before timeout (generate)");
+                        }
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        Log.w(TAG, "Writer thread join interrupted (generate)", ie);
+                    }
                 } else {
                     // Non-streaming response
                     String response = modelManager.generate(promptToUse);
@@ -583,6 +592,15 @@ public class OllamaApiServer {
                         if (!errorSent[0]) {
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
+                    }
+                    try {
+                        writerThread.join(5000);
+                        if (writerThread.isAlive()) {
+                            Log.w(TAG, "Writer thread did not finish before timeout (chat)");
+                        }
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        Log.w(TAG, "Writer thread join interrupted (chat)", ie);
                     }
                 } else {
                     // Non-streaming response
