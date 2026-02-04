@@ -63,6 +63,9 @@ public class ConfigurationManager {
         public int dryPenaltyLastN;
         public String drySequenceBreakers;
         
+        // Streaming parameter
+        public boolean streaming;
+        
         public Configuration() {
             // Default values - Gemma 1B assistant
             name = DEFAULT_CONFIG_NAME;
@@ -101,6 +104,9 @@ public class ConfigurationManager {
             dryAllowedLength = 2;
             dryPenaltyLastN = -1;
             drySequenceBreakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
+            
+            // Streaming default
+            streaming = true;
         }
         
         public Configuration(String name) {
@@ -147,6 +153,9 @@ public class ConfigurationManager {
             json.put("dryPenaltyLastN", dryPenaltyLastN);
             json.put("drySequenceBreakers", drySequenceBreakers);
             
+            // Streaming
+            json.put("streaming", streaming);
+            
             return json;
         }
         
@@ -188,6 +197,9 @@ public class ConfigurationManager {
             config.dryAllowedLength = json.optInt("dryAllowedLength", 2);
             config.dryPenaltyLastN = json.optInt("dryPenaltyLastN", -1);
             config.drySequenceBreakers = json.optString("drySequenceBreakers", DEFAULT_DRY_SEQUENCE_BREAKERS);
+            
+            // Streaming (with default for backward compatibility)
+            config.streaming = json.optBoolean("streaming", true);
             
             return config;
         }

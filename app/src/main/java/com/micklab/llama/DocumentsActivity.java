@@ -99,9 +99,6 @@ public class DocumentsActivity extends Activity {
     }
 
     private Document[] buildDocuments() {
-        String rightsTitle = "Rights / 権利";
-        String rightsText = buildRightsText();
-
         String manualTitle = "User Manual / 操作マニュアル";
         String manualText = buildManualText();
 
@@ -109,27 +106,9 @@ public class DocumentsActivity extends Activity {
         String privacyText = buildPrivacyText();
 
         return new Document[] {
-            new Document(rightsTitle, rightsText),
             new Document(manualTitle, manualText),
             new Document(privacyTitle, privacyText)
         };
-    }
-
-    private String buildRightsText() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("[日本語]\n");
-        sb.append("権利・ライセンス\n\n");
-        sb.append("本アプリ（llama Tester）は、作者が著作権を保有します。\n");
-        sb.append("本アプリの利用・複製・改変・再配布は、アプリ内のライセンス表示に従います。\n");
-        sb.append("商用利用は作者の事前の書面による許可が必要です。\n");
-        sb.append("ライセンス本文は「Settings > Show License」で確認できます。\n\n");
-        sb.append("[English]\n");
-        sb.append("Rights and License\n\n");
-        sb.append("This app (llama Tester) is copyrighted by the author.\n");
-        sb.append("Use, reproduction, modification, and redistribution are permitted per the in-app license.\n");
-        sb.append("Commercial use requires prior written permission from the author.\n");
-        sb.append("See the full license at \"Settings > Show License\".\n");
-        return sb.toString();
     }
 
     private String buildManualText() {
@@ -142,25 +121,62 @@ public class DocumentsActivity extends Activity {
         sb.append("2. 初期設定（推奨手順）\n");
         sb.append("1) メイン画面で「Settings」を開きます。\n");
         sb.append("2) モデルURLを入力し「Load Model」を押してモデルを読み込みます。\n");
-        sb.append("3) パラメータを調整する場合は各項目を編集し「Save Config」で保存します。\n\n");
+        sb.append("3) パラメータを調整する場合は各項目を編集し「Save Config」で保存します。\n");
+        sb.append("4) 「Back to Main」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
         sb.append("3. メイン画面\n");
         sb.append("- Enter Prompt: プロンプトを入力します。\n");
-        sb.append("- Send: 生成を開始します（モデル未読み込み時はエラー表示）。\n");
+        sb.append("- Send: 生成を開始します。モデル未ロード時は自動でロードを試みます。\n");
         sb.append("- Re-init Model: 現在のモデルを解放して再初期化します。\n");
         sb.append("- View Log: ログファイル内容を出力欄に表示します。\n");
         sb.append("- Clear Log: ログファイルを空にします。\n");
         sb.append("- Start/Stop API Server: APIサーバーを起動/停止します。\n");
-        sb.append("- Copy: 出力/ログをクリップボードへコピーします。\n\n");
+        sb.append("- Copy: 出力/ログをクリップボードへコピーします。\n");
+        sb.append("- Processing Status/Logs: タイムスタンプ付きでログが表示されます。\n\n");
         sb.append("4. 設定画面の操作\n");
         sb.append("- Configuration Management: 設定の保存/削除/読み込みを行います。\n");
         sb.append("- Model Selection: モデルURLを指定し読み込みます。\n");
         sb.append("- Model Parameters: 生成パラメータを設定します。\n");
+        sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
         sb.append("- Prompt Template: {USER_INPUT} で入力を差し込みます。\n");
         sb.append("- Llama API Server: サーバーポートを指定します。\n");
         sb.append("- Log Settings: ログレベルを選択します。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
-        sb.append("- Documents: 権利、操作マニュアル、プライバシーポリシーを確認できます。\n\n");
-        sb.append("5. APIサーバー（任意）\n");
+        sb.append("- Documents: 操作マニュアル、プライバシーポリシーを確認できます。\n");
+        sb.append("- Back to Main: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n\n");
+        sb.append("5. モデルパラメータの詳細説明\n\n");
+        sb.append("【基本パラメータ】\n");
+        sb.append("- Context Size (n_ctx): モデルが一度に処理できるトークン数。大きいほど長い文脈を扱えますが、メモリ消費が増加します。\n");
+        sb.append("- Threads (n_threads): 推論に使用するCPUスレッド数。端末のコア数に合わせて調整してください。\n");
+        sb.append("- Batch Size (n_batch): 一度に処理するトークン数。大きくすると高速ですがメモリを多く使用します。\n");
+        sb.append("- Temperature (temp): 出力のランダム性を制御。0に近いほど決定的、高いほど多様な出力になります。\n");
+        sb.append("- Top-p: 累積確率がこの値に達するまでのトークンから選択します（nucleus sampling）。\n");
+        sb.append("- Top-k: 確率上位k個のトークンから選択します。\n\n");
+        sb.append("【ペナルティパラメータ】\n");
+        sb.append("- Penalty Last N: ペナルティを適用する直近のトークン数。\n");
+        sb.append("- Penalty Repeat: 繰り返しトークンへのペナルティ倍率。1.0で無効、高いほど繰り返しを抑制。\n");
+        sb.append("- Penalty Frequency: 出現頻度に応じたペナルティ。\n");
+        sb.append("- Penalty Presence: 一度出現したトークンへのペナルティ。\n\n");
+        sb.append("【Mirostatパラメータ】\n");
+        sb.append("- Mirostat: 0=無効、1=Mirostat v1、2=Mirostat v2。出力の一貫性を自動調整するサンプリング手法。\n");
+        sb.append("- Mirostat Tau: 目標のサプライズ値（perplexity）。低いとより一貫性のある出力。\n");
+        sb.append("- Mirostat Eta: 学習率。Mirostatのフィードバック速度を制御。\n\n");
+        sb.append("【追加サンプリングパラメータ】\n");
+        sb.append("- Min-p: 最低確率閾値。これ以下の確率のトークンを除外。\n");
+        sb.append("- Typical P: 典型的なサンプリングのパラメータ。\n");
+        sb.append("- Dynamic Temperature Range: 動的温度調整の範囲。0で無効。\n");
+        sb.append("- Dynamic Temperature Exponent: 動的温度の指数。\n");
+        sb.append("- XTC Probability: XTCサンプリングの確率。\n");
+        sb.append("- XTC Threshold: XTCサンプリングの閾値。\n");
+        sb.append("- Top-N-Sigma: シグマベースのサンプリング。-1で無効。\n\n");
+        sb.append("【DRYパラメータ】\n");
+        sb.append("- DRY Multiplier: Don't Repeat Yourself繰り返し抑制の強度。0で無効。\n");
+        sb.append("- DRY Base: DRYペナルティの基数。\n");
+        sb.append("- DRY Allowed Length: 繰り返しを許容する最小長。\n");
+        sb.append("- DRY Penalty Last N: DRYペナルティを適用するトークン数。-1で全体に適用。\n");
+        sb.append("- DRY Sequence Breakers: DRYの区切り文字。\n\n");
+        sb.append("【出力設定】\n");
+        sb.append("- Enable Streaming: 有効にするとトークンが生成されるたびに出力が更新されます。無効にすると生成完了後に一括表示されます。\n\n");
+        sb.append("6. APIサーバー（任意）\n");
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags を提供します。\n");
         sb.append("- 同時生成は1件のみです（ビジー時は503を返します）。\n");
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
@@ -172,25 +188,62 @@ public class DocumentsActivity extends Activity {
         sb.append("2. Recommended Setup\n");
         sb.append("1) Open \"Settings\" from the main screen.\n");
         sb.append("2) Enter the model URL and tap \"Load Model\".\n");
-        sb.append("3) Edit parameters if needed and tap \"Save Config\".\n\n");
+        sb.append("3) Edit parameters if needed and tap \"Save Config\".\n");
+        sb.append("4) Tap \"Back to Main\" to save settings and apply them to the model immediately.\n\n");
         sb.append("3. Main Screen\n");
         sb.append("- Enter Prompt: Type your prompt.\n");
-        sb.append("- Send: Start generation (shows an error if the model is not loaded).\n");
+        sb.append("- Send: Start generation. If the model is not loaded, it will be loaded automatically.\n");
         sb.append("- Re-init Model: Free and re-initialize the current model.\n");
         sb.append("- View Log: Show the log file in the output area.\n");
         sb.append("- Clear Log: Clear the log file.\n");
         sb.append("- Start/Stop API Server: Toggle the API server.\n");
-        sb.append("- Copy: Copy output/log to clipboard.\n\n");
+        sb.append("- Copy: Copy output/log to clipboard.\n");
+        sb.append("- Processing Status/Logs: Logs are displayed with timestamps.\n\n");
         sb.append("4. Settings Screen\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
         sb.append("- Model Selection: Set model URL and load it.\n");
         sb.append("- Model Parameters: Set generation parameters.\n");
+        sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Use {USER_INPUT} as a placeholder.\n");
         sb.append("- Llama API Server: Set server port.\n");
         sb.append("- Log Settings: Select log level.\n");
         sb.append("- Show License: Display license text.\n");
-        sb.append("- Documents: View rights, manual, and privacy policy.\n\n");
-        sb.append("5. API Server (Optional)\n");
+        sb.append("- Documents: View manual and privacy policy.\n");
+        sb.append("- Back to Main: Save current settings and apply them to the model immediately.\n\n");
+        sb.append("5. Model Parameter Details\n\n");
+        sb.append("[Basic Parameters]\n");
+        sb.append("- Context Size (n_ctx): Number of tokens the model can process at once. Larger values handle longer contexts but use more memory.\n");
+        sb.append("- Threads (n_threads): Number of CPU threads for inference. Adjust based on your device's core count.\n");
+        sb.append("- Batch Size (n_batch): Number of tokens processed at once. Larger is faster but uses more memory.\n");
+        sb.append("- Temperature (temp): Controls output randomness. Lower is more deterministic, higher is more diverse.\n");
+        sb.append("- Top-p: Select from tokens until cumulative probability reaches this value (nucleus sampling).\n");
+        sb.append("- Top-k: Select from top k probability tokens.\n\n");
+        sb.append("[Penalty Parameters]\n");
+        sb.append("- Penalty Last N: Number of recent tokens to apply penalties to.\n");
+        sb.append("- Penalty Repeat: Multiplier for repeat token penalty. 1.0 disables, higher suppresses repetition.\n");
+        sb.append("- Penalty Frequency: Penalty based on token frequency.\n");
+        sb.append("- Penalty Presence: Penalty for tokens that appeared before.\n\n");
+        sb.append("[Mirostat Parameters]\n");
+        sb.append("- Mirostat: 0=disabled, 1=Mirostat v1, 2=Mirostat v2. Auto-adjusts output consistency.\n");
+        sb.append("- Mirostat Tau: Target surprise value (perplexity). Lower for more consistent output.\n");
+        sb.append("- Mirostat Eta: Learning rate for Mirostat feedback.\n\n");
+        sb.append("[Additional Sampling Parameters]\n");
+        sb.append("- Min-p: Minimum probability threshold. Excludes tokens below this probability.\n");
+        sb.append("- Typical P: Parameter for typical sampling.\n");
+        sb.append("- Dynamic Temperature Range: Range for dynamic temperature adjustment. 0 disables.\n");
+        sb.append("- Dynamic Temperature Exponent: Exponent for dynamic temperature.\n");
+        sb.append("- XTC Probability: Probability for XTC sampling.\n");
+        sb.append("- XTC Threshold: Threshold for XTC sampling.\n");
+        sb.append("- Top-N-Sigma: Sigma-based sampling. -1 disables.\n\n");
+        sb.append("[DRY Parameters]\n");
+        sb.append("- DRY Multiplier: Don't Repeat Yourself penalty strength. 0 disables.\n");
+        sb.append("- DRY Base: Base value for DRY penalty.\n");
+        sb.append("- DRY Allowed Length: Minimum length for allowed repetitions.\n");
+        sb.append("- DRY Penalty Last N: Number of tokens for DRY penalty. -1 applies to all.\n");
+        sb.append("- DRY Sequence Breakers: Characters that break DRY sequences.\n\n");
+        sb.append("[Output Settings]\n");
+        sb.append("- Enable Streaming: When enabled, output updates as tokens are generated. When disabled, output shows all at once after generation completes.\n\n");
+        sb.append("6. API Server (Optional)\n");
         sb.append("- Provides /api/chat, /api/generate, /api/tags on device.\n");
         sb.append("- Only one generation at a time (busy returns 503).\n");
         sb.append("- Android 13+ may require notification permission.\n");
