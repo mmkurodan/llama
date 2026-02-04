@@ -37,6 +37,8 @@ public class LlamaNative {
     
     // Set sampling parameters
     public native void setParameters(
+        int nCtx, int nThreads, int nBatch,
+        float temp, float topP, int topK,
         int penaltyLastN, float penaltyRepeat, float penaltyFreq, float penaltyPresent,
         int mirostat, float mirostatTau, float mirostatEta,
         float minP, float typicalP,

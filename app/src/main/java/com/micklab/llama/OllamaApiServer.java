@@ -278,7 +278,11 @@ public class OllamaApiServer {
                 try {
                     config = configManager.loadConfiguration(model);
                 } catch (Exception e) {
-                    Log.w(TAG, "Could not load config for template", e);
+                    Log.w(TAG, "Could not load config for parameters", e);
+                }
+                
+                if (config != null) {
+                    modelManager.applyConfiguration(config);
                 }
                 
                 if (listener != null) {
@@ -460,12 +464,23 @@ public class OllamaApiServer {
                     return;
                 }
                 
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not load config for parameters", e);
+                }
+                
+                if (config != null) {
+                    modelManager.applyConfiguration(config);
+                }
+                
                 if (listener != null) {
                     listener.onGenerating(model);
                 }
                 
-                // Build prompt from messages (already applies template if available)
-                String promptToUse = buildPromptFromMessages(messages, model);
+                // Build prompt from messages (raw concatenation; no templates)
+                String promptToUse = buildRawPromptFromMessages(messages);
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -681,63 +696,16 @@ public class OllamaApiServer {
         return "<|system|>\nYou are a helpful assistant.\n<|user|>\n" + cleanInput + "\n<|assistant|>\n";
     }
 
-    private String buildPromptFromMessages(JSONArray messages, String configName) throws JSONException {
+    private String buildRawPromptFromMessages(JSONArray messages) throws JSONException {
         StringBuilder sb = new StringBuilder();
-        
-        // Try to get prompt template from config
-        String template = null;
-        try {
-            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
-            template = config.promptTemplate;
-        } catch (Exception e) {
-            Log.w(TAG, "Could not load config for template", e);
-        }
-        
-        // Build conversation from messages
-        String systemPrompt = "You are a helpful assistant.";
-        StringBuilder userContent = new StringBuilder();
-        
         for (int i = 0; i < messages.length(); i++) {
             JSONObject msg = messages.getJSONObject(i);
-            String role = msg.optString("role", "");
             String content = msg.optString("content", "");
-            
-            // Strip any existing template markers from content to avoid double-templating
-            content = stripTemplateMarkers(content);
-            
-            if ("system".equals(role)) {
-                systemPrompt = content;
-            } else if ("user".equals(role)) {
-                if (userContent.length() > 0) {
-                    userContent.append("\n");
-                }
-                userContent.append(content);
-            } else if ("assistant".equals(role)) {
-                // Include previous assistant responses in context
-                if (userContent.length() > 0) {
-                    userContent.append("\nAssistant: ").append(content).append("\nUser: ");
-                }
+            if (i > 0) {
+                sb.append("\n");
             }
+            sb.append(content);
         }
-        
-        // Apply template if available
-        if (template != null && !template.isEmpty() && template.contains("{USER_INPUT}")) {
-            // Replace system prompt marker if present
-            String result = template;
-            if (template.contains("<|system|>")) {
-                // Use template as-is but replace user input
-                result = template.replace("{USER_INPUT}", userContent.toString());
-            } else {
-                result = template.replace("{USER_INPUT}", userContent.toString());
-            }
-            return result;
-        }
-        
-        // Default format
-        sb.append("<|system|>\n").append(systemPrompt).append("\n");
-        sb.append("<|user|>\n").append(userContent.toString()).append("\n");
-        sb.append("<|assistant|>\n");
-        
         return sb.toString();
     }
     
