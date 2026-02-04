@@ -25,6 +25,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import android.widget.EditText;
 import android.widget.Button;
@@ -67,6 +70,9 @@ public class MainActivity extends Activity {
     // API Server (via Foreground Service)
     private int apiPort = OllamaApiServer.DEFAULT_PORT;
     private boolean isServiceRunning = false;
+    
+    // Timestamp formatter for log messages
+    private final SimpleDateFormat timestampFormat = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
     
     // Broadcast receiver for service logs
     private BroadcastReceiver serviceReceiver = new BroadcastReceiver() {
@@ -154,14 +160,39 @@ public class MainActivity extends Activity {
                 showToast("Please enter a prompt");
                 return;
             }
-            if (!modelManager.isModelLoaded()) {
-                showToast("Model not loaded yet. Please load a model in Settings.");
-                return;
-            }
             
             // Check if busy
             if (!modelManager.tryAcquire()) {
                 showToast("Model is busy processing another request");
+                return;
+            }
+            
+            // If model not loaded, load it first
+            if (!modelManager.isModelLoaded()) {
+                appendMessage("Model not loaded. Loading model...");
+                new Thread(() -> {
+                    try {
+                        String configName = (currentConfig != null) ? currentConfig.name : "default";
+                        boolean loadSuccess = modelManager.loadConfiguration(configName);
+                        if (!loadSuccess) {
+                            modelManager.release();
+                            runOnUiThread(() -> {
+                                showToast("Failed to load model. Please check Settings.");
+                                appendMessage("Model load failed.");
+                            });
+                            return;
+                        }
+                        runOnUiThread(() -> {
+                            appendMessage("Model loaded successfully. Processing prompt...");
+                        });
+                        // Now proceed with generation
+                        processGeneration(userPrompt);
+                    } catch (Throwable t) {
+                        modelManager.release();
+                        appendException("Model load error", t);
+                        showToast("Model load error: " + t.getMessage());
+                    }
+                }).start();
                 return;
             }
 
@@ -193,6 +224,34 @@ public class MainActivity extends Activity {
         });
     }
     
+    private void processGeneration(String userPrompt) {
+        final String chatPrompt = applyPromptTemplate(userPrompt);
+        
+        runOnUiThread(() -> {
+            appendMessage("Running generate...");
+            outputView.setText("");
+        });
+        
+        try {
+            // Set parameters before generating
+            if (currentConfig != null) {
+                modelManager.applyConfiguration(currentConfig);
+            }
+            
+            String gen = modelManager.generate(chatPrompt);
+            final String finalGen = gen;
+            runOnUiThread(() -> {
+                appendMessage("generate() returned.");
+                outputView.setText(finalGen);
+            });
+        } catch (Throwable t) {
+            appendException("generate() threw", t);
+            showToast("Generate error: " + t.getMessage());
+        } finally {
+            modelManager.release();
+        }
+    }
+    
     private void openSettings() {
         Intent intent = new Intent(this, SettingsActivity.class);
         if (currentConfig != null) {
@@ -210,6 +269,12 @@ public class MainActivity extends Activity {
                 try {
                     currentConfig = configManager.loadConfiguration(configName);
                     appendMessage("Loaded configuration: " + configName);
+                    
+                    // Apply configuration to model immediately if loaded
+                    if (modelManager.isModelLoaded()) {
+                        modelManager.applyConfiguration(currentConfig);
+                        appendMessage("Applied configuration to model");
+                    }
                 } catch (IOException | JSONException e) {
                     Log.e(TAG, "Failed to load configuration", e);
                     appendMessage("Failed to load configuration: " + e.getMessage());
@@ -335,7 +400,8 @@ public class MainActivity extends Activity {
 
     private void appendMessage(final String msg) {
         runOnUiThread(() -> {
-            logView.append(msg + "\n");
+            String timestamp = timestampFormat.format(new Date());
+            logView.append("[" + timestamp + "] " + msg + "\n");
             logScrollView.post(() -> logScrollView.fullScroll(ScrollView.FOCUS_DOWN));
         });
     }

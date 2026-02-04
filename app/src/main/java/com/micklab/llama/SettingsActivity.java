@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -80,6 +81,9 @@ public class SettingsActivity extends Activity {
     private EditText dryAllowedLengthInput;
     private EditText dryPenaltyLastNInput;
     private EditText drySequenceBreakersInput;
+    
+    // Streaming switch
+    private Switch streamingSwitch;
     
     // API Server settings
     private EditText apiPortInput;
@@ -170,6 +174,9 @@ public class SettingsActivity extends Activity {
         dryAllowedLengthInput = findViewById(R.id.dryAllowedLengthInput);
         dryPenaltyLastNInput = findViewById(R.id.dryPenaltyLastNInput);
         drySequenceBreakersInput = findViewById(R.id.drySequenceBreakersInput);
+        
+        // Streaming switch
+        streamingSwitch = findViewById(R.id.streamingSwitch);
         
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
@@ -323,6 +330,9 @@ public class SettingsActivity extends Activity {
         dryAllowedLengthInput.setText(String.valueOf(config.dryAllowedLength));
         dryPenaltyLastNInput.setText(String.valueOf(config.dryPenaltyLastN));
         drySequenceBreakersInput.setText(config.drySequenceBreakers);
+        
+        // Streaming
+        streamingSwitch.setChecked(config.streaming);
     }
     
     private ConfigurationManager.Configuration getConfigFromUI() {
@@ -492,6 +502,9 @@ public class SettingsActivity extends Activity {
         if (config.drySequenceBreakers.isEmpty()) {
             config.drySequenceBreakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
         }
+        
+        // Streaming
+        config.streaming = streamingSwitch.isChecked();
         
         return config;
     }
@@ -697,6 +710,15 @@ public class SettingsActivity extends Activity {
         }
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit().putInt(PREF_API_PORT, apiPort).apply();
+        
+        // Save current UI configuration before returning
+        ConfigurationManager.Configuration config = getConfigFromUI();
+        try {
+            configManager.saveConfiguration(config);
+            currentConfig = config;
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to save configuration on finish", e);
+        }
         
         // Return the current configuration name and model info to MainActivity
         Intent resultIntent = new Intent();
