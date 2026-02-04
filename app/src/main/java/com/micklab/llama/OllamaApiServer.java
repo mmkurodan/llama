@@ -47,7 +47,14 @@ public class OllamaApiServer {
 
     private static class TokenError {
         final String error;
-        TokenError(String error) { this.error = (error == null) ? "unknown error" : error; }
+        TokenError(String error) {
+            if (error == null) {
+                this.error = "unknown error";
+            } else {
+                String trimmed = error.trim();
+                this.error = trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed) ? "unknown error" : error;
+            }
+        }
     }
 
     private int port = DEFAULT_PORT;
@@ -281,6 +288,7 @@ public class OllamaApiServer {
                 String promptToUse = applyPromptTemplate(prompt, config);
 
                 if (stream) {
+                    final boolean[] errorSent = { false };
                     // Start chunked response
                     String header = "HTTP/1.1 200 OK\r\n" +
                             "Content-Type: application/x-ndjson\r\n" +
@@ -299,6 +307,9 @@ public class OllamaApiServer {
                             while (true) {
                                 Object ev = tokenQueue.take();
                                 if (ev == TOKEN_COMPLETE) {
+                                    if (errorSent[0]) {
+                                        break;
+                                    }
                                     try {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
@@ -321,6 +332,7 @@ public class OllamaApiServer {
                                 } else if (ev instanceof TokenError) {
                                     TokenError te = (TokenError) ev;
                                     try {
+                                        errorSent[0] = true;
                                         JSONObject err = new JSONObject();
                                         err.put("error", te.error);
                                         byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
@@ -389,6 +401,9 @@ public class OllamaApiServer {
                         modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
+                        if (!errorSent[0]) {
+                            tokenQueue.offer(TOKEN_COMPLETE);
+                        }
                     }
                 } else {
                     // Non-streaming response
@@ -444,6 +459,7 @@ public class OllamaApiServer {
                 String promptToUse = buildPromptFromMessages(messages, model);
 
                 if (stream) {
+                    final boolean[] errorSent = { false };
                     // Start chunked response
                     String header = "HTTP/1.1 200 OK\r\n" +
                             "Content-Type: application/x-ndjson\r\n" +
@@ -462,6 +478,9 @@ public class OllamaApiServer {
                             while (true) {
                                 Object ev = tokenQueue.take();
                                 if (ev == TOKEN_COMPLETE) {
+                                    if (errorSent[0]) {
+                                        break;
+                                    }
                                     try {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
@@ -489,6 +508,7 @@ public class OllamaApiServer {
                                 } else if (ev instanceof TokenError) {
                                     TokenError te = (TokenError) ev;
                                     try {
+                                        errorSent[0] = true;
                                         JSONObject err = new JSONObject();
                                         err.put("error", te.error);
                                         byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
@@ -560,6 +580,9 @@ public class OllamaApiServer {
                         modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
+                        if (!errorSent[0]) {
+                            tokenQueue.offer(TOKEN_COMPLETE);
+                        }
                     }
                 } else {
                     // Non-streaming response
