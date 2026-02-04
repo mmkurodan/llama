@@ -57,7 +57,10 @@ public class MainActivity extends Activity {
     private Button clearLogButton;
     private Button apiServerButton;
     private Button copyOutputButton;
+    private Button updateLogButton;
     private Button copyLogButton;
+    private boolean isViewingLog = false;
+    private String savedOutputText = null;
     private TextView apiServerStatusMain;
     
     // Model Manager (singleton)
@@ -123,6 +126,7 @@ public class MainActivity extends Activity {
         clearLogButton = findViewById(R.id.clearLogButton);
         apiServerButton = findViewById(R.id.apiServerButton);
         copyOutputButton = findViewById(R.id.copyOutputButton);
+        updateLogButton = findViewById(R.id.updateLogButton);
         copyLogButton = findViewById(R.id.copyLogButton);
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
 
@@ -140,10 +144,11 @@ public class MainActivity extends Activity {
         // Set up button listeners
         settingsButton.setOnClickListener(v -> openSettings());
         initModelButton.setOnClickListener(v -> reinitializeModel());
-        viewLogButton.setOnClickListener(v -> viewLogFile());
+        viewLogButton.setOnClickListener(v -> toggleViewLog());
         clearLogButton.setOnClickListener(v -> clearLogFile());
         apiServerButton.setOnClickListener(v -> toggleApiServer());
         copyOutputButton.setOnClickListener(v -> copyToClipboard("Output", outputView.getText().toString()));
+        updateLogButton.setOnClickListener(v -> { if (isViewingLog) { refreshLogView(); } });
         copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
         
         // Initialize API server via Foreground Service
@@ -395,12 +400,36 @@ public class MainActivity extends Activity {
     }
     
     private void viewLogFile() {
+        // Deprecated: use toggleViewLog which manages state
+        toggleViewLog();
+    }
+
+    private void toggleViewLog() {
+        if (!isViewingLog) {
+            // Save current output and display logs
+            savedOutputText = outputView.getText().toString();
+            isViewingLog = true;
+            viewLogButton.setText("Hide Log");
+            updateLogButton.setEnabled(true);
+            refreshLogView();
+        } else {
+            // Restore output view
+            isViewingLog = false;
+            viewLogButton.setText("View Log");
+            updateLogButton.setEnabled(false);
+            if (savedOutputText != null) {
+                outputView.setText(savedOutputText);
+            }
+        }
+    }
+
+    private void refreshLogView() {
         File logFile = new File(getExternalFilesDir(null), "ollama.log");
         if (!logFile.exists()) {
             showToast("Log file does not exist");
             return;
         }
-        
+
         new Thread(() -> {
             StringBuilder sb = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
@@ -408,7 +437,7 @@ public class MainActivity extends Activity {
                 while ((line = reader.readLine()) != null) {
                     sb.append(line).append("\n");
                 }
-                
+
                 final String logContent = sb.toString();
                 runOnUiThread(() -> {
                     outputView.setText(logContent);
