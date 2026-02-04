@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -42,6 +43,13 @@ public class OllamaApiServer {
     private ServerSocket serverSocket;
     private ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private static final Object TOKEN_COMPLETE = new Object();
+
+    private static class TokenError {
+        final String error;
+        TokenError(String error) { this.error = error; }
+    }
+
     private int port = DEFAULT_PORT;
     
     public interface ServerListener {
@@ -284,72 +292,95 @@ public class OllamaApiServer {
 
                     final Object writeLock = new Object();
 
+                    // Use a queue + writer thread so the native generation thread is never blocked by network I/O
+                    final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
+                    final Thread writerThread = new Thread(() -> {
+                        try {
+                            while (true) {
+                                Object ev = tokenQueue.take();
+                                if (ev == TOKEN_COMPLETE) {
+                                    try {
+                                        JSONObject chunk = new JSONObject();
+                                        chunk.put("model", model);
+                                        chunk.put("created_at", getTimestamp());
+                                        chunk.put("response", "");
+                                        chunk.put("done", true);
+                                        byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                        synchronized (writeLock) {
+                                            String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                            outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write(chunkBytes);
+                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.flush();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error writing final streaming chunk", e);
+                                    }
+                                    break;
+                                } else if (ev instanceof TokenError) {
+                                    TokenError te = (TokenError) ev;
+                                    try {
+                                        JSONObject err = new JSONObject();
+                                        err.put("error", te.error);
+                                        byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                        synchronized (writeLock) {
+                                            String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                            outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write(chunkBytes);
+                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.flush();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error writing error chunk", e);
+                                    }
+                                    break;
+                                } else {
+                                    String tokenStr = (String) ev;
+                                    try {
+                                        JSONObject chunk = new JSONObject();
+                                        chunk.put("model", model);
+                                        chunk.put("created_at", getTimestamp());
+                                        chunk.put("response", tokenStr);
+                                        chunk.put("done", false);
+                                        byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                        synchronized (writeLock) {
+                                            String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                            outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write(chunkBytes);
+                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.flush();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error writing streaming chunk", e);
+                                    }
+                                }
+                            }
+                        } catch (InterruptedException ie) {
+                            Log.w(TAG, "Writer thread interrupted", ie);
+                            Thread.currentThread().interrupt();
+                        } finally {
+                            try { outputStream.flush(); } catch (Exception ignored) {}
+                        }
+                    }, "OllamaApiWriter-" + Thread.currentThread().getId());
+                    writerThread.start();
+
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         @Override
                         public void onToken(String token) {
-                            try {
-                                JSONObject chunk = new JSONObject();
-                                chunk.put("model", model);
-                                chunk.put("created_at", getTimestamp());
-                                chunk.put("response", token);
-                                chunk.put("done", false);
-                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
-                                synchronized (writeLock) {
-                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
-                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write(chunkBytes);
-                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.flush();
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error writing streaming chunk", e);
-                            }
+                            // Fast, non-blocking enqueue so native thread isn't blocked
+                            tokenQueue.offer(token);
                         }
 
                         @Override
                         public void onComplete() {
-                            try {
-                                JSONObject chunk = new JSONObject();
-                                chunk.put("model", model);
-                                chunk.put("created_at", getTimestamp());
-                                chunk.put("response", "");
-                                chunk.put("done", true);
-                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
-                                synchronized (writeLock) {
-                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
-                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write(chunkBytes);
-                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                    // End chunked stream
-                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.flush();
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error writing final streaming chunk", e);
-                            } finally {
-                                modelManager.getLlama().setTokenListener(null);
-                            }
+                            tokenQueue.offer(TOKEN_COMPLETE);
                         }
 
                         @Override
                         public void onError(String error) {
-                            try {
-                                JSONObject err = new JSONObject();
-                                err.put("error", error);
-                                byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
-                                synchronized (writeLock) {
-                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
-                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write(chunkBytes);
-                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.flush();
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error writing error chunk", e);
-                            } finally {
-                                modelManager.getLlama().setTokenListener(null);
-                            }
+                            tokenQueue.offer(new TokenError(error));
                         }
                     });
 
@@ -424,82 +455,104 @@ public class OllamaApiServer {
 
                     final Object writeLock = new Object();
 
+                    // Use a queue + writer thread so the native generation thread is never blocked by network I/O
+                    final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
+                    final Thread writerThread = new Thread(() -> {
+                        try {
+                            while (true) {
+                                Object ev = tokenQueue.take();
+                                if (ev == TOKEN_COMPLETE) {
+                                    try {
+                                        JSONObject chunk = new JSONObject();
+                                        chunk.put("model", model);
+                                        chunk.put("created_at", getTimestamp());
+
+                                        JSONObject message = new JSONObject();
+                                        message.put("role", "assistant");
+                                        message.put("content", "");
+                                        chunk.put("message", message);
+                                        chunk.put("done", true);
+
+                                        byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                        synchronized (writeLock) {
+                                            String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                            outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write(chunkBytes);
+                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.flush();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error writing final streaming chunk", e);
+                                    }
+                                    break;
+                                } else if (ev instanceof TokenError) {
+                                    TokenError te = (TokenError) ev;
+                                    try {
+                                        JSONObject err = new JSONObject();
+                                        err.put("error", te.error);
+                                        byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                        synchronized (writeLock) {
+                                            String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                            outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write(chunkBytes);
+                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.flush();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error writing error chunk", e);
+                                    }
+                                    break;
+                                } else {
+                                    String tokenStr = (String) ev;
+                                    try {
+                                        JSONObject chunk = new JSONObject();
+                                        chunk.put("model", model);
+                                        chunk.put("created_at", getTimestamp());
+
+                                        JSONObject message = new JSONObject();
+                                        message.put("role", "assistant");
+                                        message.put("content", tokenStr);
+                                        chunk.put("message", message);
+                                        chunk.put("done", false);
+
+                                        byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                        synchronized (writeLock) {
+                                            String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+                                            outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+                                            outputStream.write(chunkBytes);
+                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            outputStream.flush();
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "Error writing streaming chunk", e);
+                                    }
+                                }
+                            }
+                        } catch (InterruptedException ie) {
+                            Log.w(TAG, "Writer thread interrupted", ie);
+                            Thread.currentThread().interrupt();
+                        } finally {
+                            try { outputStream.flush(); } catch (Exception ignored) {}
+                        }
+                    }, "OllamaApiWriter-" + Thread.currentThread().getId());
+                    writerThread.start();
+
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         @Override
                         public void onToken(String token) {
-                            try {
-                                JSONObject chunk = new JSONObject();
-                                chunk.put("model", model);
-                                chunk.put("created_at", getTimestamp());
-
-                                JSONObject message = new JSONObject();
-                                message.put("role", "assistant");
-                                message.put("content", token);
-                                chunk.put("message", message);
-                                chunk.put("done", false);
-
-                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
-                                synchronized (writeLock) {
-                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
-                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write(chunkBytes);
-                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.flush();
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error writing streaming chunk", e);
-                            }
+                            tokenQueue.offer(token);
                         }
 
                         @Override
                         public void onComplete() {
-                            try {
-                                JSONObject chunk = new JSONObject();
-                                chunk.put("model", model);
-                                chunk.put("created_at", getTimestamp());
-
-                                JSONObject message = new JSONObject();
-                                message.put("role", "assistant");
-                                message.put("content", "");
-                                chunk.put("message", message);
-                                chunk.put("done", true);
-
-                                byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
-                                synchronized (writeLock) {
-                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
-                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write(chunkBytes);
-                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                    // End chunked stream
-                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.flush();
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error writing final streaming chunk", e);
-                            } finally {
-                                modelManager.getLlama().setTokenListener(null);
-                            }
+                            tokenQueue.offer(TOKEN_COMPLETE);
                         }
 
                         @Override
                         public void onError(String error) {
-                            try {
-                                JSONObject err = new JSONObject();
-                                err.put("error", error);
-                                byte[] chunkBytes = (err.toString() + "\n").getBytes(StandardCharsets.UTF_8);
-                                synchronized (writeLock) {
-                                    String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
-                                    outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write(chunkBytes);
-                                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                    outputStream.flush();
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error writing error chunk", e);
-                            } finally {
-                                modelManager.getLlama().setTokenListener(null);
-                            }
+                            tokenQueue.offer(new TokenError(error));
                         }
                     });
 

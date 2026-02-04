@@ -624,7 +624,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_micklab_llama_LlamaNative_setTokenListener(
         JNIEnv *env, jobject /*thiz*/, jobject listener) {
-    std::lock_guard<std::mutex> lock(g_mutex);
+    // Do NOT lock g_mutex here to avoid deadlocks when this is called from Java callbacks.
     // Ensure JavaVM stored
     if (!g_jvm) {
         if (env->GetJavaVM(&g_jvm) != JNI_OK) {
