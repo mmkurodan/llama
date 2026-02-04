@@ -137,7 +137,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Selection: モデルURLを指定し読み込みます。\n");
         sb.append("- Model Parameters: 生成パラメータを設定します。\n");
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
-        sb.append("- Prompt Template: {USER_INPUT} で入力を差し込みます。/api/chat はテンプレートを使用せずメッセージ本文をそのまま渡します。\n");
+        sb.append("- Prompt Template: {USER_INPUT} で入力を差し込みます。\n");
         sb.append("- Llama API Server: サーバーポートを指定します。\n");
         sb.append("- Log Settings: ログレベルを選択します。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
@@ -178,8 +178,6 @@ public class DocumentsActivity extends Activity {
         sb.append("- Enable Streaming: 有効にするとトークンが生成されるたびに出力が更新されます。無効にすると生成完了後に一括表示されます。\n\n");
         sb.append("6. APIサーバー（任意）\n");
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags を提供します。\n");
-        sb.append("- /api/chat と /api/generate は設定したモデルパラメータを反映します。\n");
-        sb.append("- /api/chat はテンプレートを無視し、メッセージ本文をそのまま渡します。\n");
         sb.append("- 同時生成は1件のみです（ビジー時は503を返します）。\n");
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("[English]\n");
@@ -206,7 +204,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Selection: Set model URL and load it.\n");
         sb.append("- Model Parameters: Set generation parameters.\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
-        sb.append("- Prompt Template: Use {USER_INPUT} as a placeholder. /api/chat ignores templates and uses raw message text.\n");
+        sb.append("- Prompt Template: Use {USER_INPUT} as a placeholder.\n");
         sb.append("- Llama API Server: Set server port.\n");
         sb.append("- Log Settings: Select log level.\n");
         sb.append("- Show License: Display license text.\n");
@@ -247,8 +245,6 @@ public class DocumentsActivity extends Activity {
         sb.append("- Enable Streaming: When enabled, output updates as tokens are generated. When disabled, output shows all at once after generation completes.\n\n");
         sb.append("6. API Server (Optional)\n");
         sb.append("- Provides /api/chat, /api/generate, /api/tags on device.\n");
-        sb.append("- /api/chat and /api/generate apply the configured model parameters.\n");
-        sb.append("- /api/chat ignores templates and forwards raw message text.\n");
         sb.append("- Only one generation at a time (busy returns 503).\n");
         sb.append("- Android 13+ may require notification permission.\n");
         return sb.toString();
