@@ -12,6 +12,13 @@ public class LlamaNative {
     
     private volatile DownloadProgressListener downloadProgressListener;
 
+    // Token listener for streaming
+    public interface TokenListener {
+        void onToken(String token);
+        void onComplete();
+        void onError(String error);
+    }
+
     static {
         System.loadLibrary("llama_jni");
     }
@@ -20,6 +27,9 @@ public class LlamaNative {
     public native String init(String modelPath);
     public native String generate(String prompt);
     public native void free();
+
+    // Token listener registration (native will keep a global ref)
+    public native void setTokenListener(TokenListener listener);
 
     // 新しく追加したネイティブ: JNI 側のログファイルパスを設定する
     public native void setLogPath(String path);
