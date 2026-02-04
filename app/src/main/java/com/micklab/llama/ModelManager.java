@@ -110,6 +110,16 @@ public class ModelManager {
         // If same config is already loaded, just return true
         if (configName.equals(currentConfigName) && modelLoaded) {
             Log.i(TAG, "Configuration already loaded: " + configName);
+            try {
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                applyConfiguration(config);
+            } catch (IOException | JSONException e) {
+                Log.e(TAG, "Failed to reload configuration parameters: " + configName, e);
+                if (listener != null) {
+                    listener.onError("Failed to reload configuration parameters: " + e.getMessage());
+                }
+                return false;
+            }
             return true;
         }
         
@@ -187,6 +197,12 @@ public class ModelManager {
      */
     public void applyConfiguration(ConfigurationManager.Configuration config) {
         llama.setParameters(
+            config.nCtx,
+            config.nThreads,
+            config.nBatch,
+            (float)config.temp,
+            (float)config.topP,
+            config.topK,
             config.penaltyLastN,
             (float)config.penaltyRepeat,
             (float)config.penaltyFreq,
