@@ -259,6 +259,9 @@ public class OllamaApiServer {
             String model = request.optString("model", "default");
             String prompt = request.optString("prompt", "");
             boolean stream = request.optBoolean("stream", true);
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "generate request model=" + model + " stream=" + stream + " promptLen=" + prompt.length());
+            }
             
             // Try to acquire busy lock - return 503 if busy
             if (!modelManager.tryAcquire()) {
@@ -379,19 +382,31 @@ public class OllamaApiServer {
                     writerThread.start();
 
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
+                        private int tokenCount = 0;
+
                         @Override
                         public void onToken(String token) {
+                            tokenCount++;
+                            if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
+                                Log.d(TAG, "generate stream tokens=" + tokenCount);
+                            }
                             // Fast, non-blocking enqueue so native thread isn't blocked
                             tokenQueue.offer(token);
                         }
 
                         @Override
                         public void onComplete() {
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "generate stream complete tokens=" + tokenCount);
+                            }
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
 
                         @Override
                         public void onError(String error) {
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "generate stream error: " + error);
+                            }
                             tokenQueue.offer(new TokenError(error));
                         }
                     });
@@ -569,18 +584,30 @@ public class OllamaApiServer {
                     writerThread.start();
 
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
+                        private int tokenCount = 0;
+
                         @Override
                         public void onToken(String token) {
+                            tokenCount++;
+                            if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
+                                Log.d(TAG, "chat stream tokens=" + tokenCount);
+                            }
                             tokenQueue.offer(token);
                         }
 
                         @Override
                         public void onComplete() {
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "chat stream complete tokens=" + tokenCount);
+                            }
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
 
                         @Override
                         public void onError(String error) {
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "chat stream error: " + error);
+                            }
                             tokenQueue.offer(new TokenError(error));
                         }
                     });

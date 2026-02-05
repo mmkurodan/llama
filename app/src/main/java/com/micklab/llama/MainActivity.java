@@ -226,16 +226,25 @@ public class MainActivity extends Activity {
                         tListener = new LlamaNative.TokenListener() {
                             @Override
                             public void onToken(String token) {
+                                if (BuildConfig.DEBUG) {
+                                    Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
+                                }
                                 runOnUiThread(() -> outputView.append(token));
                             }
 
                             @Override
                             public void onComplete() {
+                                if (BuildConfig.DEBUG) {
+                                    Log.d(TAG, "stream complete");
+                                }
                                 runOnUiThread(() -> appendMessage("streaming complete"));
                             }
 
                             @Override
                             public void onError(String error) {
+                                if (BuildConfig.DEBUG) {
+                                    Log.d(TAG, "stream error: " + error);
+                                }
                                 final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
                                         ? "unknown error" : error;
                                 runOnUiThread(() -> appendMessage("streaming error: " + safeError));
@@ -288,21 +297,30 @@ public class MainActivity extends Activity {
                 tListener = new LlamaNative.TokenListener() {
                     @Override
                     public void onToken(String token) {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
+                        }
                         runOnUiThread(() -> outputView.append(token));
                     }
 
                     @Override
                     public void onComplete() {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "stream complete");
+                        }
                         runOnUiThread(() -> appendMessage("streaming complete"));
                     }
 
-                        @Override
-                        public void onError(String error) {
-                            final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
-                                    ? "unknown error" : error;
-                            runOnUiThread(() -> appendMessage("streaming error: " + safeError));
+                    @Override
+                    public void onError(String error) {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "stream error: " + error);
                         }
-                    };
+                        final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
+                                ? "unknown error" : error;
+                        runOnUiThread(() -> appendMessage("streaming error: " + safeError));
+                    }
+                };
                 modelManager.getLlama().setTokenListener(tListener);
             } else {
                 modelManager.getLlama().setTokenListener(null);
