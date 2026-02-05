@@ -16,6 +16,7 @@
 #define LOG_TAG "LLAMA_JNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
 #include "llama.h"
 #include "ggml-backend.h"
@@ -100,6 +101,10 @@ static bool should_log(ggml_log_level level) {
     const int threshold = g_log_level.load();
     const ggml_log_level effective = normalize_log_level(level);
     return effective >= threshold;
+}
+
+static bool should_log_debug() {
+    return should_log(GGML_LOG_LEVEL_DEBUG);
 }
 
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO) {
@@ -654,6 +659,9 @@ Java_com_micklab_llama_LlamaNative_setTokenListener(
         g_token_onError = env->GetMethodID(cls, "onError", "(Ljava/lang/String;)V");
     }
     log_to_file("setTokenListener: listener registered");
+    if (should_log_debug()) {
+        LOGD("setTokenListener: listener registered");
+    }
 }
 
 // ---------------- JNI: generate ----------------
@@ -786,6 +794,9 @@ Java_com_micklab_llama_LlamaNative_generate(
                             jerr = env->NewStringUTF("unknown error");
                         }
                         if (jerr) {
+                            if (should_log_debug()) {
+                                LOGD("token listener onError (prompt) sending");
+                            }
                             env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
                             if (env->ExceptionCheck()) env->ExceptionClear();
                             env->DeleteLocalRef(jerr);
@@ -997,6 +1008,9 @@ Java_com_micklab_llama_LlamaNative_generate(
                 }
                 if (env) {
                     jstring jdelta = env->NewStringUTF(delta.c_str());
+                    if (should_log_debug()) {
+                        LOGD("token listener onToken delta_len=%zu", delta.size());
+                    }
                     env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
                     if (env->ExceptionCheck()) env->ExceptionClear();
                     env->DeleteLocalRef(jdelta);
@@ -1068,6 +1082,9 @@ Java_com_micklab_llama_LlamaNative_generate(
                         jerr = env->NewStringUTF("unknown error");
                     }
                     if (jerr) {
+                        if (should_log_debug()) {
+                            LOGD("token listener onError (generation) sending");
+                        }
                         env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
                         if (env->ExceptionCheck()) env->ExceptionClear();
                         env->DeleteLocalRef(jerr);
@@ -1092,6 +1109,9 @@ Java_com_micklab_llama_LlamaNative_generate(
             }
         }
         if (env) {
+            if (should_log_debug()) {
+                LOGD("token listener onComplete sending");
+            }
             env->CallVoidMethod(g_token_listener, g_token_onComplete);
             if (env->ExceptionCheck()) env->ExceptionClear();
         }
