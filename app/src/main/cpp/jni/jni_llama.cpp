@@ -107,6 +107,76 @@ static bool should_log_debug() {
     return should_log(GGML_LOG_LEVEL_DEBUG);
 }
 
+// Return the last index that ends on a valid UTF-8 boundary (trims incomplete trailing bytes).
+static size_t validate_utf8(const std::string& text) {
+    size_t len = text.size();
+    if (len == 0) return 0;
+
+    for (size_t i = 1; i <= 4 && i <= len; ++i) {
+        unsigned char c = static_cast<unsigned char>(text[len - i]);
+        if ((c & 0xE0) == 0xC0) {
+            if (i < 2) return len - i;
+            break;
+        } else if ((c & 0xF0) == 0xE0) {
+            if (i < 3) return len - i;
+            break;
+        } else if ((c & 0xF8) == 0xF0) {
+            if (i < 4) return len - i;
+            break;
+        } else if ((c & 0x80) == 0x00) {
+            break;
+        }
+    }
+
+    return len;
+}
+
+static int32_t detokenize_with_resize(
+        const llama_vocab * vocab,
+        const std::vector<llama_token> & tokens,
+        std::string & out_text) {
+    if (tokens.empty()) {
+        out_text.clear();
+        return 0;
+    }
+
+    size_t target = tokens.size();
+    if (out_text.capacity() > target) {
+        target = out_text.capacity();
+    }
+    out_text.resize(target);
+
+    int32_t n_chars = llama_detokenize(
+            vocab,
+            tokens.data(),
+            (int32_t)tokens.size(),
+            &out_text[0],
+            (int32_t)out_text.size(),
+            true,
+            false
+    );
+
+    if (n_chars < 0) {
+        out_text.resize(-n_chars);
+        n_chars = llama_detokenize(
+                vocab,
+                tokens.data(),
+                (int32_t)tokens.size(),
+                &out_text[0],
+                (int32_t)out_text.size(),
+                true,
+                false
+        );
+    }
+
+    if (n_chars < 0) {
+        return n_chars;
+    }
+
+    out_text.resize(n_chars);
+    return n_chars;
+}
+
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO) {
     if (!should_log(level)) return;
     std::lock_guard<std::mutex> lock(g_log_mutex);
@@ -974,19 +1044,14 @@ Java_com_micklab_llama_LlamaNative_generate(
             break;
         }
         // ★ 累積トークン列を detokenize して全文を得る
-        char buf[4096];
-        int n_chars = llama_detokenize(
-                vocab,
-                out_tokens.data(),
-                (int)out_tokens.size(),
-                buf,
-                sizeof(buf),
-                true,
-                false
-        );
+        std::string full;
+        int n_chars = detokenize_with_resize(vocab, out_tokens, full);
 
         if (n_chars > 0) {
-            std::string full(buf, n_chars);
+            size_t safe_len = validate_utf8(full);
+            if (safe_len < full.size()) {
+                full.resize(safe_len);
+            }
 
             // Compute delta from previous text
             std::string delta;
@@ -1008,12 +1073,17 @@ Java_com_micklab_llama_LlamaNative_generate(
                 }
                 if (env) {
                     jstring jdelta = env->NewStringUTF(delta.c_str());
-                    if (should_log_debug()) {
-                        LOGD("token listener onToken delta_len=%zu", delta.size());
+                    if (jdelta) {
+                        if (should_log_debug()) {
+                            LOGD("token listener onToken delta_len=%zu", delta.size());
+                        }
+                        env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        env->DeleteLocalRef(jdelta);
+                    } else {
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        log_to_file("token listener onToken: failed to create jstring", GGML_LOG_LEVEL_WARN);
                     }
-                    env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
-                    if (env->ExceptionCheck()) env->ExceptionClear();
-                    env->DeleteLocalRef(jdelta);
                 }
                 if (attached) g_jvm->DetachCurrentThread();
             }
@@ -1120,6 +1190,13 @@ Java_com_micklab_llama_LlamaNative_generate(
 
     // Free the sampler chain
     llama_sampler_free(smpl);
+
+    {
+        size_t safe_len = validate_utf8(output);
+        if (safe_len < output.size()) {
+            output.resize(safe_len);
+        }
+    }
 
     {
         std::ostringstream ss;
