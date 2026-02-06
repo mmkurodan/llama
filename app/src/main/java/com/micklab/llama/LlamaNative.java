@@ -46,6 +46,9 @@ public class LlamaNative {
         float dryMultiplier, float dryBase, int dryAllowedLength, int dryPenaltyLastN,
         String drySequenceBreakers
     );
+    
+    // Get chat template from loaded GGUF model metadata
+    public native String getChatTemplate();
 
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;

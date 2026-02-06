@@ -258,6 +258,7 @@ public class OllamaApiServer {
             JSONObject request = new JSONObject(body);
             String model = request.optString("model", "default");
             String prompt = request.optString("prompt", "");
+            String apiSystem = request.optString("system", null); // Optional system from API
             boolean stream = request.optBoolean("stream", true);
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "generate request model=" + model + " stream=" + stream + " promptLen=" + prompt.length());
@@ -288,7 +289,19 @@ public class OllamaApiServer {
                     listener.onGenerating(model);
                 }
                 
-                String promptToUse = applyPromptTemplate(prompt, config);
+                // Use PromptTemplateManager for prompt generation
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String customTemplate = (config != null) ? config.customChatTemplate : null;
+                String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
+                String modelPath = modelManager.getCurrentModelPath();
+                
+                String promptToUse = PromptTemplateManager.buildPromptForGenerate(
+                        prompt,
+                        apiSystem,
+                        customTemplate,
+                        ggufChatTemplate,
+                        settingsSystemPrompt,
+                        modelPath);
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -479,8 +492,26 @@ public class OllamaApiServer {
                     listener.onGenerating(model);
                 }
                 
-                // Build prompt from messages (already applies template if available)
-                String promptToUse = buildPromptFromMessages(messages, model);
+                // Get configuration for prompt template settings
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not load config for template", e);
+                }
+                
+                // Use PromptTemplateManager for prompt generation
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String customTemplate = (config != null) ? config.customChatTemplate : null;
+                String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
+                String modelPath = modelManager.getCurrentModelPath();
+                
+                String promptToUse = PromptTemplateManager.buildPromptFromMessages(
+                        messages,
+                        customTemplate,
+                        ggufChatTemplate,
+                        settingsSystemPrompt,
+                        modelPath);
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -695,106 +726,6 @@ public class OllamaApiServer {
             "\r\n";
         outputStream.write(response.getBytes(StandardCharsets.UTF_8));
         outputStream.flush();
-    }
-    
-
-    private String applyPromptTemplate(String userInput, ConfigurationManager.Configuration config) {
-        // Strip any existing template markers from user input to prevent double-templating
-        String cleanInput = stripTemplateMarkers(userInput);
-        
-        if (config != null && config.promptTemplate != null && !config.promptTemplate.isEmpty()) {
-            return config.promptTemplate.replace("{USER_INPUT}", cleanInput);
-        }
-        return "<|system|>\nYou are a helpful assistant.\n<|user|>\n" + cleanInput + "\n<|assistant|>\n";
-    }
-
-    private String buildPromptFromMessages(JSONArray messages, String configName) throws JSONException {
-        StringBuilder sb = new StringBuilder();
-        
-        // Try to get prompt template from config
-        String template = null;
-        try {
-            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
-            template = config.promptTemplate;
-        } catch (Exception e) {
-            Log.w(TAG, "Could not load config for template", e);
-        }
-        
-        // Build conversation from messages
-        String systemPrompt = "You are a helpful assistant.";
-        StringBuilder userContent = new StringBuilder();
-        
-        for (int i = 0; i < messages.length(); i++) {
-            JSONObject msg = messages.getJSONObject(i);
-            String role = msg.optString("role", "");
-            String content = msg.optString("content", "");
-            
-            // Strip any existing template markers from content to avoid double-templating
-            content = stripTemplateMarkers(content);
-            
-            if ("system".equals(role)) {
-                systemPrompt = content;
-            } else if ("user".equals(role)) {
-                if (userContent.length() > 0) {
-                    userContent.append("\n");
-                }
-                userContent.append(content);
-            } else if ("assistant".equals(role)) {
-                // Include previous assistant responses in context
-                if (userContent.length() > 0) {
-                    userContent.append("\nAssistant: ").append(content).append("\nUser: ");
-                }
-            }
-        }
-        
-        // Apply template if available
-        if (template != null && !template.isEmpty() && template.contains("{USER_INPUT}")) {
-            // Replace system prompt marker if present
-            String result = template;
-            if (template.contains("<|system|>")) {
-                // Use template as-is but replace user input
-                result = template.replace("{USER_INPUT}", userContent.toString());
-            } else {
-                result = template.replace("{USER_INPUT}", userContent.toString());
-            }
-            return result;
-        }
-        
-        // Default format
-        sb.append("<|system|>\n").append(systemPrompt).append("\n");
-        sb.append("<|user|>\n").append(userContent.toString()).append("\n");
-        sb.append("<|assistant|>\n");
-        
-        return sb.toString();
-    }
-    
-    /**
-     * Strip common prompt template markers from content to prevent double-templating.
-     * This handles cases where the client sends content that already contains template markers.
-     */
-    private String stripTemplateMarkers(String content) {
-        if (content == null || content.isEmpty()) {
-            return content;
-        }
-        
-        // Common template markers to strip
-        String[] markers = {
-            "<start_of_turn>system", "<end_of_turn>", "<start_of_turn>user", 
-            "<start_of_turn>model", "<start_of_turn>assistant",
-            "<|system|>", "<|user|>", "<|assistant|>", "<|model|>",
-            "<|im_start|>system", "<|im_start|>user", "<|im_start|>assistant", "<|im_end|>",
-            "[INST]", "[/INST]", "<<SYS>>", "<</SYS>>"
-        };
-        
-        String result = content;
-        for (String marker : markers) {
-            result = result.replace(marker, "");
-        }
-        
-        // Clean up extra whitespace/newlines left behind
-        result = result.replaceAll("\\n{3,}", "\n\n").trim();
-        
-        return result;
     }
     
     private void sendJsonResponse(OutputStream outputStream, int statusCode, String body) throws IOException {

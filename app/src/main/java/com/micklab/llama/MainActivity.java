@@ -502,15 +502,18 @@ public class MainActivity extends Activity {
     }
     
     private String applyPromptTemplate(String userInput) {
-        if (currentConfig == null || currentConfig.promptTemplate == null || currentConfig.promptTemplate.isEmpty()) {
-            // Fallback to default template
-            return "<|system|>\n"
-                 + "You are a helpful assistant.\n"
-                 + "<|user|>\n"
-                 + userInput + "\n"
-                 + "<|assistant|>\n";
-        }
-        return currentConfig.promptTemplate.replace("{USER_INPUT}", userInput);
+        // Use PromptTemplateManager for direct input
+        String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+        String customTemplate = (currentConfig != null) ? currentConfig.customChatTemplate : null;
+        String settingsSystemPrompt = (currentConfig != null) ? currentConfig.systemPrompt : null;
+        String modelPath = modelManager.getCurrentModelPath();
+        
+        return PromptTemplateManager.buildPromptForDirectInput(
+                userInput,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath);
     }
 
     private void appendMessage(final String msg) {

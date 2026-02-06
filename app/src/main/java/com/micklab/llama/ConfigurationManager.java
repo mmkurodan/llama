@@ -36,6 +36,10 @@ public class ConfigurationManager {
         public int topK;
         public String promptTemplate;
         
+        // New settings for prompt generation
+        public String systemPrompt;          // 前提プロンプト (system prompt)
+        public String customChatTemplate;    // カスタムプロンプトテンプレート
+        
         // Penalty parameters
         public int penaltyLastN;
         public double penaltyRepeat;
@@ -107,6 +111,10 @@ public class ConfigurationManager {
             
             // Streaming default
             streaming = true;
+            
+            // New prompt settings defaults
+            systemPrompt = "";           // Empty by default
+            customChatTemplate = "";     // Empty by default (use auto-detection)
         }
         
         public Configuration(String name) {
@@ -156,6 +164,10 @@ public class ConfigurationManager {
             // Streaming
             json.put("streaming", streaming);
             
+            // New prompt settings
+            json.put("systemPrompt", systemPrompt);
+            json.put("customChatTemplate", customChatTemplate);
+            
             return json;
         }
         
@@ -200,6 +212,10 @@ public class ConfigurationManager {
             
             // Streaming (with default for backward compatibility)
             config.streaming = json.optBoolean("streaming", true);
+            
+            // New prompt settings (with defaults for backward compatibility)
+            config.systemPrompt = json.optString("systemPrompt", "");
+            config.customChatTemplate = json.optString("customChatTemplate", "");
             
             return config;
         }
