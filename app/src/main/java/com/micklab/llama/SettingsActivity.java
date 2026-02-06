@@ -207,12 +207,14 @@ public class SettingsActivity extends Activity {
         Button loadConfigButton = findViewById(R.id.loadConfigButton);
         Button deleteConfigButton = findViewById(R.id.deleteConfigButton);
         Button backButton = findViewById(R.id.backButton);
+        Button cancelButton = findViewById(R.id.cancelButton);
         
         saveConfigButton.setOnClickListener(v -> saveCurrentConfiguration());
         loadConfigButton.setOnClickListener(v -> loadSelectedConfiguration());
         deleteConfigButton.setOnClickListener(v -> deleteSelectedConfiguration());
         loadModelButton.setOnClickListener(v -> loadModel());
         backButton.setOnClickListener(v -> finish());
+        cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
     }
@@ -741,6 +743,12 @@ public class SettingsActivity extends Activity {
         });
     }
     
+    /** Cancel without saving — simply close the activity. */
+    private void cancelAndReturn() {
+        setResult(RESULT_CANCELED);
+        super.finish();
+    }
+
     @Override
     public void finish() {
         // Save API port to preferences
