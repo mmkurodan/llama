@@ -142,7 +142,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: ログレベルを選択します。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
         sb.append("- Documents: 操作マニュアル、プライバシーポリシーを確認できます。\n");
-        sb.append("- Back to Main: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n\n");
+        sb.append("- Back to Main: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n");
+        sb.append("- Cancel: 何も保存せずメイン画面に戻ります。\n\n");
         sb.append("5. モデルパラメータの詳細説明\n\n");
         sb.append("【基本パラメータ】\n");
         sb.append("- Context Size (n_ctx): モデルが一度に処理できるトークン数。大きいほど長い文脈を扱えますが、メモリ消費が増加します。\n");
@@ -179,7 +180,8 @@ public class DocumentsActivity extends Activity {
         sb.append("7. プロンプトテンプレートの自動選択\n");
         sb.append("カスタムテンプレートが設定されていない場合、モデルファイル名からファミリーを推定しテンプレートを自動選択します。\n");
         sb.append("対応ファミリー: Gemma, Qwen, Mistral, LLaMA, Phi, Zephyr, Hermes。該当なしの場合はChatMLをフォールバックとして使用します。\n");
-        sb.append("選択結果はProcessing Status/LogsおよびINFOレベルログに記録されます。\n\n");
+        sb.append("選択結果はProcessing Status/LogsおよびINFOレベルログに記録されます。\n");
+        sb.append("/api/chatの会話履歴はモデルファミリー別のマルチターンテンプレートに従って構成されます。\n\n");
         sb.append("8. 停止シーケンス\n");
         sb.append("生成時に一般的なチャットテンプレートの区切り文字を検出すると自動的に生成を停止します。\n\n");
         sb.append("9. APIサーバー（任意）\n");
@@ -215,7 +217,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: Select log level.\n");
         sb.append("- Show License: Display license text.\n");
         sb.append("- Documents: View manual and privacy policy.\n");
-        sb.append("- Back to Main: Save current settings and apply them to the model immediately.\n\n");
+        sb.append("- Back to Main: Save current settings and apply them to the model immediately.\n");
+        sb.append("- Cancel: Return to main screen without saving any changes.\n\n");
         sb.append("5. Model Parameter Details\n\n");
         sb.append("[Basic Parameters]\n");
         sb.append("- Context Size (n_ctx): Number of tokens the model can process at once. Larger values handle longer contexts but use more memory.\n");
@@ -252,7 +255,8 @@ public class DocumentsActivity extends Activity {
         sb.append("7. Prompt Template Auto-Selection\n");
         sb.append("When no custom template is set, the app estimates the model family from the filename and auto-selects an appropriate template.\n");
         sb.append("Supported families: Gemma, Qwen, Mistral, LLaMA, Phi, Zephyr, Hermes. Falls back to ChatML if unrecognized.\n");
-        sb.append("Selection results are logged to Processing Status/Logs and INFO-level logs.\n\n");
+        sb.append("Selection results are logged to Processing Status/Logs and INFO-level logs.\n");
+        sb.append("Conversation history from /api/chat is formatted using model-family-specific multi-turn templates.\n\n");
         sb.append("8. Stop Sequences\n");
         sb.append("Generation automatically stops when common chat template delimiters are detected in the output.\n\n");
         sb.append("9. API Server (Optional)\n");

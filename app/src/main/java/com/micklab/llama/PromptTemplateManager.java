@@ -363,7 +363,6 @@ public class PromptTemplateManager {
         
         // Extract messages and find API system prompt
         String apiSystemPrompt = null;
-        StringBuilder userContent = new StringBuilder();
         List<Message> conversationHistory = new ArrayList<>();
         
         for (int i = 0; i < messages.length(); i++) {
@@ -391,24 +390,11 @@ public class PromptTemplateManager {
                 hasSystem,
                 systemResult.source);
         
-        // Build user content from conversation history
-        for (int i = 0; i < conversationHistory.size(); i++) {
-            Message msg = conversationHistory.get(i);
-            if ("user".equals(msg.role)) {
-                if (userContent.length() > 0) {
-                    userContent.append("\n");
-                }
-                userContent.append(msg.content);
-            } else if ("assistant".equals(msg.role)) {
-                // Include previous assistant responses in context
-                if (userContent.length() > 0 && i < conversationHistory.size() - 1) {
-                    userContent.append("\nAssistant: ").append(msg.content).append("\nUser: ");
-                }
-            }
-        }
+        // Detect model family for multi-turn formatting
+        ModelFamily family = detectModelFamily(modelPath);
         
-        // Apply template
-        String prompt = applyTemplate(selection.template, systemResult.prompt, userContent.toString());
+        // Build prompt using model-family-specific multi-turn formatting
+        String prompt = buildMultiTurnPrompt(family, systemResult.prompt, conversationHistory);
         return new PromptBuildResult(prompt, selection, systemResult.prompt);
     }
     
@@ -488,6 +474,137 @@ public class PromptTemplateManager {
                 ggufChatTemplate,
                 settingsSystemPrompt,
                 modelPath);
+    }
+    
+    /**
+     * Build a multi-turn prompt formatted according to the model family's chat template.
+     * Each message in the conversation history is wrapped with the appropriate role markers.
+     */
+    public static String buildMultiTurnPrompt(ModelFamily family, String systemPrompt, List<Message> history) {
+        switch (family) {
+            case GEMMA:
+                return buildMultiTurnGemma(systemPrompt, history);
+            case LLAMA:
+                return buildMultiTurnLlama(systemPrompt, history);
+            case MISTRAL:
+                return buildMultiTurnMistral(systemPrompt, history);
+            case PHI:
+                return buildMultiTurnPhi(systemPrompt, history);
+            case ZEPHYR:
+                return buildMultiTurnZephyr(systemPrompt, history);
+            case QWEN:
+            case HERMES:
+            case CHATML:
+            default:
+                return buildMultiTurnChatML(systemPrompt, history);
+        }
+    }
+
+    // ChatML / Qwen / Hermes multi-turn
+    private static String buildMultiTurnChatML(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        if (system != null && !system.isEmpty()) {
+            sb.append("<|im_start|>system\n").append(system).append("<|im_end|>\n");
+        }
+        for (Message msg : history) {
+            sb.append("<|im_start|>").append(msg.role).append("\n")
+              .append(msg.content).append("<|im_end|>\n");
+        }
+        sb.append("<|im_start|>assistant\n");
+        return sb.toString();
+    }
+
+    // Gemma multi-turn (system merged into first user turn)
+    private static String buildMultiTurnGemma(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        boolean systemInserted = (system == null || system.isEmpty());
+        for (Message msg : history) {
+            if ("user".equals(msg.role)) {
+                sb.append("<start_of_turn>user\n");
+                if (!systemInserted) {
+                    sb.append(system).append("\n\n");
+                    systemInserted = true;
+                }
+                sb.append(msg.content).append("<end_of_turn>\n");
+            } else if ("assistant".equals(msg.role)) {
+                sb.append("<start_of_turn>model\n")
+                  .append(msg.content).append("<end_of_turn>\n");
+            }
+        }
+        sb.append("<start_of_turn>model\n");
+        return sb.toString();
+    }
+
+    // LLaMA multi-turn (system in first [INST] only)
+    private static String buildMultiTurnLlama(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Message msg : history) {
+            if ("user".equals(msg.role)) {
+                sb.append("[INST] ");
+                if (first && system != null && !system.isEmpty()) {
+                    sb.append("<<SYS>>\n").append(system).append("\n<</SYS>>\n\n");
+                }
+                sb.append(msg.content).append(" [/INST]");
+                first = false;
+            } else if ("assistant".equals(msg.role)) {
+                sb.append(" ").append(msg.content).append(" ");
+            }
+        }
+        return sb.toString();
+    }
+
+    // Mistral multi-turn (system merged into first [INST])
+    private static String buildMultiTurnMistral(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Message msg : history) {
+            if ("user".equals(msg.role)) {
+                sb.append("[INST] ");
+                if (first && system != null && !system.isEmpty()) {
+                    sb.append(system).append("\n\n");
+                }
+                sb.append(msg.content).append(" [/INST]");
+                first = false;
+            } else if ("assistant".equals(msg.role)) {
+                sb.append(" ").append(msg.content).append(" ");
+            }
+        }
+        return sb.toString();
+    }
+
+    // Phi multi-turn
+    private static String buildMultiTurnPhi(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        if (system != null && !system.isEmpty()) {
+            sb.append("<|system|>\n").append(system).append("\n<|end|>\n");
+        }
+        for (Message msg : history) {
+            if ("user".equals(msg.role)) {
+                sb.append("<|user|>\n").append(msg.content).append("\n<|end|>\n");
+            } else if ("assistant".equals(msg.role)) {
+                sb.append("<|assistant|>\n").append(msg.content).append("\n<|end|>\n");
+            }
+        }
+        sb.append("<|assistant|>\n");
+        return sb.toString();
+    }
+
+    // Zephyr multi-turn
+    private static String buildMultiTurnZephyr(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        if (system != null && !system.isEmpty()) {
+            sb.append("<|system|>\n").append(system).append("</s>\n");
+        }
+        for (Message msg : history) {
+            if ("user".equals(msg.role)) {
+                sb.append("<|user|>\n").append(msg.content).append("</s>\n");
+            } else if ("assistant".equals(msg.role)) {
+                sb.append("<|assistant|>\n").append(msg.content).append("</s>\n");
+            }
+        }
+        sb.append("<|assistant|>\n");
+        return sb.toString();
     }
     
     /**
