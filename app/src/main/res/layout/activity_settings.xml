@@ -656,18 +656,28 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Legacy Template (use {USER_INPUT} as placeholder):"
+            android:text="Auto-selected Prompt Template:"
             android:paddingTop="12dp"
             android:paddingBottom="4dp" />
 
-        <EditText
-            android:id="@+id/promptTemplateInput"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter prompt template"
-            android:inputType="textMultiLine"
-            android:minLines="4"
-            android:gravity="top|start" />
+            android:text="Based on custom template, GGUF metadata, or model family detection."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:id="@+id/autoSelectedTemplateView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="(auto-selected template will appear here)"
+            android:textSize="12sp"
+            android:textColor="#333333"
+            android:background="#F5F5F5"
+            android:padding="8dp"
+            android:textIsSelectable="true" />
 
         <!-- Divider -->
         <View

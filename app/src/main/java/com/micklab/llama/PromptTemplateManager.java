@@ -1,6 +1,5 @@
 package com.micklab.llama;
 
-import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -47,6 +46,58 @@ public class PromptTemplateManager {
         public Message(String role, String content) {
             this.role = role;
             this.content = content;
+        }
+    }
+
+    public static class TemplateSelectionResult {
+        public final String template;
+        public final String source;
+        public final ModelFamily family;
+        public final boolean hasSystem;
+        public final String systemSource;
+        public final String reason;
+
+        public TemplateSelectionResult(
+                String template,
+                String source,
+                ModelFamily family,
+                boolean hasSystem,
+                String systemSource) {
+            this.template = template;
+            this.source = source;
+            this.family = family;
+            this.hasSystem = hasSystem;
+            this.systemSource = systemSource;
+            StringBuilder sb = new StringBuilder();
+            sb.append("source=").append(source);
+            if (family != null) {
+                sb.append(", family=").append(family.name());
+            }
+            sb.append(", system=").append(systemSource);
+            sb.append(", hasSystem=").append(hasSystem);
+            this.reason = sb.toString();
+        }
+    }
+
+    public static class PromptBuildResult {
+        public final String prompt;
+        public final TemplateSelectionResult selection;
+        public final String systemPrompt;
+
+        public PromptBuildResult(String prompt, TemplateSelectionResult selection, String systemPrompt) {
+            this.prompt = prompt;
+            this.selection = selection;
+            this.systemPrompt = systemPrompt;
+        }
+    }
+
+    public static class SystemPromptResult {
+        public final String prompt;
+        public final String source;
+
+        public SystemPromptResult(String prompt, String source) {
+            this.prompt = prompt;
+            this.source = source;
         }
     }
     
@@ -169,6 +220,26 @@ public class PromptTemplateManager {
                 return hasSystem ? CHATML_TEMPLATE : CHATML_TEMPLATE_NO_SYSTEM;
         }
     }
+
+    public static TemplateSelectionResult selectTemplateWithReason(
+            String customTemplate,
+            String ggufChatTemplate,
+            String modelPath,
+            boolean hasSystem,
+            String systemSource) {
+
+        if (customTemplate != null && !customTemplate.isEmpty()) {
+            return new TemplateSelectionResult(customTemplate, "custom", null, hasSystem, systemSource);
+        }
+
+        if (ggufChatTemplate != null && !ggufChatTemplate.isEmpty()) {
+            return new TemplateSelectionResult(ggufChatTemplate, "gguf", null, hasSystem, systemSource);
+        }
+
+        ModelFamily family = detectModelFamily(modelPath);
+        String template = getTemplateForFamily(family, hasSystem);
+        return new TemplateSelectionResult(template, "model-family", family, hasSystem, systemSource);
+    }
     
     /**
      * Select the appropriate template based on priority.
@@ -184,24 +255,13 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String modelPath,
             boolean hasSystem) {
-        
-        // 1. Custom template (highest priority)
-        if (customTemplate != null && !customTemplate.isEmpty()) {
-            Log.d(TAG, "Using custom template from settings");
-            return customTemplate;
-        }
-        
-        // 2. GGUF chat_template
-        if (ggufChatTemplate != null && !ggufChatTemplate.isEmpty()) {
-            Log.d(TAG, "Using GGUF chat_template from model metadata");
-            return ggufChatTemplate;
-        }
-        
-        // 3. Model family detection
-        ModelFamily family = detectModelFamily(modelPath);
-        Log.d(TAG, "Detected model family: " + family.name());
-        
-        return getTemplateForFamily(family, hasSystem);
+        TemplateSelectionResult selection = selectTemplateWithReason(
+                customTemplate,
+                ggufChatTemplate,
+                modelPath,
+                hasSystem,
+                hasSystem ? "provided" : "none");
+        return selection.template;
     }
     
     /**
@@ -225,6 +285,18 @@ public class PromptTemplateManager {
         
         // 3. No system
         return null;
+    }
+
+    public static SystemPromptResult resolveSystemPromptWithSource(String apiSystem, String settingsSystem) {
+        if (apiSystem != null && !apiSystem.isEmpty()) {
+            return new SystemPromptResult(apiSystem, "api");
+        }
+
+        if (settingsSystem != null && !settingsSystem.isEmpty()) {
+            return new SystemPromptResult(settingsSystem, "settings");
+        }
+
+        return new SystemPromptResult(null, "none");
     }
     
     /**
@@ -268,9 +340,30 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) throws JSONException {
+        return buildPromptFromMessagesWithSelection(
+                messages,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath).prompt;
+    }
+
+    public static PromptBuildResult buildPromptFromMessagesWithSelection(
+            JSONArray messages,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath) throws JSONException {
         
         if (messages == null || messages.length() == 0) {
-            return "";
+            SystemPromptResult systemResult = resolveSystemPromptWithSource(null, settingsSystemPrompt);
+            TemplateSelectionResult selection = selectTemplateWithReason(
+                    customTemplate,
+                    ggufChatTemplate,
+                    modelPath,
+                    systemResult.prompt != null && !systemResult.prompt.isEmpty(),
+                    systemResult.source);
+            return new PromptBuildResult("", selection, systemResult.prompt);
         }
         
         // Extract messages and find API system prompt
@@ -293,12 +386,15 @@ public class PromptTemplateManager {
             }
         }
         
-        // Resolve final system prompt using priority
-        String finalSystem = resolveSystemPrompt(apiSystemPrompt, settingsSystemPrompt);
-        boolean hasSystem = finalSystem != null && !finalSystem.isEmpty();
+        SystemPromptResult systemResult = resolveSystemPromptWithSource(apiSystemPrompt, settingsSystemPrompt);
+        boolean hasSystem = systemResult.prompt != null && !systemResult.prompt.isEmpty();
         
-        // Select template
-        String template = selectTemplate(customTemplate, ggufChatTemplate, modelPath, hasSystem);
+        TemplateSelectionResult selection = selectTemplateWithReason(
+                customTemplate,
+                ggufChatTemplate,
+                modelPath,
+                hasSystem,
+                systemResult.source);
         
         // Build user content from conversation history
         for (int i = 0; i < conversationHistory.size(); i++) {
@@ -317,7 +413,8 @@ public class PromptTemplateManager {
         }
         
         // Apply template
-        return applyTemplate(template, finalSystem, userContent.toString());
+        String prompt = applyTemplate(selection.template, systemResult.prompt, userContent.toString());
+        return new PromptBuildResult(prompt, selection, systemResult.prompt);
     }
     
     /**
@@ -331,19 +428,37 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) {
-        
-        // Strip template markers from prompt
+        return buildPromptForGenerateWithSelection(
+                prompt,
+                apiSystem,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath).prompt;
+    }
+
+    public static PromptBuildResult buildPromptForGenerateWithSelection(
+            String prompt,
+            String apiSystem,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath) {
+
         String cleanPrompt = stripTemplateMarkers(prompt);
-        
-        // Resolve system prompt
-        String finalSystem = resolveSystemPrompt(apiSystem, settingsSystemPrompt);
-        boolean hasSystem = finalSystem != null && !finalSystem.isEmpty();
-        
-        // Select template
-        String template = selectTemplate(customTemplate, ggufChatTemplate, modelPath, hasSystem);
-        
-        // Apply template
-        return applyTemplate(template, finalSystem, cleanPrompt);
+
+        SystemPromptResult systemResult = resolveSystemPromptWithSource(apiSystem, settingsSystemPrompt);
+        boolean hasSystem = systemResult.prompt != null && !systemResult.prompt.isEmpty();
+
+        TemplateSelectionResult selection = selectTemplateWithReason(
+                customTemplate,
+                ggufChatTemplate,
+                modelPath,
+                hasSystem,
+                systemResult.source);
+
+        String finalPrompt = applyTemplate(selection.template, systemResult.prompt, cleanPrompt);
+        return new PromptBuildResult(finalPrompt, selection, systemResult.prompt);
     }
     
     /**
@@ -356,11 +471,24 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) {
-        
-        // For direct input, API system is always null
-        return buildPromptForGenerate(
+        return buildPromptForDirectInputWithSelection(
                 userInput,
-                null,  // no API system
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath).prompt;
+    }
+
+    public static PromptBuildResult buildPromptForDirectInputWithSelection(
+            String userInput,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath) {
+
+        return buildPromptForGenerateWithSelection(
+                userInput,
+                null,
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
