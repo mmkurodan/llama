@@ -122,18 +122,8 @@ public class ModelManager {
      * @return true if successful, false otherwise
      */
     public boolean loadConfiguration(String configName) {
-        // If same config is already loaded, just return true
-        if (configName.equals(currentConfigName) && modelLoaded) {
-            Log.i(TAG, "Configuration already loaded: " + configName);
-            return true;
-        }
-        
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
-            
-            if (listener != null) {
-                listener.onModelLoading(configName);
-            }
             
             // Extract filename from URL
             String filename = extractFilenameFromUrl(config.modelUrl);
@@ -144,6 +134,18 @@ public class ModelManager {
             
             File destFile = new File(context.getFilesDir(), filename);
             String modelPath = destFile.getAbsolutePath();
+            
+            // If same model is already loaded, just re-apply parameters
+            if (modelPath.equals(currentModelPath) && modelLoaded) {
+                Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
+                applyConfiguration(config);
+                currentConfigName = configName;
+                return true;
+            }
+            
+            if (listener != null) {
+                listener.onModelLoading(configName);
+            }
             
             // Download if not exists
             if (!destFile.exists() || destFile.length() == 0) {
