@@ -111,11 +111,12 @@ public class PromptTemplateManager {
         "<|im_start|>assistant\n";
     
     private static final String GEMMA_TEMPLATE = 
-        "<start_of_turn>user\n{SYSTEM}\n\n{USER}<end_of_turn>\n" +
+        "<start_of_turn>system\n{SYSTEM}\n<end_of_turn>\n" +
+        "<start_of_turn>user\n{USER}\n<end_of_turn>\n" +
         "<start_of_turn>model\n";
     
     private static final String GEMMA_TEMPLATE_NO_SYSTEM = 
-        "<start_of_turn>user\n{USER}<end_of_turn>\n" +
+        "<start_of_turn>user\n{USER}\n<end_of_turn>\n" +
         "<start_of_turn>model\n";
     
     private static final String LLAMA_TEMPLATE = 
@@ -514,21 +515,19 @@ public class PromptTemplateManager {
         return sb.toString();
     }
 
-    // Gemma multi-turn (system merged into first user turn)
+    // Gemma multi-turn (system as separate block)
     private static String buildMultiTurnGemma(String system, List<Message> history) {
         StringBuilder sb = new StringBuilder();
-        boolean systemInserted = (system == null || system.isEmpty());
+        if (system != null && !system.isEmpty()) {
+            sb.append("<start_of_turn>system\n").append(system).append("\n<end_of_turn>\n");
+        }
         for (Message msg : history) {
             if ("user".equals(msg.role)) {
-                sb.append("<start_of_turn>user\n");
-                if (!systemInserted) {
-                    sb.append(system).append("\n\n");
-                    systemInserted = true;
-                }
-                sb.append(msg.content).append("<end_of_turn>\n");
+                sb.append("<start_of_turn>user\n")
+                  .append(msg.content).append("\n<end_of_turn>\n");
             } else if ("assistant".equals(msg.role)) {
                 sb.append("<start_of_turn>model\n")
-                  .append(msg.content).append("<end_of_turn>\n");
+                  .append(msg.content).append("\n<end_of_turn>\n");
             }
         }
         sb.append("<start_of_turn>model\n");

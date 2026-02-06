@@ -122,7 +122,7 @@ public class DocumentsActivity extends Activity {
         sb.append("1) メイン画面で「Settings」を開きます。\n");
         sb.append("2) モデルURLを入力し「Load Model」を押してモデルを読み込みます。\n");
         sb.append("3) パラメータを調整する場合は各項目を編集し「Save Config」で保存します。\n");
-        sb.append("4) 「Back to Main」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
+        sb.append("4) 「SAVE & CLOSE」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
         sb.append("3. メイン画面\n");
         sb.append("- Enter Prompt: プロンプトを入力します。\n");
         sb.append("- Send: 生成を開始します。モデル未ロード時は自動でロードを試みます。\n");
@@ -142,8 +142,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: ログレベルを選択します。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
         sb.append("- Documents: 操作マニュアル、プライバシーポリシーを確認できます。\n");
-        sb.append("- Back to Main: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n");
-        sb.append("- Cancel: 何も保存せずメイン画面に戻ります。\n\n");
+        sb.append("- SAVE & CLOSE: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n");
+        sb.append("- CLOSE: 何も保存せずメイン画面に戻ります。\n\n");
         sb.append("5. モデルパラメータの詳細説明\n\n");
         sb.append("【基本パラメータ】\n");
         sb.append("- Context Size (n_ctx): モデルが一度に処理できるトークン数。大きいほど長い文脈を扱えますが、メモリ消費が増加します。\n");
@@ -197,7 +197,7 @@ public class DocumentsActivity extends Activity {
         sb.append("1) Open \"Settings\" from the main screen.\n");
         sb.append("2) Enter the model URL and tap \"Load Model\".\n");
         sb.append("3) Edit parameters if needed and tap \"Save Config\".\n");
-        sb.append("4) Tap \"Back to Main\" to save settings and apply them to the model immediately.\n\n");
+        sb.append("4) Tap \"SAVE & CLOSE\" to save settings and apply them to the model immediately.\n\n");
         sb.append("3. Main Screen\n");
         sb.append("- Enter Prompt: Type your prompt.\n");
         sb.append("- Send: Start generation. If the model is not loaded, it will be loaded automatically.\n");
@@ -217,8 +217,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: Select log level.\n");
         sb.append("- Show License: Display license text.\n");
         sb.append("- Documents: View manual and privacy policy.\n");
-        sb.append("- Back to Main: Save current settings and apply them to the model immediately.\n");
-        sb.append("- Cancel: Return to main screen without saving any changes.\n\n");
+        sb.append("- SAVE & CLOSE: Save current settings and apply them to the model immediately.\n");
+        sb.append("- CLOSE: Return to main screen without saving any changes.\n\n");
         sb.append("5. Model Parameter Details\n\n");
         sb.append("[Basic Parameters]\n");
         sb.append("- Context Size (n_ctx): Number of tokens the model can process at once. Larger values handle longer contexts but use more memory.\n");
