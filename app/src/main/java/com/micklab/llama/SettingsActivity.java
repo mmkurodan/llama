@@ -50,7 +50,7 @@ public class SettingsActivity extends Activity {
     private EditText tempInput;
     private EditText topPInput;
     private EditText topKInput;
-    private EditText promptTemplateInput;
+    private TextView autoSelectedTemplateView;
     private TextView modelFileInfo;
     private ProgressBar modelProgressBar;
     private Button loadModelButton;
@@ -147,7 +147,7 @@ public class SettingsActivity extends Activity {
         tempInput = findViewById(R.id.tempInput);
         topPInput = findViewById(R.id.topPInput);
         topKInput = findViewById(R.id.topKInput);
-        promptTemplateInput = findViewById(R.id.promptTemplateInput);
+        autoSelectedTemplateView = findViewById(R.id.autoSelectedTemplateView);
         modelFileInfo = findViewById(R.id.modelFileInfo);
         modelProgressBar = findViewById(R.id.modelProgressBar);
         loadModelButton = findViewById(R.id.loadModelButton);
@@ -313,7 +313,6 @@ public class SettingsActivity extends Activity {
         tempInput.setText(String.valueOf(config.temp));
         topPInput.setText(String.valueOf(config.topP));
         topKInput.setText(String.valueOf(config.topK));
-        promptTemplateInput.setText(config.promptTemplate);
         
         // Penalty parameters
         penaltyLastNInput.setText(String.valueOf(config.penaltyLastN));
@@ -348,6 +347,29 @@ public class SettingsActivity extends Activity {
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
         customChatTemplateInput.setText(config.customChatTemplate != null ? config.customChatTemplate : "");
+        updateAutoTemplatePreview(config);
+    }
+
+    private void updateAutoTemplatePreview(ConfigurationManager.Configuration config) {
+        if (autoSelectedTemplateView == null || config == null) {
+            return;
+        }
+        String ggufChatTemplate = "";
+        if (modelManager != null && modelManager.isModelLoaded()) {
+            ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+        }
+        String modelPath = loadedModelPath != null ? loadedModelPath : config.modelUrl;
+        String settingsSystemPrompt = config.systemPrompt;
+        boolean hasSystem = settingsSystemPrompt != null && !settingsSystemPrompt.isEmpty();
+        String systemSource = hasSystem ? "settings" : "none";
+        PromptTemplateManager.TemplateSelectionResult selection =
+                PromptTemplateManager.selectTemplateWithReason(
+                        config.customChatTemplate,
+                        ggufChatTemplate,
+                        modelPath,
+                        hasSystem,
+                        systemSource);
+        autoSelectedTemplateView.setText(selection.template != null ? selection.template : "");
     }
     
     private ConfigurationManager.Configuration getConfigFromUI() {
@@ -396,9 +418,8 @@ public class SettingsActivity extends Activity {
             config.topK = 40;
         }
         
-        config.promptTemplate = promptTemplateInput.getText().toString();
-        if (config.promptTemplate.isEmpty()) {
-            config.promptTemplate = "<|system|>\nYou are a helpful assistant.\n<|user|>\n{USER_INPUT}\n<|assistant|>\n";
+        if (currentConfig != null && currentConfig.promptTemplate != null && !currentConfig.promptTemplate.isEmpty()) {
+            config.promptTemplate = currentConfig.promptTemplate;
         }
         
         // Penalty parameters
@@ -584,7 +605,7 @@ public class SettingsActivity extends Activity {
     
     private void loadModel() {
         // Persist current UI config so ModelManager can load by name
-        ConfigurationManager.Configuration config = getConfigFromUI();
+        final ConfigurationManager.Configuration config = getConfigFromUI();
         try {
             configManager.saveConfiguration(config);
         } catch (IOException | JSONException e) {
@@ -628,6 +649,7 @@ public class SettingsActivity extends Activity {
                     lastDownloadProgress = success ? 100 : 0;
                     loadModelButton.setEnabled(true);
                     showToast(success ? "Model initialized successfully" : "Model initialization failed");
+                    updateAutoTemplatePreview(config);
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Model load error", t);
@@ -685,6 +707,7 @@ public class SettingsActivity extends Activity {
                     loadModelButton.setEnabled(true);
                     modelProgressBar.setProgress(100);
                     showToast("Model initialized successfully");
+                    updateAutoTemplatePreview(config);
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Model init error", t);

@@ -1,6 +1,7 @@
 package com.micklab.llama;
 
 import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -218,6 +219,8 @@ public class OllamaApiServer {
                 int read = reader.read(bodyChars, 0, contentLength);
                 body = new String(bodyChars, 0, read);
             }
+
+            Log.d(TAG, "Raw request body:\n" + body);
             
             // Route request
             if ("POST".equals(method)) {
@@ -295,13 +298,16 @@ public class OllamaApiServer {
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
                 String modelPath = modelManager.getCurrentModelPath();
                 
-                String promptToUse = PromptTemplateManager.buildPromptForGenerate(
-                        prompt,
-                        apiSystem,
-                        customTemplate,
-                        ggufChatTemplate,
-                        settingsSystemPrompt,
-                        modelPath);
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptForGenerateWithSelection(
+                                prompt,
+                                apiSystem,
+                                customTemplate,
+                                ggufChatTemplate,
+                                settingsSystemPrompt,
+                                modelPath);
+                logTemplateSelection("generate", promptResult.selection);
+                String promptToUse = promptResult.prompt;
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -506,12 +512,15 @@ public class OllamaApiServer {
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
                 String modelPath = modelManager.getCurrentModelPath();
                 
-                String promptToUse = PromptTemplateManager.buildPromptFromMessages(
-                        messages,
-                        customTemplate,
-                        ggufChatTemplate,
-                        settingsSystemPrompt,
-                        modelPath);
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptFromMessagesWithSelection(
+                                messages,
+                                customTemplate,
+                                ggufChatTemplate,
+                                settingsSystemPrompt,
+                                modelPath);
+                logTemplateSelection("chat", promptResult.selection);
+                String promptToUse = promptResult.prompt;
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -715,6 +724,21 @@ public class OllamaApiServer {
             Log.e(TAG, "Error building tags response", e);
             sendErrorResponse(outputStream, 500, "Internal Server Error");
         }
+    }
+
+    private void logTemplateSelection(String contextLabel, PromptTemplateManager.TemplateSelectionResult selection) {
+        if (selection == null) {
+            return;
+        }
+        String message = "Prompt template selection (" + contextLabel + "): " + selection.reason;
+        Log.i(TAG, message);
+        sendProcessingLog(message);
+    }
+
+    private void sendProcessingLog(String message) {
+        Intent intent = new Intent(OllamaForegroundService.ACTION_LOG);
+        intent.putExtra(OllamaForegroundService.EXTRA_LOG_MESSAGE, message);
+        context.sendBroadcast(intent);
     }
     
     private void handleCors(OutputStream outputStream) throws IOException {

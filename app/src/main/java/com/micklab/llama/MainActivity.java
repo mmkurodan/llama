@@ -507,13 +507,25 @@ public class MainActivity extends Activity {
         String customTemplate = (currentConfig != null) ? currentConfig.customChatTemplate : null;
         String settingsSystemPrompt = (currentConfig != null) ? currentConfig.systemPrompt : null;
         String modelPath = modelManager.getCurrentModelPath();
-        
-        return PromptTemplateManager.buildPromptForDirectInput(
-                userInput,
-                customTemplate,
-                ggufChatTemplate,
-                settingsSystemPrompt,
-                modelPath);
+
+        PromptTemplateManager.PromptBuildResult result =
+                PromptTemplateManager.buildPromptForDirectInputWithSelection(
+                        userInput,
+                        customTemplate,
+                        ggufChatTemplate,
+                        settingsSystemPrompt,
+                        modelPath);
+        logTemplateSelection("direct", result.selection);
+        return result.prompt;
+    }
+
+    private void logTemplateSelection(String context, PromptTemplateManager.TemplateSelectionResult selection) {
+        if (selection == null) {
+            return;
+        }
+        String message = "Prompt template selection (" + context + "): " + selection.reason;
+        Log.i(TAG, message);
+        appendMessage(message);
     }
 
     private void appendMessage(final String msg) {

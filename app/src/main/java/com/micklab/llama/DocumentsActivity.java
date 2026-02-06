@@ -137,7 +137,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Selection: モデルURLを指定し読み込みます。\n");
         sb.append("- Model Parameters: 生成パラメータを設定します。\n");
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
-        sb.append("- Prompt Template: {USER_INPUT} で入力を差し込みます。\n");
+        sb.append("- Prompt Template: 自動選択されたテンプレートを表示します。\n");
         sb.append("- Llama API Server: サーバーポートを指定します。\n");
         sb.append("- Log Settings: ログレベルを選択します。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
@@ -204,7 +204,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Selection: Set model URL and load it.\n");
         sb.append("- Model Parameters: Set generation parameters.\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
-        sb.append("- Prompt Template: Use {USER_INPUT} as a placeholder.\n");
+        sb.append("- Prompt Template: Shows the auto-selected template.\n");
         sb.append("- Llama API Server: Set server port.\n");
         sb.append("- Log Settings: Select log level.\n");
         sb.append("- Show License: Display license text.\n");
