@@ -81,6 +81,21 @@ static int   g_dry_allowed_length   = 2;
 static int   g_dry_penalty_last_n   = -1;
 static std::string g_dry_sequence_breakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
 
+// Common stop sequences for chat templates to prevent runaway generation
+static const std::vector<std::string> DEFAULT_STOP_SEQUENCES = {
+        "<|end|>",
+        "<|im_end|>",
+        "</s>",
+        "<|eot_id|>",
+        "<end_of_turn>",
+        "<|user|>",
+        "<|system|>",
+        "<|im_start|>user",
+        "<|im_start|>system",
+        "<start_of_turn>user",
+        "<start_of_turn>model"
+};
+
 // ---------------- ログユーティリティ ----------------
 static std::string current_time_str() {
     using namespace std::chrono;
@@ -129,6 +144,24 @@ static size_t validate_utf8(const std::string& text) {
     }
 
     return len;
+}
+
+static bool find_stop_sequence(const std::string& text, size_t * stop_pos, std::string * stop_seq) {
+    size_t earliest = std::string::npos;
+    std::string found;
+    for (const auto& seq : DEFAULT_STOP_SEQUENCES) {
+        size_t pos = text.find(seq);
+        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
+            earliest = pos;
+            found = seq;
+        }
+    }
+    if (earliest != std::string::npos) {
+        if (stop_pos) *stop_pos = earliest;
+        if (stop_seq) *stop_seq = found;
+        return true;
+    }
+    return false;
 }
 
 static int32_t detokenize_with_resize(
@@ -1053,11 +1086,24 @@ Java_com_micklab_llama_LlamaNative_generate(
                 full.resize(safe_len);
             }
 
+            bool stop_hit = false;
+            size_t stop_pos = std::string::npos;
+            std::string stop_seq;
+            if (find_stop_sequence(full, &stop_pos, &stop_seq)) {
+                if (stop_pos < full.size()) {
+                    full.resize(stop_pos);
+                }
+                stop_hit = true;
+            }
+
             // Compute delta from previous text
             std::string delta;
             if (full.size() > prev_text.size()) {
                 delta = full.substr(prev_text.size());
                 output += delta;
+            }
+            if (stop_hit) {
+                output = full;
             }
 
             // Call token listener with delta if available
@@ -1096,6 +1142,12 @@ Java_com_micklab_llama_LlamaNative_generate(
                    << " full_len=" << full.size()
                    << " step=" << i;
                 log_to_file(ss.str());
+            }
+            if (stop_hit) {
+                std::ostringstream ss;
+                ss << "generate: stop sequence hit \"" << stop_seq << "\" at pos=" << stop_pos;
+                log_to_file(ss.str());
+                break;
             }
         } else {
             // Only log if detokenize fails (unusual case)
