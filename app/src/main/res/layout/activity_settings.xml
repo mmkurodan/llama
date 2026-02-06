@@ -771,7 +771,7 @@
             android:id="@+id/backButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Back to Main"
+            android:text="SAVE &amp; CLOSE"
             android:layout_marginTop="16dp" />
 
         <!-- Cancel Button -->
@@ -779,7 +779,7 @@
             android:id="@+id/cancelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Cancel"
+            android:text="CLOSE"
             android:layout_marginTop="8dp" />
 
     </LinearLayout>
