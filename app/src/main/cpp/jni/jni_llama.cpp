@@ -1216,3 +1216,28 @@ Java_com_micklab_llama_LlamaNative_free(
     log_to_file("Java_com_micklab_llama_LlamaNative_free called");
     llama_jni_free();
 }
+
+// ---------------- JNI: getChatTemplate ----------------
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_getChatTemplate(
+        JNIEnv *env, jobject /*thiz*/
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    
+    if (!g_model) {
+        log_to_file("getChatTemplate: model not loaded", GGML_LOG_LEVEL_WARN);
+        return env->NewStringUTF("");
+    }
+    
+    // Try to get chat template from GGUF metadata
+    const char* chat_template = llama_model_chat_template(g_model, nullptr);
+    
+    if (chat_template && strlen(chat_template) > 0) {
+        log_to_file(std::string("getChatTemplate: found template, len=") + std::to_string(strlen(chat_template)));
+        return env->NewStringUTF(chat_template);
+    }
+    
+    log_to_file("getChatTemplate: no chat template in model metadata");
+    return env->NewStringUTF("");
+}

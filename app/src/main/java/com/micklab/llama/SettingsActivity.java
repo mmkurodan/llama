@@ -85,6 +85,10 @@ public class SettingsActivity extends Activity {
     // Streaming switch
     private Switch streamingSwitch;
     
+    // New prompt settings
+    private EditText systemPromptInput;
+    private EditText customChatTemplateInput;
+    
     // API Server settings
     private EditText apiPortInput;
     private TextView apiServerStatus;
@@ -177,6 +181,10 @@ public class SettingsActivity extends Activity {
         
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
+        
+        // New prompt settings
+        systemPromptInput = findViewById(R.id.systemPromptInput);
+        customChatTemplateInput = findViewById(R.id.customChatTemplateInput);
         
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
@@ -336,6 +344,10 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         streamingSwitch.setChecked(config.streaming);
+        
+        // New prompt settings
+        systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
+        customChatTemplateInput.setText(config.customChatTemplate != null ? config.customChatTemplate : "");
     }
     
     private ConfigurationManager.Configuration getConfigFromUI() {
@@ -508,6 +520,10 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         config.streaming = streamingSwitch.isChecked();
+        
+        // New prompt settings
+        config.systemPrompt = systemPromptInput.getText().toString();
+        config.customChatTemplate = customChatTemplateInput.getText().toString();
         
         return config;
     }

@@ -609,7 +609,55 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Template (use {USER_INPUT} as placeholder):"
+            android:text="System Prompt (前提プロンプト):"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Used when API doesn't provide a system message."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/systemPromptInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter system prompt (optional)"
+            android:inputType="textMultiLine"
+            android:minLines="2"
+            android:gravity="top|start" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Custom Chat Template (カスタムプロンプトテンプレート):"
+            android:paddingTop="12dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Overrides auto-detection. Use {SYSTEM} and {USER} placeholders."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/customChatTemplateInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter custom chat template (optional)"
+            android:inputType="textMultiLine"
+            android:minLines="3"
+            android:gravity="top|start" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Legacy Template (use {USER_INPUT} as placeholder):"
+            android:paddingTop="12dp"
             android:paddingBottom="4dp" />
 
         <EditText
