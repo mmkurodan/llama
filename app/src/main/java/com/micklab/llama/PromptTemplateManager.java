@@ -14,9 +14,8 @@ import java.util.Locale;
  * 
  * Template selection priority:
  * 1. Custom prompt template (Settings)
- * 2. GGUF metadata chat_template
- * 3. Model family estimation (Qwen/LLaMA/Mistral/Gemma/Phi/Zephyr/Hermes)
- * 4. Fallback: ChatML generic template
+ * 2. Model family estimation (Qwen/LLaMA/Mistral/Gemma/Phi/Zephyr/Hermes)
+ * 3. Fallback: ChatML generic template
  * 
  * System prompt priority:
  * 1. API-provided system (highest priority)
@@ -230,10 +229,6 @@ public class PromptTemplateManager {
 
         if (customTemplate != null && !customTemplate.isEmpty()) {
             return new TemplateSelectionResult(customTemplate, "custom", null, hasSystem, systemSource);
-        }
-
-        if (ggufChatTemplate != null && !ggufChatTemplate.isEmpty()) {
-            return new TemplateSelectionResult(ggufChatTemplate, "gguf", null, hasSystem, systemSource);
         }
 
         ModelFamily family = detectModelFamily(modelPath);

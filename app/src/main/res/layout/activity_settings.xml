@@ -609,7 +609,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="System Prompt (前提プロンプト):"
+            android:text="System Prompt:"
             android:paddingBottom="4dp" />
 
         <TextView
@@ -632,7 +632,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Custom Chat Template (カスタムプロンプトテンプレート):"
+            android:text="Custom Chat Template:"
             android:paddingTop="12dp"
             android:paddingBottom="4dp" />
 
@@ -663,7 +663,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Based on custom template, GGUF metadata, or model family detection."
+            android:text="Based on custom template or model family detection."
             android:textSize="12sp"
             android:textColor="#666666"
             android:paddingBottom="4dp" />
