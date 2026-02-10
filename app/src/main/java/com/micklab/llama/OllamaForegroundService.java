@@ -22,6 +22,8 @@ public class OllamaForegroundService extends Service {
     
     public static final String ACTION_START = "com.micklab.llama.START_SERVICE";
     public static final String ACTION_STOP = "com.micklab.llama.STOP_SERVICE";
+    public static final String ACTION_EXIT = "com.micklab.llama.EXIT_APP";
+    public static final String ACTION_DISCONNECT_ALL = "com.micklab.llama.DISCONNECT_ALL";
     
     // Broadcast actions for communicating with MainActivity
     public static final String ACTION_LOG = "com.micklab.llama.LOG";
@@ -52,6 +54,22 @@ public class OllamaForegroundService extends Service {
             if (ACTION_STOP.equals(action)) {
                 stopSelf();
                 return START_NOT_STICKY;
+            }
+            if (ACTION_EXIT.equals(action)) {
+                Log.i(TAG, "Exit action received - terminating app");
+                stopApiServer();
+                stopSelf();
+                // Terminate the entire application
+                android.os.Process.killProcess(android.os.Process.myPid());
+                return START_NOT_STICKY;
+            }
+            if (ACTION_DISCONNECT_ALL.equals(action)) {
+                Log.i(TAG, "Disconnect all action received");
+                if (apiServer != null) {
+                    apiServer.disconnectAll();
+                    sendLog("API: All connections disconnected");
+                }
+                return START_STICKY;
             }
             
             port = intent.getIntExtra("port", OllamaApiServer.DEFAULT_PORT);
@@ -110,6 +128,13 @@ public class OllamaForegroundService extends Service {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         
+        Intent exitIntent = new Intent(this, OllamaForegroundService.class);
+        exitIntent.setAction(ACTION_EXIT);
+        PendingIntent exitPendingIntent = PendingIntent.getService(
+            this, 1, exitIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        
         Notification.Builder builder;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             builder = new Notification.Builder(this, CHANNEL_ID);
@@ -123,6 +148,7 @@ public class OllamaForegroundService extends Service {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
+            .addAction(android.R.drawable.ic_delete, "Exit", exitPendingIntent)
             .setOngoing(true)
             .build();
     }

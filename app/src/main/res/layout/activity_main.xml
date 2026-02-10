@@ -5,82 +5,131 @@
     android:orientation="vertical"
     android:padding="8dp">
 
-    <!-- Top Buttons Row -->
-    <LinearLayout
+    <!-- Controls Section (20% of screen, scrollable) -->
+    <ScrollView
+        android:id="@+id/controlsScrollView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_height="0dp"
+        android:layout_weight="2"
+        android:fillViewport="true">
 
-        <Button
-            android:id="@+id/settingsButton"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Settings"
-            android:layout_marginEnd="4dp" />
+            android:orientation="vertical">
 
-        <Button
-            android:id="@+id/initModelButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Re-init Model"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            <!-- Top Buttons Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
-    </LinearLayout>
+                <Button
+                    android:id="@+id/settingsButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Settings"
+                    android:layout_marginEnd="4dp" />
 
-    <!-- Second Button Row -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="4dp">
+                <Button
+                    android:id="@+id/initModelButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Re-init Model"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp" />
 
-        <Button
-            android:id="@+id/viewLogButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="View Log"
-            android:layout_marginEnd="4dp" />
+            </LinearLayout>
 
-        <Button
-            android:id="@+id/clearLogButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Clear Log"
-            android:layout_marginStart="4dp" />
+            <!-- Second Button Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
 
-    </LinearLayout>
+                <Button
+                    android:id="@+id/viewLogButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="View Log"
+                    android:layout_marginEnd="4dp" />
 
-    <!-- API Server Row -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="4dp">
+                <Button
+                    android:id="@+id/clearLogButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Clear Log"
+                    android:layout_marginStart="4dp" />
 
-        <Button
-            android:id="@+id/apiServerButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Start API Server"
-            android:layout_marginEnd="4dp" />
+            </LinearLayout>
 
-        <TextView
-            android:id="@+id/apiServerStatusMain"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="API: Stopped"
-            android:gravity="center_vertical"
-            android:layout_marginStart="4dp"
-            android:textSize="12sp" />
+            <!-- API Server Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
 
-    </LinearLayout>
+                <Button
+                    android:id="@+id/apiServerButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Start API Server"
+                    android:layout_marginEnd="4dp" />
+
+                <TextView
+                    android:id="@+id/apiServerStatusMain"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="API: Stopped"
+                    android:gravity="center_vertical"
+                    android:layout_marginStart="4dp"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#CCCCCC"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Prompt Input -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enter Prompt:"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/promptInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter your prompt here"
+                android:inputType="textMultiLine"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top|start" />
+
+            <Button
+                android:id="@+id/sendButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Send"
+                android:enabled="false" />
+
+        </LinearLayout>
+
+    </ScrollView>
 
     <!-- Divider -->
     <View
@@ -90,39 +139,7 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp" />
 
-    <!-- Prompt Input -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Enter Prompt:"
-        android:textSize="14sp" />
-
-    <EditText
-        android:id="@+id/promptInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter your prompt here"
-        android:inputType="textMultiLine"
-        android:minLines="2"
-        android:maxLines="4"
-        android:gravity="top|start" />
-
-    <Button
-        android:id="@+id/sendButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Send"
-        android:enabled="false" />
-
-    <!-- Divider -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#CCCCCC"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp" />
-
-    <!-- Model Output Section -->
+    <!-- Model Output Section (40% of remaining space) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -162,7 +179,7 @@
         android:id="@+id/outputScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="4"
         android:background="#F5F5F5"
         android:padding="8dp">
 
@@ -184,7 +201,7 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp" />
 
-    <!-- Processing Status/Log Section -->
+    <!-- Processing Status/Log Section (40% of remaining space) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -214,7 +231,7 @@
         android:id="@+id/logScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_weight="4"
         android:background="#F0F0F0"
         android:padding="8dp">
 

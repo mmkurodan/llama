@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -45,6 +46,9 @@ public class OllamaApiServer {
     private ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private static final Object TOKEN_COMPLETE = new Object();
+    
+    // Track active client connections for disconnectAll
+    private final java.util.Set<Socket> activeConnections = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
     private static class TokenError {
         final String error;
@@ -103,9 +107,10 @@ public class OllamaApiServer {
         executorService = Executors.newCachedThreadPool();
         executorService.submit(() -> {
             try {
-                serverSocket = new ServerSocket(port);
+                // Bind to 0.0.0.0 to accept external connections
+                serverSocket = new ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"));
                 running.set(true);
-                Log.i(TAG, "Llama API server started on port " + port);
+                Log.i(TAG, "Llama API server started on port " + port + " (0.0.0.0)");
                 
                 if (listener != null) {
                     listener.onServerStarted(port);
@@ -131,6 +136,7 @@ public class OllamaApiServer {
                 while (running.get()) {
                     try {
                         Socket clientSocket = serverSocket.accept();
+                        activeConnections.add(clientSocket);
                         executorService.submit(() -> handleClient(clientSocket));
                     } catch (IOException e) {
                         if (running.get()) {
@@ -150,6 +156,9 @@ public class OllamaApiServer {
     public void stop() {
         running.set(false);
         
+        // Close all active client connections
+        disconnectAll();
+        
         if (serverSocket != null) {
             try {
                 serverSocket.close();
@@ -166,6 +175,26 @@ public class OllamaApiServer {
         if (listener != null) {
             listener.onServerStopped();
         }
+    }
+    
+    /**
+     * Disconnect all active client connections.
+     * This is used when reinitializing the model to stop ongoing requests.
+     */
+    public void disconnectAll() {
+        synchronized (activeConnections) {
+            for (Socket socket : activeConnections) {
+                try {
+                    if (!socket.isClosed()) {
+                        socket.close();
+                    }
+                } catch (IOException e) {
+                    Log.w(TAG, "Error closing client socket", e);
+                }
+            }
+            activeConnections.clear();
+        }
+        Log.i(TAG, "Disconnected all active connections");
     }
     
     private void handleClient(Socket clientSocket) {
@@ -253,6 +282,8 @@ public class OllamaApiServer {
             try {
                 clientSocket.close();
             } catch (IOException ignored) {}
+        } finally {
+            activeConnections.remove(clientSocket);
         }
     }
     
