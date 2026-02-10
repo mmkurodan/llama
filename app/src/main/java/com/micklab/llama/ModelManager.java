@@ -115,6 +115,15 @@ public class ModelManager {
     }
     
     /**
+     * Force reset the busy state.
+     * This is used during model reinitialization to clear any stuck busy state.
+     */
+    public void resetBusy() {
+        busy.set(false);
+        Log.i(TAG, "Busy state forcefully reset");
+    }
+    
+    /**
      * Load a configuration and its model if not already loaded.
      * This method is NOT thread-safe - caller must hold busy lock.
      * 

@@ -398,9 +398,31 @@ public class MainActivity extends Activity {
             return;
         }
         
-        appendMessage("Freeing current model...");
+        appendMessage("Initializing model reload...");
+        
+        // Disable buttons during reinitialization
+        sendButton.setEnabled(false);
+        initModelButton.setEnabled(false);
+        
         new Thread(() -> {
             try {
+                // 1. Disconnect all API connections
+                appendMessage("Disconnecting all API connections...");
+                if (isServiceRunning) {
+                    Intent disconnectIntent = new Intent(this, OllamaForegroundService.class);
+                    disconnectIntent.setAction(OllamaForegroundService.ACTION_DISCONNECT_ALL);
+                    startService(disconnectIntent);
+                }
+                
+                // 2. Reset busy state (force clear any stuck 503 state)
+                appendMessage("Resetting busy state...");
+                modelManager.resetBusy();
+                
+                // Small delay to ensure connections are closed
+                Thread.sleep(200);
+                
+                // 3. Free and reload model
+                appendMessage("Freeing current model...");
                 modelManager.free();
                 runOnUiThread(() -> {
                     appendMessage("Model freed.");
@@ -423,14 +445,27 @@ public class MainActivity extends Activity {
                                 appendMessage("Model re-initialization failed");
                                 showToast("Model re-initialization failed");
                             }
+                            // Re-enable buttons
+                            sendButton.setEnabled(true);
+                            initModelButton.setEnabled(true);
                         });
                     } finally {
                         modelManager.release();
                     }
+                } else {
+                    runOnUiThread(() -> {
+                        appendMessage("Could not acquire model lock for reinitialization");
+                        sendButton.setEnabled(true);
+                        initModelButton.setEnabled(true);
+                    });
                 }
             } catch (Throwable t) {
                 appendException("Model re-initialization error", t);
                 showToast("Error: " + t.getMessage());
+                runOnUiThread(() -> {
+                    sendButton.setEnabled(true);
+                    initModelButton.setEnabled(true);
+                });
             }
         }).start();
     }
