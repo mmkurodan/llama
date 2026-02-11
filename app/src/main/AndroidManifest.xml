@@ -9,7 +9,7 @@
 
     <application
         android:label="llama Tester"
-        android:theme="@android:style/Theme.Material.Light"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:icon="@mipmap/ic_launcher">
 
         <activity
