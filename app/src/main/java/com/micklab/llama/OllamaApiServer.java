@@ -342,6 +342,13 @@ public class OllamaApiServer {
 
                 if (stream) {
                     final boolean[] errorSent = { false };
+                    final AtomicBoolean clientDisconnected = new AtomicBoolean(false);
+                    final Runnable onClientDisconnected = () -> {
+                        if (clientDisconnected.compareAndSet(false, true)) {
+                            Log.w(TAG, "Client disconnected during /api/generate stream");
+                            modelManager.getLlama().cancelGeneration();
+                        }
+                    };
                     // Start chunked response
                     String header = "HTTP/1.1 200 OK\r\n" +
                             "Content-Type: application/x-ndjson\r\n" +
@@ -374,17 +381,18 @@ public class OllamaApiServer {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
                                             outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
                                             outputStream.write(chunkBytes);
-                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.flush();
-                                        }
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "Error writing final streaming chunk", e);
-                                    }
-                                    break;
-                                } else if (ev instanceof TokenError) {
-                                    TokenError te = (TokenError) ev;
-                                    try {
+                                             outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.flush();
+                                         }
+                                     } catch (Exception e) {
+                                        Log.w(TAG, "Error writing final streaming chunk", e);
+                                        onClientDisconnected.run();
+                                     }
+                                     break;
+                                 } else if (ev instanceof TokenError) {
+                                     TokenError te = (TokenError) ev;
+                                     try {
                                         errorSent[0] = true;
                                         JSONObject err = new JSONObject();
                                         err.put("error", te.error);
@@ -393,17 +401,18 @@ public class OllamaApiServer {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
                                             outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
                                             outputStream.write(chunkBytes);
-                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.flush();
-                                        }
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "Error writing error chunk", e);
-                                    }
-                                    break;
-                                } else {
-                                    String tokenStr = (String) ev;
-                                    try {
+                                             outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.flush();
+                                         }
+                                     } catch (Exception e) {
+                                        Log.w(TAG, "Error writing error chunk", e);
+                                        onClientDisconnected.run();
+                                     }
+                                     break;
+                                 } else {
+                                     String tokenStr = (String) ev;
+                                     try {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
@@ -414,16 +423,18 @@ public class OllamaApiServer {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
                                             outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
                                             outputStream.write(chunkBytes);
-                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.flush();
-                                        }
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "Error writing streaming chunk", e);
-                                    }
-                                }
-                            }
-                        } catch (InterruptedException ie) {
-                            Log.w(TAG, "Writer thread interrupted", ie);
+                                             outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.flush();
+                                         }
+                                     } catch (Exception e) {
+                                        Log.w(TAG, "Error writing streaming chunk", e);
+                                        onClientDisconnected.run();
+                                        break;
+                                     }
+                                 }
+                             }
+                         } catch (InterruptedException ie) {
+                             Log.w(TAG, "Writer thread interrupted", ie);
                             Thread.currentThread().interrupt();
                         } finally {
                             try { outputStream.flush(); } catch (Exception ignored) {}
@@ -466,7 +477,7 @@ public class OllamaApiServer {
                         modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
-                        if (!errorSent[0]) {
+                        if (!errorSent[0] && !clientDisconnected.get()) {
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
                     }
@@ -555,6 +566,13 @@ public class OllamaApiServer {
 
                 if (stream) {
                     final boolean[] errorSent = { false };
+                    final AtomicBoolean clientDisconnected = new AtomicBoolean(false);
+                    final Runnable onClientDisconnected = () -> {
+                        if (clientDisconnected.compareAndSet(false, true)) {
+                            Log.w(TAG, "Client disconnected during /api/chat stream");
+                            modelManager.getLlama().cancelGeneration();
+                        }
+                    };
                     // Start chunked response
                     String header = "HTTP/1.1 200 OK\r\n" +
                             "Content-Type: application/x-ndjson\r\n" +
@@ -592,17 +610,18 @@ public class OllamaApiServer {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
                                             outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
                                             outputStream.write(chunkBytes);
-                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.flush();
-                                        }
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "Error writing final streaming chunk", e);
-                                    }
-                                    break;
-                                } else if (ev instanceof TokenError) {
-                                    TokenError te = (TokenError) ev;
-                                    try {
+                                             outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.flush();
+                                         }
+                                     } catch (Exception e) {
+                                        Log.w(TAG, "Error writing final streaming chunk", e);
+                                        onClientDisconnected.run();
+                                     }
+                                     break;
+                                 } else if (ev instanceof TokenError) {
+                                     TokenError te = (TokenError) ev;
+                                     try {
                                         errorSent[0] = true;
                                         JSONObject err = new JSONObject();
                                         err.put("error", te.error);
@@ -611,17 +630,18 @@ public class OllamaApiServer {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
                                             outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
                                             outputStream.write(chunkBytes);
-                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.flush();
-                                        }
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "Error writing error chunk", e);
-                                    }
-                                    break;
-                                } else {
-                                    String tokenStr = (String) ev;
-                                    try {
+                                             outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.flush();
+                                         }
+                                     } catch (Exception e) {
+                                        Log.w(TAG, "Error writing error chunk", e);
+                                        onClientDisconnected.run();
+                                     }
+                                     break;
+                                 } else {
+                                     String tokenStr = (String) ev;
+                                     try {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
@@ -637,16 +657,18 @@ public class OllamaApiServer {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
                                             outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
                                             outputStream.write(chunkBytes);
-                                            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-                                            outputStream.flush();
-                                        }
-                                    } catch (Exception e) {
-                                        Log.e(TAG, "Error writing streaming chunk", e);
-                                    }
-                                }
-                            }
-                        } catch (InterruptedException ie) {
-                            Log.w(TAG, "Writer thread interrupted", ie);
+                                             outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                             outputStream.flush();
+                                         }
+                                     } catch (Exception e) {
+                                        Log.w(TAG, "Error writing streaming chunk", e);
+                                        onClientDisconnected.run();
+                                        break;
+                                     }
+                                 }
+                             }
+                         } catch (InterruptedException ie) {
+                             Log.w(TAG, "Writer thread interrupted", ie);
                             Thread.currentThread().interrupt();
                         } finally {
                             try { outputStream.flush(); } catch (Exception ignored) {}
@@ -687,7 +709,7 @@ public class OllamaApiServer {
                         modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
-                        if (!errorSent[0]) {
+                        if (!errorSent[0] && !clientDisconnected.get()) {
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
                     }

@@ -34,6 +34,7 @@ static jobject g_token_listener = nullptr;
 static jmethodID g_token_onToken = nullptr;
 static jmethodID g_token_onComplete = nullptr;
 static jmethodID g_token_onError = nullptr;
+static std::atomic<bool> g_cancel_generation(false);
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 
@@ -767,6 +768,15 @@ Java_com_micklab_llama_LlamaNative_setTokenListener(
     }
 }
 
+// ---------------- JNI: cancelGeneration ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_cancelGeneration(
+        JNIEnv *, jobject) {
+    g_cancel_generation.store(true);
+    log_to_file("cancelGeneration: cancellation requested", GGML_LOG_LEVEL_WARN);
+}
+
 // ---------------- JNI: generate ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -780,6 +790,8 @@ Java_com_micklab_llama_LlamaNative_generate(
         log_to_file("generate: not initialized", GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("not initialized");
     }
+
+    g_cancel_generation.store(false);
 
     std::string prompt = jstring_to_std(env, jPrompt);
     {
@@ -848,6 +860,11 @@ Java_com_micklab_llama_LlamaNative_generate(
         
         // Process prompt in chunks of g_n_batch size to avoid OOM on Android
         for (int i = 0; i < n_tokens; i += g_n_batch) {
+            if (g_cancel_generation.load()) {
+                log_to_file("generate: cancelled during prompt decode", GGML_LOG_LEVEL_WARN);
+                return env->NewStringUTF("generation cancelled");
+            }
+
             int batch_size = std::min(g_n_batch, n_tokens - i);
             
             {
@@ -1046,6 +1063,11 @@ Java_com_micklab_llama_LlamaNative_generate(
 
     log_to_file("generate: entering decode loop");
     for (int i = 0; i < max_tokens; ++i) {
+        if (g_cancel_generation.load()) {
+            log_to_file("generate: cancellation requested, stopping", GGML_LOG_LEVEL_WARN);
+            break;
+        }
+
         {
             std::ostringstream ss;
             ss << "generate: step=" << i << " out_tokens=" << out_tokens.size();
@@ -1219,8 +1241,10 @@ Java_com_micklab_llama_LlamaNative_generate(
         }
     }
 
+    const bool was_cancelled = g_cancel_generation.load();
+
     // Notify Java listener that generation is complete
-    if (g_jvm && g_token_listener && g_token_onComplete) {
+    if (!was_cancelled && g_jvm && g_token_listener && g_token_onComplete) {
         JNIEnv* env = nullptr;
         bool attached = false;
         if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
@@ -1238,6 +1262,10 @@ Java_com_micklab_llama_LlamaNative_generate(
             if (env->ExceptionCheck()) env->ExceptionClear();
         }
         if (attached) g_jvm->DetachCurrentThread();
+    }
+
+    if (was_cancelled) {
+        log_to_file("generate: completed with cancellation", GGML_LOG_LEVEL_WARN);
     }
 
     // Free the sampler chain
