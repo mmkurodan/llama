@@ -21,6 +21,7 @@ import org.json.JSONException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
@@ -54,6 +55,7 @@ public class SettingsActivity extends Activity {
     private TextView modelFileInfo;
     private ProgressBar modelProgressBar;
     private Button loadModelButton;
+    private Button maintainModelButton;
     
     // Penalty parameter inputs
     private EditText penaltyLastNInput;
@@ -151,6 +153,7 @@ public class SettingsActivity extends Activity {
         modelFileInfo = findViewById(R.id.modelFileInfo);
         modelProgressBar = findViewById(R.id.modelProgressBar);
         loadModelButton = findViewById(R.id.loadModelButton);
+        maintainModelButton = findViewById(R.id.maintainModelButton);
         
         // Penalty parameter inputs
         penaltyLastNInput = findViewById(R.id.penaltyLastNInput);
@@ -213,6 +216,7 @@ public class SettingsActivity extends Activity {
         loadConfigButton.setOnClickListener(v -> loadSelectedConfiguration());
         deleteConfigButton.setOnClickListener(v -> deleteSelectedConfiguration());
         loadModelButton.setOnClickListener(v -> loadModel());
+        maintainModelButton.setOnClickListener(v -> showModelMaintenanceDialog());
         backButton.setOnClickListener(v -> finish());
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
@@ -602,6 +606,106 @@ public class SettingsActivity extends Activity {
             loadConfigurationByName("default");
         } else {
             showToast("Failed to delete configuration");
+        }
+    }
+
+    private void showModelMaintenanceDialog() {
+        final File[] modelFiles = getDownloadedModelFiles();
+        if (modelFiles.length == 0) {
+            showToast("No downloaded model files found");
+            return;
+        }
+
+        String[] fileItems = new String[modelFiles.length];
+        for (int i = 0; i < modelFiles.length; i++) {
+            fileItems[i] = modelFiles[i].getName() + " (" + modelFiles[i].length() + " bytes)";
+        }
+
+        final int[] selectedIndex = {0};
+        new AlertDialog.Builder(this)
+            .setTitle("Model Maintenance")
+            .setSingleChoiceItems(fileItems, 0, (dialog, which) -> selectedIndex[0] = which)
+            .setPositiveButton("Delete Selected", (dialog, which) -> confirmDeleteModelFile(modelFiles[selectedIndex[0]]))
+            .setNegativeButton("Close", null)
+            .show();
+    }
+
+    private File[] getDownloadedModelFiles() {
+        List<File> modelFiles = new ArrayList<>();
+        List<String> configs = configManager.listConfigurations();
+        for (String configName : configs) {
+            try {
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                String filename = extractFilenameFromUrl(config.modelUrl);
+                if (filename == null || filename.isEmpty()) {
+                    continue;
+                }
+                File file = new File(getFilesDir(), filename);
+                if (file.isFile() && file.length() > 0 && !containsFile(modelFiles, file)) {
+                    modelFiles.add(file);
+                }
+            } catch (IOException | JSONException e) {
+                Log.w(TAG, "Skipping model file lookup for config: " + configName, e);
+            }
+        }
+
+        if (loadedModelPath != null && !loadedModelPath.isEmpty()) {
+            File loadedFile = new File(loadedModelPath);
+            if (loadedFile.isFile() && loadedFile.length() > 0 && !containsFile(modelFiles, loadedFile)) {
+                modelFiles.add(loadedFile);
+            }
+        }
+
+        modelFiles.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        return modelFiles.toArray(new File[0]);
+    }
+
+    private boolean containsFile(List<File> files, File target) {
+        for (File file : files) {
+            if (file.getAbsolutePath().equals(target.getAbsolutePath())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void confirmDeleteModelFile(File modelFile) {
+        new AlertDialog.Builder(this)
+            .setTitle("Delete Model File")
+            .setMessage("Delete " + modelFile.getName() + "?")
+            .setPositiveButton("Delete", (dialog, which) -> deleteModelFile(modelFile))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void deleteModelFile(File modelFile) {
+        if (modelManager.isBusy()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
+
+        boolean removedLoadedModel = false;
+        String currentModelPath = modelManager.getCurrentModelPath();
+        if (currentModelPath != null && currentModelPath.equals(modelFile.getAbsolutePath())) {
+            modelManager.free();
+            removedLoadedModel = true;
+        }
+
+        boolean deleted = modelFile.delete();
+        if (deleted) {
+            if (loadedModelPath != null && loadedModelPath.equals(modelFile.getAbsolutePath())) {
+                loadedModelPath = null;
+                modelLoadedSuccessfully = false;
+                removedLoadedModel = true;
+            }
+            if (removedLoadedModel) {
+                modelFileInfo.setText("Model file: (none)");
+                modelProgressBar.setProgress(0);
+                lastDownloadProgress = 0;
+            }
+            showToast("Deleted model file: " + modelFile.getName());
+        } else {
+            showToast("Failed to delete model file: " + modelFile.getName());
         }
     }
     
