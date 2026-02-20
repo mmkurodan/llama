@@ -237,10 +237,10 @@ public class MainActivity extends Activity {
             
             // If model not loaded, load it first
             if (!modelManager.isModelLoaded()) {
-                appendMessage("Model not loaded. Loading model...");
+                final String configName = resolveDirectInputConfigName();
+                appendMessage("Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
                 new Thread(() -> {
                     try {
-                        String configName = (currentConfig != null) ? currentConfig.name : "default";
                         boolean loadSuccess = modelManager.loadConfiguration(configName);
                         if (!loadSuccess) {
                             modelManager.release();
@@ -609,6 +609,18 @@ public class MainActivity extends Activity {
             appendMessage("Failed to clear log file: " + e.getMessage());
             showToast("Failed to clear log file");
         }
+    }
+
+    private String resolveDirectInputConfigName() {
+        String configName = (currentConfig != null) ? currentConfig.name : null;
+        if (configName == null) {
+            return "default";
+        }
+        String trimmed = configName.trim();
+        if (trimmed.isEmpty() || "default".equalsIgnoreCase(trimmed)) {
+            return "default";
+        }
+        return trimmed;
     }
     
     private String applyPromptTemplate(String userInput) {
