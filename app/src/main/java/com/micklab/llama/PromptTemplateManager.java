@@ -119,11 +119,9 @@ public class PromptTemplateManager {
         "<start_of_turn>user\n{USER}\n<end_of_turn>\n" +
         "<start_of_turn>model\n";
     
-    private static final String LLAMA_TEMPLATE = 
-        "[INST] <<SYS>>\n{SYSTEM}\n<</SYS>>\n\n{USER} [/INST]";
+    private static final String LLAMA_TEMPLATE = CHATML_TEMPLATE;
     
-    private static final String LLAMA_TEMPLATE_NO_SYSTEM = 
-        "[INST] {USER} [/INST]";
+    private static final String LLAMA_TEMPLATE_NO_SYSTEM = CHATML_TEMPLATE_NO_SYSTEM;
     
     private static final String MISTRAL_TEMPLATE = 
         "[INST] {SYSTEM}\n\n{USER} [/INST]";
@@ -391,11 +389,15 @@ public class PromptTemplateManager {
                 hasSystem,
                 systemResult.source);
         
-        // Detect model family for multi-turn formatting
-        ModelFamily family = detectModelFamily(modelPath);
-        
-        // Build prompt using model-family-specific multi-turn formatting
-        String prompt = buildMultiTurnPrompt(family, systemResult.prompt, conversationHistory);
+        String prompt;
+        if ("custom".equals(selection.source)) {
+            String conversationText = buildConversationText(conversationHistory);
+            prompt = applyTemplate(selection.template, systemResult.prompt, conversationText);
+        } else {
+            // Build prompt using model-family-specific multi-turn formatting
+            ModelFamily family = detectModelFamily(modelPath);
+            prompt = buildMultiTurnPrompt(family, systemResult.prompt, conversationHistory);
+        }
         return new PromptBuildResult(prompt, selection, systemResult.prompt);
     }
     
@@ -476,6 +478,24 @@ public class PromptTemplateManager {
                 settingsSystemPrompt,
                 modelPath);
     }
+
+    private static String buildConversationText(List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        for (Message msg : history) {
+            if (sb.length() > 0) {
+                sb.append("\n");
+            }
+            if ("assistant".equals(msg.role)) {
+                sb.append("assistant: ");
+            } else if ("user".equals(msg.role)) {
+                sb.append("user: ");
+            } else {
+                sb.append(msg.role).append(": ");
+            }
+            sb.append(msg.content != null ? msg.content : "");
+        }
+        return sb.toString();
+    }
     
     /**
      * Build a multi-turn prompt formatted according to the model family's chat template.
@@ -486,7 +506,7 @@ public class PromptTemplateManager {
             case GEMMA:
                 return buildMultiTurnGemma(systemPrompt, history);
             case LLAMA:
-                return buildMultiTurnLlama(systemPrompt, history);
+                return buildMultiTurnChatML(systemPrompt, history);
             case MISTRAL:
                 return buildMultiTurnMistral(systemPrompt, history);
             case PHI:
