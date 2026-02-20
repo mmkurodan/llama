@@ -184,23 +184,6 @@ public class OllamaApiServer {
                     listener.onServerStarted(port);
                 }
                 
-                // Preload default configuration in background
-                executorService.submit(() -> {
-                    if (modelManager.tryAcquire()) {
-                        try {
-                            if (modelManager.loadConfiguration("default")) {
-                                Log.i(TAG, "Preloaded default configuration");
-                            } else {
-                                Log.w(TAG, "Preload default configuration failed");
-                            }
-                        } catch (Exception e) {
-                            Log.w(TAG, "Preload exception", e);
-                        } finally {
-                            modelManager.release();
-                        }
-                    }
-                });
-                
                 while (running.get()) {
                     try {
                         Socket clientSocket = serverSocket.accept();
