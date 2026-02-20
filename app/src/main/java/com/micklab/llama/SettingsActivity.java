@@ -632,20 +632,16 @@ public class SettingsActivity extends Activity {
 
     private File[] getDownloadedModelFiles() {
         List<File> modelFiles = new ArrayList<>();
-        List<String> configs = configManager.listConfigurations();
-        for (String configName : configs) {
-            try {
-                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
-                String filename = extractFilenameFromUrl(config.modelUrl);
-                if (filename == null || filename.isEmpty()) {
-                    continue;
-                }
-                File file = new File(getFilesDir(), filename);
-                if (file.isFile() && file.length() > 0 && !containsFile(modelFiles, file)) {
+        File modelDir = getModelStorageDir();
+        File[] existingFiles = modelDir.listFiles();
+        if (existingFiles != null) {
+            for (File file : existingFiles) {
+                if (file.isFile()
+                        && file.length() > 0
+                        && !"ollama.log".equals(file.getName())
+                        && !containsFile(modelFiles, file)) {
                     modelFiles.add(file);
                 }
-            } catch (IOException | JSONException e) {
-                Log.w(TAG, "Skipping model file lookup for config: " + configName, e);
             }
         }
 
@@ -723,7 +719,7 @@ public class SettingsActivity extends Activity {
         // Show quick file info from URL (if present)
         final String filename = extractFilenameFromUrl(config.modelUrl);
         if (filename != null && !filename.isEmpty()) {
-            File destFile = new File(getFilesDir(), filename);
+            File destFile = new File(getModelStorageDir(), filename);
             modelFileInfo.setText("Model file: " + filename + (destFile.exists() ? " (" + destFile.length() + " bytes)" : " (checking...)"));
         } else {
             modelFileInfo.setText("Model file: (unknown)");
@@ -837,6 +833,11 @@ public class SettingsActivity extends Activity {
             return pure.substring(slash + 1);
         }
         return null;
+    }
+
+    private File getModelStorageDir() {
+        File externalDir = getExternalFilesDir(null);
+        return externalDir != null ? externalDir : getFilesDir();
     }
     
     private void showToast(final String msg) {

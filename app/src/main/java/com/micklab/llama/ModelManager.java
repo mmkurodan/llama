@@ -141,7 +141,7 @@ public class ModelManager {
                 return false;
             }
             
-            File destFile = new File(context.getFilesDir(), filename);
+            File destFile = new File(getModelStorageDir(), filename);
             String modelPath = destFile.getAbsolutePath();
             
             // If same model is already loaded, just re-apply parameters
@@ -296,5 +296,10 @@ public class ModelManager {
             return pure.substring(slash + 1);
         }
         return null;
+    }
+
+    private File getModelStorageDir() {
+        File externalDir = context.getExternalFilesDir(null);
+        return externalDir != null ? externalDir : context.getFilesDir();
     }
 }
