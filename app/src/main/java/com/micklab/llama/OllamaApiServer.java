@@ -65,14 +65,11 @@ public class OllamaApiServer {
 
     private static class StreamTokenFilter {
         private final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue;
-        private final Runnable terminateGeneration;
         private final StringBuilder pending = new StringBuilder();
         private final int holdbackLength;
-        private boolean terminated = false;
 
-        StreamTokenFilter(java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue, Runnable terminateGeneration) {
+        StreamTokenFilter(java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue) {
             this.tokenQueue = tokenQueue;
-            this.terminateGeneration = terminateGeneration;
             int maxMarkerLength = 0;
             for (String marker : STREAM_END_MARKERS) {
                 if (marker.length() > maxMarkerLength) {
@@ -83,60 +80,53 @@ public class OllamaApiServer {
         }
 
         void onToken(String token) {
-            if (terminated || token == null || token.isEmpty()) {
+            if (token == null || token.isEmpty()) {
                 return;
             }
-
             pending.append(token);
-            int markerPos = findStopMarkerPosition(pending.toString());
-            if (markerPos >= 0) {
-                if (markerPos > 0) {
-                    tokenQueue.offer(pending.substring(0, markerPos));
-                }
-                pending.setLength(0);
-                terminated = true;
-                terminateGeneration.run();
-                tokenQueue.offer(TOKEN_COMPLETE);
-                return;
-            }
-
-            int emitLength = pending.length() - holdbackLength;
-            if (emitLength > 0) {
-                tokenQueue.offer(pending.substring(0, emitLength));
-                pending.delete(0, emitLength);
-            }
+            flushFiltered(false);
         }
 
         void onComplete() {
-            if (!terminated) {
-                flushPending();
-            }
+            flushFiltered(true);
             tokenQueue.offer(TOKEN_COMPLETE);
         }
 
         void onError(String error) {
-            if (!terminated) {
-                flushPending();
-            }
+            flushFiltered(true);
             tokenQueue.offer(new TokenError(error));
         }
 
-        private void flushPending() {
-            if (pending.length() > 0) {
-                tokenQueue.offer(pending.toString());
-                pending.setLength(0);
+        private void flushFiltered(boolean flushAll) {
+            if (pending.length() == 0) {
+                return;
+            }
+            String filtered = stripStopMarkers(pending.toString());
+            pending.setLength(0);
+            if (flushAll) {
+                if (!filtered.isEmpty()) {
+                    tokenQueue.offer(filtered);
+                }
+                return;
+            }
+            int emitLength = filtered.length() - holdbackLength;
+            if (emitLength > 0) {
+                String head = filtered.substring(0, emitLength);
+                if (!head.isEmpty()) {
+                    tokenQueue.offer(head);
+                }
+                pending.append(filtered, emitLength, filtered.length());
+            } else {
+                pending.append(filtered);
             }
         }
 
-        private int findStopMarkerPosition(String text) {
-            int earliest = -1;
+        private String stripStopMarkers(String text) {
+            String result = text;
             for (String marker : STREAM_END_MARKERS) {
-                int pos = text.indexOf(marker);
-                if (pos >= 0 && (earliest < 0 || pos < earliest)) {
-                    earliest = pos;
-                }
+                result = result.replace(marker, "");
             }
-            return earliest;
+            return result;
         }
     }
 
@@ -437,11 +427,9 @@ public class OllamaApiServer {
                     outputStream.flush();
 
                     final Object writeLock = new Object();
-                    final Runnable onStopMarker = () -> modelManager.getLlama().cancelGeneration();
-
                     // Use a queue + writer thread so the native generation thread is never blocked by network I/O
                     final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
-                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(tokenQueue, onStopMarker);
+                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(tokenQueue);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -663,11 +651,9 @@ public class OllamaApiServer {
                     outputStream.flush();
 
                     final Object writeLock = new Object();
-                    final Runnable onStopMarker = () -> modelManager.getLlama().cancelGeneration();
-
                     // Use a queue + writer thread so the native generation thread is never blocked by network I/O
                     final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
-                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(tokenQueue, onStopMarker);
+                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(tokenQueue);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
