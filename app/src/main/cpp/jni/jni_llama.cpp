@@ -85,7 +85,6 @@ static std::string g_dry_sequence_breakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
 // Common stop sequences for chat templates to prevent runaway generation
 static const std::vector<std::string> DEFAULT_STOP_SEQUENCES = {
         "<|end|>",
-        "<|im_end|>",
         "</s>",
         "<|eot_id|>",
         "<end_of_turn>",
