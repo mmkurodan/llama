@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
+    private static final String[] STREAM_REMOVE_MARKERS = {"<|im_end|>", "<|IM_END|>"};
     
     private TextView logView;           // log view (append-only)
     private ScrollView logScrollView;
@@ -76,6 +77,60 @@ public class MainActivity extends Activity {
     
     // Timestamp formatter for log messages
     private final SimpleDateFormat timestampFormat = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
+
+    private static class StreamOutputFilter {
+        private final StringBuilder pending = new StringBuilder();
+        private final int holdbackLength;
+
+        StreamOutputFilter() {
+            int maxMarkerLength = 0;
+            for (String marker : STREAM_REMOVE_MARKERS) {
+                if (marker.length() > maxMarkerLength) {
+                    maxMarkerLength = marker.length();
+                }
+            }
+            holdbackLength = Math.max(0, maxMarkerLength - 1);
+        }
+
+        String onToken(String token) {
+            if (token == null || token.isEmpty()) {
+                return "";
+            }
+            pending.append(token);
+            return flushFiltered(false);
+        }
+
+        String onComplete() {
+            return flushFiltered(true);
+        }
+
+        private String flushFiltered(boolean flushAll) {
+            if (pending.length() == 0) {
+                return "";
+            }
+            String filtered = stripMarkers(pending.toString());
+            pending.setLength(0);
+            if (flushAll) {
+                return filtered;
+            }
+            int emitLength = filtered.length() - holdbackLength;
+            if (emitLength > 0) {
+                String out = filtered.substring(0, emitLength);
+                pending.append(filtered, emitLength, filtered.length());
+                return out;
+            }
+            pending.append(filtered);
+            return "";
+        }
+
+        private String stripMarkers(String text) {
+            String result = text;
+            for (String marker : STREAM_REMOVE_MARKERS) {
+                result = result.replace(marker, "");
+            }
+            return result;
+        }
+    }
     
     // Broadcast receiver for service logs
     private BroadcastReceiver serviceReceiver = new BroadcastReceiver() {
@@ -223,13 +278,17 @@ public class MainActivity extends Activity {
                     }
 
                     if (currentConfig != null && currentConfig.streaming) {
+                        final StreamOutputFilter streamOutputFilter = new StreamOutputFilter();
                         tListener = new LlamaNative.TokenListener() {
                             @Override
                             public void onToken(String token) {
                                 if (BuildConfig.DEBUG) {
                                     Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
                                 }
-                                runOnUiThread(() -> outputView.append(token));
+                                final String filteredToken = streamOutputFilter.onToken(token);
+                                if (!filteredToken.isEmpty()) {
+                                    runOnUiThread(() -> outputView.append(filteredToken));
+                                }
                             }
 
                             @Override
@@ -237,7 +296,13 @@ public class MainActivity extends Activity {
                                 if (BuildConfig.DEBUG) {
                                     Log.d(TAG, "stream complete");
                                 }
-                                runOnUiThread(() -> appendMessage("streaming complete"));
+                                final String tail = streamOutputFilter.onComplete();
+                                runOnUiThread(() -> {
+                                    if (!tail.isEmpty()) {
+                                        outputView.append(tail);
+                                    }
+                                    appendMessage("streaming complete");
+                                });
                             }
 
                             @Override
@@ -294,13 +359,17 @@ public class MainActivity extends Activity {
             }
 
             if (currentConfig != null && currentConfig.streaming) {
+                final StreamOutputFilter streamOutputFilter = new StreamOutputFilter();
                 tListener = new LlamaNative.TokenListener() {
                     @Override
                     public void onToken(String token) {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
                         }
-                        runOnUiThread(() -> outputView.append(token));
+                        final String filteredToken = streamOutputFilter.onToken(token);
+                        if (!filteredToken.isEmpty()) {
+                            runOnUiThread(() -> outputView.append(filteredToken));
+                        }
                     }
 
                     @Override
@@ -308,7 +377,13 @@ public class MainActivity extends Activity {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "stream complete");
                         }
-                        runOnUiThread(() -> appendMessage("streaming complete"));
+                        final String tail = streamOutputFilter.onComplete();
+                        runOnUiThread(() -> {
+                            if (!tail.isEmpty()) {
+                                outputView.append(tail);
+                            }
+                            appendMessage("streaming complete");
+                        });
                     }
 
                     @Override
