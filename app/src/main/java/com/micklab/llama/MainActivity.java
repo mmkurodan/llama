@@ -43,7 +43,20 @@ public class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
-    private static final String[] STREAM_REMOVE_MARKERS = {"<|im_end|>", "<|IM_END|>"};
+    private static final String[] STREAM_REMOVE_MARKERS = {
+            "<|im_start|>", "<|IM_START|>", "<|im_end|>", "<|IM_END|>"
+    };
+    
+    private static String stripResponseMarkers(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String result = text;
+        for (String marker : STREAM_REMOVE_MARKERS) {
+            result = result.replace(marker, "");
+        }
+        return result;
+    }
     
     private TextView logView;           // log view (append-only)
     private ScrollView logScrollView;
@@ -124,11 +137,7 @@ public class MainActivity extends Activity {
         }
 
         private String stripMarkers(String text) {
-            String result = text;
-            for (String marker : STREAM_REMOVE_MARKERS) {
-                result = result.replace(marker, "");
-            }
-            return result;
+            return MainActivity.stripResponseMarkers(text);
         }
     }
     
@@ -324,7 +333,7 @@ public class MainActivity extends Activity {
                     final String finalGen = gen;
                     runOnUiThread(() -> {
                         appendMessage("generate() returned.");
-                        outputView.setText(finalGen);
+                        outputView.setText(stripResponseMarkers(finalGen));
                     });
                 } catch (Throwable t) {
                     appendException("generate() threw", t);
@@ -405,7 +414,7 @@ public class MainActivity extends Activity {
             final String finalGen = gen;
             runOnUiThread(() -> {
                 appendMessage("generate() returned.");
-                outputView.setText(finalGen);
+                outputView.setText(stripResponseMarkers(finalGen));
             });
         } catch (Throwable t) {
             appendException("generate() threw", t);
