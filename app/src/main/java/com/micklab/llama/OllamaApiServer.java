@@ -476,7 +476,7 @@ public class OllamaApiServer {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
-                                        chunk.put("response", tokenStr);
+                                        chunk.put("response", stripResponseMarkers(tokenStr));
                                         chunk.put("done", false);
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
@@ -708,7 +708,7 @@ public class OllamaApiServer {
 
                                         JSONObject message = new JSONObject();
                                         message.put("role", "assistant");
-                                        message.put("content", tokenStr);
+                                        message.put("content", stripResponseMarkers(tokenStr));
                                         chunk.put("message", message);
                                         chunk.put("done", false);
 
