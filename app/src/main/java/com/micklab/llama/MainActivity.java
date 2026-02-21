@@ -43,6 +43,8 @@ public class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
+    private static final String PREF_LOG_LEVEL = "log_level";
+    private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final String[] STREAM_REMOVE_MARKERS = {
             "<|im_start|>", "<|IM_START|>",
             "<|im_end|>", "<|IM_END|>", "<|im_end|", "<|IM_END|", "<|im_end", "<|IM_END"
@@ -56,6 +58,7 @@ public class MainActivity extends Activity {
         for (String marker : STREAM_REMOVE_MARKERS) {
             result = result.replace(marker, "");
         }
+        result = result.replaceAll("(?is)<\\|im(?:_(?:start|end)?)?\\|?>?\\s*$", "");
         return result;
     }
     
@@ -276,6 +279,7 @@ public class MainActivity extends Activity {
 
             // Apply prompt template
             final String chatPrompt = applyPromptTemplate(userPrompt);
+            logMaxDebugPayload("direct.prompt", chatPrompt);
 
             appendMessage("Running generate...");
             outputView.setText("");
@@ -295,8 +299,10 @@ public class MainActivity extends Activity {
                                 if (BuildConfig.DEBUG) {
                                     Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
                                 }
+                                logMaxDebugPayload("direct.stream.model.token", token);
                                 final String filteredToken = streamOutputFilter.onToken(token);
                                 if (!filteredToken.isEmpty()) {
+                                    logMaxDebugPayload("direct.stream.filtered.token", filteredToken);
                                     runOnUiThread(() -> outputView.append(filteredToken));
                                 }
                             }
@@ -309,6 +315,7 @@ public class MainActivity extends Activity {
                                 final String tail = streamOutputFilter.onComplete();
                                 runOnUiThread(() -> {
                                     if (!tail.isEmpty()) {
+                                        logMaxDebugPayload("direct.stream.tail", tail);
                                         outputView.append(tail);
                                     }
                                     appendMessage("streaming complete");
@@ -331,10 +338,13 @@ public class MainActivity extends Activity {
                     }
 
                     String gen = modelManager.generate(chatPrompt);
+                    logMaxDebugPayload("direct.nonstream.model.raw", gen);
                     final String finalGen = gen;
                     runOnUiThread(() -> {
                         appendMessage("generate() returned.");
-                        outputView.setText(stripResponseMarkers(finalGen));
+                        String safe = stripResponseMarkers(finalGen);
+                        logMaxDebugPayload("direct.nonstream.output", safe);
+                        outputView.setText(safe);
                     });
                 } catch (Throwable t) {
                     appendException("generate() threw", t);
@@ -349,6 +359,7 @@ public class MainActivity extends Activity {
     
     private void processGeneration(String userPrompt) {
         final String chatPrompt = applyPromptTemplate(userPrompt);
+        logMaxDebugPayload("direct.prompt", chatPrompt);
         
         runOnUiThread(() -> {
             if (isViewingLog) {
@@ -376,8 +387,10 @@ public class MainActivity extends Activity {
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
                         }
+                        logMaxDebugPayload("direct.stream.model.token", token);
                         final String filteredToken = streamOutputFilter.onToken(token);
                         if (!filteredToken.isEmpty()) {
+                            logMaxDebugPayload("direct.stream.filtered.token", filteredToken);
                             runOnUiThread(() -> outputView.append(filteredToken));
                         }
                     }
@@ -390,6 +403,7 @@ public class MainActivity extends Activity {
                         final String tail = streamOutputFilter.onComplete();
                         runOnUiThread(() -> {
                             if (!tail.isEmpty()) {
+                                logMaxDebugPayload("direct.stream.tail", tail);
                                 outputView.append(tail);
                             }
                             appendMessage("streaming complete");
@@ -412,10 +426,13 @@ public class MainActivity extends Activity {
             }
             
             String gen = modelManager.generate(chatPrompt);
+            logMaxDebugPayload("direct.nonstream.model.raw", gen);
             final String finalGen = gen;
             runOnUiThread(() -> {
                 appendMessage("generate() returned.");
-                outputView.setText(stripResponseMarkers(finalGen));
+                String safe = stripResponseMarkers(finalGen);
+                logMaxDebugPayload("direct.nonstream.output", safe);
+                outputView.setText(safe);
             });
         } catch (Throwable t) {
             appendException("generate() threw", t);
@@ -658,6 +675,34 @@ public class MainActivity extends Activity {
         String message = "Prompt template selection (" + context + "): " + selection.reason;
         Log.i(TAG, message);
         appendMessage(message);
+    }
+
+    private boolean isMaxDebugEnabled() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int defaultLogLevel = BuildConfig.DEBUG ? 1 : 2;
+        return prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel) == LOG_LEVEL_MAX_DEBUG;
+    }
+
+    private void logMaxDebugPayload(String label, String payload) {
+        if (!isMaxDebugEnabled()) {
+            return;
+        }
+        String safe = payload == null ? "null" : payload;
+        if (safe.isEmpty()) {
+            String msg = "[MAX_DEBUG] " + label + " (empty)";
+            Log.d(TAG, msg);
+            appendMessage(msg);
+            return;
+        }
+        final int chunkSize = 1800;
+        int index = 0;
+        for (int start = 0; start < safe.length(); start += chunkSize) {
+            int end = Math.min(start + chunkSize, safe.length());
+            String msg = "[MAX_DEBUG] " + label + " part=" + index + " \"" + safe.substring(start, end) + "\"";
+            Log.d(TAG, msg);
+            appendMessage(msg);
+            index++;
+        }
     }
 
     private void appendMessage(final String msg) {

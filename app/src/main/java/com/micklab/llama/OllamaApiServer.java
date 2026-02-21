@@ -2,6 +2,7 @@ package com.micklab.llama;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -37,6 +38,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class OllamaApiServer {
     private static final String TAG = "OllamaApiServer";
     public static final int DEFAULT_PORT = 11434;
+    private static final String PREFS_NAME = "ollama_prefs";
+    private static final String PREF_LOG_LEVEL = "log_level";
+    private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final String[] STREAM_REMOVE_MARKERS = {
             "<|IM_START|>", "<|im_start|>",
             "<|IM_END|>", "<|im_end|>", "<|IM_END|", "<|im_end|", "<|IM_END", "<|im_end"
@@ -84,6 +88,7 @@ public class OllamaApiServer {
                 result = result.substring(0, markerStart);
             }
         }
+        result = result.replaceAll("(?is)<\\|im(?:_(?:start|end)?)?\\|?>?\\s*$", "");
         return result;
     }
 
@@ -409,6 +414,7 @@ public class OllamaApiServer {
             }
 
             Log.d(TAG, "Raw request body:\n" + body);
+            logMaxDebugPayload("api.request.body", body);
             
             // Route request
             if ("POST".equals(method)) {
@@ -498,6 +504,7 @@ public class OllamaApiServer {
                                 modelPath);
                 logTemplateSelection("generate", promptResult.selection);
                 String promptToUse = promptResult.prompt;
+                logMaxDebugPayload("api.generate.prompt", promptToUse);
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -578,8 +585,10 @@ public class OllamaApiServer {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
-                                        chunk.put("response", stripResponseMarkers(tokenStr));
+                                        String safeToken = stripResponseMarkers(tokenStr);
+                                        chunk.put("response", safeToken);
                                         chunk.put("done", false);
+                                        logMaxDebugPayload("api.generate.stream.chunk.response", safeToken);
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
@@ -613,6 +622,7 @@ public class OllamaApiServer {
                             if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
                                 Log.d(TAG, "generate stream tokens=" + tokenCount);
                             }
+                            logMaxDebugPayload("api.generate.stream.model.token", token);
                             // Fast, non-blocking enqueue so native thread isn't blocked
                             streamTokenFilter.onToken(token);
                         }
@@ -654,12 +664,16 @@ public class OllamaApiServer {
                     }
                 } else {
                     // Non-streaming response
-                    String response = stripResponseMarkers(modelManager.generate(promptToUse));
+                    String rawResponse = modelManager.generate(promptToUse);
+                    logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
+                    String response = stripResponseMarkers(rawResponse);
+                    logMaxDebugPayload("api.generate.nonstream.response", response);
                     JSONObject result = new JSONObject();
                     result.put("model", model);
                     result.put("created_at", getTimestamp());
                     result.put("response", response);
                     result.put("done", true);
+                    logMaxDebugPayload("api.generate.nonstream.response.json", result.toString());
 
                     sendJsonResponse(outputStream, 200, result.toString());
                 }
@@ -725,6 +739,7 @@ public class OllamaApiServer {
                                 modelPath);
                 logTemplateSelection("chat", promptResult.selection);
                 String promptToUse = promptResult.prompt;
+                logMaxDebugPayload("api.chat.prompt", promptToUse);
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -813,9 +828,11 @@ public class OllamaApiServer {
 
                                         JSONObject message = new JSONObject();
                                         message.put("role", "assistant");
-                                        message.put("content", stripResponseMarkers(tokenStr));
+                                        String safeToken = stripResponseMarkers(tokenStr);
+                                        message.put("content", safeToken);
                                         chunk.put("message", message);
                                         chunk.put("done", false);
+                                        logMaxDebugPayload("api.chat.stream.chunk.content", safeToken);
 
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
@@ -850,6 +867,7 @@ public class OllamaApiServer {
                             if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
                                 Log.d(TAG, "chat stream tokens=" + tokenCount);
                             }
+                            logMaxDebugPayload("api.chat.stream.model.token", token);
                             streamTokenFilter.onToken(token);
                         }
 
@@ -889,7 +907,10 @@ public class OllamaApiServer {
                     }
                 } else {
                     // Non-streaming response
-                    String response = stripResponseMarkers(modelManager.generate(promptToUse));
+                    String rawResponse = modelManager.generate(promptToUse);
+                    logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
+                    String response = stripResponseMarkers(rawResponse);
+                    logMaxDebugPayload("api.chat.nonstream.response", response);
 
                     JSONObject result = new JSONObject();
                     result.put("model", model);
@@ -900,6 +921,7 @@ public class OllamaApiServer {
                     message.put("content", response);
                     result.put("message", message);
                     result.put("done", true);
+                    logMaxDebugPayload("api.chat.nonstream.response.json", result.toString());
 
                     sendJsonResponse(outputStream, 200, result.toString());
                 }
@@ -951,6 +973,34 @@ public class OllamaApiServer {
         String message = "Prompt template selection (" + contextLabel + "): " + selection.reason;
         Log.i(TAG, message);
         sendProcessingLog(message);
+    }
+
+    private boolean isMaxDebugEnabled() {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        int defaultLogLevel = BuildConfig.DEBUG ? 1 : 2;
+        return prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel) == LOG_LEVEL_MAX_DEBUG;
+    }
+
+    private void logMaxDebugPayload(String label, String payload) {
+        if (!isMaxDebugEnabled()) {
+            return;
+        }
+        String safe = payload == null ? "null" : payload;
+        if (safe.isEmpty()) {
+            String msg = "[MAX_DEBUG] " + label + " (empty)";
+            Log.d(TAG, msg);
+            sendProcessingLog(msg);
+            return;
+        }
+        final int chunkSize = 1800;
+        int index = 0;
+        for (int start = 0; start < safe.length(); start += chunkSize) {
+            int end = Math.min(start + chunkSize, safe.length());
+            String msg = "[MAX_DEBUG] " + label + " part=" + index + " \"" + safe.substring(start, end) + "\"";
+            Log.d(TAG, msg);
+            sendProcessingLog(msg);
+            index++;
+        }
     }
 
     private void sendProcessingLog(String message) {
