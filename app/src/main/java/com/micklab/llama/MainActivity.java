@@ -44,7 +44,8 @@ public class MainActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String[] STREAM_REMOVE_MARKERS = {
-            "<|im_start|>", "<|IM_START|>", "<|im_end|>", "<|IM_END|>", "<|im_end|", "<|IM_END|"
+            "<|im_start|>", "<|IM_START|>",
+            "<|im_end|>", "<|IM_END|>", "<|im_end|", "<|IM_END|", "<|im_end", "<|IM_END"
     };
     
     private static String stripResponseMarkers(String text) {

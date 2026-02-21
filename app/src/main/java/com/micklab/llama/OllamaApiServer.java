@@ -38,7 +38,8 @@ public class OllamaApiServer {
     private static final String TAG = "OllamaApiServer";
     public static final int DEFAULT_PORT = 11434;
     private static final String[] STREAM_REMOVE_MARKERS = {
-            "<|IM_START|>", "<|im_start|>", "<|IM_END|>", "<|im_end|>", "<|IM_END|", "<|im_end|"
+            "<|IM_START|>", "<|im_start|>",
+            "<|IM_END|>", "<|im_end|>", "<|IM_END|", "<|im_end|", "<|IM_END", "<|im_end"
     };
     
     private final Context context;
