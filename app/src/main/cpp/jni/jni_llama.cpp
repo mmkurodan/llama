@@ -128,6 +128,10 @@ static bool should_log_debug() {
     return should_log(GGML_LOG_LEVEL_DEBUG);
 }
 
+static bool is_max_debug_mode() {
+    return g_log_level.load() == GGML_LOG_LEVEL_NONE;
+}
+
 // Return the last index that ends on a valid UTF-8 boundary (trims incomplete trailing bytes).
 static size_t validate_utf8(const std::string& text) {
     size_t len = text.size();
@@ -1135,6 +1139,9 @@ Java_com_micklab_llama_LlamaNative_generate(
 
             // Call token listener with delta if available
             if (!delta.empty() && g_token_listener && g_token_onToken && g_jvm) {
+                if (is_max_debug_mode()) {
+                    log_to_file(std::string("generate: token delta=\"") + delta + "\"", GGML_LOG_LEVEL_DEBUG);
+                }
                 JNIEnv* env = nullptr;
                 bool attached = false;
                 if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
@@ -1287,6 +1294,10 @@ Java_com_micklab_llama_LlamaNative_generate(
         std::ostringstream ss;
         ss << "generate: finished, output_len=" << output.size();
         log_to_file(ss.str());
+    }
+
+    if (is_max_debug_mode()) {
+        log_to_file(std::string("generate: output=\n") + output, GGML_LOG_LEVEL_DEBUG);
     }
 
     return env->NewStringUTF(output.c_str());

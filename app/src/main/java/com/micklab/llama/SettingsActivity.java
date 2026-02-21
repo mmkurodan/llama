@@ -229,17 +229,17 @@ public class SettingsActivity extends Activity {
     }
 
     private void setupLogLevelSpinner(int savedLogLevel) {
-        String[] levels = new String[] { "DEBUG", "INFO", "WARN", "ERROR" };
+        String[] levels = new String[] { "MAX_DEBUG", "DEBUG", "INFO", "WARN", "ERROR" };
         ArrayAdapter<String> logAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, levels);
         logAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         logLevelSpinner.setAdapter(logAdapter);
-        int selection = Math.max(0, Math.min(levels.length - 1, savedLogLevel - 1));
+        int selection = Math.max(0, Math.min(levels.length - 1, savedLogLevel));
         logLevelSpinner.setSelection(selection);
-        modelManager.getLlama().setLogLevel(selection + 1);
+        modelManager.getLlama().setLogLevel(selection);
         logLevelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
-                int level = position + 1;
+                int level = position;
                 modelManager.getLlama().setLogLevel(level);
                 SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
                 prefs.edit().putInt(PREF_LOG_LEVEL, level).apply();
