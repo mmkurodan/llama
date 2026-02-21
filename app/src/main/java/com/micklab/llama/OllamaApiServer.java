@@ -37,7 +37,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class OllamaApiServer {
     private static final String TAG = "OllamaApiServer";
     public static final int DEFAULT_PORT = 11434;
-    private static final String[] STREAM_END_MARKERS = {"<|IM_END|>", "<|im_end|>"};
+    private static final String[] STREAM_REMOVE_MARKERS = {
+            "<|IM_START|>", "<|im_start|>", "<|IM_END|>", "<|im_end|>"
+    };
     
     private final Context context;
     private final ConfigurationManager configManager;
@@ -62,6 +64,17 @@ public class OllamaApiServer {
             }
         }
     }
+    
+    private static String stripResponseMarkers(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        String result = text;
+        for (String marker : STREAM_REMOVE_MARKERS) {
+            result = result.replace(marker, "");
+        }
+        return result;
+    }
 
     private static class StreamTokenFilter {
         private final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue;
@@ -71,7 +84,7 @@ public class OllamaApiServer {
         StreamTokenFilter(java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue) {
             this.tokenQueue = tokenQueue;
             int maxMarkerLength = 0;
-            for (String marker : STREAM_END_MARKERS) {
+            for (String marker : STREAM_REMOVE_MARKERS) {
                 if (marker.length() > maxMarkerLength) {
                     maxMarkerLength = marker.length();
                 }
@@ -122,11 +135,7 @@ public class OllamaApiServer {
         }
 
         private String stripStopMarkers(String text) {
-            String result = text;
-            for (String marker : STREAM_END_MARKERS) {
-                result = result.replace(marker, "");
-            }
-            return result;
+            return stripResponseMarkers(text);
         }
     }
 
@@ -543,7 +552,7 @@ public class OllamaApiServer {
                     }
                 } else {
                     // Non-streaming response
-                    String response = modelManager.generate(promptToUse);
+                    String response = stripResponseMarkers(modelManager.generate(promptToUse));
                     JSONObject result = new JSONObject();
                     result.put("model", model);
                     result.put("created_at", getTimestamp());
@@ -775,7 +784,7 @@ public class OllamaApiServer {
                     }
                 } else {
                     // Non-streaming response
-                    String response = modelManager.generate(promptToUse);
+                    String response = stripResponseMarkers(modelManager.generate(promptToUse));
 
                     JSONObject result = new JSONObject();
                     result.put("model", model);
