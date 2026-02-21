@@ -91,6 +91,8 @@ static const std::vector<std::string> DEFAULT_STOP_SEQUENCES = {
         "<|IM_END|>",
         "<|im_end|",
         "<|IM_END|",
+        "<|im_end",
+        "<|IM_END",
         "<end_of_turn>",
         "<|user|>",
         "<|system|>",
