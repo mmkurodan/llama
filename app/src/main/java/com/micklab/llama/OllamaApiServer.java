@@ -41,6 +41,8 @@ public class OllamaApiServer {
             "<|IM_START|>", "<|im_start|>",
             "<|IM_END|>", "<|im_end|>", "<|IM_END|", "<|im_end|", "<|IM_END", "<|im_end"
     };
+    private static final String IM_START_MARKER_PREFIX = "<|im_start";
+    private static final String IM_END_MARKER_PREFIX = "<|im_end";
     
     private final Context context;
     private final ConfigurationManager configManager;
@@ -74,27 +76,46 @@ public class OllamaApiServer {
         for (String marker : STREAM_REMOVE_MARKERS) {
             result = result.replace(marker, "");
         }
+        String lower = result.toLowerCase(Locale.ROOT);
+        int markerStart = lower.lastIndexOf("<|");
+        if (markerStart >= 0) {
+            String tail = lower.substring(markerStart);
+            if (IM_START_MARKER_PREFIX.startsWith(tail) || IM_END_MARKER_PREFIX.startsWith(tail)) {
+                result = result.substring(0, markerStart);
+            }
+        }
         return result;
     }
 
     private static class StreamTokenFilter {
-        private final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue;
-        private final StringBuilder pending = new StringBuilder();
-        private final int holdbackLength;
+        private static class ParseResult {
+            final String output;
+            final String remaining;
+            final boolean endMarkerDetected;
 
-        StreamTokenFilter(java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue) {
-            this.tokenQueue = tokenQueue;
-            int maxMarkerLength = 0;
-            for (String marker : STREAM_REMOVE_MARKERS) {
-                if (marker.length() > maxMarkerLength) {
-                    maxMarkerLength = marker.length();
-                }
+            ParseResult(String output, String remaining, boolean endMarkerDetected) {
+                this.output = output;
+                this.remaining = remaining;
+                this.endMarkerDetected = endMarkerDetected;
             }
-            this.holdbackLength = Math.max(0, maxMarkerLength - 1);
+        }
+
+        private final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue;
+        private final Runnable onEndMarkerDetected;
+        private final StringBuilder pending = new StringBuilder();
+        private final AtomicBoolean completionQueued = new AtomicBoolean(false);
+        private boolean finishedByEndMarker = false;
+
+        StreamTokenFilter(
+                java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue,
+                Runnable onEndMarkerDetected
+        ) {
+            this.tokenQueue = tokenQueue;
+            this.onEndMarkerDetected = onEndMarkerDetected;
         }
 
         void onToken(String token) {
-            if (token == null || token.isEmpty()) {
+            if (token == null || token.isEmpty() || finishedByEndMarker) {
                 return;
             }
             pending.append(token);
@@ -102,41 +123,118 @@ public class OllamaApiServer {
         }
 
         void onComplete() {
+            if (finishedByEndMarker) {
+                queueCompleteOnce();
+                return;
+            }
             flushFiltered(true);
-            tokenQueue.offer(TOKEN_COMPLETE);
+            if (!finishedByEndMarker) {
+                queueCompleteOnce();
+            }
         }
 
         void onError(String error) {
+            if (finishedByEndMarker) {
+                queueCompleteOnce();
+                return;
+            }
             flushFiltered(true);
+            if (finishedByEndMarker) {
+                return;
+            }
             tokenQueue.offer(new TokenError(error));
         }
 
         private void flushFiltered(boolean flushAll) {
-            if (pending.length() == 0) {
+            if (pending.length() == 0 || finishedByEndMarker) {
                 return;
             }
-            String filtered = stripStopMarkers(pending.toString());
+            ParseResult parsed = parsePending(pending.toString(), flushAll);
             pending.setLength(0);
-            if (flushAll) {
-                if (!filtered.isEmpty()) {
-                    tokenQueue.offer(filtered);
-                }
-                return;
+            pending.append(parsed.remaining);
+            if (!parsed.output.isEmpty()) {
+                tokenQueue.offer(parsed.output);
             }
-            int emitLength = filtered.length() - holdbackLength;
-            if (emitLength > 0) {
-                String head = filtered.substring(0, emitLength);
-                if (!head.isEmpty()) {
-                    tokenQueue.offer(head);
+            if (parsed.endMarkerDetected) {
+                finishedByEndMarker = true;
+                pending.setLength(0);
+                if (onEndMarkerDetected != null) {
+                    onEndMarkerDetected.run();
                 }
-                pending.append(filtered, emitLength, filtered.length());
-            } else {
-                pending.append(filtered);
+                queueCompleteOnce();
             }
         }
 
-        private String stripStopMarkers(String text) {
-            return stripResponseMarkers(text);
+        private void queueCompleteOnce() {
+            if (completionQueued.compareAndSet(false, true)) {
+                tokenQueue.offer(TOKEN_COMPLETE);
+            }
+        }
+
+        private ParseResult parsePending(String text, boolean flushAll) {
+            StringBuilder output = new StringBuilder();
+            int i = 0;
+
+            while (i < text.length()) {
+                int markerPos = text.indexOf("<|", i);
+                if (markerPos < 0) {
+                    if (flushAll) {
+                        output.append(text, i, text.length());
+                        return new ParseResult(output.toString(), "", false);
+                    }
+                    int keepFrom = text.length();
+                    if (text.length() - i >= 2
+                            && text.charAt(text.length() - 2) == '<'
+                            && text.charAt(text.length() - 1) == '|') {
+                        keepFrom = text.length() - 2;
+                    } else if (text.length() - i >= 1 && text.charAt(text.length() - 1) == '<') {
+                        keepFrom = text.length() - 1;
+                    }
+                    if (keepFrom > i) {
+                        output.append(text, i, keepFrom);
+                    }
+                    return new ParseResult(output.toString(), text.substring(keepFrom), false);
+                }
+
+                if (markerPos > i) {
+                    output.append(text, i, markerPos);
+                }
+
+                String tail = text.substring(markerPos);
+                String tailLower = tail.toLowerCase(Locale.ROOT);
+
+                boolean matchesStart = tailLower.startsWith(IM_START_MARKER_PREFIX);
+                boolean matchesEnd = tailLower.startsWith(IM_END_MARKER_PREFIX);
+                boolean maybeStart = IM_START_MARKER_PREFIX.startsWith(tailLower);
+                boolean maybeEnd = IM_END_MARKER_PREFIX.startsWith(tailLower);
+
+                if (!matchesStart && !matchesEnd) {
+                    if (maybeStart || maybeEnd) {
+                        if (flushAll) {
+                            return new ParseResult(output.toString(), "", false);
+                        }
+                        return new ParseResult(output.toString(), tail, false);
+                    }
+                    output.append("<|");
+                    i = markerPos + 2;
+                    continue;
+                }
+
+                int closePos = tailLower.indexOf("|>");
+                if (closePos < 0) {
+                    if (flushAll) {
+                        return new ParseResult(output.toString(), "", matchesEnd);
+                    }
+                    return new ParseResult(output.toString(), tail, false);
+                }
+
+                i = markerPos + closePos + 2;
+                if (matchesEnd) {
+                    return new ParseResult(output.toString(), "", true);
+                }
+            }
+
+            return new ParseResult(output.toString(), "", false);
         }
     }
 
@@ -422,7 +520,10 @@ public class OllamaApiServer {
                     final Object writeLock = new Object();
                     // Use a queue + writer thread so the native generation thread is never blocked by network I/O
                     final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
-                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(tokenQueue);
+                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(
+                            tokenQueue,
+                            () -> modelManager.getLlama().cancelGeneration()
+                    );
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -646,7 +747,10 @@ public class OllamaApiServer {
                     final Object writeLock = new Object();
                     // Use a queue + writer thread so the native generation thread is never blocked by network I/O
                     final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
-                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(tokenQueue);
+                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(
+                            tokenQueue,
+                            () -> modelManager.getLlama().cancelGeneration()
+                    );
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
