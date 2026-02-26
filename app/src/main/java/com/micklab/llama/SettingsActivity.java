@@ -5,6 +5,8 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.widget.AdapterView;
@@ -96,6 +98,12 @@ public class SettingsActivity extends Activity {
     private TextView apiServerStatus;
     private Spinner logLevelSpinner;
     private Button licenseButton;
+    private Button documentsButton;
+    private Button saveConfigButton;
+    private Button loadConfigButton;
+    private Button deleteConfigButton;
+    private Button backButton;
+    private Button cancelButton;
     
     private ConfigurationManager.Configuration currentConfig;
     private ArrayAdapter<String> configAdapter;
@@ -103,6 +111,14 @@ public class SettingsActivity extends Activity {
     private boolean modelLoadedSuccessfully = false;
     
     private volatile int lastDownloadProgress = 0;
+    private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
+    private final Runnable busyStateUpdater = new Runnable() {
+        @Override
+        public void run() {
+            updateActionButtonStateForBusy();
+            busyStateHandler.postDelayed(this, 200);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -194,7 +210,7 @@ public class SettingsActivity extends Activity {
         apiServerStatus = findViewById(R.id.apiServerStatus);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
         licenseButton = findViewById(R.id.licenseButton);
-        Button documentsButton = findViewById(R.id.documentsButton);
+        documentsButton = findViewById(R.id.documentsButton);
         
         // Load saved API port
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -206,26 +222,76 @@ public class SettingsActivity extends Activity {
                 : defaultLogLevel;
         setupLogLevelSpinner(savedLogLevel);
         
-        Button saveConfigButton = findViewById(R.id.saveConfigButton);
-        Button loadConfigButton = findViewById(R.id.loadConfigButton);
-        Button deleteConfigButton = findViewById(R.id.deleteConfigButton);
-        Button backButton = findViewById(R.id.backButton);
-        Button cancelButton = findViewById(R.id.cancelButton);
+        saveConfigButton = findViewById(R.id.saveConfigButton);
+        loadConfigButton = findViewById(R.id.loadConfigButton);
+        deleteConfigButton = findViewById(R.id.deleteConfigButton);
+        backButton = findViewById(R.id.backButton);
+        cancelButton = findViewById(R.id.cancelButton);
         
-        saveConfigButton.setOnClickListener(v -> saveCurrentConfiguration());
-        loadConfigButton.setOnClickListener(v -> loadSelectedConfiguration());
-        deleteConfigButton.setOnClickListener(v -> deleteSelectedConfiguration());
-        loadModelButton.setOnClickListener(v -> loadModel());
-        maintainModelButton.setOnClickListener(v -> showModelMaintenanceDialog());
+        saveConfigButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            saveCurrentConfiguration();
+        });
+        loadConfigButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            loadSelectedConfiguration();
+        });
+        deleteConfigButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            deleteSelectedConfiguration();
+        });
+        loadModelButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            loadModel();
+        });
+        maintainModelButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showModelMaintenanceDialog();
+        });
         backButton.setOnClickListener(v -> finish());
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
+        updateActionButtonStateForBusy();
     }
 
     private void openDocuments() {
         Intent intent = new Intent(this, DocumentsActivity.class);
         startActivity(intent);
+    }
+
+    private boolean isBusyActionBlocked() {
+        if (modelManager != null && modelManager.isBusy()) {
+            updateActionButtonStateForBusy();
+            showToast("Model is busy processing another request");
+            return true;
+        }
+        return false;
+    }
+
+    private void updateActionButtonStateForBusy() {
+        boolean isBusy = modelManager != null && modelManager.isBusy();
+
+        if (saveConfigButton != null) saveConfigButton.setEnabled(!isBusy);
+        if (loadConfigButton != null) loadConfigButton.setEnabled(!isBusy);
+        if (deleteConfigButton != null) deleteConfigButton.setEnabled(!isBusy);
+        if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
+        if (maintainModelButton != null) maintainModelButton.setEnabled(!isBusy);
+
+        if (backButton != null) backButton.setEnabled(true);
+        if (cancelButton != null) cancelButton.setEnabled(true);
+        if (licenseButton != null) licenseButton.setEnabled(true);
+        if (documentsButton != null) documentsButton.setEnabled(true);
     }
 
     private void setupLogLevelSpinner(int savedLogLevel) {
@@ -852,6 +918,19 @@ public class SettingsActivity extends Activity {
     private void cancelAndReturn() {
         setResult(RESULT_CANCELED);
         super.finish();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateActionButtonStateForBusy();
+        busyStateHandler.post(busyStateUpdater);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        busyStateHandler.removeCallbacks(busyStateUpdater);
     }
 
     @Override

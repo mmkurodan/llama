@@ -248,10 +248,12 @@ public class MainActivity extends Activity {
                 return;
             }
             
-            // If model not loaded, load it first
-            if (!modelManager.isModelLoaded()) {
-                final String configName = resolveDirectInputConfigName();
-                appendMessage("Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
+            final String configName = resolveDirectInputConfigName();
+            // If the selected configuration model is not loaded, load it first
+            if (shouldLoadConfigurationModelForDirectInput()) {
+                appendMessage(modelManager.isModelLoaded()
+                        ? "Loaded model differs from selected profile. Loading profile \"" + configName + "\"..."
+                        : "Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
                 new Thread(() -> {
                     try {
                         boolean loadSuccess = modelManager.loadConfiguration(configName);
@@ -461,10 +463,14 @@ public class MainActivity extends Activity {
                     currentConfig = configManager.loadConfiguration(configName);
                     appendMessage("Loaded configuration: " + configName);
                     
-                    // Apply configuration to model immediately if loaded
+                    // Apply configuration immediately only when selected model already matches.
                     if (modelManager.isModelLoaded()) {
-                        modelManager.applyConfiguration(currentConfig);
-                        appendMessage("Applied configuration to model");
+                        if (isLoadedModelMatchingCurrentConfiguration()) {
+                            modelManager.applyConfiguration(currentConfig);
+                            appendMessage("Applied configuration to model");
+                        } else {
+                            appendMessage("Selected profile model will be loaded on next prompt.");
+                        }
                     }
                 } catch (IOException | JSONException e) {
                     Log.e(TAG, "Failed to load configuration", e);
@@ -648,6 +654,47 @@ public class MainActivity extends Activity {
             return "default";
         }
         return trimmed;
+    }
+
+    private boolean shouldLoadConfigurationModelForDirectInput() {
+        return !modelManager.isModelLoaded() || !isLoadedModelMatchingCurrentConfiguration();
+    }
+
+    private boolean isLoadedModelMatchingCurrentConfiguration() {
+        if (currentConfig == null) {
+            return true;
+        }
+        String configuredModelPath = resolveConfiguredModelPath(currentConfig.modelUrl);
+        if (configuredModelPath == null || configuredModelPath.isEmpty()) {
+            return true;
+        }
+        return configuredModelPath.equals(modelManager.getCurrentModelPath());
+    }
+
+    private String resolveConfiguredModelPath(String modelUrl) {
+        String filename = extractFilenameFromUrl(modelUrl);
+        if (filename == null || filename.isEmpty()) {
+            return null;
+        }
+        return new File(getModelStorageDir(), filename).getAbsolutePath();
+    }
+
+    private String extractFilenameFromUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        int q = url.indexOf('?');
+        String pure = (q >= 0) ? url.substring(0, q) : url;
+        int slash = pure.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < pure.length()) {
+            return pure.substring(slash + 1);
+        }
+        return null;
+    }
+
+    private File getModelStorageDir() {
+        File externalDir = getExternalFilesDir(null);
+        return externalDir != null ? externalDir : getFilesDir();
     }
     
     private String applyPromptTemplate(String userInput) {
