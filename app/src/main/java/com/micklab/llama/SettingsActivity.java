@@ -330,14 +330,15 @@ public class SettingsActivity extends Activity {
         scrollView.addView(textView);
 
         new AlertDialog.Builder(this)
-            .setTitle("Llama Tester License")
+            .setTitle("LLM tester with llama.cpp License")
             .setView(scrollView)
             .setPositiveButton("Close", null)
             .show();
     }
 
     private String getLicenseText() {
-        return "Llama Tester\n\n"
+        return "LLM tester with llama.cpp\n"
+            + "Built with Llama (llama.cpp)\n\n"
             + "Copyright (c) 2026 Mitsuo Kuroda\n\n"
             + "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n"
             + "1. Grant of Rights\n"
