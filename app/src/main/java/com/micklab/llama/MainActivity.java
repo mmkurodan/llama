@@ -1,6 +1,7 @@
 package com.micklab.llama;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
@@ -13,6 +14,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -31,6 +34,8 @@ import java.util.Locale;
 
 import android.widget.EditText;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.LinearLayout;
 
 import org.json.JSONException;
 
@@ -44,6 +49,7 @@ public class MainActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
+    private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final String[] STREAM_REMOVE_MARKERS = {
             "<|im_start|>", "<|IM_START|>",
@@ -94,6 +100,14 @@ public class MainActivity extends Activity {
     
     // Timestamp formatter for log messages
     private final SimpleDateFormat timestampFormat = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
+    private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
+    private final Runnable busyStateUpdater = new Runnable() {
+        @Override
+        public void run() {
+            updateSettingsButtonForBusyState();
+            busyStateHandler.postDelayed(this, 200);
+        }
+    };
 
     private static class StreamOutputFilter {
         private final StringBuilder pending = new StringBuilder();
@@ -208,6 +222,7 @@ public class MainActivity extends Activity {
         // Ensure UI buttons start enabled
         sendButton.setEnabled(true);
         initModelButton.setEnabled(true);
+        updateSettingsButtonForBusyState();
 
         // Set up button listeners
         settingsButton.setOnClickListener(v -> openSettings());
@@ -247,6 +262,7 @@ public class MainActivity extends Activity {
                 showToast("Model is busy processing another request");
                 return;
             }
+            updateSettingsButtonForBusyState();
             
             final String configName = resolveDirectInputConfigName();
             // If the selected configuration model is not loaded, load it first
@@ -354,9 +370,12 @@ public class MainActivity extends Activity {
                 } finally {
                     modelManager.getLlama().setTokenListener(null);
                     modelManager.release();
+                    runOnUiThread(this::updateSettingsButtonForBusyState);
                 }
             }).start();
         });
+
+        showStartupInstructionsIfNeeded();
     }
     
     private void processGeneration(String userPrompt) {
@@ -442,10 +461,15 @@ public class MainActivity extends Activity {
         } finally {
             modelManager.getLlama().setTokenListener(null);
             modelManager.release();
+            runOnUiThread(this::updateSettingsButtonForBusyState);
         }
     }
     
     private void openSettings() {
+        if (modelManager != null && modelManager.isBusy()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
         Intent intent = new Intent(this, SettingsActivity.class);
         if (currentConfig != null) {
             intent.putExtra(SettingsActivity.EXTRA_CONFIG_NAME, currentConfig.name);
@@ -774,6 +798,44 @@ public class MainActivity extends Activity {
             toast.show();
         });
     }
+
+    private void showStartupInstructionsIfNeeded() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (!prefs.getBoolean(PREF_SHOW_STARTUP_INSTRUCTIONS, true)) {
+            return;
+        }
+
+        TextView messageView = new TextView(this);
+        messageView.setText(
+                "[日本語]\n" +
+                "1) SettingsでモデルをLoad Modelしてください。\n" +
+                "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
+                "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
+                "[English]\n" +
+                "1) In Settings, load a model with Load Model.\n" +
+                "2) Tap SAVE & CLOSE to return to the main screen.\n" +
+                "3) Enter your instruction in the input field and tap Send to display the response.");
+
+        CheckBox doNotShowAgainCheckBox = new CheckBox(this);
+        doNotShowAgainCheckBox.setText("次回は表示しない / Don't show next time");
+
+        LinearLayout dialogLayout = new LinearLayout(this);
+        dialogLayout.setOrientation(LinearLayout.VERTICAL);
+        dialogLayout.setPadding(48, 32, 48, 16);
+        dialogLayout.addView(messageView);
+        dialogLayout.addView(doNotShowAgainCheckBox);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Quick Start / 簡易インストラクション")
+                .setView(dialogLayout)
+                .setCancelable(false)
+                .setPositiveButton("OK", (dialog, which) -> {
+                    if (doNotShowAgainCheckBox.isChecked()) {
+                        prefs.edit().putBoolean(PREF_SHOW_STARTUP_INSTRUCTIONS, false).apply();
+                    }
+                })
+                .show();
+    }
     
     private void copyToClipboard(String label, String text) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
@@ -797,6 +859,13 @@ public class MainActivity extends Activity {
         } else {
             apiServerButton.setText("Start API Server");
             apiServerStatusMain.setText("API: Stopped");
+        }
+    }
+
+    private void updateSettingsButtonForBusyState() {
+        boolean isBusy = modelManager != null && modelManager.isBusy();
+        if (settingsButton != null) {
+            settingsButton.setEnabled(!isBusy);
         }
     }
     
@@ -884,6 +953,8 @@ public class MainActivity extends Activity {
         // Update service status when returning to the activity
         isServiceRunning = isServiceRunning(OllamaForegroundService.class);
         updateApiServerUI();
+        updateSettingsButtonForBusyState();
+        busyStateHandler.post(busyStateUpdater);
     }
     
     @Override
@@ -895,6 +966,7 @@ public class MainActivity extends Activity {
         } catch (IllegalArgumentException e) {
             // Receiver not registered
         }
+        busyStateHandler.removeCallbacks(busyStateUpdater);
     }
     
     @Override
