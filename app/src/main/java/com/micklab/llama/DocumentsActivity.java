@@ -116,6 +116,8 @@ public class DocumentsActivity extends Activity {
         sb.append("[日本語]\n");
         sb.append("操作マニュアル\n\n");
         sb.append("1. アプリ概要\n");
+        sb.append("アプリ名: LLM tester with llama.cpp\n");
+        sb.append("Built with Llama (llama.cpp)\n");
         sb.append("本アプリは端末上でLLMを実行し、プロンプトに対する回答を生成します。\n");
         sb.append("必要に応じてOllama互換APIサーバーを起動できます。\n\n");
         sb.append("2. 初期設定（推奨手順）\n");
@@ -193,6 +195,8 @@ public class DocumentsActivity extends Activity {
         sb.append("[English]\n");
         sb.append("User Manual\n\n");
         sb.append("1. Overview\n");
+        sb.append("App name: LLM tester with llama.cpp\n");
+        sb.append("Built with Llama (llama.cpp).\n");
         sb.append("This app runs an LLM on your device and generates responses to prompts.\n");
         sb.append("An Ollama-compatible API server can be started if needed.\n\n");
         sb.append("2. Recommended Setup\n");
