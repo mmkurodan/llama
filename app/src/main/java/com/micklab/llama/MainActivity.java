@@ -245,7 +245,7 @@ public class MainActivity extends Activity {
         updateLogButton.setOnClickListener(v -> { if (isViewingLog) { refreshLogView(); } });
         copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
         updateLogButton.setVisibility(Button.GONE);
-        downloadLogButton.setEnabled(false);
+        downloadLogButton.setEnabled(true);
         
         // Initialize API server via Foreground Service
         initApiServer();
@@ -640,7 +640,6 @@ public class MainActivity extends Activity {
             viewLogButton.setText("View Log");
             updateLogButton.setEnabled(false);
             updateLogButton.setVisibility(Button.GONE);
-            downloadLogButton.setEnabled(false);
             if (savedOutputText != null) {
                 outputView.setText(savedOutputText);
             }
@@ -682,6 +681,17 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         for (String line : tail) {
             sb.append(line).append('\n');
+        }
+        return sb.toString();
+    }
+    
+    private String readEntireLogFile(File logFile) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
         }
         return sb.toString();
     }
@@ -876,20 +886,54 @@ public class MainActivity extends Activity {
     }
 
     private void downloadDisplayedLog() {
+        File logFile = new File(getExternalFilesDir(null), "ollama.log");
+        String content = null;
+        String suggestedFilename = "ollama-log.txt";
+
         if (!isViewingLog) {
-            showToast("Open View Log first");
+            // Prefer current model response when not viewing logs
+            String response = outputView.getText().toString();
+            if (response != null && !response.trim().isEmpty()) {
+                content = response;
+                suggestedFilename = "llm-response.txt";
+            } else if (logFile.exists()) {
+                try {
+                    content = readEntireLogFile(logFile);
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to read log file", e);
+                    showToast("Failed to read log file: " + e.getMessage());
+                    return;
+                }
+            }
+        } else {
+            // When viewing log, prefer to download the full log
+            if (logFile.exists()) {
+                try {
+                    content = readEntireLogFile(logFile);
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to read log file", e);
+                    showToast("Failed to read log file: " + e.getMessage());
+                    return;
+                }
+            } else {
+                String response = outputView.getText().toString();
+                if (response != null && !response.trim().isEmpty()) {
+                    content = response;
+                    suggestedFilename = "llm-response.txt";
+                }
+            }
+        }
+
+        if (content == null || content.trim().isEmpty()) {
+            showToast("No log or response content to download");
             return;
         }
-        String logContent = outputView.getText().toString();
-        if (logContent == null || logContent.trim().isEmpty()) {
-            showToast("No log content to download");
-            return;
-        }
-        pendingLogDownloadContent = logContent;
+
+        pendingLogDownloadContent = content;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TITLE, "ollama-log-latest-100.txt");
+        intent.putExtra(Intent.EXTRA_TITLE, suggestedFilename);
         startActivityForResult(intent, REQUEST_CREATE_LOG_FILE);
     }
 
