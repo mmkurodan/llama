@@ -267,7 +267,6 @@ public class MainActivity extends Activity {
                 viewLogButton.setText("View Log");
                 updateLogButton.setEnabled(false);
                 updateLogButton.setVisibility(Button.GONE);
-                downloadLogButton.setEnabled(false);
             }
             
             // Check if busy
