@@ -279,49 +279,74 @@ public class DocumentsActivity extends Activity {
     private String buildPrivacyText() {
         StringBuilder sb = new StringBuilder();
         sb.append("[日本語]\n");
-        sb.append("プライバシーポリシー\n\n");
+        sb.append("プライバシーポリシー（日本語版）\n\n");
+
         sb.append("1. 収集する情報\n");
-        sb.append("本アプリは、個人情報を外部サーバーへ送信しません。\n");
-        sb.append("以下の情報を端末内に保存します。\n");
+        sb.append("本アプリは、個人情報を外部サーバーへ送信しません。以下の情報を端末内に保存します。\n\n");
         sb.append("- 設定情報（モデルURL、各種パラメータ、APIポート、ログレベル）\n");
         sb.append("- 構成ファイル（configs/*.json）\n");
         sb.append("- ダウンロードしたモデルファイル\n");
         sb.append("- ログファイル（ollama.log）\n\n");
+
+        sb.append("また、アプリの生成機能を利用する際、ユーザーが入力したテキスト（会話内容）は、端末内または同一ローカルネットワーク内で動作するローカル API に送信されます。このデータは外部サーバーへ送信されず、保存も行いません。\n\n");
+
+        sb.append("---\n\n");
+
         sb.append("2. 通信\n");
-        sb.append("- モデルのダウンロード時に、入力されたURLへ通信します。\n");
-        sb.append("- APIサーバーを有効にした場合、端末のポートでリクエストを受け付けます。\n");
-        sb.append("  入力内容は端末内で処理され、アプリが外部サーバーへ送信することはありません。\n\n");
+        sb.append("- モデルのダウンロード時に、ユーザーが入力した URL へ通信します。\n");
+        sb.append("- API サーバーを有効にした場合、端末内またはローカルネットワーク内のポート（0.0.0.0）でリクエストを受け付けます。\n");
+        sb.append("- ユーザーの入力内容（会話全文）はローカル API に送信されますが、インターネットを経由して外部サーバーへ送信されることはありません。\n");
+        sb.append("- ローカルネットワーク内からアクセス可能ですが、外部ネットワークからのアクセスは意図されておらず、アプリは外部公開を行いません。\n");
+        sb.append("- ローカル通信は暗号化されていない場合がありますが、通信は端末内または同一ネットワーク内に限定されます。\n\n");
+
         sb.append("3. 利用目的\n");
-        sb.append("上記データはアプリの動作、生成機能、表示のために使用します。\n\n");
+        sb.append("上記データは、アプリの動作、生成機能、表示のために使用します。ユーザーの入力内容は生成処理のためにのみ利用され、外部送信・第三者提供・保存は行いません。\n\n");
+
         sb.append("4. ログ\n");
-        sb.append("ログにはアプリの動作状況やAPIリクエスト情報が記録される場合があります。\n\n");
+        sb.append("ログにはアプリの動作状況や API リクエスト情報が記録される場合があります。ログは端末内にのみ保存され、外部へ送信されません。\n\n");
+
         sb.append("5. 保存期間\n");
-        sb.append("設定・モデル・ログは、ユーザーが削除するかアプリのデータを消去するまで保持されます。\n");
-        sb.append("ログはメイン画面の「Clear Log」で削除できます。\n\n");
+        sb.append("設定・モデル・ログは、ユーザーが削除するかアプリのデータを消去するまで保持されます。ログはメイン画面の「Clear Log」で削除できます。\n\n");
+
         sb.append("6. お問い合わせ\n");
-        sb.append("ライセンス記載の連絡先へお問い合わせください。\n\n");
+        sb.append("ご不明点がある場合は、以下のメールアドレスまでお問い合わせください。\n");
+        sb.append("micklab2026@gmail.com\n\n");
+
+        sb.append("© Mick Lab — 生成AIアプリケーション研究\n\n");
+
         sb.append("[English]\n");
-        sb.append("Privacy Policy\n\n");
-        sb.append("1. Data Collected\n");
-        sb.append("This app does not send personal data to external servers.\n");
-        sb.append("It stores the following on the device:\n");
-        sb.append("- Settings (model URL, parameters, API port, log level)\n");
+        sb.append("Privacy Policy (English Version)\n\n");
+
+        sb.append("1. Information Collected\n");
+        sb.append("This application does not transmit any personal information to external servers. The following data is stored locally on the device:\n\n");
+        sb.append("- Configuration data (model URL, parameters, API port, log level)\n");
         sb.append("- Configuration files (configs/*.json)\n");
         sb.append("- Downloaded model files\n");
         sb.append("- Log file (ollama.log)\n\n");
-        sb.append("2. Network Communication\n");
-        sb.append("- The app connects to the URL you provide when downloading models.\n");
-        sb.append("- When the API server is enabled, it listens on a device port for requests.\n");
-        sb.append("  Inputs are processed on device; the app does not send them to external servers.\n\n");
+
+        sb.append("When using the generation features, the text entered by the user (conversation content) is sent to a local API running on the device or within the same local network. This data is not transmitted to external servers and is not stored.\n\n");
+
+        sb.append("2. Communication\n");
+        sb.append("- When downloading models, the application communicates with the URL entered by the user.\n");
+        sb.append("- When the API server is enabled, it listens on a port (0.0.0.0) accessible within the device or the local network.\n");
+        sb.append("- User input (full conversation text) is sent to the local API, but it is never transmitted over the internet or to any external server.\n");
+        sb.append("- The API may be accessible from devices within the same local network, but it is not intended for external network access, and the application does not expose the API to the internet.\n");
+        sb.append("- Local communication may be unencrypted, but all communication is restricted to the device or the same local network.\n\n");
+
         sb.append("3. Purpose of Use\n");
-        sb.append("These data are used to run the app, generate responses, and display status.\n\n");
+        sb.append("The collected data is used solely for application functionality, generation processing, and display. User input is used only for generation and is not transmitted externally, shared with third parties, or stored.\n\n");
+
         sb.append("4. Logs\n");
-        sb.append("Logs may contain operational status and API request information.\n\n");
-        sb.append("5. Retention\n");
-        sb.append("Settings, models, and logs remain until you delete them or clear app data.\n");
-        sb.append("Logs can be cleared from the main screen using \"Clear Log\".\n\n");
+        sb.append("Logs may contain operational information or API request details. Logs are stored only on the device and are not transmitted externally.\n\n");
+
+        sb.append("5. Retention Period\n");
+        sb.append("Settings, models, and logs are retained until the user deletes them or clears the application data. Logs can be deleted using the \"Clear Log\" option on the main screen.\n\n");
+
         sb.append("6. Contact\n");
-        sb.append("Please contact the address listed in the license.\n");
+        sb.append("If you have any questions, please contact:\n");
+        sb.append("micklab2026@gmail.com\n\n");
+
+        sb.append("© Mick Lab — Generative AI Application Research\n");
         return sb.toString();
     }
 }
