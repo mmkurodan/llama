@@ -216,7 +216,7 @@ public class SettingsActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         int savedPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         apiPortInput.setText(String.valueOf(savedPort));
-        int defaultLogLevel = BuildConfig.DEBUG ? 1 : 2;
+        int defaultLogLevel = 2;
         int savedLogLevel = prefs.contains(PREF_LOG_LEVEL)
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
                 : defaultLogLevel;

@@ -977,7 +977,7 @@ public class OllamaApiServer {
 
     private boolean isMaxDebugEnabled() {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        int defaultLogLevel = BuildConfig.DEBUG ? 1 : 2;
+        int defaultLogLevel = 2;
         return prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel) == LOG_LEVEL_MAX_DEBUG;
     }
 
