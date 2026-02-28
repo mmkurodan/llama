@@ -12,6 +12,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,9 +27,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.Date;
 import java.util.Locale;
 
@@ -46,11 +50,14 @@ public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final int REQUEST_SETTINGS = 1;
     private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
+    private static final int REQUEST_CREATE_LOG_FILE = 3;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
+    private static final int LOG_LEVEL_INFO = 2;
+    private static final int LOG_DISPLAY_MAX_LINES = 100;
     private static final String[] STREAM_REMOVE_MARKERS = {
             "<|im_start|>", "<|IM_START|>",
             "<|im_end|>", "<|IM_END|>", "<|im_end|", "<|IM_END|", "<|im_end", "<|IM_END"
@@ -81,10 +88,12 @@ public class MainActivity extends Activity {
     private Button clearLogButton;
     private Button apiServerButton;
     private Button copyOutputButton;
+    private Button downloadLogButton;
     private Button updateLogButton;
     private Button copyLogButton;
     private boolean isViewingLog = false;
     private String savedOutputText = null;
+    private String pendingLogDownloadContent = null;
     private TextView apiServerStatusMain;
     
     // Model Manager (singleton)
@@ -208,6 +217,7 @@ public class MainActivity extends Activity {
         clearLogButton = findViewById(R.id.clearLogButton);
         apiServerButton = findViewById(R.id.apiServerButton);
         copyOutputButton = findViewById(R.id.copyOutputButton);
+        downloadLogButton = findViewById(R.id.downloadLogButton);
         updateLogButton = findViewById(R.id.updateLogButton);
         copyLogButton = findViewById(R.id.copyLogButton);
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
@@ -231,9 +241,11 @@ public class MainActivity extends Activity {
         clearLogButton.setOnClickListener(v -> clearLogFile());
         apiServerButton.setOnClickListener(v -> toggleApiServer());
         copyOutputButton.setOnClickListener(v -> copyToClipboard("Output", outputView.getText().toString()));
+        downloadLogButton.setOnClickListener(v -> downloadDisplayedLog());
         updateLogButton.setOnClickListener(v -> { if (isViewingLog) { refreshLogView(); } });
         copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
         updateLogButton.setVisibility(Button.GONE);
+        downloadLogButton.setEnabled(false);
         
         // Initialize API server via Foreground Service
         initApiServer();
@@ -255,6 +267,7 @@ public class MainActivity extends Activity {
                 viewLogButton.setText("View Log");
                 updateLogButton.setEnabled(false);
                 updateLogButton.setVisibility(Button.GONE);
+                downloadLogButton.setEnabled(false);
             }
             
             // Check if busy
@@ -480,6 +493,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CREATE_LOG_FILE) {
+            handleLogDownloadResult(resultCode, data);
+            return;
+        }
         if (requestCode == REQUEST_SETTINGS && resultCode == RESULT_OK && data != null) {
             String configName = data.getStringExtra(SettingsActivity.EXTRA_CONFIG_NAME);
             if (configName != null) {
@@ -615,6 +632,7 @@ public class MainActivity extends Activity {
             viewLogButton.setText("Hide Log");
             updateLogButton.setEnabled(true);
             updateLogButton.setVisibility(Button.VISIBLE);
+            downloadLogButton.setEnabled(true);
             refreshLogView();
         } else {
             // Restore output view
@@ -622,6 +640,7 @@ public class MainActivity extends Activity {
             viewLogButton.setText("View Log");
             updateLogButton.setEnabled(false);
             updateLogButton.setVisibility(Button.GONE);
+            downloadLogButton.setEnabled(false);
             if (savedOutputText != null) {
                 outputView.setText(savedOutputText);
             }
@@ -636,23 +655,35 @@ public class MainActivity extends Activity {
         }
 
         new Thread(() -> {
-            StringBuilder sb = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line).append("\n");
-                }
-
-                final String logContent = sb.toString();
+            try {
+                final String logContent = readLatestLogLines(logFile, LOG_DISPLAY_MAX_LINES);
                 runOnUiThread(() -> {
                     outputView.setText(logContent);
-                    showToast("Displaying log file content");
+                    showToast("Displaying latest " + LOG_DISPLAY_MAX_LINES + " log lines");
                 });
             } catch (IOException e) {
                 Log.e(TAG, "Failed to read log file", e);
                 showToast("Failed to read log file: " + e.getMessage());
             }
         }).start();
+    }
+
+    private String readLatestLogLines(File logFile, int maxLines) throws IOException {
+        ArrayDeque<String> tail = new ArrayDeque<>(maxLines);
+        try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (tail.size() == maxLines) {
+                    tail.removeFirst();
+                }
+                tail.addLast(line);
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String line : tail) {
+            sb.append(line).append('\n');
+        }
+        return sb.toString();
     }
     
     private void clearLogFile() {
@@ -750,7 +781,7 @@ public class MainActivity extends Activity {
 
     private boolean isMaxDebugEnabled() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        int defaultLogLevel = BuildConfig.DEBUG ? 1 : 2;
+        int defaultLogLevel = LOG_LEVEL_INFO;
         return prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel) == LOG_LEVEL_MAX_DEBUG;
     }
 
@@ -842,6 +873,55 @@ public class MainActivity extends Activity {
         ClipData clip = ClipData.newPlainText(label, text);
         clipboard.setPrimaryClip(clip);
         showToast(label + " copied to clipboard");
+    }
+
+    private void downloadDisplayedLog() {
+        if (!isViewingLog) {
+            showToast("Open View Log first");
+            return;
+        }
+        String logContent = outputView.getText().toString();
+        if (logContent == null || logContent.trim().isEmpty()) {
+            showToast("No log content to download");
+            return;
+        }
+        pendingLogDownloadContent = logContent;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, "ollama-log-latest-100.txt");
+        startActivityForResult(intent, REQUEST_CREATE_LOG_FILE);
+    }
+
+    private void handleLogDownloadResult(int resultCode, Intent data) {
+        if (resultCode != RESULT_OK || data == null) {
+            pendingLogDownloadContent = null;
+            return;
+        }
+        Uri destinationUri = data.getData();
+        if (destinationUri == null) {
+            pendingLogDownloadContent = null;
+            showToast("No destination selected");
+            return;
+        }
+        String content = pendingLogDownloadContent;
+        pendingLogDownloadContent = null;
+        if (content == null || content.isEmpty()) {
+            showToast("No log content to save");
+            return;
+        }
+        try (OutputStream outputStream = getContentResolver().openOutputStream(destinationUri)) {
+            if (outputStream == null) {
+                showToast("Failed to open destination");
+                return;
+            }
+            outputStream.write(content.getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+            showToast("Log saved");
+        } catch (IOException | SecurityException e) {
+            Log.e(TAG, "Failed to save log file", e);
+            showToast("Failed to save log file: " + e.getMessage());
+        }
     }
     
     private void initApiServer() {

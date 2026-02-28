@@ -131,10 +131,11 @@ public class DocumentsActivity extends Activity {
         sb.append("- Send: 生成を開始します。モデル未ロード時は自動でロードを試みます。\n");
         sb.append("- Settings: 推論中（Busy）は自動的に無効化され、処理完了後に再び有効になります。\n");
         sb.append("- Re-init Model: 現在のモデルを解放して再初期化します。\n");
-        sb.append("- View Log: ログファイル内容を出力欄に表示します。\n");
+        sb.append("- View Log: ログファイルの最新100行を出力欄に表示します。\n");
         sb.append("- Clear Log: ログファイルを空にします。\n");
         sb.append("- Start/Stop API Server: APIサーバーを起動/停止します。\n");
-        sb.append("- Copy: 出力/ログをクリップボードへコピーします。\n");
+        sb.append("- Copy: 表示中の出力/ログをクリップボードへコピーします。\n");
+        sb.append("- Download: View Log表示中のログ（最新100行）を保存先を指定して保存します。\n");
         sb.append("- Processing Status/Logs: タイムスタンプ付きでログが表示されます。\n\n");
         sb.append("4. 設定画面の操作\n");
         sb.append("- Configuration Management: 設定の保存/削除/読み込みを行います。\n");
@@ -143,7 +144,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
         sb.append("- Prompt Template: System Promptとカスタムテンプレートを設定できます。カスタム未設定時はモデルファミリーから自動選択されます。\n");
         sb.append("- Llama API Server: サーバーポートを指定します。\n");
-        sb.append("- Log Settings: ログレベルを選択します。\n");
+        sb.append("- Log Settings: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
         sb.append("- Documents: 操作マニュアル、プライバシーポリシーを確認できます。\n");
         sb.append("- SAVE & CLOSE: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n");
@@ -210,10 +211,11 @@ public class DocumentsActivity extends Activity {
         sb.append("- Send: Start generation. If the model is not loaded, it will be loaded automatically.\n");
         sb.append("- Settings: Automatically disabled while inference is busy, and re-enabled when busy is cleared.\n");
         sb.append("- Re-init Model: Free and re-initialize the current model.\n");
-        sb.append("- View Log: Show the log file in the output area.\n");
+        sb.append("- View Log: Show the latest 100 lines from the log file in the output area.\n");
         sb.append("- Clear Log: Clear the log file.\n");
         sb.append("- Start/Stop API Server: Toggle the API server.\n");
-        sb.append("- Copy: Copy output/log to clipboard.\n");
+        sb.append("- Copy: Copy displayed output/log to clipboard.\n");
+        sb.append("- Download: While View Log is active, save the displayed log (latest 100 lines) to a location you choose.\n");
         sb.append("- Processing Status/Logs: Logs are displayed with timestamps.\n\n");
         sb.append("4. Settings Screen\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
@@ -222,7 +224,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt and custom chat template. When no custom template is set, one is auto-selected based on model family.\n");
         sb.append("- Llama API Server: Set server port.\n");
-        sb.append("- Log Settings: Select log level.\n");
+        sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
         sb.append("- Show License: Display license text.\n");
         sb.append("- Documents: View manual and privacy policy.\n");
         sb.append("- SAVE & CLOSE: Save current settings and apply them to the model immediately.\n");

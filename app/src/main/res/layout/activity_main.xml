@@ -180,6 +180,16 @@
             android:minWidth="60dp"
             android:minHeight="32dp" />
 
+        <Button
+            android:id="@+id/downloadLogButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Download"
+            android:textSize="12sp"
+            android:minWidth="60dp"
+            android:minHeight="32dp"
+            android:layout_marginStart="4dp" />
+
     </LinearLayout>
 
     <FrameLayout

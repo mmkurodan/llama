@@ -18,7 +18,6 @@ public class ModelManager {
     private static final String TAG = "ModelManager";
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
-    private static final int DEFAULT_LOG_LEVEL_DEBUG = 1;
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
     
     private static ModelManager instance;
@@ -58,7 +57,7 @@ public class ModelManager {
         }
 
         SharedPreferences prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        int defaultLogLevel = BuildConfig.DEBUG ? DEFAULT_LOG_LEVEL_DEBUG : DEFAULT_LOG_LEVEL_INFO;
+        int defaultLogLevel = DEFAULT_LOG_LEVEL_INFO;
         int savedLogLevel = prefs.contains(PREF_LOG_LEVEL)
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
                 : defaultLogLevel;
