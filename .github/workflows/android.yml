@@ -20,7 +20,7 @@ jobs:
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26b
+          ndk-version: r28b
 
       - name: Build mbedTLS for arm64 (with -fPIC)
         run: |
@@ -47,6 +47,7 @@ jobs:
             -DENABLE_TESTING=OFF \
             -DENABLE_PROGRAMS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
             -DCMAKE_C_FLAGS="-fPIC" \
             -DCMAKE_CXX_FLAGS="-fPIC" \
             -DCMAKE_INSTALL_PREFIX=$PWD/install
@@ -74,7 +75,7 @@ jobs:
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26b
+          ndk-version: r28b
 
       - name: Download mbedTLS artifact
         uses: actions/download-artifact@v4
@@ -98,6 +99,7 @@ jobs:
           export CXX=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang++
           export AR=$TOOLCHAIN/bin/llvm-ar
           export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export LDFLAGS="-Wl,-z,max-page-size=16384"
 
           ./configure \
             --host=aarch64-linux-android \
@@ -144,14 +146,14 @@ jobs:
           name: libcurl-arm64
           path: app/src/main/cpp/third_party/libcurl
 
-      - name: Download Gradle 8.4
+      - name: Download Gradle 8.7
         run: |
-          wget https://services.gradle.org/distributions/gradle-8.4-bin.zip
-          unzip gradle-8.4-bin.zip
-          echo "$PWD/gradle-8.4/bin" >> $GITHUB_PATH
+          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip gradle-8.7-bin.zip
+          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
 
-      - name: Generate Gradle Wrapper (8.4)
-        run: gradle wrapper --gradle-version 8.4
+      - name: Generate Gradle Wrapper (8.7)
+        run: gradle wrapper --gradle-version 8.7
 
       - name: Build debug APK
         run: |
@@ -166,6 +168,17 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Verify .so files and 16KB ELF alignment
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          unzip -q -o "$APK" "lib/*/*.so" -d /tmp/apk-check
+          mapfile -t so_files < <(find /tmp/apk-check/lib -name '*.so' | sort)
+          test ${#so_files[@]} -gt 0
+          for so in "${so_files[@]}"; do
+            readelf -l "$so" | awk '/LOAD/ {print $NF}' | grep -qE '^0x0*4000$'
+          done
 
       - name: Build AAB (bundleRelease)
         run: |

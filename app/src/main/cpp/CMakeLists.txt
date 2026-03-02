@@ -118,6 +118,12 @@ target_compile_definitions(
     GGML_USE_K_QUANTS
 )
 
+target_link_options(
+    llama_jni
+    PRIVATE
+    -Wl,-z,max-page-size=16384
+)
+
 # ---------------------------------------------------------
 # include directories
 # ---------------------------------------------------------

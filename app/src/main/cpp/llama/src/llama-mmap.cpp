@@ -307,11 +307,11 @@ struct llama_mmap::impl {
     }
 
     static void align_range(size_t * first, size_t * last, size_t page_size) {
-        size_t offset_in_page = *first & (page_size - 1);
+        size_t offset_in_page = *first % page_size;
         size_t offset_to_page = offset_in_page == 0 ? 0 : page_size - offset_in_page;
         *first += offset_to_page;
 
-        *last = *last & ~(page_size - 1);
+        *last -= *last % page_size;
 
         if (*last <= *first) {
             *last = *first;
