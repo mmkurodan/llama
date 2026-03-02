@@ -173,6 +173,7 @@ target_link_options(
     PRIVATE
     -Wl,-z,max-page-size=16384
     -Wl,-z,common-page-size=16384
+    -Wl,-align-segments=0x4000
 )
 
 target_link_libraries(
