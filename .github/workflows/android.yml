@@ -149,14 +149,14 @@ jobs:
         with:
           ndk-version: r29
 
-      - name: Download Gradle 8.7
+      - name: Download Gradle 8.6
         run: |
-          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip gradle-8.7-bin.zip
-          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
+          wget https://services.gradle.org/distributions/gradle-8.6-bin.zip
+          unzip gradle-8.6-bin.zip
+          echo "$PWD/gradle-8.6/bin" >> $GITHUB_PATH
 
-      - name: Generate Gradle Wrapper (8.7)
-        run: gradle wrapper --gradle-version 8.7
+      - name: Generate Gradle Wrapper (8.6)
+        run: gradle wrapper --gradle-version 8.6
 
       - name: Build debug APK
         run: |
