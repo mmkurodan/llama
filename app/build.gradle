@@ -54,7 +54,9 @@ android {
         }
     }
 
-    ndkVersion "26.1.10909125"
+    // Nativeライブラリを含むため最新NDK系（r29）を固定
+    // ※ Java/KotlinのみのアプリでNDKを使わない場合は compileSdk/targetSdk 35 のビルド対応で十分
+    ndkVersion "29.0.13113456"
 }
 
 dependencies {
