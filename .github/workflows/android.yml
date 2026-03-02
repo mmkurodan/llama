@@ -194,7 +194,7 @@ jobs:
             tmp_so="$(mktemp)"
             unzip -p "$APK" "$so" > "$tmp_so"
 
-            if ! "$READELF" -l "$tmp_so" | awk '/LOAD/ && $NF != "0x4000" { bad=1 } END { exit bad }'; then
+            if ! "$READELF" -l "$tmp_so" | awk '/LOAD/ { if ($0 !~ /0x4000[[:space:]]*$/) bad=1 } END { exit bad }'; then
               echo "❌ $so has a LOAD segment without 0x4000 alignment"
               "$READELF" -l "$tmp_so" | grep LOAD
               rm -f "$tmp_so"
