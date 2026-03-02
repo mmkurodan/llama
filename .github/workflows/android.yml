@@ -177,7 +177,21 @@ jobs:
           mapfile -t so_files < <(find /tmp/apk-check/lib -name '*.so' | sort)
           test ${#so_files[@]} -gt 0
           for so in "${so_files[@]}"; do
-            readelf -l "$so" | awk '/LOAD/ {print $NF}' | grep -qE '^0x0*4000$'
+            readelf -l "$so" | awk -v so="$so" '
+              /LOAD/ {
+                found=1
+                if ($NF !~ /^0x0*4000$/) {
+                  printf("Invalid LOAD alignment %s in %s\n", $NF, so)
+                  exit 1
+                }
+              }
+              END {
+                if (!found) {
+                  printf("No LOAD segments found in %s\n", so)
+                  exit 1
+                }
+              }
+            '
           done
 
       - name: Build AAB (bundleRelease)
