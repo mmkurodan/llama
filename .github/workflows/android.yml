@@ -158,6 +158,32 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace --info
 
+      - name: Verify .so files and 16KB ELF alignment
+        run: |
+          set -e
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p /tmp/apk_so
+          unzip -o "$APK" 'lib/*.so' -d /tmp/apk_so
+
+          FAILED=0
+          for so in $(find /tmp/apk_so -name "*.so"); do
+            echo "Checking: $so"
+            while IFS= read -r align; do
+              if [ "$align" != "0x4000" ]; then
+                echo "  ERROR: LOAD alignment is $align (expected 0x4000)"
+                FAILED=1
+              else
+                echo "  OK: LOAD alignment is $align"
+              fi
+            done < <(readelf -l "$so" | awk '/^ +LOAD /{print $NF}')
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "FAILED: One or more .so files have incorrect 16KB LOAD alignment"
+            exit 1
+          fi
+          echo "All .so files have correct 16KB LOAD alignment (0x4000)"
+
       - name: Build release APK
         run: |
           chmod +x gradlew
