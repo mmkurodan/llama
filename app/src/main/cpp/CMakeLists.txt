@@ -167,6 +167,10 @@ set_target_properties(mbedx509 PROPERTIES
 
 # ---------------------------------------------------------
 # link
+# NOTE: Use -Wl,-z,max-page-size=16384 and -Wl,-z,common-page-size=16384 for
+# 16KB page-size support on Android (required for Android 15+ devices).
+# Do NOT use -Wl,-align-segments=0x4000: that flag is unsupported by the
+# Android NDK's ld.lld and causes: error: unknown argument '-align-segments=0x4000'.
 # ---------------------------------------------------------
 target_link_options(
     llama_jni
