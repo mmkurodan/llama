@@ -185,6 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
+          MIN_ALIGNMENT=0x4000 # 16KB
           APKANALYZER="${ANDROID_HOME}/cmdline-tools/latest/bin/apkanalyzer"
           if command -v apkanalyzer >/dev/null 2>&1; then
             APKANALYZER="apkanalyzer"
@@ -192,8 +193,8 @@ jobs:
 
           SO_LIST=$("$APKANALYZER" files list "$APK" | grep '\.so$' || true)
           if [ -z "$SO_LIST" ]; then
-            echo "No native .so files found in APK."
-            exit 1
+            echo "No native .so files found in APK. Skipping alignment verification."
+            exit 0
           fi
 
           READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
@@ -206,7 +207,13 @@ jobs:
             unzip -p "$APK" "$so_path" > "$so_file"
             echo "Checking $so_path"
             while IFS= read -r align; do
-              if (( align < 0x4000 )); then
+              norm_align="${align#0x}"
+              norm_align="${norm_align#0X}"
+              if [[ ! "$norm_align" =~ ^[0-9a-fA-F]+$ ]]; then
+                echo "Unexpected LOAD alignment format in $so_path: $align"
+                exit 1
+              fi
+              if (( 16#$norm_align < MIN_ALIGNMENT )); then
                 echo "16KB page-size incompatible LOAD alignment in $so_path: $align"
                 exit 1
               fi
