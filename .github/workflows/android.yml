@@ -176,15 +176,9 @@ jobs:
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
-          APKANALYZER="$(find "$ANDROID_HOME/build-tools" -type f -name apkanalyzer | sort -V | tail -n 1)"
           READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
 
-          if [ -z "$APKANALYZER" ]; then
-            echo "apkanalyzer not found under \$ANDROID_HOME/build-tools"
-            exit 1
-          fi
-
-          mapfile -t SO_FILES < <("$APKANALYZER" files list "$APK" | grep -E '^lib/.+\.so$' || true)
+          mapfile -t SO_FILES < <(unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true)
           if [ ${#SO_FILES[@]} -eq 0 ]; then
             echo "No native .so files found in $APK"
             exit 0
