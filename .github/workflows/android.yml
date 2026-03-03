@@ -20,7 +20,7 @@ jobs:
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26b
+          ndk-version: r27
 
       - name: Build mbedTLS for arm64 (with -fPIC)
         run: |
@@ -74,7 +74,7 @@ jobs:
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26b
+          ndk-version: r27
 
       - name: Download mbedTLS artifact
         uses: actions/download-artifact@v4
@@ -144,14 +144,19 @@ jobs:
           name: libcurl-arm64
           path: app/src/main/cpp/third_party/libcurl
 
-      - name: Download Gradle 8.4
-        run: |
-          wget https://services.gradle.org/distributions/gradle-8.4-bin.zip
-          unzip gradle-8.4-bin.zip
-          echo "$PWD/gradle-8.4/bin" >> $GITHUB_PATH
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27
 
-      - name: Generate Gradle Wrapper (8.4)
-        run: gradle wrapper --gradle-version 8.4
+      - name: Download Gradle 8.7
+        run: |
+          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip gradle-8.7-bin.zip
+          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
+
+      - name: Generate Gradle Wrapper (8.7)
+        run: gradle wrapper --gradle-version 8.7
 
       - name: Build debug APK
         run: |
@@ -166,6 +171,33 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Verify .so 16KB compatibility with ApkAnalyzer
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+
+          mapfile -t SO_FILES < <(unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true)
+          if [ ${#SO_FILES[@]} -eq 0 ]; then
+            echo "No native .so files found in $APK"
+            exit 0
+          fi
+
+          for so in "${SO_FILES[@]}"; do
+            tmp_so="$(mktemp)"
+            unzip -p "$APK" "$so" > "$tmp_so"
+
+            if ! "$READELF" -l "$tmp_so" | awk '/LOAD/ { if ($0 !~ /0x4000[[:space:]]*$/) bad=1 } END { exit bad }'; then
+              echo "❌ $so has a LOAD segment without 0x4000 alignment"
+              "$READELF" -l "$tmp_so" | grep LOAD
+              rm -f "$tmp_so"
+              exit 1
+            fi
+
+            echo "✅ $so has 16KB (0x4000) LOAD alignment"
+            rm -f "$tmp_so"
+          done
 
       - name: Build AAB (bundleRelease)
         run: |
