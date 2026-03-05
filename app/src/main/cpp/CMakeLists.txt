@@ -55,10 +55,15 @@ file(GLOB LLAMA_SRC_FILES
     ${LLAMA_ROOT_DIR}/src/*.cpp
 )
 
+file(GLOB LLAMA_MODEL_FILES
+    ${LLAMA_ROOT_DIR}/src/models/*.cpp
+)
+
 set(LLAMA_SOURCES
     ${LLAMA_ROOT_FILES}
     ${LLAMA_COMMON_FILES}
     ${LLAMA_SRC_FILES}
+    ${LLAMA_MODEL_FILES}
     ${CMAKE_CURRENT_BINARY_DIR}/build-info.cpp
 )
 
@@ -73,6 +78,7 @@ set(GGML_SOURCES
     ${GGML_ROOT_DIR}/src/ggml-opt.cpp
     ${GGML_ROOT_DIR}/src/ggml-threading.cpp
     ${GGML_ROOT_DIR}/src/gguf.cpp
+    ${GGML_ROOT_DIR}/src/ggml-backend-dl.cpp
     ${GGML_ROOT_DIR}/src/ggml-backend.cpp
     ${GGML_ROOT_DIR}/src/ggml-backend-reg.cpp
 
@@ -190,5 +196,6 @@ target_link_libraries(
     android
     jnigraphics
     m
+    dl
     atomic
 )
