@@ -59,7 +59,7 @@ set(LLAMA_SOURCES
 )
 
 # ---------------------------------------------------------
-# GGML sources (旧構造 GGML に合わせる)
+# GGML sources (updated for llama.cpp b8204)
 # ---------------------------------------------------------
 set(GGML_SOURCES
     ${GGML_ROOT_DIR}/src/ggml.c
@@ -83,16 +83,10 @@ set(GGML_SOURCES
     ${GGML_ROOT_DIR}/src/ggml-cpu/binary-ops.cpp
     ${GGML_ROOT_DIR}/src/ggml-cpu/hbm.cpp
 
-    # ★ 旧構造 GGML：ARM は quants.c のみ存在
+    # ARM architecture support
     ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/quants.c
     ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/repack.cpp
-)
-
-# ---------------------------------------------------------
-# vendor sources (xxhash)
-# ---------------------------------------------------------
-file(GLOB VENDOR_SOURCES
-    ${LLAMA_ROOT_DIR}/vendor/xxhash/*.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/cpu-feats.cpp
 )
 
 # ---------------------------------------------------------
@@ -106,7 +100,6 @@ add_library(
 
     ${LLAMA_SOURCES}
     ${GGML_SOURCES}
-    ${VENDOR_SOURCES}
 )
 
 # ---------------------------------------------------------
