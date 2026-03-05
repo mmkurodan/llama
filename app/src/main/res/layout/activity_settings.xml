@@ -663,6 +663,30 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="Chat Template Kwargs (JSON):"
+            android:paddingTop="12dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Equivalent to --chat-template-kwargs. Example: {&quot;enable_thinking&quot;: false}"
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/chatTemplateKwargsInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="{&quot;enable_thinking&quot;: false}"
+            android:text="{&quot;enable_thinking&quot;: false}"
+            android:inputType="text"
+            android:singleLine="true" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Auto-selected Prompt Template:"
             android:paddingTop="12dp"
             android:paddingBottom="4dp" />

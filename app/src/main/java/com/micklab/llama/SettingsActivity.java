@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_CHAT_TEMPLATE_KWARGS;
 import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
 
 public class SettingsActivity extends Activity {
@@ -92,6 +93,7 @@ public class SettingsActivity extends Activity {
     // New prompt settings
     private EditText systemPromptInput;
     private EditText customChatTemplateInput;
+    private EditText chatTemplateKwargsInput;
     
     // API Server settings
     private EditText apiPortInput;
@@ -204,6 +206,7 @@ public class SettingsActivity extends Activity {
         // New prompt settings
         systemPromptInput = findViewById(R.id.systemPromptInput);
         customChatTemplateInput = findViewById(R.id.customChatTemplateInput);
+        chatTemplateKwargsInput = findViewById(R.id.chatTemplateKwargsInput);
         
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
@@ -420,6 +423,7 @@ public class SettingsActivity extends Activity {
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
         customChatTemplateInput.setText(config.customChatTemplate != null ? config.customChatTemplate : "");
+        chatTemplateKwargsInput.setText(config.chatTemplateKwargs != null ? config.chatTemplateKwargs : DEFAULT_CHAT_TEMPLATE_KWARGS);
         updateAutoTemplatePreview(config);
     }
 
@@ -618,6 +622,10 @@ public class SettingsActivity extends Activity {
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();
         config.customChatTemplate = customChatTemplateInput.getText().toString();
+        config.chatTemplateKwargs = chatTemplateKwargsInput.getText().toString().trim();
+        if (config.chatTemplateKwargs.isEmpty()) {
+            config.chatTemplateKwargs = DEFAULT_CHAT_TEMPLATE_KWARGS;
+        }
         
         return config;
     }

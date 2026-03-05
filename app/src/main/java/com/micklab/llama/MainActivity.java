@@ -308,7 +308,16 @@ public class MainActivity extends Activity {
             }
 
             // Apply prompt template
-            final String chatPrompt = applyPromptTemplate(userPrompt);
+            final String chatPrompt;
+            try {
+                chatPrompt = applyPromptTemplate(userPrompt);
+            } catch (RuntimeException e) {
+                modelManager.release();
+                updateSettingsButtonForBusyState();
+                appendException("Prompt build error", e);
+                showToast("Prompt build error: " + (e.getMessage() != null ? e.getMessage() : "unknown"));
+                return;
+            }
             logMaxDebugPayload("direct.prompt", chatPrompt);
 
             appendMessage("Running generate...");
@@ -391,7 +400,16 @@ public class MainActivity extends Activity {
     }
     
     private void processGeneration(String userPrompt) {
-        final String chatPrompt = applyPromptTemplate(userPrompt);
+        final String chatPrompt;
+        try {
+            chatPrompt = applyPromptTemplate(userPrompt);
+        } catch (RuntimeException e) {
+            appendException("Prompt build error", e);
+            showToast("Prompt build error: " + (e.getMessage() != null ? e.getMessage() : "unknown"));
+            modelManager.release();
+            runOnUiThread(this::updateSettingsButtonForBusyState);
+            return;
+        }
         logMaxDebugPayload("direct.prompt", chatPrompt);
         
         runOnUiThread(() -> {
@@ -766,6 +784,7 @@ public class MainActivity extends Activity {
         String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
         String customTemplate = (currentConfig != null) ? currentConfig.customChatTemplate : null;
         String settingsSystemPrompt = (currentConfig != null) ? currentConfig.systemPrompt : null;
+        String chatTemplateKwargs = (currentConfig != null) ? currentConfig.chatTemplateKwargs : null;
         String modelPath = modelManager.getCurrentModelPath();
 
         PromptTemplateManager.PromptBuildResult result =
@@ -774,6 +793,7 @@ public class MainActivity extends Activity {
                         customTemplate,
                         ggufChatTemplate,
                         settingsSystemPrompt,
+                        chatTemplateKwargs,
                         modelPath);
         logTemplateSelection("direct", result.selection);
         return result.prompt;
