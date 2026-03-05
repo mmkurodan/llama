@@ -28,6 +28,10 @@ set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
+# ggml.c expects these string macros to be defined at compile time.
+set(GGML_VERSION      "0.9.7"   CACHE STRING "")
+set(GGML_BUILD_COMMIT "unknown" CACHE STRING "")
+
 # ---------------------------------------------------------
 # build-info.cpp を生成
 # ---------------------------------------------------------
@@ -109,6 +113,8 @@ target_compile_definitions(
     llama_jni
     PRIVATE
     GGML_USE_K_QUANTS
+    GGML_VERSION="${GGML_VERSION}"
+    GGML_COMMIT="${GGML_BUILD_COMMIT}"
 )
 
 # ---------------------------------------------------------
