@@ -1,6 +1,7 @@
 package com.micklab.llama;
 
 import android.app.Application;
+import android.os.Process;
 import android.util.Log;
 
 import java.io.File;
@@ -14,11 +15,13 @@ import java.util.Locale;
 public class LlamaApplication extends Application {
 
     private static final String TAG = "LlamaApplication";
+    private static final String LOG_FILENAME = "ollama.log";
     private static final String CRASH_LOG_FILENAME = "last_crash.txt";
 
     @Override
     public void onCreate() {
         super.onCreate();
+        configureNativeLogging();
 
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();
@@ -36,19 +39,41 @@ public class LlamaApplication extends Application {
                 e.printStackTrace(pw);
                 pw.flush();
 
-                File crashFile = new File(getFilesDir(), CRASH_LOG_FILENAME);
+                File crashFile = getCrashLogFile();
                 try (FileWriter fw = new FileWriter(crashFile, false)) {
                     fw.write(sw.toString());
                 }
                 Log.e(TAG, "Crash log written to " + crashFile.getAbsolutePath());
-            } catch (Throwable ignored) {
-                // Best-effort — don't make things worse
+            } catch (Throwable logError) {
+                Log.e(TAG, "Failed to persist Java crash log", logError);
             }
 
             // Delegate to the system default handler so the process terminates normally
             if (defaultHandler != null) {
                 defaultHandler.uncaughtException(t, e);
+                return;
             }
+
+            Process.killProcess(Process.myPid());
+            System.exit(10);
         });
+    }
+
+    private void configureNativeLogging() {
+        try {
+            File logFile = new File(getAppFilesDir(), LOG_FILENAME);
+            new LlamaNative().setLogPath(logFile.getAbsolutePath());
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to configure native logging", t);
+        }
+    }
+
+    private File getCrashLogFile() {
+        return new File(getAppFilesDir(), CRASH_LOG_FILENAME);
+    }
+
+    private File getAppFilesDir() {
+        File externalDir = getExternalFilesDir(null);
+        return externalDir != null ? externalDir : getFilesDir();
     }
 }

@@ -11,6 +11,9 @@
 #include <cerrno>
 #include <cstring>
 #include <cctype>
+#include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <android/log.h>
 #define LOG_TAG "LLAMA_JNI"
@@ -43,6 +46,10 @@ static std::mutex g_log_mutex;
 static std::string g_log_path;
 static std::ofstream g_log_ofs;
 static std::atomic<int> g_log_level(GGML_LOG_LEVEL_INFO);
+static volatile sig_atomic_t g_signal_log_fd = -1;
+static volatile sig_atomic_t g_signal_crash_fd = -1;
+static std::atomic<bool> g_fatal_signal_handlers_installed(false);
+static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 
 // 設定
 static int   g_n_ctx      = 2048;
@@ -130,6 +137,142 @@ static bool should_log_debug() {
 
 static bool is_max_debug_mode() {
     return g_log_level.load() == GGML_LOG_LEVEL_NONE;
+}
+
+static size_t append_literal(char * buffer, size_t offset, size_t capacity, const char * text) {
+    if (!text || offset >= capacity) {
+        return offset;
+    }
+    while (*text != '\0' && offset < capacity) {
+        buffer[offset++] = *text++;
+    }
+    return offset;
+}
+
+static size_t append_decimal(char * buffer, size_t offset, size_t capacity, int value) {
+    if (offset >= capacity) {
+        return offset;
+    }
+    if (value == 0) {
+        if (offset < capacity) {
+            buffer[offset++] = '0';
+        }
+        return offset;
+    }
+
+    unsigned int magnitude;
+    if (value < 0) {
+        if (offset < capacity) {
+            buffer[offset++] = '-';
+        }
+        magnitude = static_cast<unsigned int>(-(value + 1)) + 1u;
+    } else {
+        magnitude = static_cast<unsigned int>(value);
+    }
+
+    char digits[16];
+    size_t count = 0;
+    while (magnitude > 0 && count < sizeof(digits)) {
+        digits[count++] = static_cast<char>('0' + (magnitude % 10u));
+        magnitude /= 10u;
+    }
+    while (count > 0 && offset < capacity) {
+        buffer[offset++] = digits[--count];
+    }
+    return offset;
+}
+
+static const char * fatal_signal_name(int signo) {
+    switch (signo) {
+        case SIGABRT: return "SIGABRT";
+        case SIGBUS:  return "SIGBUS";
+        case SIGFPE:  return "SIGFPE";
+        case SIGILL:  return "SIGILL";
+        case SIGSEGV: return "SIGSEGV";
+        default:      return "UNKNOWN";
+    }
+}
+
+static void write_best_effort(int fd, const char * buffer, size_t length) {
+    if (fd < 0 || !buffer || length == 0) {
+        return;
+    }
+    size_t written = 0;
+    while (written < length) {
+        const ssize_t rc = write(fd, buffer + written, length - written);
+        if (rc > 0) {
+            written += static_cast<size_t>(rc);
+            continue;
+        }
+        if (rc < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+}
+
+static void write_native_crash_marker(int fd, int signo) {
+    char buffer[256];
+    size_t len = 0;
+    len = append_literal(buffer, len, sizeof(buffer), "\n=== Native fatal signal ===\nSignal: ");
+    len = append_literal(buffer, len, sizeof(buffer), fatal_signal_name(signo));
+    len = append_literal(buffer, len, sizeof(buffer), " (");
+    len = append_decimal(buffer, len, sizeof(buffer), signo);
+    len = append_literal(buffer, len, sizeof(buffer), ")\nThe process aborted before Java crash handlers could run.\nSee ollama.log for the preceding JNI/llama.cpp lines.\n");
+    write_best_effort(fd, buffer, len);
+}
+
+static void native_fatal_signal_handler(int signo, siginfo_t *, void *) {
+    const int saved_errno = errno;
+    const int crash_fd = static_cast<int>(g_signal_crash_fd);
+    const int log_fd = static_cast<int>(g_signal_log_fd);
+
+    write_native_crash_marker(crash_fd, signo);
+    if (log_fd >= 0 && log_fd != crash_fd) {
+        write_native_crash_marker(log_fd, signo);
+    }
+
+    errno = saved_errno;
+    kill(getpid(), signo);
+    _exit(128 + signo);
+}
+
+static void ensure_fatal_signal_handlers_installed() {
+    if (g_fatal_signal_handlers_installed.exchange(true)) {
+        return;
+    }
+
+    struct sigaction action = {};
+    sigemptyset(&action.sa_mask);
+    action.sa_sigaction = native_fatal_signal_handler;
+    action.sa_flags = SA_SIGINFO | SA_RESETHAND | SA_NODEFER;
+
+    const int fatal_signals[] = {SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV};
+    for (const int signo : fatal_signals) {
+        sigaction(signo, &action, nullptr);
+    }
+}
+
+static std::string derive_crash_log_path(const std::string & log_path) {
+    if (log_path.empty()) {
+        return "";
+    }
+    const size_t slash = log_path.find_last_of("/\\");
+    if (slash == std::string::npos) {
+        return NATIVE_CRASH_LOG_FILENAME;
+    }
+    return log_path.substr(0, slash + 1) + NATIVE_CRASH_LOG_FILENAME;
+}
+
+static void replace_signal_fd(volatile sig_atomic_t * target, int new_fd) {
+    if (!target || new_fd < 0) {
+        return;
+    }
+    const int old_fd = static_cast<int>(*target);
+    *target = static_cast<sig_atomic_t>(new_fd);
+    if (old_fd >= 0 && old_fd != new_fd) {
+        close(old_fd);
+    }
 }
 
 // Return the last index that ends on a valid UTF-8 boundary (trims incomplete trailing bytes).
@@ -385,8 +528,13 @@ Java_com_micklab_llama_LlamaNative_setLogPath(
         JNIEnv *env, jobject, jstring jLogPath) {
 
     std::string path = jstring_to_std(env, jLogPath);
+    ensure_fatal_signal_handlers_installed();
     {
         std::lock_guard<std::mutex> lock(g_log_mutex);
+        if (path == g_log_path && g_log_ofs.is_open() &&
+                g_signal_log_fd >= 0 && g_signal_crash_fd >= 0) {
+            return;
+        }
         if (g_log_ofs.is_open()) {
             g_log_ofs << current_time_str() << " [JNI] Log reopened with path: " << path << std::endl;
             g_log_ofs.close();
@@ -399,6 +547,29 @@ Java_com_micklab_llama_LlamaNative_setLogPath(
                 g_log_ofs.flush();
             } else {
                 LOGE("Failed to open log file: %s", g_log_path.c_str());
+            }
+        }
+
+        if (!g_log_path.empty()) {
+            const int signal_log_fd = open(g_log_path.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+            if (signal_log_fd >= 0) {
+                replace_signal_fd(&g_signal_log_fd, signal_log_fd);
+            } else {
+                LOGE("Failed to open signal log file: %s", g_log_path.c_str());
+            }
+
+            const std::string crash_path = derive_crash_log_path(g_log_path);
+            if (!crash_path.empty()) {
+                const int signal_crash_fd = open(crash_path.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+                if (signal_crash_fd >= 0) {
+                    replace_signal_fd(&g_signal_crash_fd, signal_crash_fd);
+                    if (g_log_ofs) {
+                        g_log_ofs << current_time_str() << " [JNI] Native crash log path: " << crash_path << std::endl;
+                        g_log_ofs.flush();
+                    }
+                } else {
+                    LOGE("Failed to open native crash log file: %s", crash_path.c_str());
+                }
             }
         }
     }
@@ -841,10 +1012,10 @@ Java_com_micklab_llama_LlamaNative_generate(
     const int max_tokens = 1024;
 
     llama_memory_t mem = llama_get_memory(g_ctx);
-    llama_memory_seq_rm(mem, -1, 0, -1);
+    llama_memory_clear(mem, false);
     {
         std::ostringstream ss;
-        ss << "generate: kv cache cleared; ctx=" << g_n_ctx;
+        ss << "generate: memory cleared; ctx=" << g_n_ctx;
         log_to_file(ss.str());
     }
 

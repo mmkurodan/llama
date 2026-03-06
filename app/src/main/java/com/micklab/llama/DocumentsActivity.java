@@ -286,7 +286,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 設定情報（モデルURL、各種パラメータ、APIポート、ログレベル）\n");
         sb.append("- 構成ファイル（configs/*.json）\n");
         sb.append("- ダウンロードしたモデルファイル\n");
-        sb.append("- ログファイル（ollama.log）\n\n");
+        sb.append("- ログファイル（ollama.log、Javaクラッシュ時は last_crash.txt、ネイティブクラッシュ時は native_crash.txt）\n\n");
 
         sb.append("また、アプリの生成機能を利用する際、ユーザーが入力したテキスト（会話内容）は、端末内または同一ローカルネットワーク内で動作するローカル API に送信されます。このデータは外部サーバーへ送信されず、保存も行いません。\n\n");
 
@@ -322,7 +322,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Configuration data (model URL, parameters, API port, log level)\n");
         sb.append("- Configuration files (configs/*.json)\n");
         sb.append("- Downloaded model files\n");
-        sb.append("- Log file (ollama.log)\n\n");
+        sb.append("- Log files (ollama.log, last_crash.txt for Java crashes, and native_crash.txt for native crashes)\n\n");
 
         sb.append("When using the generation features, the text entered by the user (conversation content) is sent to a local API running on the device or within the same local network. This data is not transmitted to external servers and is not stored.\n\n");
 

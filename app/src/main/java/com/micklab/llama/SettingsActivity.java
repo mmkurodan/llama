@@ -706,6 +706,8 @@ public class SettingsActivity extends Activity {
                 if (file.isFile()
                         && file.length() > 0
                         && !"ollama.log".equals(file.getName())
+                        && !"last_crash.txt".equals(file.getName())
+                        && !"native_crash.txt".equals(file.getName())
                         && !containsFile(modelFiles, file)) {
                     modelFiles.add(file);
                 }
