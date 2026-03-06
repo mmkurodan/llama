@@ -784,7 +784,6 @@ public class MainActivity extends Activity {
         String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
         String customTemplate = (currentConfig != null) ? currentConfig.customChatTemplate : null;
         String settingsSystemPrompt = (currentConfig != null) ? currentConfig.systemPrompt : null;
-        String chatTemplateKwargs = (currentConfig != null) ? currentConfig.chatTemplateKwargs : null;
         String modelPath = modelManager.getCurrentModelPath();
 
         PromptTemplateManager.PromptBuildResult result =
@@ -793,7 +792,6 @@ public class MainActivity extends Activity {
                         customTemplate,
                         ggufChatTemplate,
                         settingsSystemPrompt,
-                        chatTemplateKwargs,
                         modelPath);
         logTemplateSelection("direct", result.selection);
         return result.prompt;

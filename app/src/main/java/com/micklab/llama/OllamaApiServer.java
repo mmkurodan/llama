@@ -492,7 +492,6 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
-                String chatTemplateKwargs = (config != null) ? config.chatTemplateKwargs : null;
                 String modelPath = modelManager.getCurrentModelPath();
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
@@ -502,7 +501,6 @@ public class OllamaApiServer {
                                 customTemplate,
                                 ggufChatTemplate,
                                 settingsSystemPrompt,
-                                chatTemplateKwargs,
                                 modelPath);
                 logTemplateSelection("generate", promptResult.selection);
                 String promptToUse = promptResult.prompt;
@@ -730,7 +728,6 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
-                String chatTemplateKwargs = (config != null) ? config.chatTemplateKwargs : null;
                 String modelPath = modelManager.getCurrentModelPath();
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
@@ -739,7 +736,6 @@ public class OllamaApiServer {
                                 customTemplate,
                                 ggufChatTemplate,
                                 settingsSystemPrompt,
-                                chatTemplateKwargs,
                                 modelPath);
                 logTemplateSelection("chat", promptResult.selection);
                 String promptToUse = promptResult.prompt;

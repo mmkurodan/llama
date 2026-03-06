@@ -25,7 +25,6 @@ public class ConfigurationManager {
     public static class Configuration {
         // Default constant for DRY sequence breakers (must match C++ DEFAULT_DRY_SEQUENCE_BREAKERS)
         public static final String DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
-        public static final String DEFAULT_CHAT_TEMPLATE_KWARGS = "{\"enable_thinking\": false}";
         
         public String name;
         public String modelUrl;
@@ -40,7 +39,6 @@ public class ConfigurationManager {
         // New settings for prompt generation
         public String systemPrompt;          // 前提プロンプト (system prompt)
         public String customChatTemplate;    // カスタムプロンプトテンプレート
-        public String chatTemplateKwargs;    // --chat-template-kwargs equivalent
         
         // Penalty parameters
         public int penaltyLastN;
@@ -117,7 +115,6 @@ public class ConfigurationManager {
             // New prompt settings defaults
             systemPrompt = "";           // Empty by default
             customChatTemplate = "";     // Empty by default (use auto-detection)
-            chatTemplateKwargs = DEFAULT_CHAT_TEMPLATE_KWARGS;
         }
         
         public Configuration(String name) {
@@ -170,7 +167,6 @@ public class ConfigurationManager {
             // New prompt settings
             json.put("systemPrompt", systemPrompt);
             json.put("customChatTemplate", customChatTemplate);
-            json.put("chatTemplateKwargs", chatTemplateKwargs);
             
             return json;
         }
@@ -220,7 +216,6 @@ public class ConfigurationManager {
             // New prompt settings (with defaults for backward compatibility)
             config.systemPrompt = json.optString("systemPrompt", "");
             config.customChatTemplate = json.optString("customChatTemplate", "");
-            config.chatTemplateKwargs = json.optString("chatTemplateKwargs", DEFAULT_CHAT_TEMPLATE_KWARGS);
             
             return config;
         }

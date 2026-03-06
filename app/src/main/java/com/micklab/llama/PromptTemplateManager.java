@@ -292,49 +292,6 @@ public class PromptTemplateManager {
 
         return new SystemPromptResult(null, "none");
     }
-
-    public static boolean isThinkingEnabled(String chatTemplateKwargs) {
-        if (chatTemplateKwargs == null) {
-            return true;
-        }
-        String kwargs = chatTemplateKwargs.trim();
-        if (kwargs.isEmpty()) {
-            return true;
-        }
-        if (!kwargs.startsWith("{") || !kwargs.endsWith("}")) {
-            return true;
-        }
-        try {
-            JSONObject json = new JSONObject(kwargs);
-            if (!json.has("enable_thinking")) {
-                return true;
-            }
-            Object value = json.get("enable_thinking");
-            if (value instanceof Boolean) {
-                return (Boolean) value;
-            }
-            if (value instanceof String) {
-                return !"false".equalsIgnoreCase(((String) value).trim());
-            }
-        } catch (Exception ignored) {
-            // Keep default behavior when kwargs are malformed.
-        }
-        return true;
-    }
-
-    private static String applyThinkingKwargsToUserPrompt(String userContent, String chatTemplateKwargs) {
-        if (userContent == null || isThinkingEnabled(chatTemplateKwargs)) {
-            return userContent;
-        }
-        String trimmed = userContent.trim();
-        if (trimmed.isEmpty()) {
-            return "/nothink";
-        }
-        if (trimmed.toLowerCase(Locale.US).endsWith("/nothink")) {
-            return userContent;
-        }
-        return userContent + "\n/nothink";
-    }
     
     /**
      * Apply template to system and user content.
@@ -376,14 +333,12 @@ public class PromptTemplateManager {
             String customTemplate,
             String ggufChatTemplate,
             String settingsSystemPrompt,
-            String chatTemplateKwargs,
             String modelPath) throws JSONException {
         return buildPromptFromMessagesWithSelection(
                 messages,
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                chatTemplateKwargs,
                 modelPath).prompt;
     }
 
@@ -392,7 +347,6 @@ public class PromptTemplateManager {
             String customTemplate,
             String ggufChatTemplate,
             String settingsSystemPrompt,
-            String chatTemplateKwargs,
             String modelPath) throws JSONException {
         
         if (messages == null || messages.length() == 0) {
@@ -421,9 +375,6 @@ public class PromptTemplateManager {
             if ("system".equals(role)) {
                 apiSystemPrompt = content;
             } else {
-                if ("user".equals(role)) {
-                    content = applyThinkingKwargsToUserPrompt(content, chatTemplateKwargs);
-                }
                 conversationHistory.add(new Message(role, content));
             }
         }
@@ -460,7 +411,6 @@ public class PromptTemplateManager {
             String customTemplate,
             String ggufChatTemplate,
             String settingsSystemPrompt,
-            String chatTemplateKwargs,
             String modelPath) {
         return buildPromptForGenerateWithSelection(
                 prompt,
@@ -468,7 +418,6 @@ public class PromptTemplateManager {
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                chatTemplateKwargs,
                 modelPath).prompt;
     }
 
@@ -478,11 +427,9 @@ public class PromptTemplateManager {
             String customTemplate,
             String ggufChatTemplate,
             String settingsSystemPrompt,
-            String chatTemplateKwargs,
             String modelPath) {
 
         String cleanPrompt = stripTemplateMarkers(prompt);
-        cleanPrompt = applyThinkingKwargsToUserPrompt(cleanPrompt, chatTemplateKwargs);
 
         SystemPromptResult systemResult = resolveSystemPromptWithSource(apiSystem, settingsSystemPrompt);
         boolean hasSystem = systemResult.prompt != null && !systemResult.prompt.isEmpty();
@@ -507,14 +454,12 @@ public class PromptTemplateManager {
             String customTemplate,
             String ggufChatTemplate,
             String settingsSystemPrompt,
-            String chatTemplateKwargs,
             String modelPath) {
         return buildPromptForDirectInputWithSelection(
                 userInput,
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                chatTemplateKwargs,
                 modelPath).prompt;
     }
 
@@ -523,7 +468,6 @@ public class PromptTemplateManager {
             String customTemplate,
             String ggufChatTemplate,
             String settingsSystemPrompt,
-            String chatTemplateKwargs,
             String modelPath) {
 
         return buildPromptForGenerateWithSelection(
@@ -532,7 +476,6 @@ public class PromptTemplateManager {
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                chatTemplateKwargs,
                 modelPath);
     }
 
