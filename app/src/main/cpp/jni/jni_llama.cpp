@@ -174,6 +174,24 @@ static bool find_stop_sequence(const std::string& text, size_t * stop_pos, std::
     return false;
 }
 
+static std::string summarize_registered_backends() {
+    const size_t backend_count = ggml_backend_reg_count();
+    std::ostringstream ss;
+    ss << "registered backends=" << backend_count;
+    if (backend_count > 0) {
+        ss << " [";
+        for (size_t i = 0; i < backend_count; ++i) {
+            if (i > 0) {
+                ss << ", ";
+            }
+            ggml_backend_reg_t reg = ggml_backend_reg_get(i);
+            ss << (reg ? ggml_backend_reg_name(reg) : "<null>");
+        }
+        ss << "]";
+    }
+    return ss.str();
+}
+
 static int32_t detokenize_with_resize(
         const llama_vocab * vocab,
         const std::vector<llama_token> & tokens,
@@ -616,7 +634,13 @@ Java_com_micklab_llama_LlamaNative_init(
     }
 
     llama_backend_init();
-    log_to_file("init: backend init (CPU backend registered internally)");
+
+    const size_t backend_count = ggml_backend_reg_count();
+    log_to_file(std::string("init: backend init complete, ") + summarize_registered_backends(),
+                backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
+    if (backend_count == 0) {
+        return env->NewStringUTF("no ggml backends registered");
+    }
     
     llama_model_params mparams = llama_model_default_params();
 

@@ -121,6 +121,8 @@ add_library(
 target_compile_definitions(
     llama_jni
     PRIVATE
+    # This target vendors ggml sources directly, so mirror upstream backend-selection defines.
+    GGML_USE_CPU
     GGML_USE_K_QUANTS
     GGML_VERSION="${GGML_VERSION}"
     GGML_COMMIT="${GGML_BUILD_COMMIT}"
