@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name="com.micklab.llama.LlamaApplication"
         android:label="LLM tester with llama.cpp"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:icon="@mipmap/ic_launcher">

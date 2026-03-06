@@ -357,13 +357,7 @@ static void llama_jni_free() {
     }
 
     llama_backend_free();
-    log_to_file("Backend freed");
-
-    std::lock_guard<std::mutex> llog(g_log_mutex);
-    if (g_log_ofs.is_open()) {
-        g_log_ofs << current_time_str() << " [JNI] Log closed" << std::endl;
-        g_log_ofs.close();
-    }
+    log_to_file("Backend freed (log kept open for re-init)");
 }
 
 // ---------------- JNI: setLogPath ----------------
@@ -555,6 +549,22 @@ Java_com_micklab_llama_LlamaNative_init(
         return env->NewStringUTF("ok");
     }
 
+    // Defensively free existing resources before loading a new model
+    if (g_ctx) {
+        log_to_file("init: freeing existing context before re-init");
+        llama_free(g_ctx);
+        g_ctx = nullptr;
+    }
+    if (g_model) {
+        log_to_file("init: freeing existing model before re-init");
+        llama_model_free(g_model);
+        g_model = nullptr;
+    }
+    if (!g_current_model_path.empty()) {
+        log_to_file("init: clearing previous model path");
+        g_current_model_path.clear();
+    }
+
     {
         std::ifstream ifs(model_path, std::ios::binary | std::ios::ate);
         if (!ifs) {
@@ -606,16 +616,7 @@ Java_com_micklab_llama_LlamaNative_init(
     }
 
     llama_backend_init();
-    log_to_file("init: backend init");
-
-    // ★ CPU backend をレジストリ経由で登録
-    ggml_backend_reg_t cpu_reg = ggml_backend_cpu_reg();
-    if (cpu_reg) {
-        ggml_backend_register(cpu_reg);
-        log_to_file("init: CPU backend registered via reg");
-    } else {
-        log_to_file("init: CPU backend_reg() returned null");
-    }
+    log_to_file("init: backend init (CPU backend registered internally)");
     
     llama_model_params mparams = llama_model_default_params();
 
