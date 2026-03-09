@@ -19,6 +19,13 @@ public class ModelManager {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
+    private static final int PRELOAD_N_CTX = 64;
+    private static final int DEFAULT_N_CTX = 2048;
+    private static final int DEFAULT_N_THREADS = 2;
+    private static final int DEFAULT_N_BATCH = 16;
+    private static final float DEFAULT_TEMP = 0.7f;
+    private static final float DEFAULT_TOP_P = 0.9f;
+    private static final int DEFAULT_TOP_K = 40;
     
     private static ModelManager instance;
     
@@ -173,7 +180,19 @@ public class ModelManager {
                 if (currentModelPath != null) {
                     llama.free();
                 }
-                
+
+                applyLoadParameters(config, PRELOAD_N_CTX);
+                String preloadResult = llama.init(modelPath);
+                if (!"ok".equals(preloadResult)) {
+                    Log.e(TAG, "Model preload failed: " + preloadResult);
+                    if (listener != null) {
+                        listener.onError("Model preload failed: " + preloadResult);
+                    }
+                    return false;
+                }
+
+                llama.free();
+                applyLoadParameters(config, config.nCtx);
                 String initResult = llama.init(modelPath);
                 if (!"ok".equals(initResult)) {
                     Log.e(TAG, "Model init failed: " + initResult);
@@ -232,6 +251,24 @@ public class ModelManager {
             config.dryPenaltyLastN,
             config.drySequenceBreakers
         );
+    }
+
+    private void applyLoadParameters(ConfigurationManager.Configuration config, int nCtxOverride) {
+        int nCtx = safePositive(nCtxOverride > 0 ? nCtxOverride : config.nCtx, DEFAULT_N_CTX);
+        int nThreads = safePositive(config.nThreads, DEFAULT_N_THREADS);
+        int nBatch = safePositive(config.nBatch, DEFAULT_N_BATCH);
+        float temp = safeFinite((float) config.temp, DEFAULT_TEMP);
+        float topP = safeFinite((float) config.topP, DEFAULT_TOP_P);
+        int topK = safePositive(config.topK, DEFAULT_TOP_K);
+        llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK);
+    }
+
+    private int safePositive(int value, int fallback) {
+        return value > 0 ? value : fallback;
+    }
+
+    private float safeFinite(float value, float fallback) {
+        return Float.isFinite(value) ? value : fallback;
     }
     
     /**

@@ -907,6 +907,35 @@ Java_com_micklab_llama_LlamaNative_init(
     }
 }
 
+// ---------------- JNI: setLoadParameters ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setLoadParameters(
+        JNIEnv *, jobject,
+        jint nCtx, jint nThreads, jint nBatch,
+        jfloat temp, jfloat topP, jint topK
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    g_n_ctx = nCtx > 0 ? nCtx : 1;
+    g_n_threads = nThreads > 0 ? nThreads : 1;
+    g_n_batch = nBatch > 0 ? nBatch : 1;
+    g_temp = temp;
+    g_top_p = topP;
+    g_top_k = topK;
+
+    {
+        std::ostringstream ss;
+        ss << "setLoadParameters: n_ctx=" << g_n_ctx
+           << " n_threads=" << g_n_threads
+           << " n_batch=" << g_n_batch
+           << " temp=" << g_temp
+           << " top_p=" << g_top_p
+           << " top_k=" << g_top_k;
+        log_to_file(ss.str());
+    }
+}
+
 // ---------------- JNI: setParameters ----------------
 extern "C"
 JNIEXPORT void JNICALL
