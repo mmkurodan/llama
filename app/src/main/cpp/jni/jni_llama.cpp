@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <cstring>
 #include <cctype>
+#include <exception>
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -396,24 +397,31 @@ static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_
 // ---------------- llama.cpp ログコールバック ----------------
 // 0.17.1 は llama_log_level ではなく ggml_log_level を使う
 static void llama_log_callback(enum ggml_log_level level, const char * text, void * user_data) {
-    const ggml_log_level effective = normalize_log_level(level);
-    if (!should_log(effective)) return;
-    std::string msg = text ? text : "";
-    // Skip empty messages and continuation messages
-    if (msg.empty() || msg == "\n") {
-        return;
+    (void) user_data;
+    try {
+        const ggml_log_level effective = normalize_log_level(level);
+        if (!should_log(effective)) return;
+        std::string msg = text ? text : "";
+        // Skip empty messages and continuation messages
+        if (msg.empty() || msg == "\n") {
+            return;
+        }
+        // Only log INFO, WARN, ERROR levels
+        if (effective == GGML_LOG_LEVEL_ERROR) {
+            LOGE("[llama.cpp] %s", msg.c_str());
+        } else if (effective == GGML_LOG_LEVEL_WARN) {
+            LOGI("[llama.cpp WARN] %s", msg.c_str());
+        } else if (effective == GGML_LOG_LEVEL_DEBUG) {
+            LOGI("[llama.cpp DEBUG] %s", msg.c_str());
+        } else {
+            LOGI("[llama.cpp] %s", msg.c_str());
+        }
+        log_to_file(std::string("llama.cpp: ") + msg, effective);
+    } catch (const std::exception & e) {
+        LOGE("llama_log_callback exception: %s", e.what());
+    } catch (...) {
+        LOGE("llama_log_callback unknown exception");
     }
-    // Only log INFO, WARN, ERROR levels
-    if (effective == GGML_LOG_LEVEL_ERROR) {
-        LOGE("[llama.cpp] %s", msg.c_str());
-    } else if (effective == GGML_LOG_LEVEL_WARN) {
-        LOGI("[llama.cpp WARN] %s", msg.c_str());
-    } else if (effective == GGML_LOG_LEVEL_DEBUG) {
-        LOGI("[llama.cpp DEBUG] %s", msg.c_str());
-    } else {
-        LOGI("[llama.cpp] %s", msg.c_str());
-    }
-    log_to_file(std::string("llama.cpp: ") + msg, effective);
 }
 
 // ---------------- 既存ユーティリティ ----------------
@@ -454,8 +462,16 @@ static std::string process_escape_sequences(const std::string& input) {
 // ---------------- download() 用 ----------------
 static size_t write_data(void* ptr, size_t size, size_t nmemb, void* userdata) {
     std::ofstream* ofs = reinterpret_cast<std::ofstream*>(userdata);
-    ofs->write(reinterpret_cast<const char*>(ptr), size * nmemb);
-    return size * nmemb;
+    if (!ofs) {
+        return 0;
+    }
+    const size_t bytes = size * nmemb;
+    ofs->write(reinterpret_cast<const char*>(ptr), bytes);
+    if (!(*ofs)) {
+        log_to_file("download: file write failed", GGML_LOG_LEVEL_ERROR);
+        return 0;
+    }
+    return bytes;
 }
 
 struct ProgressData {
@@ -595,6 +611,7 @@ Java_com_micklab_llama_LlamaNative_download(
         jobject thiz,
         jstring jurl,
         jstring jpath) {
+    ensure_fatal_signal_handlers_installed();
 
     // Ensure we have a stored JavaVM for callbacks even if init() has not been called yet
     if (!g_jvm) {
@@ -715,154 +732,179 @@ Java_com_micklab_llama_LlamaNative_init(
         jstring jModelPath
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
+    ensure_fatal_signal_handlers_installed();
 
-    log_to_file("init: start");
-
-    // ★ llama.cpp 内部ログを JNI 側へ流す
-    llama_log_set(llama_log_callback, nullptr);
-    log_to_file("init: llama_log_callback registered");
-
-    std::string model_path = jstring_to_std(env, jModelPath);
-
-    {
-        std::ostringstream ss;
-        ss << "init: model_path=" << model_path;
-        log_to_file(ss.str());
-    }
-
-    // If the same model is already loaded in JNI, skip re-initialization to avoid heavy work
-    if (!g_current_model_path.empty() && g_current_model_path == model_path && g_model && g_ctx) {
-        std::ostringstream ss;
-        ss << "init: model already initialized at path=" << model_path << "; skipping init";
-        log_to_file(ss.str());
-        return env->NewStringUTF("ok");
-    }
-
-    // Defensively free existing resources before loading a new model
-    if (g_ctx) {
-        log_to_file("init: freeing existing context before re-init");
-        llama_free(g_ctx);
-        g_ctx = nullptr;
-    }
-    if (g_model) {
-        log_to_file("init: freeing existing model before re-init");
-        llama_model_free(g_model);
-        g_model = nullptr;
-    }
-    if (!g_current_model_path.empty()) {
-        log_to_file("init: clearing previous model path");
+    auto clear_partial_init = []() {
+        if (g_ctx) {
+            llama_free(g_ctx);
+            g_ctx = nullptr;
+        }
+        if (g_model) {
+            llama_model_free(g_model);
+            g_model = nullptr;
+        }
         g_current_model_path.clear();
-    }
+    };
 
-    {
-        std::ifstream ifs(model_path, std::ios::binary | std::ios::ate);
-        if (!ifs) {
+    try {
+        log_to_file("init: start");
+
+        // ★ llama.cpp 内部ログを JNI 側へ流す
+        llama_log_set(llama_log_callback, nullptr);
+        log_to_file("init: llama_log_callback registered");
+
+        std::string model_path = jstring_to_std(env, jModelPath);
+
+        {
             std::ostringstream ss;
-            ss << "init: model file cannot be opened: " << model_path
-               << " errno=" << errno << " strerror=" << std::strerror(errno);
-            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-            return env->NewStringUTF("model file open failed");
-        } else {
-            auto sz = ifs.tellg();
-            std::ostringstream ss;
-            ss << "init: model file exists, size=" << sz << " bytes";
+            ss << "init: model_path=" << model_path;
             log_to_file(ss.str());
-            ifs.close();
         }
-    }
 
-    {
-        std::ifstream ifh(model_path, std::ios::binary);
-        if (ifh) {
-            char hdr_buf[64];
-            ifh.read(hdr_buf, sizeof(hdr_buf));
-            std::streamsize got = ifh.gcount();
+        // If the same model is already loaded in JNI, skip re-initialization to avoid heavy work
+        if (!g_current_model_path.empty() && g_current_model_path == model_path && g_model && g_ctx) {
             std::ostringstream ss;
-            ss << "init: header(" << got << "):";
-            ss << std::hex << std::setfill('0');
-            for (std::streamsize i = 0; i < got; ++i) {
-                ss << ' ' << std::setw(2)
-                   << (static_cast<unsigned int>(static_cast<unsigned char>(hdr_buf[i])));
+            ss << "init: model already initialized at path=" << model_path << "; skipping init";
+            log_to_file(ss.str());
+            return env->NewStringUTF("ok");
+        }
+
+        // Defensively free existing resources before loading a new model
+        if (g_ctx) {
+            log_to_file("init: freeing existing context before re-init");
+            llama_free(g_ctx);
+            g_ctx = nullptr;
+        }
+        if (g_model) {
+            log_to_file("init: freeing existing model before re-init");
+            llama_model_free(g_model);
+            g_model = nullptr;
+        }
+        if (!g_current_model_path.empty()) {
+            log_to_file("init: clearing previous model path");
+            g_current_model_path.clear();
+        }
+
+        {
+            std::ifstream ifs(model_path, std::ios::binary | std::ios::ate);
+            if (!ifs) {
+                std::ostringstream ss;
+                ss << "init: model file cannot be opened: " << model_path
+                   << " errno=" << errno << " strerror=" << std::strerror(errno);
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("model file open failed");
+            } else {
+                auto sz = ifs.tellg();
+                std::ostringstream ss;
+                ss << "init: model file exists, size=" << sz << " bytes";
+                log_to_file(ss.str());
+                ifs.close();
             }
-            ss << " | ";
-            for (std::streamsize i = 0; i < got; ++i) {
-                unsigned char c = static_cast<unsigned char>(hdr_buf[i]);
-                ss << (std::isprint(c) ? static_cast<char>(c) : '.');
+        }
+
+        {
+            std::ifstream ifh(model_path, std::ios::binary);
+            if (ifh) {
+                char hdr_buf[64];
+                ifh.read(hdr_buf, sizeof(hdr_buf));
+                std::streamsize got = ifh.gcount();
+                std::ostringstream ss;
+                ss << "init: header(" << got << "):";
+                ss << std::hex << std::setfill('0');
+                for (std::streamsize i = 0; i < got; ++i) {
+                    ss << ' ' << std::setw(2)
+                       << (static_cast<unsigned int>(static_cast<unsigned char>(hdr_buf[i])));
+                }
+                ss << " | ";
+                for (std::streamsize i = 0; i < got; ++i) {
+                    unsigned char c = static_cast<unsigned char>(hdr_buf[i]);
+                    ss << (std::isprint(c) ? static_cast<char>(c) : '.');
+                }
+                log_to_file(ss.str());
+            } else {
+                std::ostringstream ss;
+                ss << "init: header dump failed to open file: " << model_path;
+                log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
             }
-            log_to_file(ss.str());
+        }
+
+        if (env->GetJavaVM(&g_jvm) != JNI_OK) {
+            g_jvm = nullptr;
+            log_to_file("init: GetJavaVM failed", GGML_LOG_LEVEL_WARN);
         } else {
+            log_to_file("init: JavaVM stored");
+        }
+
+        llama_backend_init();
+
+        const size_t backend_count = ggml_backend_reg_count();
+        log_to_file(std::string("init: backend init complete, ") + summarize_registered_backends(),
+                    backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
+        if (backend_count == 0) {
+            return env->NewStringUTF("no ggml backends registered");
+        }
+
+        llama_model_params mparams = llama_model_default_params();
+
+        {
+            using namespace std::chrono;
+            auto t0 = high_resolution_clock::now();
+            g_model = llama_model_load_from_file(model_path.c_str(), mparams);
+            auto t1 = high_resolution_clock::now();
+            auto ms = duration_cast<milliseconds>(t1 - t0).count();
+
             std::ostringstream ss;
-            ss << "init: header dump failed to open file: " << model_path;
-            log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
+            if (!g_model) {
+                ss << "init: failed to load model (returned null) after "
+                   << ms << " ms. path_len=" << model_path.size();
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("failed to load model");
+            } else {
+                ss << "init: model loaded successfully in " << ms << " ms";
+                log_to_file(ss.str());
+            }
         }
-    }
 
-    if (env->GetJavaVM(&g_jvm) != JNI_OK) {
-        g_jvm = nullptr;
-        log_to_file("init: GetJavaVM failed", GGML_LOG_LEVEL_WARN);
-    } else {
-        log_to_file("init: JavaVM stored");
-    }
+        llama_context_params cparams = llama_context_default_params();
+        cparams.n_ctx           = g_n_ctx;
+        cparams.n_threads       = g_n_threads;
+        cparams.n_batch         = g_n_batch;
+        cparams.n_threads_batch = g_n_threads;
 
-    llama_backend_init();
+        {
+            using namespace std::chrono;
+            auto t0 = high_resolution_clock::now();
+            g_ctx = llama_init_from_model(g_model, cparams);
+            auto t1 = high_resolution_clock::now();
+            auto ms = duration_cast<milliseconds>(t1 - t0).count();
 
-    const size_t backend_count = ggml_backend_reg_count();
-    log_to_file(std::string("init: backend init complete, ") + summarize_registered_backends(),
-                backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
-    if (backend_count == 0) {
-        return env->NewStringUTF("no ggml backends registered");
-    }
-    
-    llama_model_params mparams = llama_model_default_params();
+            std::ostringstream ss;
+            if (!g_ctx) {
+                ss << "init: failed to create context (returned null) after "
+                   << ms << " ms";
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("failed to create context");
+            } else {
+                ss << "init: context created successfully in " << ms << " ms";
+                log_to_file(ss.str());
+            }
+        }
 
-    {
-        using namespace std::chrono;
-        auto t0 = high_resolution_clock::now();
-        g_model = llama_model_load_from_file(model_path.c_str(), mparams);
-        auto t1 = high_resolution_clock::now();
-        auto ms = duration_cast<milliseconds>(t1 - t0).count();
+        g_current_model_path = model_path;
+        log_to_file("init: context created");
 
+        return env->NewStringUTF("ok");
+    } catch (const std::exception & e) {
         std::ostringstream ss;
-        if (!g_model) {
-            ss << "init: failed to load model (returned null) after "
-               << ms << " ms. path_len=" << model_path.size();
-            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-            return env->NewStringUTF("failed to load model");
-        } else {
-            ss << "init: model loaded successfully in " << ms << " ms";
-            log_to_file(ss.str());
-        }
+        ss << "init: exception: " << e.what();
+        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+        clear_partial_init();
+        return env->NewStringUTF("init exception");
+    } catch (...) {
+        log_to_file("init: unknown native exception", GGML_LOG_LEVEL_ERROR);
+        clear_partial_init();
+        return env->NewStringUTF("init unknown exception");
     }
-
-    llama_context_params cparams = llama_context_default_params();
-    cparams.n_ctx           = g_n_ctx;
-    cparams.n_threads       = g_n_threads;
-    cparams.n_batch         = g_n_batch;
-    cparams.n_threads_batch = g_n_threads;
-
-    {
-        using namespace std::chrono;
-        auto t0 = high_resolution_clock::now();
-        g_ctx = llama_init_from_model(g_model, cparams);
-        auto t1 = high_resolution_clock::now();
-        auto ms = duration_cast<milliseconds>(t1 - t0).count();
-
-        std::ostringstream ss;
-        if (!g_ctx) {
-            ss << "init: failed to create context (returned null) after "
-               << ms << " ms";
-            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-            return env->NewStringUTF("failed to create context");
-        } else {
-            ss << "init: context created successfully in " << ms << " ms";
-            log_to_file(ss.str());
-        }
-    }
-
-    g_current_model_path = model_path;
-    log_to_file("init: context created");
-
-    return env->NewStringUTF("ok");
 }
 
 // ---------------- JNI: setParameters ----------------
