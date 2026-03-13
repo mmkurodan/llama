@@ -262,7 +262,7 @@ public class ModelManager {
         float temp = safeFinite((float) config.temp, DEFAULT_TEMP);
         float topP = safeFinite((float) config.topP, DEFAULT_TOP_P);
         int topK = safePositive(config.topK, DEFAULT_TOP_K);
-        int nGpuLayers = config.gpuOffloadEnabled ? GPU_LAYERS_ENABLED_ALL : GPU_LAYERS_DISABLED;
+        int nGpuLayers = (config.gpuOffloadLayers < 0 || config.gpuOffloadLayers > 39) ? GPU_LAYERS_ENABLED_ALL : Math.max(0, config.gpuOffloadLayers);
         llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK, nGpuLayers);
     }
 

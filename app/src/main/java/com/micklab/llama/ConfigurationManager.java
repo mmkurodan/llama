@@ -71,7 +71,7 @@ public class ConfigurationManager {
         public boolean streaming;
 
         // Runtime behavior switches
-        public boolean gpuOffloadEnabled;
+        public int gpuOffloadLayers;
         public boolean enableThinking;
         
         public Configuration() {
@@ -117,7 +117,7 @@ public class ConfigurationManager {
             streaming = true;
 
             // Runtime behavior defaults
-            gpuOffloadEnabled = false;
+            gpuOffloadLayers = 0;
             enableThinking = true;
             
             // New prompt settings defaults
@@ -173,7 +173,8 @@ public class ConfigurationManager {
             json.put("streaming", streaming);
 
             // Runtime behavior switches
-            json.put("gpuOffloadEnabled", gpuOffloadEnabled);
+            json.put("gpuOffloadLayers", gpuOffloadLayers);
+            json.put("gpuOffloadEnabled", gpuOffloadLayers != 0);
             json.put("enableThinking", enableThinking);
             
             // New prompt settings
@@ -226,7 +227,12 @@ public class ConfigurationManager {
             config.streaming = json.optBoolean("streaming", true);
 
             // Runtime behavior switches (with defaults for backward compatibility)
-            config.gpuOffloadEnabled = json.optBoolean("gpuOffloadEnabled", false);
+            if (json.has("gpuOffloadLayers")) {
+                config.gpuOffloadLayers = json.optInt("gpuOffloadLayers", 0);
+            } else {
+                boolean enabled = json.optBoolean("gpuOffloadEnabled", false);
+                config.gpuOffloadLayers = enabled ? -1 : 0;
+            }
             config.enableThinking = json.optBoolean("enableThinking", true);
             
             // New prompt settings (with defaults for backward compatibility)

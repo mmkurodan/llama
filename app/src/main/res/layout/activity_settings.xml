@@ -199,13 +199,29 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Enable GPU Offload:" />
+                android:text="GPU Offload Layers:" />
 
-            <Switch
-                android:id="@+id/gpuOffloadSwitch"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:checked="false" />
+                android:orientation="vertical">
+
+                <SeekBar
+                    android:id="@+id/gpuLayersSeekBar"
+                    android:layout_width="200dp"
+                    android:layout_height="wrap_content"
+                    android:max="40"
+                    android:progress="0" />
+
+                <TextView
+                    android:id="@+id/gpuLayersValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textSize="12sp"
+                    android:paddingTop="4dp"
+                    android:gravity="center" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

@@ -16,6 +16,7 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.Switch;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -88,7 +89,8 @@ public class SettingsActivity extends Activity {
     
     // Runtime switches
     private Switch streamingSwitch;
-    private Switch gpuOffloadSwitch;
+    private SeekBar gpuLayersSeekBar;
+    private TextView gpuLayersValue;
     private Switch enableThinkingSwitch;
     
     // New prompt settings
@@ -202,7 +204,16 @@ public class SettingsActivity extends Activity {
         
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
-        gpuOffloadSwitch = findViewById(R.id.gpuOffloadSwitch);
+        gpuLayersSeekBar = findViewById(R.id.gpuLayersSeekBar);
+        gpuLayersValue = findViewById(R.id.gpuLayersValue);
+        gpuLayersSeekBar.setMax(40);
+        gpuLayersSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                gpuLayersValue.setText(String.valueOf(progress > 39 ? -1 : progress));
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
         enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
         
         // New prompt settings
@@ -420,7 +431,10 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         streamingSwitch.setChecked(config.streaming);
-        gpuOffloadSwitch.setChecked(config.gpuOffloadEnabled);
+        int layers = config.gpuOffloadLayers;
+        int displayLayers = (layers < 0) ? 40 : layers;
+        gpuLayersSeekBar.setProgress(displayLayers);
+        gpuLayersValue.setText(String.valueOf(displayLayers > 39 ? -1 : displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
         
         // New prompt settings
@@ -620,7 +634,8 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         config.streaming = streamingSwitch.isChecked();
-        config.gpuOffloadEnabled = gpuOffloadSwitch.isChecked();
+        int progress = gpuLayersSeekBar.getProgress();
+        config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
         
         // New prompt settings
