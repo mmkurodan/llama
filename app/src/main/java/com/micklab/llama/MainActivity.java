@@ -868,13 +868,17 @@ public class MainActivity extends Activity {
         TextView messageView = new TextView(this);
         messageView.setText(
                 "[日本語]\n" +
+                "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
                 "1) SettingsでモデルをLoad Modelしてください。\n" +
                 "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
                 "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
                 "[English]\n" +
+                "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
                 "1) In Settings, load a model with Load Model.\n" +
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
-                "3) Enter your instruction in the input field and tap Send to display the response.");
+                "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
+                "[TIPS]\n" +
+                "Tips: When using very large models, Android OS memory limits or process management may cause the app to crash. If that occurs, try a smaller model, or free the current model (e.g., Re-init Model in Settings), wait a short while, and then attempt to load the model again.");
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
         doNotShowAgainCheckBox.setText("次回は表示しない / Don't show next time");

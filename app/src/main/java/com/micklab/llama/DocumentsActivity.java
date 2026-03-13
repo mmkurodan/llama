@@ -115,6 +115,7 @@ public class DocumentsActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         sb.append("[日本語]\n");
         sb.append("操作マニュアル\n\n");
+        sb.append("【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n");
         sb.append("1. アプリ概要\n");
         sb.append("アプリ名: LLM tester with llama.cpp\n");
         sb.append("Built with Llama (llama.cpp)\n");
@@ -198,6 +199,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("[English]\n");
         sb.append("User Manual\n\n");
+        sb.append("IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n");
         sb.append("1. Overview\n");
         sb.append("App name: LLM tester with llama.cpp\n");
         sb.append("Built with Llama (llama.cpp).\n");
@@ -279,6 +281,10 @@ public class DocumentsActivity extends Activity {
         sb.append("- Provides /api/chat, /api/generate, /api/tags on device.\n");
         sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 60 seconds; queue overflow or timeout returns 503.\n");
         sb.append("- Android 13+ may require notification permission.\n");
+        sb.append("\n");
+        sb.append("[TIPS]\n");
+        sb.append("日本語: 大きなモデルを利用すると、Android OS のメモリ制約やプロセス管理によりクラッシュする可能性があります。もしクラッシュが発生した場合は、より小さいモデルを試すか、一度モデルを解放（例: Settings の Re-init Model）し、少し時間をおいてから再度モデルをロードしてください。\n\n");
+        sb.append("English: When using very large models, Android OS memory limits or process management may cause crashes. If this occurs, try a smaller model, or free the current model (e.g., Re-init Model in Settings), wait a short while, and then attempt to load the model again.\n");
         return sb.toString();
     }
 
