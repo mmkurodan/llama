@@ -140,9 +140,9 @@ public class DocumentsActivity extends Activity {
         sb.append("4. 設定画面の操作\n");
         sb.append("- Configuration Management: 設定の保存/削除/読み込みを行います。\n");
         sb.append("- Model Selection: モデルURLを指定し読み込みます。\n");
-        sb.append("- Model Parameters: 生成パラメータを設定します。\n");
+        sb.append("- Model Parameters: 生成パラメータを設定します（GPU Offload スイッチを含む）。\n");
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
-        sb.append("- Prompt Template: System Promptとカスタムテンプレートを設定できます。カスタム未設定時はモデルファミリーから自動選択されます。\n");
+        sb.append("- Prompt Template: System Prompt、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はモデルファミリーから自動選択されます。\n");
         sb.append("- Llama API Server: サーバーポートを指定します。\n");
         sb.append("- Log Settings: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
@@ -154,6 +154,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): モデルが一度に処理できるトークン数。大きいほど長い文脈を扱えますが、メモリ消費が増加します。\n");
         sb.append("- Threads (n_threads): 推論に使用するCPUスレッド数。端末のコア数に合わせて調整してください。\n");
         sb.append("- Batch Size (n_batch): 一度に処理するトークン数。大きくすると高速ですがメモリを多く使用します。\n");
+        sb.append("- Enable GPU Offload: 有効にすると対応バックエンド利用時にGPUへオフロードを試みます。無効でCPUのみを使用します。\n");
         sb.append("- Temperature (temp): 出力のランダム性を制御。0に近いほど決定的、高いほど多様な出力になります。\n");
         sb.append("- Top-p: 累積確率がこの値に達するまでのトークンから選択します（nucleus sampling）。\n");
         sb.append("- Top-k: 確率上位k個のトークンから選択します。\n\n");
@@ -182,6 +183,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Sequence Breakers: DRYの区切り文字。\n\n");
         sb.append("【出力設定】\n");
         sb.append("- Enable Streaming: 有効にするとトークンが生成されるたびに出力が更新されます。無効にすると生成完了後に一括表示されます。\n\n");
+        sb.append("【Think設定】\n");
+        sb.append("- Enable Think: chat-template-kwargs の enable_thinking を切り替えます。無効時はモデルの思考出力を抑制する形式でプロンプトを生成します。\n\n");
         sb.append("7. プロンプトテンプレートの自動選択\n");
         sb.append("カスタムテンプレートが設定されていない場合、モデルファイル名からファミリーを推定しテンプレートを自動選択します。\n");
         sb.append("対応ファミリー: Gemma, Qwen, Mistral, LLaMA, Phi, Zephyr, Hermes。該当なしの場合はChatMLをフォールバックとして使用します。\n");
@@ -191,7 +194,7 @@ public class DocumentsActivity extends Activity {
         sb.append("生成時に一般的なチャットテンプレートの区切り文字を検出すると自動的に生成を停止します。\n\n");
         sb.append("9. APIサーバー（任意）\n");
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags を提供します。\n");
-        sb.append("- 同時生成は1件のみです（ビジー時は503を返します）。\n");
+        sb.append("- 同時生成は1件のみです。ビジー時は最大10件までキューに入り、最大60秒待機します。60秒超過またはキュー満杯時は503を返します。\n");
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("[English]\n");
         sb.append("User Manual\n\n");
@@ -220,9 +223,9 @@ public class DocumentsActivity extends Activity {
         sb.append("4. Settings Screen\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
         sb.append("- Model Selection: Set model URL and load it.\n");
-        sb.append("- Model Parameters: Set generation parameters.\n");
+        sb.append("- Model Parameters: Set generation parameters (including the GPU Offload switch).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
-        sb.append("- Prompt Template: Set System Prompt and custom chat template. When no custom template is set, one is auto-selected based on model family.\n");
+        sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, one is auto-selected based on model family.\n");
         sb.append("- Llama API Server: Set server port.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
         sb.append("- Show License: Display license text.\n");
@@ -234,6 +237,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): Number of tokens the model can process at once. Larger values handle longer contexts but use more memory.\n");
         sb.append("- Threads (n_threads): Number of CPU threads for inference. Adjust based on your device's core count.\n");
         sb.append("- Batch Size (n_batch): Number of tokens processed at once. Larger is faster but uses more memory.\n");
+        sb.append("- Enable GPU Offload: When enabled, the app tries to offload layers to GPU on supported backends. Disable to run CPU-only.\n");
         sb.append("- Temperature (temp): Controls output randomness. Lower is more deterministic, higher is more diverse.\n");
         sb.append("- Top-p: Select from tokens until cumulative probability reaches this value (nucleus sampling).\n");
         sb.append("- Top-k: Select from top k probability tokens.\n\n");
@@ -262,6 +266,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Sequence Breakers: Characters that break DRY sequences.\n\n");
         sb.append("[Output Settings]\n");
         sb.append("- Enable Streaming: When enabled, output updates as tokens are generated. When disabled, output shows all at once after generation completes.\n\n");
+        sb.append("[Think Settings]\n");
+        sb.append("- Enable Think: Toggles chat-template-kwargs enable_thinking. When disabled, prompts are formatted to suppress visible thinking output.\n\n");
         sb.append("7. Prompt Template Auto-Selection\n");
         sb.append("When no custom template is set, the app estimates the model family from the filename and auto-selects an appropriate template.\n");
         sb.append("Supported families: Gemma, Qwen, Mistral, LLaMA, Phi, Zephyr, Hermes. Falls back to ChatML if unrecognized.\n");
@@ -271,7 +277,7 @@ public class DocumentsActivity extends Activity {
         sb.append("Generation automatically stops when common chat template delimiters are detected in the output.\n\n");
         sb.append("9. API Server (Optional)\n");
         sb.append("- Provides /api/chat, /api/generate, /api/tags on device.\n");
-        sb.append("- Only one generation at a time (busy returns 503).\n");
+        sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 60 seconds; queue overflow or timeout returns 503.\n");
         sb.append("- Android 13+ may require notification permission.\n");
         return sb.toString();
     }

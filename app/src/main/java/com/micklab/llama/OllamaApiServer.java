@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Ollama-compatible API server that provides /api/chat and /api/generate endpoints.
@@ -47,6 +48,9 @@ public class OllamaApiServer {
     };
     private static final String IM_START_MARKER_PREFIX = "<|im_start";
     private static final String IM_END_MARKER_PREFIX = "<|im_end";
+    private static final int MAX_BUSY_QUEUE_SIZE = 10;
+    private static final long BUSY_QUEUE_WAIT_MS = 60_000L;
+    private static final long BUSY_QUEUE_POLL_INTERVAL_MS = 100L;
     
     private final Context context;
     private final ConfigurationManager configManager;
@@ -59,6 +63,7 @@ public class OllamaApiServer {
     
     // Track active client connections for disconnectAll
     private final java.util.Set<Socket> activeConnections = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private final AtomicInteger waitingRequestCount = new AtomicInteger(0);
 
     private static class TokenError {
         final String error;
@@ -463,10 +468,7 @@ public class OllamaApiServer {
                 Log.d(TAG, "generate request model=" + model + " stream=" + stream + " promptLen=" + prompt.length());
             }
             
-            // Try to acquire busy lock - return 503 if busy
-            if (!modelManager.tryAcquire()) {
-                Log.w(TAG, "Model is busy, rejecting request");
-                sendErrorResponse(outputStream, 503, "Model is busy processing another request");
+            if (!acquireGenerationSlot(outputStream, "/api/generate")) {
                 return;
             }
             
@@ -492,6 +494,7 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
+                boolean enableThinking = config == null || config.enableThinking;
                 String modelPath = modelManager.getCurrentModelPath();
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
@@ -501,7 +504,8 @@ public class OllamaApiServer {
                                 customTemplate,
                                 ggufChatTemplate,
                                 settingsSystemPrompt,
-                                modelPath);
+                                modelPath,
+                                enableThinking);
                 logTemplateSelection("generate", promptResult.selection);
                 String promptToUse = promptResult.prompt;
                 logMaxDebugPayload("api.generate.prompt", promptToUse);
@@ -698,10 +702,7 @@ public class OllamaApiServer {
                 return;
             }
             
-            // Try to acquire busy lock - return 503 if busy
-            if (!modelManager.tryAcquire()) {
-                Log.w(TAG, "Model is busy, rejecting request");
-                sendErrorResponse(outputStream, 503, "Model is busy processing another request");
+            if (!acquireGenerationSlot(outputStream, "/api/chat")) {
                 return;
             }
             
@@ -728,6 +729,7 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
+                boolean enableThinking = config == null || config.enableThinking;
                 String modelPath = modelManager.getCurrentModelPath();
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
@@ -736,7 +738,8 @@ public class OllamaApiServer {
                                 customTemplate,
                                 ggufChatTemplate,
                                 settingsSystemPrompt,
-                                modelPath);
+                                modelPath,
+                                enableThinking);
                 logTemplateSelection("chat", promptResult.selection);
                 String promptToUse = promptResult.prompt;
                 logMaxDebugPayload("api.chat.prompt", promptToUse);
@@ -932,6 +935,47 @@ public class OllamaApiServer {
             Log.e(TAG, "Invalid JSON in chat request", e);
             sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
         }
+    }
+
+    private boolean acquireGenerationSlot(OutputStream outputStream, String endpoint) throws IOException {
+        if (modelManager.tryAcquire()) {
+            return true;
+        }
+
+        int queued = waitingRequestCount.incrementAndGet();
+        if (queued > MAX_BUSY_QUEUE_SIZE) {
+            waitingRequestCount.decrementAndGet();
+            Log.w(TAG, "Busy queue full for " + endpoint + " queued=" + queued);
+            sendErrorResponse(outputStream, 503, "Model busy queue is full (max 10)");
+            return false;
+        }
+
+        long deadline = System.currentTimeMillis() + BUSY_QUEUE_WAIT_MS;
+        boolean acquired = false;
+        try {
+            while (System.currentTimeMillis() < deadline) {
+                if (modelManager.tryAcquire()) {
+                    acquired = true;
+                    break;
+                }
+                try {
+                    Thread.sleep(BUSY_QUEUE_POLL_INTERVAL_MS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        } finally {
+            waitingRequestCount.decrementAndGet();
+        }
+
+        if (!acquired) {
+            Log.w(TAG, "Busy queue timeout for " + endpoint + " waitedMs=" + BUSY_QUEUE_WAIT_MS);
+            sendErrorResponse(outputStream, 503, "Model is busy; queue wait timed out after 60 seconds");
+            return false;
+        }
+
+        return true;
     }
     
     private void handleTags(OutputStream outputStream) throws IOException {

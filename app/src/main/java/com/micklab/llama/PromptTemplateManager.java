@@ -164,6 +164,8 @@ public class PromptTemplateManager {
     private static final String HERMES_TEMPLATE_NO_SYSTEM = 
         "<|im_start|>user\n{USER}<|im_end|>\n" +
         "<|im_start|>assistant\n";
+
+    private static final String NO_THINKING_BLOCK = "<think>\n\n</think>\n\n";
     
     /**
      * Detect model family from model filename or path.
@@ -323,6 +325,22 @@ public class PromptTemplateManager {
         
         return result;
     }
+
+    private static String applyThinkingToggle(
+            String prompt,
+            TemplateSelectionResult selection,
+            boolean enableThinking) {
+        if (enableThinking || prompt == null || prompt.isEmpty() || selection == null) {
+            return prompt;
+        }
+        if ("custom".equals(selection.source) || selection.family != ModelFamily.QWEN) {
+            return prompt;
+        }
+        if (prompt.endsWith("<|im_start|>assistant\n")) {
+            return prompt + NO_THINKING_BLOCK;
+        }
+        return prompt;
+    }
     
     /**
      * Build prompt from messages array (for /api/chat).
@@ -334,12 +352,29 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) throws JSONException {
+        return buildPromptFromMessages(
+                messages,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath,
+                true);
+    }
+
+    public static String buildPromptFromMessages(
+            JSONArray messages,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath,
+            boolean enableThinking) throws JSONException {
         return buildPromptFromMessagesWithSelection(
                 messages,
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                modelPath).prompt;
+                modelPath,
+                enableThinking).prompt;
     }
 
     public static PromptBuildResult buildPromptFromMessagesWithSelection(
@@ -348,6 +383,22 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) throws JSONException {
+        return buildPromptFromMessagesWithSelection(
+                messages,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath,
+                true);
+    }
+
+    public static PromptBuildResult buildPromptFromMessagesWithSelection(
+            JSONArray messages,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath,
+            boolean enableThinking) throws JSONException {
         
         if (messages == null || messages.length() == 0) {
             SystemPromptResult systemResult = resolveSystemPromptWithSource(null, settingsSystemPrompt);
@@ -398,6 +449,7 @@ public class PromptTemplateManager {
             ModelFamily family = detectModelFamily(modelPath);
             prompt = buildMultiTurnPrompt(family, systemResult.prompt, conversationHistory);
         }
+        prompt = applyThinkingToggle(prompt, selection, enableThinking);
         return new PromptBuildResult(prompt, selection, systemResult.prompt);
     }
     
@@ -412,13 +464,32 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) {
+        return buildPromptForGenerate(
+                prompt,
+                apiSystem,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath,
+                true);
+    }
+
+    public static String buildPromptForGenerate(
+            String prompt,
+            String apiSystem,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath,
+            boolean enableThinking) {
         return buildPromptForGenerateWithSelection(
                 prompt,
                 apiSystem,
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                modelPath).prompt;
+                modelPath,
+                enableThinking).prompt;
     }
 
     public static PromptBuildResult buildPromptForGenerateWithSelection(
@@ -428,6 +499,24 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) {
+        return buildPromptForGenerateWithSelection(
+                prompt,
+                apiSystem,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath,
+                true);
+    }
+
+    public static PromptBuildResult buildPromptForGenerateWithSelection(
+            String prompt,
+            String apiSystem,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath,
+            boolean enableThinking) {
 
         String cleanPrompt = stripTemplateMarkers(prompt);
 
@@ -442,6 +531,7 @@ public class PromptTemplateManager {
                 systemResult.source);
 
         String finalPrompt = applyTemplate(selection.template, systemResult.prompt, cleanPrompt);
+        finalPrompt = applyThinkingToggle(finalPrompt, selection, enableThinking);
         return new PromptBuildResult(finalPrompt, selection, systemResult.prompt);
     }
     
@@ -455,12 +545,29 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) {
+        return buildPromptForDirectInput(
+                userInput,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath,
+                true);
+    }
+
+    public static String buildPromptForDirectInput(
+            String userInput,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath,
+            boolean enableThinking) {
         return buildPromptForDirectInputWithSelection(
                 userInput,
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                modelPath).prompt;
+                modelPath,
+                enableThinking).prompt;
     }
 
     public static PromptBuildResult buildPromptForDirectInputWithSelection(
@@ -469,6 +576,22 @@ public class PromptTemplateManager {
             String ggufChatTemplate,
             String settingsSystemPrompt,
             String modelPath) {
+        return buildPromptForDirectInputWithSelection(
+                userInput,
+                customTemplate,
+                ggufChatTemplate,
+                settingsSystemPrompt,
+                modelPath,
+                true);
+    }
+
+    public static PromptBuildResult buildPromptForDirectInputWithSelection(
+            String userInput,
+            String customTemplate,
+            String ggufChatTemplate,
+            String settingsSystemPrompt,
+            String modelPath,
+            boolean enableThinking) {
 
         return buildPromptForGenerateWithSelection(
                 userInput,
@@ -476,7 +599,8 @@ public class PromptTemplateManager {
                 customTemplate,
                 ggufChatTemplate,
                 settingsSystemPrompt,
-                modelPath);
+                modelPath,
+                enableThinking);
     }
 
     private static String buildConversationText(List<Message> history) {

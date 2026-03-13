@@ -59,6 +59,7 @@ static int   g_n_batch    = 16;
 static float g_temp       = 0.7f;
 static float g_top_p      = 0.9f;
 static int   g_top_k      = 40;
+static int   g_n_gpu_layers = 0;
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
@@ -845,6 +846,7 @@ Java_com_micklab_llama_LlamaNative_init(
         }
 
         llama_model_params mparams = llama_model_default_params();
+        mparams.n_gpu_layers = g_n_gpu_layers;
 
         {
             using namespace std::chrono;
@@ -913,7 +915,7 @@ JNIEXPORT void JNICALL
 Java_com_micklab_llama_LlamaNative_setLoadParameters(
         JNIEnv *, jobject,
         jint nCtx, jint nThreads, jint nBatch,
-        jfloat temp, jfloat topP, jint topK
+        jfloat temp, jfloat topP, jint topK, jint nGpuLayers
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
 
@@ -923,6 +925,7 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
     g_temp = temp;
     g_top_p = topP;
     g_top_k = topK;
+    g_n_gpu_layers = nGpuLayers;
 
     {
         std::ostringstream ss;
@@ -931,7 +934,8 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
            << " n_batch=" << g_n_batch
            << " temp=" << g_temp
            << " top_p=" << g_top_p
-           << " top_k=" << g_top_k;
+           << " top_k=" << g_top_k
+           << " n_gpu_layers=" << g_n_gpu_layers;
         log_to_file(ss.str());
     }
 }

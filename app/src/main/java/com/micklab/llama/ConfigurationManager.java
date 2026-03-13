@@ -69,6 +69,10 @@ public class ConfigurationManager {
         
         // Streaming parameter
         public boolean streaming;
+
+        // Runtime behavior switches
+        public boolean gpuOffloadEnabled;
+        public boolean enableThinking;
         
         public Configuration() {
             // Default values - Gemma 1B assistant
@@ -111,6 +115,10 @@ public class ConfigurationManager {
             
             // Streaming default
             streaming = true;
+
+            // Runtime behavior defaults
+            gpuOffloadEnabled = false;
+            enableThinking = true;
             
             // New prompt settings defaults
             systemPrompt = "";           // Empty by default
@@ -163,6 +171,10 @@ public class ConfigurationManager {
             
             // Streaming
             json.put("streaming", streaming);
+
+            // Runtime behavior switches
+            json.put("gpuOffloadEnabled", gpuOffloadEnabled);
+            json.put("enableThinking", enableThinking);
             
             // New prompt settings
             json.put("systemPrompt", systemPrompt);
@@ -212,6 +224,10 @@ public class ConfigurationManager {
             
             // Streaming (with default for backward compatibility)
             config.streaming = json.optBoolean("streaming", true);
+
+            // Runtime behavior switches (with defaults for backward compatibility)
+            config.gpuOffloadEnabled = json.optBoolean("gpuOffloadEnabled", false);
+            config.enableThinking = json.optBoolean("enableThinking", true);
             
             // New prompt settings (with defaults for backward compatibility)
             config.systemPrompt = json.optString("systemPrompt", "");

@@ -26,6 +26,8 @@ public class ModelManager {
     private static final float DEFAULT_TEMP = 0.7f;
     private static final float DEFAULT_TOP_P = 0.9f;
     private static final int DEFAULT_TOP_K = 40;
+    private static final int GPU_LAYERS_DISABLED = 0;
+    private static final int GPU_LAYERS_ENABLED_ALL = -1;
     
     private static ModelManager instance;
     
@@ -260,7 +262,8 @@ public class ModelManager {
         float temp = safeFinite((float) config.temp, DEFAULT_TEMP);
         float topP = safeFinite((float) config.topP, DEFAULT_TOP_P);
         int topK = safePositive(config.topK, DEFAULT_TOP_K);
-        llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK);
+        int nGpuLayers = config.gpuOffloadEnabled ? GPU_LAYERS_ENABLED_ALL : GPU_LAYERS_DISABLED;
+        llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK, nGpuLayers);
     }
 
     private int safePositive(int value, int fallback) {

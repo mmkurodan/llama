@@ -25,7 +25,7 @@ public class LlamaNative {
 
     public native String download(String url, String path);
     public native String init(String modelPath);
-    public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK);
+    public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
     public native String generate(String prompt);
     public native void cancelGeneration();
     public native void free();

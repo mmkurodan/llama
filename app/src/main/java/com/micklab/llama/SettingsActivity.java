@@ -86,8 +86,10 @@ public class SettingsActivity extends Activity {
     private EditText dryPenaltyLastNInput;
     private EditText drySequenceBreakersInput;
     
-    // Streaming switch
+    // Runtime switches
     private Switch streamingSwitch;
+    private Switch gpuOffloadSwitch;
+    private Switch enableThinkingSwitch;
     
     // New prompt settings
     private EditText systemPromptInput;
@@ -200,6 +202,8 @@ public class SettingsActivity extends Activity {
         
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
+        gpuOffloadSwitch = findViewById(R.id.gpuOffloadSwitch);
+        enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
         
         // New prompt settings
         systemPromptInput = findViewById(R.id.systemPromptInput);
@@ -416,6 +420,8 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         streamingSwitch.setChecked(config.streaming);
+        gpuOffloadSwitch.setChecked(config.gpuOffloadEnabled);
+        enableThinkingSwitch.setChecked(config.enableThinking);
         
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
@@ -614,6 +620,8 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         config.streaming = streamingSwitch.isChecked();
+        config.gpuOffloadEnabled = gpuOffloadSwitch.isChecked();
+        config.enableThinking = enableThinkingSwitch.isChecked();
         
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();
