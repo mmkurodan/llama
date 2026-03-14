@@ -2,6 +2,7 @@ package com.micklab.llama;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -36,6 +37,7 @@ public class SettingsActivity extends Activity {
     public static final String EXTRA_MODEL_PATH = "model_path";
     public static final String EXTRA_MODEL_LOADED = "model_loaded";
     public static final String EXTRA_API_PORT = "api_port";
+    public static final String EXTRA_DISPLAY_LANGUAGE = "display_language";
     
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
@@ -100,6 +102,8 @@ public class SettingsActivity extends Activity {
     // API Server settings
     private EditText apiPortInput;
     private TextView apiServerStatus;
+    private TextView languageLabel;
+    private Spinner languageSpinner;
     private Spinner logLevelSpinner;
     private Button licenseButton;
     private Button documentsButton;
@@ -115,6 +119,7 @@ public class SettingsActivity extends Activity {
     private boolean modelLoadedSuccessfully = false;
     
     private volatile int lastDownloadProgress = 0;
+    private boolean languageSpinnerInitialized = false;
     private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
     private final Runnable busyStateUpdater = new Runnable() {
         @Override
@@ -123,6 +128,11 @@ public class SettingsActivity extends Activity {
             busyStateHandler.postDelayed(this, 200);
         }
     };
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -223,6 +233,8 @@ public class SettingsActivity extends Activity {
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
         apiServerStatus = findViewById(R.id.apiServerStatus);
+        languageLabel = findViewById(R.id.languageLabel);
+        languageSpinner = findViewById(R.id.languageSpinner);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
         licenseButton = findViewById(R.id.licenseButton);
         documentsButton = findViewById(R.id.documentsButton);
@@ -235,6 +247,7 @@ public class SettingsActivity extends Activity {
         int savedLogLevel = prefs.contains(PREF_LOG_LEVEL)
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
                 : defaultLogLevel;
+        setupLanguageSpinner();
         setupLogLevelSpinner(savedLogLevel);
         
         saveConfigButton = findViewById(R.id.saveConfigButton);
@@ -307,6 +320,50 @@ public class SettingsActivity extends Activity {
         if (cancelButton != null) cancelButton.setEnabled(true);
         if (licenseButton != null) licenseButton.setEnabled(true);
         if (documentsButton != null) documentsButton.setEnabled(true);
+    }
+
+    private String localizedText(String ja, String en) {
+        return AppLanguageManager.isJapanese(this) ? ja : en;
+    }
+
+    private void setupLanguageSpinner() {
+        if (languageSpinner == null) {
+            return;
+        }
+        if (languageLabel != null) {
+            languageLabel.setText(localizedText("表示言語 / Display Language", "Display Language / 表示言語"));
+        }
+        String[] languages = new String[] { "日本語", "English" };
+        ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, languages);
+        languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        languageSpinner.setAdapter(languageAdapter);
+
+        String currentLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+        languageSpinner.setSelection(AppLanguageManager.LANGUAGE_JA.equals(currentLanguage) ? 0 : 1, false);
+
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
+                if (!languageSpinnerInitialized) {
+                    languageSpinnerInitialized = true;
+                    return;
+                }
+                String selectedLanguage = (position == 0)
+                        ? AppLanguageManager.LANGUAGE_JA
+                        : AppLanguageManager.LANGUAGE_EN;
+                String existingLanguage = AppLanguageManager.getOrInitDisplayLanguage(SettingsActivity.this);
+                if (!selectedLanguage.equals(existingLanguage)) {
+                    AppLanguageManager.saveDisplayLanguage(SettingsActivity.this, selectedLanguage);
+                    showToast(localizedText("表示言語を変更しました", "Display language updated"));
+                    recreate();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // No-op
+            }
+        });
     }
 
     private void setupLogLevelSpinner(int savedLogLevel) {
@@ -990,6 +1047,7 @@ public class SettingsActivity extends Activity {
             resultIntent.putExtra(EXTRA_MODEL_LOADED, modelLoadedSuccessfully);
         }
         resultIntent.putExtra(EXTRA_API_PORT, apiPort);
+        resultIntent.putExtra(EXTRA_DISPLAY_LANGUAGE, AppLanguageManager.getOrInitDisplayLanguage(this));
         setResult(RESULT_OK, resultIntent);
         super.finish();
     }

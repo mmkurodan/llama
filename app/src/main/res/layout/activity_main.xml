@@ -110,6 +110,7 @@
 
             <!-- Prompt Input -->
             <TextView
+                android:id="@+id/promptLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Enter Prompt:"
@@ -153,6 +154,7 @@
         android:orientation="horizontal">
 
         <TextView
+            android:id="@+id/outputSectionLabel"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -231,6 +233,7 @@
         android:orientation="horizontal">
 
         <TextView
+            android:id="@+id/processingSectionLabel"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

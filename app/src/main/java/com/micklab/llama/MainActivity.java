@@ -55,6 +55,10 @@ public class MainActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
+    private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
+            "show_startup_message",
+            "show_quick_start"
+    };
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final int LOG_LEVEL_INFO = 2;
     private static final int LOG_DISPLAY_MAX_LINES = 100;
@@ -79,6 +83,9 @@ public class MainActivity extends Activity {
     private ScrollView logScrollView;
     private TextView outputView;
     private ScrollView outputScrollView;
+    private TextView promptLabel;
+    private TextView outputSectionLabel;
+    private TextView processingSectionLabel;
 
     private EditText promptInput;
     private Button sendButton;
@@ -102,6 +109,7 @@ public class MainActivity extends Activity {
     // Configuration
     private ConfigurationManager configManager;
     private ConfigurationManager.Configuration currentConfig;
+    private String currentDisplayLanguage;
     
     // API Server (via Foreground Service)
     private int apiPort = OllamaApiServer.DEFAULT_PORT;
@@ -189,9 +197,15 @@ public class MainActivity extends Activity {
     };
 
     @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        currentDisplayLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
         
         // Initialize configuration manager
         configManager = new ConfigurationManager(this);
@@ -209,6 +223,9 @@ public class MainActivity extends Activity {
         logScrollView = findViewById(R.id.logScrollView);
         outputView = findViewById(R.id.outputView);
         outputScrollView = findViewById(R.id.outputScrollView);
+        promptLabel = findViewById(R.id.promptLabel);
+        outputSectionLabel = findViewById(R.id.outputSectionLabel);
+        processingSectionLabel = findViewById(R.id.processingSectionLabel);
         promptInput = findViewById(R.id.promptInput);
         sendButton = findViewById(R.id.sendButton);
         settingsButton = findViewById(R.id.settingsButton);
@@ -221,6 +238,7 @@ public class MainActivity extends Activity {
         updateLogButton = findViewById(R.id.updateLogButton);
         copyLogButton = findViewById(R.id.copyLogButton);
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
+        applyLocalizedUiText();
 
         appendMessage("UI ready.");
 
@@ -264,7 +282,7 @@ public class MainActivity extends Activity {
 
             if (isViewingLog) {
                 isViewingLog = false;
-                viewLogButton.setText("View Log");
+                viewLogButton.setText(localizedText("ログ表示", "View Log"));
                 updateLogButton.setEnabled(false);
                 updateLogButton.setVisibility(Button.GONE);
             }
@@ -415,7 +433,7 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> {
             if (isViewingLog) {
                 isViewingLog = false;
-                viewLogButton.setText("View Log");
+                viewLogButton.setText(localizedText("ログ表示", "View Log"));
                 updateLogButton.setEnabled(false);
                 updateLogButton.setVisibility(Button.GONE);
             }
@@ -646,7 +664,7 @@ public class MainActivity extends Activity {
             // Save current output and display logs
             savedOutputText = outputView.getText().toString();
             isViewingLog = true;
-            viewLogButton.setText("Hide Log");
+            viewLogButton.setText(localizedText("ログを隠す", "Hide Log"));
             updateLogButton.setEnabled(true);
             updateLogButton.setVisibility(Button.VISIBLE);
             downloadLogButton.setEnabled(true);
@@ -654,7 +672,7 @@ public class MainActivity extends Activity {
         } else {
             // Restore output view
             isViewingLog = false;
-            viewLogButton.setText("View Log");
+            viewLogButton.setText(localizedText("ログ表示", "View Log"));
             updateLogButton.setEnabled(false);
             updateLogButton.setVisibility(Button.GONE);
             if (savedOutputText != null) {
@@ -859,9 +877,82 @@ public class MainActivity extends Activity {
         });
     }
 
+    private String localizedText(String ja, String en) {
+        return AppLanguageManager.isJapanese(this) ? ja : en;
+    }
+
+    private void applyLocalizedUiText() {
+        if (promptLabel != null) {
+            promptLabel.setText(localizedText("プロンプト入力:", "Enter Prompt:"));
+        }
+        if (outputSectionLabel != null) {
+            outputSectionLabel.setText(localizedText("モデル出力:", "Model Output:"));
+        }
+        if (processingSectionLabel != null) {
+            processingSectionLabel.setText(localizedText("処理状況/ログ:", "Processing Status/Logs:"));
+        }
+
+        if (promptInput != null) {
+            promptInput.setHint(localizedText("ここにプロンプトを入力", "Enter your prompt here"));
+        }
+        if (sendButton != null) {
+            sendButton.setText(localizedText("送信", "Send"));
+        }
+        if (settingsButton != null) {
+            settingsButton.setText(localizedText("設定", "Settings"));
+        }
+        if (initModelButton != null) {
+            initModelButton.setText(localizedText("モデル再初期化", "Re-init Model"));
+        }
+        if (viewLogButton != null) {
+            viewLogButton.setText(localizedText(isViewingLog ? "ログを隠す" : "ログ表示", isViewingLog ? "Hide Log" : "View Log"));
+        }
+        if (clearLogButton != null) {
+            clearLogButton.setText(localizedText("ログ消去", "Clear Log"));
+        }
+        if (copyOutputButton != null) {
+            copyOutputButton.setText(localizedText("コピー", "Copy"));
+        }
+        if (downloadLogButton != null) {
+            downloadLogButton.setText(localizedText("保存", "Download"));
+        }
+        if (updateLogButton != null) {
+            updateLogButton.setText(localizedText("更新", "Update"));
+        }
+        if (copyLogButton != null) {
+            copyLogButton.setText(localizedText("コピー", "Copy"));
+        }
+        if (outputView != null) {
+            String currentText = outputView.getText() != null ? outputView.getText().toString() : "";
+            if (currentText.isEmpty() || "Output will appear here".equals(currentText) || "出力がここに表示されます".equals(currentText)) {
+                outputView.setText(localizedText("出力がここに表示されます", "Output will appear here"));
+            }
+        }
+        if (logView != null) {
+            String currentText = logView.getText() != null ? logView.getText().toString() : "";
+            if ("Starting...\n".equals(currentText) || "起動中...\n".equals(currentText)) {
+                logView.setText(localizedText("起動中...\n", "Starting...\n"));
+            }
+        }
+    }
+
+    private boolean shouldShowStartupInstructions(SharedPreferences prefs) {
+        if (prefs.contains(PREF_SHOW_STARTUP_INSTRUCTIONS)) {
+            return prefs.getBoolean(PREF_SHOW_STARTUP_INSTRUCTIONS, true);
+        }
+        for (String legacyKey : LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS) {
+            if (prefs.contains(legacyKey)) {
+                boolean show = prefs.getBoolean(legacyKey, true);
+                prefs.edit().putBoolean(PREF_SHOW_STARTUP_INSTRUCTIONS, show).apply();
+                return show;
+            }
+        }
+        return true;
+    }
+
     private void showStartupInstructionsIfNeeded() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        if (!prefs.getBoolean(PREF_SHOW_STARTUP_INSTRUCTIONS, true)) {
+        if (!shouldShowStartupInstructions(prefs)) {
             return;
         }
 
@@ -878,10 +969,11 @@ public class MainActivity extends Activity {
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
                 "[TIPS]\n" +
-                "Tips: When using very large models, Android OS memory limits or process management may cause the app to crash. If that occurs, try a smaller model, or free the current model (e.g., Re-init Model in Settings), wait a short while, and then attempt to load the model again.");
+                "日本語: 大きなモデルを利用すると、Android OS のメモリ制約やプロセス管理によりクラッシュする可能性があります。もしクラッシュが発生した場合は、より小さいモデルを試すか、一度モデルを解放（例: Settings の Re-init Model）し、少し時間をおいてから再度モデルをロードしてください。\n\n" +
+                "English: When using very large models, Android OS memory limits or process management may cause the app to crash. If that occurs, try a smaller model, or free the current model (e.g., Re-init Model in Settings), wait a short while, and then attempt to load the model again.");
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
-        doNotShowAgainCheckBox.setText("次回は表示しない / Don't show next time");
+        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
 
         LinearLayout dialogLayout = new LinearLayout(this);
         dialogLayout.setOrientation(LinearLayout.VERTICAL);
@@ -890,7 +982,7 @@ public class MainActivity extends Activity {
         dialogLayout.addView(doNotShowAgainCheckBox);
 
         new AlertDialog.Builder(this)
-                .setTitle("Quick Start / 簡易インストラクション")
+                .setTitle(localizedText("クイックスタート / Quick Start", "Quick Start / クイックスタート"))
                 .setView(dialogLayout)
                 .setCancelable(false)
                 .setPositiveButton("OK", (dialog, which) -> {
@@ -1001,11 +1093,11 @@ public class MainActivity extends Activity {
     
     private void updateApiServerUI() {
         if (isServiceRunning) {
-            apiServerButton.setText("Stop API Server");
-            apiServerStatusMain.setText("API: Running on port " + apiPort);
+            apiServerButton.setText(localizedText("APIサーバー停止", "Stop API Server"));
+            apiServerStatusMain.setText(localizedText("API: ポート " + apiPort + " で稼働中", "API: Running on port " + apiPort));
         } else {
-            apiServerButton.setText("Start API Server");
-            apiServerStatusMain.setText("API: Stopped");
+            apiServerButton.setText(localizedText("APIサーバー開始", "Start API Server"));
+            apiServerStatusMain.setText(localizedText("API: 停止中", "API: Stopped"));
         }
     }
 
@@ -1091,6 +1183,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        String latestLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+        if (currentDisplayLanguage == null) {
+            currentDisplayLanguage = latestLanguage;
+        } else if (!currentDisplayLanguage.equals(latestLanguage)) {
+            currentDisplayLanguage = latestLanguage;
+            recreate();
+            return;
+        }
+        applyLocalizedUiText();
         // Register broadcast receiver
         IntentFilter filter = new IntentFilter();
         filter.addAction(OllamaForegroundService.ACTION_LOG);

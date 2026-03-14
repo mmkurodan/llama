@@ -186,15 +186,15 @@ public class ConfigurationManager {
         
         public static Configuration fromJSON(JSONObject json) throws JSONException {
             Configuration config = new Configuration();
-            config.name = json.getString("name");
-            config.modelUrl = json.getString("modelUrl");
-            config.nCtx = json.getInt("nCtx");
-            config.nThreads = json.getInt("nThreads");
-            config.nBatch = json.getInt("nBatch");
-            config.temp = json.getDouble("temp");
-            config.topP = json.getDouble("topP");
-            config.topK = json.getInt("topK");
-            config.promptTemplate = json.getString("promptTemplate");
+            config.name = json.optString("name", config.name);
+            config.modelUrl = json.optString("modelUrl", config.modelUrl);
+            config.nCtx = json.optInt("nCtx", config.nCtx);
+            config.nThreads = json.optInt("nThreads", config.nThreads);
+            config.nBatch = json.optInt("nBatch", config.nBatch);
+            config.temp = json.optDouble("temp", config.temp);
+            config.topP = json.optDouble("topP", config.topP);
+            config.topK = json.optInt("topK", config.topK);
+            config.promptTemplate = json.optString("promptTemplate", config.promptTemplate);
             
             // Penalty parameters (with defaults for backward compatibility)
             config.penaltyLastN = json.optInt("penaltyLastN", 64);

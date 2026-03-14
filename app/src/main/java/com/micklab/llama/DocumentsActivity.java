@@ -14,6 +14,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class DocumentsActivity extends Activity {
+    private TextView documentsHeader;
+    private TextView selectDocumentLabel;
     private Spinner documentSpinner;
     private TextView documentTitle;
     private TextView documentContent;
@@ -33,15 +35,23 @@ public class DocumentsActivity extends Activity {
     private Document[] documents;
 
     @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_documents);
 
+        documentsHeader = findViewById(R.id.documentsHeader);
+        selectDocumentLabel = findViewById(R.id.selectDocumentLabel);
         documentSpinner = findViewById(R.id.documentSpinner);
         documentTitle = findViewById(R.id.documentTitle);
         documentContent = findViewById(R.id.documentContent);
         copyButton = findViewById(R.id.copyDocumentButton);
         backButton = findViewById(R.id.backButton);
+        applyLocalizedUiText();
 
         documents = buildDocuments();
 
@@ -74,6 +84,25 @@ public class DocumentsActivity extends Activity {
         }
     }
 
+    private String localizedText(String ja, String en) {
+        return AppLanguageManager.isJapanese(this) ? ja : en;
+    }
+
+    private void applyLocalizedUiText() {
+        if (documentsHeader != null) {
+            documentsHeader.setText(localizedText("ドキュメント", "Documents"));
+        }
+        if (selectDocumentLabel != null) {
+            selectDocumentLabel.setText(localizedText("表示するドキュメント:", "Select document:"));
+        }
+        if (copyButton != null) {
+            copyButton.setText(localizedText("コピー", "Copy"));
+        }
+        if (backButton != null) {
+            backButton.setText(localizedText("戻る", "Back"));
+        }
+    }
+
     private void showDocument(int index) {
         if (index < 0 || index >= documents.length) {
             return;
@@ -87,7 +116,7 @@ public class DocumentsActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText(label, text);
         clipboard.setPrimaryClip(clip);
-        showToast(label + " copied to clipboard");
+        showToast(localizedText("クリップボードにコピーしました", label + " copied to clipboard"));
     }
 
     private void showToast(final String msg) {
@@ -99,10 +128,10 @@ public class DocumentsActivity extends Activity {
     }
 
     private Document[] buildDocuments() {
-        String manualTitle = "User Manual / 操作マニュアル";
+        String manualTitle = localizedText("操作マニュアル / User Manual", "User Manual / 操作マニュアル");
         String manualText = buildManualText();
 
-        String privacyTitle = "Privacy Policy / プライバシーポリシー";
+        String privacyTitle = localizedText("プライバシーポリシー / Privacy Policy", "Privacy Policy / プライバシーポリシー");
         String privacyText = buildPrivacyText();
 
         return new Document[] {
@@ -122,6 +151,7 @@ public class DocumentsActivity extends Activity {
         sb.append("本アプリは端末上でLLMを実行し、プロンプトに対する回答を生成します。\n");
         sb.append("必要に応じてOllama互換APIサーバーを起動できます。\n\n");
         sb.append("2. 初期設定（推奨手順）\n");
+        sb.append("0) 初回起動時のQuick Startで「次回以降は表示しない」をチェックすると、次回起動以降は表示されません。\n");
         sb.append("1) メイン画面で「Settings」を開きます。\n");
         sb.append("   ※推論中（Busy）はSettingsボタンが無効化されます。処理完了後に自動で再有効化されます。\n");
         sb.append("2) モデルURLを入力し「Load Model」を押してモデルを読み込みます。\n");
@@ -145,6 +175,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
         sb.append("- Prompt Template: System Prompt、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はモデルファミリーから自動選択されます。\n");
         sb.append("- Llama API Server: サーバーポートを指定します。\n");
+        sb.append("- Display Language: 日本語/English の表示言語を切り替えます。初回は端末設定から自動選択され、次回以降は選択が保存されます。\n");
         sb.append("- Log Settings: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
         sb.append("- Show License: ライセンス文面を表示します。\n");
         sb.append("- Documents: 操作マニュアル、プライバシーポリシーを確認できます。\n");
@@ -206,6 +237,7 @@ public class DocumentsActivity extends Activity {
         sb.append("This app runs an LLM on your device and generates responses to prompts.\n");
         sb.append("An Ollama-compatible API server can be started if needed.\n\n");
         sb.append("2. Recommended Setup\n");
+        sb.append("0) On first launch, if you check \"Don't show next time\" in Quick Start, it will not be shown on subsequent launches.\n");
         sb.append("1) Open \"Settings\" from the main screen.\n");
         sb.append("   * During inference (Busy), the Settings button is disabled and is re-enabled automatically when processing completes.\n");
         sb.append("2) Enter the model URL and tap \"Load Model\".\n");
@@ -229,6 +261,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, one is auto-selected based on model family.\n");
         sb.append("- Llama API Server: Set server port.\n");
+        sb.append("- Display Language: Switch UI language between Japanese and English. On first launch it follows your device locale, and your choice is saved for later launches.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
         sb.append("- Show License: Display license text.\n");
         sb.append("- Documents: View manual and privacy policy.\n");
