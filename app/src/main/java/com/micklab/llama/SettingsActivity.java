@@ -10,6 +10,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -119,7 +121,6 @@ public class SettingsActivity extends Activity {
     private boolean modelLoadedSuccessfully = false;
     
     private volatile int lastDownloadProgress = 0;
-    private boolean languageSpinnerInitialized = false;
     private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
     private final Runnable busyStateUpdater = new Runnable() {
         @Override
@@ -290,6 +291,7 @@ public class SettingsActivity extends Activity {
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
+        applyLocalizedUiText();
         updateActionButtonStateForBusy();
     }
 
@@ -326,12 +328,126 @@ public class SettingsActivity extends Activity {
         return AppLanguageManager.isJapanese(this) ? ja : en;
     }
 
+    private void applyLocalizedUiText() {
+        setTitle(localizedText("設定", "Settings"));
+        View root = findViewById(android.R.id.content);
+        if (root != null) {
+            localizeViewTree(root);
+        }
+    }
+
+    private void localizeViewTree(View view) {
+        if (view instanceof TextView) {
+            TextView textView = (TextView) view;
+            CharSequence currentText = textView.getText();
+            if (currentText != null) {
+                String translatedText = translateSettingsText(currentText.toString());
+                if (!translatedText.equals(currentText.toString())) {
+                    textView.setText(translatedText);
+                }
+            }
+            CharSequence currentHint = textView.getHint();
+            if (currentHint != null) {
+                String translatedHint = translateSettingsHint(currentHint.toString());
+                if (!translatedHint.equals(currentHint.toString())) {
+                    textView.setHint(translatedHint);
+                }
+            }
+        }
+
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                localizeViewTree(group.getChildAt(i));
+            }
+        }
+    }
+
+    private String translateSettingsHint(String hint) {
+        if (AppLanguageManager.isJapanese(this)) {
+            if ("Enter configuration name".equals(hint)) return "設定名を入力";
+            if ("Enter system prompt (optional)".equals(hint)) return "システムプロンプトを入力（任意）";
+            if ("Enter custom chat template (optional)".equals(hint)) return "カスタムチャットテンプレートを入力（任意）";
+            if (hint.startsWith("Default: ")) return "既定値: " + hint.substring("Default: ".length());
+        } else {
+            if ("設定名を入力".equals(hint)) return "Enter configuration name";
+            if ("システムプロンプトを入力（任意）".equals(hint)) return "Enter system prompt (optional)";
+            if ("カスタムチャットテンプレートを入力（任意）".equals(hint)) return "Enter custom chat template (optional)";
+            if (hint.startsWith("既定値: ")) return "Default: " + hint.substring("既定値: ".length());
+        }
+        return hint;
+    }
+
+    private String translateSettingsText(String text) {
+        if (AppLanguageManager.isJapanese(this)) {
+            switch (text) {
+                case "Configuration Management": return "設定管理";
+                case "Display Language / 表示言語": return "表示言語";
+                case "Configuration Name:": return "設定名:";
+                case "Save Config": return "設定を保存";
+                case "Delete Config": return "設定を削除";
+                case "Load Configuration:": return "設定を読み込み:";
+                case "Load Selected Config": return "選択した設定を読み込む";
+                case "Model Selection": return "モデル選択";
+                case "Model Download URL:": return "モデルダウンロードURL:";
+                case "Load Model": return "モデルを読み込む";
+                case "MAINTAIN MODEL": return "モデル管理";
+                case "Model file: (none)": return "モデルファイル: （なし）";
+                case "Model Parameters": return "モデルパラメータ";
+                case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
+                case "Threads (n_threads):": return "スレッド数 (n_threads):";
+                case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
+                case "GPU Offload Layers:": return "GPUオフロード層:";
+                case "Temperature (temp):": return "温度 (temp):";
+                case "Penalty Parameters": return "ペナルティ設定";
+                case "Penalty Last N:": return "ペナルティ対象直近N:";
+                case "Penalty Repeat:": return "反復ペナルティ:";
+                case "Penalty Frequency:": return "頻度ペナルティ:";
+                case "Penalty Presence:": return "出現ペナルティ:";
+                case "Mirostat Parameters": return "Mirostat 設定";
+                case "Additional Sampling Parameters": return "追加サンプリング設定";
+                case "Dynamic Temperature Range:": return "動的温度レンジ:";
+                case "Dynamic Temperature Exponent:": return "動的温度指数:";
+                case "DRY (Don't Repeat Yourself) Parameters": return "DRY (重複抑制) 設定";
+                case "DRY Allowed Length:": return "DRY 許容長:";
+                case "DRY Penalty Last N:": return "DRY ペナルティ直近N:";
+                case "DRY Sequence Breakers:": return "DRY シーケンス区切り:";
+                case "Output Settings": return "出力設定";
+                case "Enable Streaming:": return "ストリーミングを有効化:";
+                case "Prompt Template": return "プロンプトテンプレート";
+                case "System Prompt:": return "システムプロンプト:";
+                case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
+                case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
+                case "Custom Chat Template:": return "カスタムチャットテンプレート:";
+                case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
+                case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
+                case "Based on custom template or model family detection.": return "カスタムテンプレートまたはモデル種別判定に基づきます。";
+                case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
+                case "Llama API Server": return "Llama APIサーバー";
+                case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
+                case "Server: Stopped": return "サーバー: 停止中";
+                case "Log Settings": return "ログ設定";
+                case "Log Level:": return "ログレベル:";
+                case "Show License": return "ライセンス表示";
+                case "Documents": return "ドキュメント";
+                case "SAVE & CLOSE": return "保存して閉じる";
+                case "CLOSE": return "閉じる";
+                default: return text;
+            }
+        } else {
+            switch (text) {
+                case "表示言語": return "Display Language";
+                default: return text;
+            }
+        }
+    }
+
     private void setupLanguageSpinner() {
         if (languageSpinner == null) {
             return;
         }
         if (languageLabel != null) {
-            languageLabel.setText(localizedText("表示言語 / Display Language", "Display Language / 表示言語"));
+            languageLabel.setText(localizedText("表示言語", "Display Language"));
         }
         String[] languages = new String[] { "日本語", "English" };
         ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, languages);
@@ -344,10 +460,6 @@ public class SettingsActivity extends Activity {
         languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
-                if (!languageSpinnerInitialized) {
-                    languageSpinnerInitialized = true;
-                    return;
-                }
                 String selectedLanguage = (position == 0)
                         ? AppLanguageManager.LANGUAGE_JA
                         : AppLanguageManager.LANGUAGE_EN;

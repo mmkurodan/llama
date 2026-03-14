@@ -971,19 +971,26 @@ public class MainActivity extends Activity {
                 "[TIPS]\n" +
                 "日本語: 大きなモデルを利用すると、Android OS のメモリ制約やプロセス管理によりクラッシュする可能性があります。もしクラッシュが発生した場合は、より小さいモデルを試すか、一度モデルを解放（例: Settings の Re-init Model）し、少し時間をおいてから再度モデルをロードしてください。\n\n" +
                 "English: When using very large models, Android OS memory limits or process management may cause the app to crash. If that occurs, try a smaller model, or free the current model (e.g., Re-init Model in Settings), wait a short while, and then attempt to load the model again.");
+        messageView.setTextSize(14f);
+        messageView.setLineSpacing(0f, 1.1f);
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
         doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
+        doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
 
-        LinearLayout dialogLayout = new LinearLayout(this);
-        dialogLayout.setOrientation(LinearLayout.VERTICAL);
-        dialogLayout.setPadding(48, 32, 48, 16);
-        dialogLayout.addView(messageView);
-        dialogLayout.addView(doNotShowAgainCheckBox);
+        LinearLayout dialogContentLayout = new LinearLayout(this);
+        dialogContentLayout.setOrientation(LinearLayout.VERTICAL);
+        dialogContentLayout.setPadding(48, 32, 48, 16);
+        dialogContentLayout.addView(messageView);
+        dialogContentLayout.addView(doNotShowAgainCheckBox);
+
+        ScrollView dialogScrollView = new ScrollView(this);
+        dialogScrollView.setFillViewport(true);
+        dialogScrollView.addView(dialogContentLayout);
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("クイックスタート / Quick Start", "Quick Start / クイックスタート"))
-                .setView(dialogLayout)
+                .setView(dialogScrollView)
                 .setCancelable(false)
                 .setPositiveButton("OK", (dialog, which) -> {
                     if (doNotShowAgainCheckBox.isChecked()) {

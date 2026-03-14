@@ -63,7 +63,7 @@ public final class AppLanguageManager {
             normalized = LANGUAGE_EN;
         }
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putString(PREF_DISPLAY_LANGUAGE, normalized).apply();
+        prefs.edit().putString(PREF_DISPLAY_LANGUAGE, normalized).commit();
     }
 
     public static boolean isJapanese(Context context) {
