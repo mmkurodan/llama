@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -23,6 +24,7 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
 #include "llama.h"
+#include "gguf.h"
 #include "ggml-backend.h"
 #include "ggml-backend-impl.h"   // ★ これが必要
 #include "ggml-cpu.h"
@@ -516,6 +518,348 @@ static int xferinfo(void* p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t, c
     return 0;
 }
 
+static bool is_existing_nonempty_file(const std::string & path) {
+    std::ifstream ifs(path, std::ios::binary | std::ios::ate);
+    if (!ifs) {
+        return false;
+    }
+    const std::streampos size = ifs.tellg();
+    return size > 0;
+}
+
+static bool is_ascii_digits(const std::string & value) {
+    if (value.empty()) {
+        return false;
+    }
+    for (unsigned char c : value) {
+        if (!std::isdigit(c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool parse_split_file_info(
+        const std::string & candidate,
+        std::string & prefix,
+        int & split_no,
+        int & split_count) {
+    static const std::string suffix = ".gguf";
+    if (candidate.size() <= suffix.size() ||
+        candidate.compare(candidate.size() - suffix.size(), suffix.size(), suffix) != 0) {
+        return false;
+    }
+
+    const size_t suffix_pos = candidate.size() - suffix.size();
+    const size_t of_pos = candidate.rfind("-of-", suffix_pos);
+    if (of_pos == std::string::npos) {
+        return false;
+    }
+
+    const size_t no_pos = candidate.rfind('-', of_pos == 0 ? 0 : of_pos - 1);
+    if (no_pos == std::string::npos) {
+        return false;
+    }
+
+    const std::string split_no_str = candidate.substr(no_pos + 1, of_pos - (no_pos + 1));
+    const std::string split_count_str = candidate.substr(of_pos + 4, suffix_pos - (of_pos + 4));
+    if (split_no_str.size() != 5 || split_count_str.size() != 5 ||
+        !is_ascii_digits(split_no_str) || !is_ascii_digits(split_count_str)) {
+        return false;
+    }
+
+    split_no = std::stoi(split_no_str);
+    split_count = std::stoi(split_count_str);
+    if (split_no <= 0 || split_count <= 1 || split_no > split_count) {
+        return false;
+    }
+
+    prefix = candidate.substr(0, no_pos);
+    return !prefix.empty();
+}
+
+static std::string split_url_suffix(const std::string & url, std::string & url_without_suffix) {
+    const size_t query_pos = url.find('?');
+    const size_t fragment_pos = url.find('#');
+
+    size_t suffix_pos = std::string::npos;
+    if (query_pos != std::string::npos && fragment_pos != std::string::npos) {
+        suffix_pos = std::min(query_pos, fragment_pos);
+    } else if (query_pos != std::string::npos) {
+        suffix_pos = query_pos;
+    } else {
+        suffix_pos = fragment_pos;
+    }
+
+    if (suffix_pos == std::string::npos) {
+        url_without_suffix = url;
+        return "";
+    }
+
+    url_without_suffix = url.substr(0, suffix_pos);
+    return url.substr(suffix_pos);
+}
+
+static void cleanup_downloaded_files(const std::vector<std::string> & paths) {
+    for (const auto & path : paths) {
+        if (path.empty()) {
+            continue;
+        }
+        if (unlink(path.c_str()) == 0) {
+            log_to_file(std::string("download: removed partial file ") + path, GGML_LOG_LEVEL_WARN);
+        }
+    }
+}
+
+static bool download_file_with_curl(
+        const std::string & url,
+        const std::string & path,
+        ProgressData * progress_data,
+        std::string & error_message) {
+    CURL * curl = curl_easy_init();
+    if (!curl) {
+        error_message = "curl init failed";
+        log_to_file("download: curl init failed", GGML_LOG_LEVEL_ERROR);
+        return false;
+    }
+
+    std::ofstream ofs(path, std::ios::binary | std::ios::trunc);
+    if (!ofs) {
+        curl_easy_cleanup(curl);
+        error_message = "file open failed";
+        log_to_file(std::string("download: file open failed path=") + path, GGML_LOG_LEVEL_ERROR);
+        return false;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
+
+    if (progress_data) {
+        progress_data->last_percent = -1;
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, progress_data);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    } else {
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
+    }
+
+    bool disable_ssl = false;
+    std::string ssl_host;
+    if (url.rfind("https://huggingface.co/", 0) == 0) {
+        disable_ssl = true;
+        ssl_host = "huggingface.co";
+    } else if (url.rfind("https://github.com/", 0) == 0) {
+        disable_ssl = true;
+        ssl_host = "github.com";
+    }
+    if (disable_ssl) {
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        log_to_file(std::string("download: disabled SSL verification for ") + ssl_host);
+    }
+
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,
+        "Mozilla/5.0 (Linux; Android 14; Mobile) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Mobile Safari/537.36");
+
+    const CURLcode res = curl_easy_perform(curl);
+
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    ofs.flush();
+    ofs.close();
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        std::ostringstream ss;
+        ss << "curl download failed";
+        if (http_code > 0) {
+            ss << " (HTTP " << http_code << ")";
+        }
+        ss << ": " << curl_easy_strerror(res);
+        error_message = ss.str();
+        log_to_file(std::string("download: ") + ss.str(), GGML_LOG_LEVEL_ERROR);
+        unlink(path.c_str());
+        return false;
+    }
+
+    if (!is_existing_nonempty_file(path)) {
+        error_message = "downloaded file is empty";
+        log_to_file(std::string("download: empty file after download path=") + path, GGML_LOG_LEVEL_ERROR);
+        unlink(path.c_str());
+        return false;
+    }
+
+    return true;
+}
+
+static bool read_split_count_from_gguf(
+        const std::string & path,
+        int & n_split,
+        std::string & error_message) {
+    n_split = 0;
+
+    struct gguf_init_params gguf_params = {
+            /*.no_alloc = */ true,
+            /*.ctx      = */ nullptr,
+    };
+
+    gguf_context * ctx_gguf = gguf_init_from_file(path.c_str(), gguf_params);
+    if (!ctx_gguf) {
+        error_message = std::string("failed to load GGUF metadata from ") + path;
+        log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+        return false;
+    }
+
+    const int64_t key_n_split = gguf_find_key(ctx_gguf, "split.count");
+    if (key_n_split >= 0) {
+        n_split = gguf_get_val_u16(ctx_gguf, key_n_split);
+    }
+
+    gguf_free(ctx_gguf);
+    return true;
+}
+
+static bool find_missing_split_shard_path(
+        const std::string & model_path,
+        std::string & missing_path) {
+    std::string split_prefix;
+    int split_no = 0;
+    int split_count = 0;
+    if (!parse_split_file_info(model_path, split_prefix, split_no, split_count)) {
+        missing_path.clear();
+        return false;
+    }
+
+    for (int idx = 0; idx < split_count; ++idx) {
+        std::vector<char> split_path_buf(split_prefix.size() + 32, '\0');
+        if (!llama_split_path(split_path_buf.data(), split_path_buf.size(), split_prefix.c_str(), idx, split_count)) {
+            missing_path = model_path;
+            return true;
+        }
+        const std::string shard_path(split_path_buf.data());
+        if (!is_existing_nonempty_file(shard_path)) {
+            missing_path = shard_path;
+            return true;
+        }
+    }
+
+    missing_path.clear();
+    return false;
+}
+
+static bool download_model_with_splits(
+        const std::string & model_url,
+        const std::string & model_path,
+        ProgressData * progress_data,
+        std::string & error_message) {
+    std::vector<std::string> newly_downloaded_paths;
+    bool allow_progress = progress_data != nullptr;
+
+    if (!is_existing_nonempty_file(model_path)) {
+        log_to_file(std::string("download: fetching primary shard url=") + model_url + " path=" + model_path);
+        if (!download_file_with_curl(model_url, model_path, allow_progress ? progress_data : nullptr, error_message)) {
+            cleanup_downloaded_files(newly_downloaded_paths);
+            return false;
+        }
+        newly_downloaded_paths.push_back(model_path);
+        allow_progress = false;
+    } else {
+        log_to_file(std::string("download: primary shard already present, probing metadata path=") + model_path);
+    }
+
+    int n_split = 0;
+    if (!read_split_count_from_gguf(model_path, n_split, error_message)) {
+        cleanup_downloaded_files(newly_downloaded_paths);
+        return false;
+    }
+
+    if (n_split <= 1) {
+        return true;
+    }
+
+    std::string path_prefix;
+    int split_no = 0;
+    int split_count_from_name = 0;
+    if (!parse_split_file_info(model_path, path_prefix, split_no, split_count_from_name)) {
+        error_message = std::string("unexpected split model file name: ") + model_path;
+        log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+        cleanup_downloaded_files(newly_downloaded_paths);
+        return false;
+    }
+    if (split_count_from_name != n_split) {
+        error_message = std::string("split count mismatch between file name and GGUF metadata: ") + model_path;
+        log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+        cleanup_downloaded_files(newly_downloaded_paths);
+        return false;
+    }
+
+    std::string url_without_suffix;
+    const std::string url_suffix = split_url_suffix(model_url, url_without_suffix);
+    std::string url_prefix;
+    int url_split_no = 0;
+    int url_split_count = 0;
+    if (!parse_split_file_info(url_without_suffix, url_prefix, url_split_no, url_split_count)) {
+        error_message = std::string("unexpected split model url: ") + model_url;
+        log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+        cleanup_downloaded_files(newly_downloaded_paths);
+        return false;
+    }
+    if (url_split_no != split_no || url_split_count != n_split) {
+        error_message = std::string("split model url does not match local shard naming: ") + model_url;
+        log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+        cleanup_downloaded_files(newly_downloaded_paths);
+        return false;
+    }
+
+    {
+        std::ostringstream ss;
+        ss << "download: split GGUF detected split_no=" << split_no << " split_count=" << n_split;
+        log_to_file(ss.str());
+    }
+
+    for (int idx = 0; idx < n_split; ++idx) {
+        std::vector<char> split_path_buf(path_prefix.size() + 32, '\0');
+        std::vector<char> split_url_buf(url_prefix.size() + 32, '\0');
+        if (!llama_split_path(split_path_buf.data(), split_path_buf.size(), path_prefix.c_str(), idx, n_split) ||
+            !llama_split_path(split_url_buf.data(), split_url_buf.size(), url_prefix.c_str(), idx, n_split)) {
+            error_message = "failed to build split file path";
+            log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+            cleanup_downloaded_files(newly_downloaded_paths);
+            return false;
+        }
+
+        const std::string split_path(split_path_buf.data());
+        if (is_existing_nonempty_file(split_path)) {
+            continue;
+        }
+
+        const std::string split_url = std::string(split_url_buf.data()) + url_suffix;
+        log_to_file(std::string("download: fetching split shard url=") + split_url + " path=" + split_path);
+        if (!download_file_with_curl(split_url, split_path, allow_progress ? progress_data : nullptr, error_message)) {
+            cleanup_downloaded_files(newly_downloaded_paths);
+            return false;
+        }
+        newly_downloaded_paths.push_back(split_path);
+        allow_progress = false;
+    }
+
+    std::string missing_split_path;
+    if (find_missing_split_shard_path(model_path, missing_split_path)) {
+        error_message = std::string("missing split shard after download: ") + missing_split_path;
+        log_to_file(std::string("download: ") + error_message, GGML_LOG_LEVEL_ERROR);
+        cleanup_downloaded_files(newly_downloaded_paths);
+        return false;
+    }
+
+    return true;
+}
+
 // ---------------- 解放 ----------------
 static void llama_jni_free() {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -624,41 +968,25 @@ Java_com_micklab_llama_LlamaNative_download(
         }
     }
 
-    const char* url  = env->GetStringUTFChars(jurl,  nullptr);
-    const char* path = env->GetStringUTFChars(jpath, nullptr);
+    const char* url_chars  = env->GetStringUTFChars(jurl,  nullptr);
+    const char* path_chars = env->GetStringUTFChars(jpath, nullptr);
 
-    if (!url || !path) {
-        if (url)  env->ReleaseStringUTFChars(jurl, url);
-        if (path) env->ReleaseStringUTFChars(jpath, path);
+    if (!url_chars || !path_chars) {
+        if (url_chars)  env->ReleaseStringUTFChars(jurl, url_chars);
+        if (path_chars) env->ReleaseStringUTFChars(jpath, path_chars);
         log_to_file("download: invalid args", GGML_LOG_LEVEL_ERROR);
         return env->NewStringUTF("invalid args");
     }
+
+    const std::string url(url_chars);
+    const std::string path(path_chars);
+    env->ReleaseStringUTFChars(jurl, url_chars);
+    env->ReleaseStringUTFChars(jpath, path_chars);
 
     {
         std::ostringstream ss;
         ss << "download: start url=" << url << " path=" << path;
         log_to_file(ss.str());
-    }
-
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        env->ReleaseStringUTFChars(jurl,  url);
-        env->ReleaseStringUTFChars(jpath, path);
-        log_to_file("download: curl init failed", GGML_LOG_LEVEL_ERROR);
-        return env->NewStringUTF("curl init failed");
-    }
-
-    std::ofstream ofs(path, std::ios::binary);
-    if (!ofs) {
-        env->ReleaseStringUTFChars(jurl,  url);
-        env->ReleaseStringUTFChars(jpath, path);
-        curl_easy_cleanup(curl);
-        {
-            std::ostringstream ss;
-            ss << "download: file open failed path=" << path;
-            log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-        }
-        return env->NewStringUTF("file open failed");
     }
 
     ProgressData pd;
@@ -671,54 +999,14 @@ Java_com_micklab_llama_LlamaNative_download(
         pd.onProgressMethod = env->GetMethodID(cls, "onDownloadProgress", "(I)V");
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
-
-    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo);
-    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &pd);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-
-    std::string surl(url);
-    // Disable SSL verification for specific hosts (huggingface.co and github.com)
-    bool disable_ssl = false;
-    std::string ssl_host;
-    if (surl.rfind("https://huggingface.co/", 0) == 0) {
-        disable_ssl = true;
-        ssl_host = "huggingface.co";
-    }
-    if (surl.rfind("https://github.com/", 0) == 0) {
-        disable_ssl = true;
-        ssl_host = "github.com";
-    }
-    if (disable_ssl) {
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        std::ostringstream ss;
-        ss << "download: disabled SSL verification for " << ssl_host;
-        log_to_file(ss.str());
-    }
-
-    curl_easy_setopt(curl, CURLOPT_USERAGENT,
-        "Mozilla/5.0 (Linux; Android 14; Mobile) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Mobile Safari/537.36");
-
-    CURLcode res = curl_easy_perform(curl);
-
-    env->ReleaseStringUTFChars(jurl,  url);
-    env->ReleaseStringUTFChars(jpath, path);
-    curl_easy_cleanup(curl);
-    ofs.close();
-
+    std::string error_message;
+    const bool ok = download_model_with_splits(url, path, &pd, error_message);
     if (pd.thiz_global) env->DeleteGlobalRef(pd.thiz_global);
-
-    if (res != CURLE_OK) {
-        std::ostringstream ss;
-        ss << "download: curl download failed res=" << res << " msg=" << curl_easy_strerror(res);
-        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-        return env->NewStringUTF("curl download failed");
+    if (!ok) {
+        if (error_message.empty()) {
+            error_message = "download failed";
+        }
+        return env->NewStringUTF(error_message.c_str());
     }
 
     log_to_file("download: ok");
@@ -800,6 +1088,16 @@ Java_com_micklab_llama_LlamaNative_init(
                 ss << "init: model file exists, size=" << sz << " bytes";
                 log_to_file(ss.str());
                 ifs.close();
+            }
+        }
+
+        {
+            std::string missing_split_path;
+            if (find_missing_split_shard_path(model_path, missing_split_path)) {
+                std::ostringstream ss;
+                ss << "init: missing split shard: " << missing_split_path;
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF(ss.str().c_str());
             }
         }
 

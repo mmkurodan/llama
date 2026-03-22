@@ -1,0 +1,750 @@
+アプリケーションソースレビュー兼 改修用仕様書
+作成日: 2026-03-20
+対象リポジトリ: /root/llama
+
+======================================================================
+0. 結論サマリー
+======================================================================
+
+本リポジトリは、Android 端末上で llama.cpp を直接動かし、
+1) 端末内での対話 UI
+2) Ollama 互換 API サーバー
+を提供するアプリケーションである。
+
+現行コードは「単一モデルをロードして UI / API の両方から推論する」という主目的は満たしている。
+一方で、今後の改修ベースとしては以下が優先課題になる。
+
+最優先で修整提案したい項目
+- 署名用 keystore と base64 変換済みファイルがリポジトリ直下に追跡されている
+- モデルダウンロード時に SSL 証明書検証を無効化している
+- API サーバーが 0.0.0.0 で待受し、認証もない
+- PromptTemplateManager が GGUF の chat_template を受け取りながら実際には使っていない
+- MainActivity / OllamaApiServer / SettingsActivity に重複処理と未使用コードが目立つ
+
+ローカル検証結果
+- `gradle testDebugUnitTest assembleDebug` はこの環境では成功しなかった
+- 失敗要因は主に環境依存で、NDK の配置不一致
+  (`/opt/android-sdk/ndk-bundle` vs `/opt/android-sdk/ndk/27.2.12479018`)
+  と AAPT2 daemon 起動失敗
+- さらに、リポジトリ直下に Gradle wrapper が存在せず、CI では wrapper を都度生成している
+- `app/src/test` と `app/src/androidTest` 配下にテストソースは存在しない
+
+======================================================================
+1. リポジトリ構成レビュー
+======================================================================
+
+1-1. 主要ディレクトリ
+
+- `app/src/main/java/com/micklab/llama/`
+  Android アプリ本体。UI、設定、Foreground Service、Ollama 互換 API、設定保存を担当。
+
+- `app/src/main/cpp/jni/`
+  JNI ブリッジ実装。Java から llama.cpp / ggml / libcurl へ接続する。
+
+- `app/src/main/cpp/llama/`
+  vendored な llama.cpp 一式。
+  ただし Android アプリの CMake が直接使うのは一部の src/common/ggml であり、
+  docs/examples/tests/scripts/models など大量の周辺資産も同梱されている。
+
+- `app/src/main/res/`
+  レイアウトとランチャーアイコン。
+
+- `.github/workflows/android.yml`
+  GitHub Actions の本流ビルド。mbedTLS と libcurl を別ジョブでビルドし、
+  debug/release APK と AAB を生成している。
+
+1-2. Java クラス一覧と役割
+
+- `LlamaApplication`
+  アプリ起動時の初期化、Java 例外ログ永続化、JNI ログパス設定。
+
+- `MainActivity`
+  メイン UI。プロンプト入力、生成結果表示、ログ閲覧、API サービス起動停止、
+  モデル再初期化を担当。
+
+- `SettingsActivity`
+  設定画面。プロファイル保存/読込/削除、モデル URL、推論パラメータ、
+  API ポート、言語、ログレベル、文書画面遷移を担当。
+
+- `DocumentsActivity`
+  操作マニュアルとプライバシーポリシー表示。
+
+- `OllamaForegroundService`
+  Foreground Service として API サーバーを維持。
+
+- `OllamaApiServer`
+  手書き HTTP サーバー。`/api/generate`, `/api/chat`, `/api/tags` を提供。
+
+- `ModelManager`
+  モデルロード / 再ロード / 生成 / busy 管理を一元化するシングルトン。
+
+- `ConfigurationManager`
+  JSON ベースの設定ファイル永続化。
+
+- `PromptTemplateManager`
+  モデルファミリー検出、system prompt 優先順位、direct input / generate / chat 用の
+  プロンプト生成。
+
+- `LlamaNative`
+  JNI の Java 側インターフェース。
+
+- `AppLanguageManager`
+  日本語 / English の表示言語切替。
+
+1-3. レイアウト
+
+- `activity_main.xml`
+  Settings / Re-init / View Log / Clear Log / API Server ボタン、
+  Prompt 入力、Output、Processing Log の 3 領域。
+
+- `activity_settings.xml`
+  構成管理、モデル URL、各種 sampling parameter、prompt template、
+  API サーバー設定、言語、ログ設定の大画面フォーム。
+
+- `activity_documents.xml`
+  文書選択 Spinner と本文表示。
+
+======================================================================
+2. 現行機能仕様
+======================================================================
+
+2-1. 起動時動作
+
+- `AndroidManifest.xml`
+  `LlamaApplication` を Application クラスとして使用し、
+  `MainActivity`, `SettingsActivity`, `DocumentsActivity`,
+  `OllamaForegroundService` を登録している。
+
+- `LlamaApplication`
+  起動時に `ollama.log` のパスを JNI に通知し、
+  Java の未捕捉例外を `last_crash.txt` に保存する。
+
+2-2. メイン画面仕様 (`MainActivity`)
+
+- 表示要素
+  - Settings
+  - Re-init Model
+  - View Log / Clear Log
+  - Start/Stop API Server
+  - Prompt 入力欄
+  - 出力欄
+  - Processing Status / Logs
+
+- 初期動作
+  - `default` 設定を読み込む
+  - `ModelManager` を取得する
+  - SharedPreferences から API ポートを復元する
+
+- Send の動作
+  1) busy 状態を取得
+  2) 必要であれば設定に対応するモデルをロード
+  3) PromptTemplateManager で prompt を生成
+  4) streaming 有効時は token listener を設定
+  5) JNI `generate()` を実行
+  6) 出力欄へ反映
+
+- View Log の動作
+  - `ollama.log` の末尾 100 行を出力欄に表示する
+
+- Download の動作
+  - ログ表示中はログ全文保存を優先
+  - 通常時は出力欄のレスポンス保存を優先
+  - 出力が空の場合はログ全文保存へフォールバックする
+
+- Re-init Model の動作
+  - API 接続切断
+  - busy state のリセット
+  - モデル解放
+  - その後 `default` プロファイルを再ロード
+  注意: 現在選択中プロファイルではなく `default` を再ロードする実装になっている。
+
+2-3. 設定画面仕様 (`SettingsActivity`)
+
+設定画面には以下の要素がある。
+
+- Configuration Management
+  - 設定名
+  - Save Config
+  - Load Selected Config
+  - Delete Config
+
+- Model Selection
+  - Model Download URL
+  - Load Model
+  - Maintain Model
+
+- 基本ロード/推論パラメータ
+  - n_ctx
+  - n_threads
+  - n_batch
+  - GPU Offload Layers
+  - temp
+  - top_p
+  - top_k
+
+- Penalty
+  - penalty_last_n
+  - penalty_repeat
+  - penalty_freq
+  - penalty_present
+
+- Mirostat
+  - mirostat
+  - mirostat_tau
+  - mirostat_eta
+
+- Additional sampling
+  - min_p
+  - typical_p
+  - dynatemp_range
+  - dynatemp_exponent
+  - xtc_probability
+  - xtc_threshold
+  - top_n_sigma
+
+- DRY
+  - dry_multiplier
+  - dry_base
+  - dry_allowed_length
+  - dry_penalty_last_n
+  - dry_sequence_breakers
+
+- Output / Prompt
+  - streaming on/off
+  - enableThinking
+  - systemPrompt
+  - customChatTemplate
+  - auto selected template preview
+
+- 運用
+  - API server port
+  - display language
+  - log level
+  - license dialog
+  - documents screen
+
+- 画面終了時仕様
+  - `SAVE & CLOSE` 側は `finish()` により設定保存して戻る
+  - `CLOSE` 側は `cancelAndReturn()` で保存せず戻る
+
+2-4. 設定保存仕様 (`ConfigurationManager`)
+
+- 保存先
+  - `getExternalFilesDir(null)/configs/*.json`
+
+- `default` が存在しなければ自動生成
+
+- デフォルト設定の中心値
+  - modelUrl: Hugging Face 上の Gemma 3 1B Thinking GGUF
+  - nCtx: 2048
+  - nThreads: 4
+  - nBatch: 16
+  - temp: 0.7
+  - topP: 0.9
+  - topK: 40
+  - streaming: true
+  - gpuOffloadLayers: 0
+  - enableThinking: true
+
+2-5. モデル管理仕様 (`ModelManager`)
+
+- 単一インスタンスで model state を管理する
+- `tryAcquire()` / `release()` で busy 制御する
+- モデルロード時の流れ
+  1) config 読込
+  2) model URL からファイル名抽出
+  3) ローカルファイルがなければ download
+  4) preload 用の小さい n_ctx=64 で一度 init
+  5) free
+  6) 本来の n_ctx で init
+  7) sampling parameter 適用
+
+- モデルの実体保存先
+  - `getExternalFilesDir(null)` 優先
+  - null の場合 `getFilesDir()`
+
+2-6. プロンプト生成仕様 (`PromptTemplateManager`)
+
+- 役割
+  - モデルファミリー推定
+  - system prompt の優先順位解決
+  - direct input / generate / chat 用 prompt 構築
+
+- 想定しているテンプレート優先順位
+  1) custom template
+  2) GGUF chat_template
+  3) model family template
+  4) ChatML fallback
+
+- 現行実装の実際
+  - 実装上は 1) custom template か 3) model family の二択で、
+    GGUF chat_template は受け渡されているが未使用
+
+- サポートしている family
+  - CHATML
+  - GEMMA
+  - LLAMA
+  - MISTRAL
+  - QWEN
+  - PHI
+  - ZEPHYR
+  - HERMES
+
+- system prompt の優先順位
+  1) API から渡された system
+  2) Settings の systemPrompt
+  3) なし
+
+2-7. API サーバー仕様 (`OllamaApiServer`)
+
+- Foreground Service から起動される
+- デフォルトポートは 11434
+- `0.0.0.0` に bind するため、端末外部からの接続も受け付ける
+
+- エンドポイント
+  - `GET /`
+  - `GET /api`
+  - `GET /api/tags`
+  - `POST /api/tags`
+  - `POST /api/generate`
+  - `POST /api/chat`
+  - `OPTIONS` による CORS 応答
+
+- 同時実行制御
+  - 実際の生成は 1 件のみ
+  - busy 中は最大 10 件まで待機
+  - 最大待機時間は 60 秒
+  - 溢れた場合は 503
+
+- streaming
+  - chunked transfer + NDJSON 形式で返す
+  - token queue + writer thread で JNI スレッドをネットワーク I/O から切り離している
+
+2-8. Foreground Service (`OllamaForegroundService`)
+
+- 常駐通知を表示し API サーバーを維持する
+- Stop / Exit / Disconnect All の action を受ける
+- MainActivity へ broadcast でログと状態を返す
+
+2-9. 文書画面 (`DocumentsActivity`)
+
+- 組み込み文書は 2 種類
+  - User Manual
+  - Privacy Policy
+
+- アプリ外ファイルを読むのではなく、Java コード内で本文を組み立てている
+
+2-10. ログ / クラッシュ仕様
+
+- Java crash: `last_crash.txt`
+- Native crash: `native_crash.txt`
+- 通常ログ: `ollama.log`
+
+- 保存先はいずれも基本的に app 専用 external files dir
+
+2-11. JNI / ネイティブ推論仕様 (`jni_llama.cpp`)
+
+- JNI が提供する主要 API
+  - `download(url, path)`
+  - `init(modelPath)`
+  - `setLoadParameters(...)`
+  - `setParameters(...)`
+  - `setTokenListener(listener)`
+  - `generate(prompt)`
+  - `cancelGeneration()`
+  - `free()`
+  - `setLogPath(path)`
+  - `setLogLevel(level)`
+  - `getChatTemplate()`
+
+- JNI 側のグローバル state
+  - `g_model`, `g_ctx`
+  - `g_jvm`
+  - `g_token_listener`
+  - load parameter / sampling parameter 一式
+  - stop sequence 一覧
+
+- generate の概略
+  1) prompt tokenize
+  2) prompt を batch 単位で decode
+  3) sampler chain を構築
+  4) token を 1 個ずつ sample / decode
+  5) detokenize 差分を token listener に流す
+  6) stop sequence または EOS または context safety limit で停止
+
+- stop sequence
+  - `<|end|>`, `</s>`, `<|im_end|>`, `<end_of_turn>` などを検出して早期停止
+
+======================================================================
+3. ビルド・運用仕様
+======================================================================
+
+3-1. Android ビルド設定
+
+- namespace / applicationId: `com.micklab.llama`
+- compileSdk: 35
+- targetSdk: 35
+- minSdk: 24
+- ABI: `arm64-v8a` のみ
+- NDK version: `27.2.12479018`
+- CMake: `app/src/main/cpp/CMakeLists.txt`
+
+3-2. ネイティブリンクの要点
+
+- JNI ターゲット名: `llama_jni`
+- llama.cpp と ggml を vendored source から直接ビルド
+- `curl`, `mbedtls`, `mbedcrypto`, `mbedx509` は
+  `app/src/main/cpp/third_party/...` 前提の imported static library
+- 16KB page size 対応として
+  `-Wl,-z,max-page-size=16384`
+  `-Wl,-z,common-page-size=16384`
+  を付与
+
+3-3. CI ワークフロー (`.github/workflows/android.yml`)
+
+- job 1: mbedTLS を Android arm64 向けにビルドして artifact 化
+- job 2: libcurl を Android arm64 向けにビルドして artifact 化
+- job 3: APK/AAB ビルド
+  - keystore を secret から `app/release.keystore` に復元
+  - Gradle 8.7 をダウンロード
+  - wrapper を生成
+  - debug / release APK と release AAB を生成
+  - APK 内 `.so` の 16KB alignment を `llvm-readelf` で検査
+
+3-4. ローカルビルドの前提不足
+
+- リポジトリ直下に `gradlew` は存在しない
+- `app/src/main/cpp/third_party/` もリポジトリには含まれておらず、
+  CI が artifact を配置する前提になっている
+- よって、ローカルでの再現性は現状あまり高くない
+
+3-5. 今回のローカル検証結果
+
+- 実行コマンド
+  - `gradle testDebugUnitTest assembleDebug`
+
+- 結果
+  - `:app:processDebugResources` で AAPT2 daemon 起動失敗
+  - `:app:configureCMakeDebug[arm64-v8a]` で NDK path inconsistency
+
+- 解釈
+  - ソースコードの論理不整合よりも、実行環境側の Android SDK / NDK 配置差異の可能性が高い
+  - ただし local bootstrap 手順の未整備は実際のメンテナンス障害である
+
+======================================================================
+4. 品質レビュー結果（優先度順）
+======================================================================
+
+4-1. P0: セキュリティ / 運用リスク
+
+[P0-1] 署名用 keystore がリポジトリに追跡されている
+対象:
+- `release.keystore`
+- `release.keystore.base64`
+- `app/build.gradle`
+- `.github/workflows/android.yml`
+
+所見:
+- build 設定は `app/release.keystore` を参照している
+- CI も secret から `app/release.keystore` を復元している
+- にもかかわらず、リポジトリ直下に keystore と base64 化ファイルが追跡されている
+
+提案:
+- 即時に利用停止・ローテーション
+- リポジトリ履歴から削除
+- `.gitignore` と秘密情報運用ルールを整備
+
+[P0-2] モデルダウンロード時に SSL 検証を無効化している
+対象:
+- `app/src/main/cpp/jni/jni_llama.cpp` の `download()`
+
+所見:
+- Hugging Face と GitHub 向けに `CURLOPT_SSL_VERIFYPEER=0`,
+  `CURLOPT_SSL_VERIFYHOST=0` を設定している
+- 中間者攻撃や改ざんモデル混入のリスクがある
+
+提案:
+- 例外をやめて常に SSL 検証を有効化
+- 必要なら CA bundle / pinning / ダウンロード元 allowlist を採用
+- HTTP status code と checksum も確認する
+
+[P0-3] API サーバーが外部公開前提になっている
+対象:
+- `app/src/main/java/com/micklab/llama/OllamaApiServer.java`
+
+所見:
+- `0.0.0.0` bind
+- 認証なし
+- CORS 全許可
+
+提案:
+- まずは loopback bind を既定値にする
+- LAN 公開は明示 opt-in にする
+- API token / Bearer 認証を追加する
+- socket timeout を設定する
+
+4-2. P1: 正しさ / 改修効率に影響する問題
+
+[P1-1] GGUF の chat_template が実質未使用
+対象:
+- `PromptTemplateManager.selectTemplateWithReason()`
+- `MainActivity`, `OllamaApiServer`, `SettingsActivity` から渡される `ggufChatTemplate`
+
+所見:
+- シグネチャとコメントは GGUF metadata を使う前提だが、
+  実装は custom template か model family 判定しか使っていない
+- `LlamaNative.getChatTemplate()` を呼んでいる意味が現状ほぼない
+
+提案:
+- GGUF template を正規に適用する実装へ修整
+- 使わないなら引数と呼び出しを削除して設計を単純化
+
+[P1-2] LLaMA 用 multi-turn builder が死んでおり、dispatch も不整合
+対象:
+- `PromptTemplateManager.buildMultiTurnPrompt()`
+- `PromptTemplateManager.buildMultiTurnLlama()`
+
+所見:
+- `ModelFamily.LLAMA` が `buildMultiTurnChatML()` に流されている
+- `buildMultiTurnLlama()` は存在するが呼ばれていない
+
+提案:
+- LLaMA 系の正しい会話テンプレートを再確認し dispatch を修整
+- 使わない builder は削除
+
+[P1-3] HTTP request body の読み込みが 1 回 read 前提
+対象:
+- `OllamaApiServer.handleClient()`
+
+所見:
+- `reader.read(bodyChars, 0, contentLength)` を 1 回だけ呼んでいる
+- ソケットの都合で body が分割到着した場合、途中までしか読めない可能性がある
+
+提案:
+- content-length を満たすまでループして読む
+- 将来は手書き HTTP をやめて既存ライブラリ採用も検討
+
+[P1-4] MainActivity の生成処理が重複している
+対象:
+- `MainActivity.onCreate()` 内 sendButton 処理
+- `MainActivity.processGeneration()`
+
+所見:
+- streaming / non-streaming / error handling の大半が重複
+- 修整時に片方だけ直して差分が出るリスクが高い
+
+提案:
+- direct prompt の生成処理を 1 メソッドに集約
+
+[P1-5] Re-init Model が currentConfig ではなく `default` を再ロードする
+対象:
+- `MainActivity.reinitializeModel()`
+
+所見:
+- UI 上で他プロファイルを選んでいても再初期化後は default に戻る
+- 利用者視点では意図が読みにくい
+
+提案:
+- `currentConfig.name` を優先して再ロードする
+- もし default 固定が仕様なら UI 文言を明示する
+
+4-3. P2: リファクタリング / 保守性の課題
+
+[P2-1] 応答マーカー除去と streaming 補助処理が重複
+対象:
+- `MainActivity.stripResponseMarkers()`
+- `OllamaApiServer.stripResponseMarkers()`
+- 各 streaming filter 実装
+
+所見:
+- UI と API で似た処理を別実装している
+- 微妙に差が出ると不具合調査が難しい
+
+提案:
+- `ResponseMarkerUtils` / `StreamOutputFilter` 共通化
+
+[P2-2] `extractFilenameFromUrl()` / `getModelStorageDir()` が 3 箇所に重複
+対象:
+- `MainActivity`
+- `ModelManager`
+- `SettingsActivity`
+
+提案:
+- `ModelPathUtils` などへ抽出
+
+[P2-3] max debug ログ出力実装が重複
+対象:
+- `MainActivity.logMaxDebugPayload()`
+- `OllamaApiServer.logMaxDebugPayload()`
+
+提案:
+- 共有ユーティリティ化
+
+[P2-4] ドキュメント本文がコード内に重複
+対象:
+- `MainActivity.showStartupInstructionsIfNeeded()`
+- `DocumentsActivity.buildManualText()`
+
+所見:
+- Quick Start と User Manual の内容が重複している
+- すでに「Download ボタンの説明」と実装で齟齬が見える
+
+提案:
+- 文書を 1 箇所に集約
+- 少なくとも定数・リソース化して差分管理しやすくする
+
+4-4. P3: 不整合・軽微な改善候補
+
+[P3-1] SettingsActivity の入力 fallback 値が ConfigurationManager のデフォルトと一部不一致
+例:
+- `nThreads`: 既定 4 に対して UI parse fallback は 2
+- `penaltyRepeat`: 既定 1.1 に対して fallback は 1.0
+- `minP`: 既定 0.01 に対して fallback は 0.05
+
+提案:
+- `ConfigurationManager.Configuration` のデフォルトを単一ソースにして UI から参照
+
+[P3-2] 旧ストレージ権限が残っている
+対象:
+- `AndroidManifest.xml`
+
+所見:
+- `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` が宣言されている
+- 実装は app 専用 external files dir を主に使っており、現行用途と一致しない
+
+提案:
+- 実機要件を再確認の上、不要なら削除
+
+======================================================================
+5. 重複・未使用・整理候補一覧
+======================================================================
+
+5-1. 未使用 / 死んでいる可能性が高いコード
+
+- `SettingsActivity.initModelInBackground()`
+  定義はあるが参照が見当たらない
+
+- `MainActivity.viewLogFile()`
+  deprecated コメント付きで実参照なし
+
+- `PromptTemplateManager.normalizeRole()`
+  参照なし
+
+- `PromptTemplateManager.buildMultiTurnLlama()`
+  実参照なし
+
+- `OllamaApiServer.sendStreamingResponse()`
+  実参照なし
+
+- `SettingsActivity.EXTRA_DISPLAY_LANGUAGE`
+  返却しているが MainActivity 側で利用していない
+
+- `ConfigurationManager.Configuration.promptTemplate`
+  JSON には残るが実際の prompt 構築でほぼ使っていない
+  実質 legacy field とみなせる
+
+5-2. リポジトリ上の不要候補
+
+- `release.keystore`
+- `release.keystore.base64`
+  セキュリティ上の理由で削除対象
+
+- `ic_launcher.png`
+  ルート直下のファイルで、`res/mipmap-*` とは別管理
+  ソース・ビルド定義からの参照は確認できなかった
+
+- `push.sh`
+  `git add . && git commit -m "update" && git push`
+  という強引な内容で、build artifact や秘密情報を誤って巻き込む危険が高い
+
+5-3. ベンダ資産の肥大化
+
+`app/src/main/cpp/llama/` は約 131MB。
+そのうち Android アプリの CMake で直接参照していないディレクトリ例:
+
+- `app/src/main/cpp/llama/docs`      約 35MB
+- `app/src/main/cpp/llama/models`    約 54MB
+- `app/src/main/cpp/llama/examples`  約 2.0MB
+- `app/src/main/cpp/llama/tests`     約 1.4MB
+- `app/src/main/cpp/llama/scripts`   約 468KB
+- `app/src/main/cpp/llama/media`     約 748KB
+- `app/src/main/cpp/llama/gguf-py`   約 682KB
+
+注意:
+- `llama/src/models/*.cpp` はビルド対象
+- `llama/models/` ディレクトリ内の GGUF 語彙ファイル群は Android アプリ CMake の対象外
+
+提案:
+- vendored subtree を必要最小限へ削減
+- もしくは llama.cpp を submodule 化し、Android ビルドに必要な部分だけ checkout / copy する
+
+======================================================================
+6. テスト観点レビュー
+======================================================================
+
+- `app/src/test` なし
+- `app/src/androidTest` なし
+- Java/Kotlin アプリ層の自動テストは未整備
+- vendor 側の `app/src/main/cpp/llama/tests/` は upstream テスト群だが、
+  Android アプリの Gradle/CI からは使われていない
+
+提案:
+- 最低限、以下のテストを追加したい
+  - PromptTemplateManager の family 判定と prompt 生成
+  - ConfigurationManager の save/load round trip
+  - MainActivity / API 共有ロジックの marker 除去
+  - OllamaApiServer の request parsing / queue 制御
+
+======================================================================
+7. 今後の改修優先順位提案
+======================================================================
+
+第1段階（先にやるべき）
+1. keystore 流出対策
+2. SSL 検証無効化の撤廃
+3. API bind / 認証方針の見直し
+4. PromptTemplateManager の GGUF / LLAMA 周りの正しさ修整
+
+第2段階（安全に育てるため）
+5. MainActivity / OllamaApiServer の重複ロジック集約
+6. URL からモデルパスを引く helper の共通化
+7. 未使用コード削除
+8. Settings の fallback 値統一
+
+第3段階（保守性向上）
+9. 文書文面の一元化
+10. ローカル build bootstrap 手順の整備
+11. ベンダ資産の整理
+12. アプリ層ユニットテストの追加
+
+======================================================================
+8. 改修時の参照ポイント
+======================================================================
+
+UI / 画面改修
+- `app/src/main/java/com/micklab/llama/MainActivity.java`
+- `app/src/main/java/com/micklab/llama/SettingsActivity.java`
+- `app/src/main/java/com/micklab/llama/DocumentsActivity.java`
+- `app/src/main/res/layout/*.xml`
+
+モデルロード / 推論
+- `app/src/main/java/com/micklab/llama/ModelManager.java`
+- `app/src/main/java/com/micklab/llama/LlamaNative.java`
+- `app/src/main/cpp/jni/jni_llama.cpp`
+
+prompt / template
+- `app/src/main/java/com/micklab/llama/PromptTemplateManager.java`
+
+設定保存
+- `app/src/main/java/com/micklab/llama/ConfigurationManager.java`
+
+API / background service
+- `app/src/main/java/com/micklab/llama/OllamaApiServer.java`
+- `app/src/main/java/com/micklab/llama/OllamaForegroundService.java`
+
+ビルド / CI
+- `app/build.gradle`
+- `app/src/main/cpp/CMakeLists.txt`
+- `.github/workflows/android.yml`
+
+以上。

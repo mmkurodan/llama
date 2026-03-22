@@ -8,7 +8,10 @@ import org.json.JSONException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Singleton class that manages model loading and generation.
@@ -28,6 +31,7 @@ public class ModelManager {
     private static final int DEFAULT_TOP_K = 40;
     private static final int GPU_LAYERS_DISABLED = 0;
     private static final int GPU_LAYERS_ENABLED_ALL = -1;
+    private static final Pattern SPLIT_GGUF_PATTERN = Pattern.compile("^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$");
     
     private static ModelManager instance;
     
@@ -164,17 +168,13 @@ public class ModelManager {
                 listener.onModelLoading(configName);
             }
             
-            // Download if not exists
-            if (!destFile.exists() || destFile.length() == 0) {
-                Log.i(TAG, "Downloading model from: " + config.modelUrl);
-                String dlResult = llama.download(config.modelUrl, modelPath);
-                if (!"ok".equals(dlResult)) {
-                    Log.e(TAG, "Download failed: " + dlResult);
-                    if (listener != null) {
-                        listener.onError("Download failed: " + dlResult);
-                    }
-                    return false;
+            String fileAvailabilityError = ensureModelFilesAvailable(config, destFile);
+            if (fileAvailabilityError != null) {
+                Log.e(TAG, fileAvailabilityError);
+                if (listener != null) {
+                    listener.onError(fileAvailabilityError);
                 }
+                return false;
             }
             
             // Initialize model if path changed
@@ -340,5 +340,73 @@ public class ModelManager {
     private File getModelStorageDir() {
         File externalDir = context.getExternalFilesDir(null);
         return externalDir != null ? externalDir : context.getFilesDir();
+    }
+
+    private String ensureModelFilesAvailable(ConfigurationManager.Configuration config, File destFile) {
+        boolean needsDownload = !destFile.exists() || destFile.length() == 0;
+        String missingShardPath = findMissingSplitShardPath(destFile);
+
+        if (!needsDownload && missingShardPath != null) {
+            Log.w(TAG, "Incomplete split model detected, repairing download. Missing: " + missingShardPath);
+            needsDownload = true;
+        }
+
+        if (needsDownload) {
+            Log.i(TAG, "Downloading model from: " + config.modelUrl);
+            String downloadResult = llama.download(config.modelUrl, destFile.getAbsolutePath());
+            if (!"ok".equals(downloadResult)) {
+                return "Download failed: " + downloadResult;
+            }
+        }
+
+        missingShardPath = findMissingSplitShardPath(destFile);
+        if (missingShardPath != null) {
+            return "Incomplete split model download, missing file: " + missingShardPath;
+        }
+        if (!destFile.exists() || destFile.length() == 0) {
+            return "Model file missing after download: " + destFile.getAbsolutePath();
+        }
+
+        return null;
+    }
+
+    private String findMissingSplitShardPath(File modelFile) {
+        if (modelFile == null) {
+            return null;
+        }
+
+        Matcher matcher = SPLIT_GGUF_PATTERN.matcher(modelFile.getName());
+        if (!matcher.matches()) {
+            return null;
+        }
+
+        final int splitNo;
+        final int splitCount;
+        try {
+            splitNo = Integer.parseInt(matcher.group(2));
+            splitCount = Integer.parseInt(matcher.group(3));
+        } catch (NumberFormatException e) {
+            Log.w(TAG, "Could not parse split model name: " + modelFile.getName(), e);
+            return null;
+        }
+
+        if (splitNo <= 0 || splitCount <= 1 || splitNo > splitCount) {
+            return null;
+        }
+
+        File parentDir = modelFile.getParentFile();
+        if (parentDir == null) {
+            return modelFile.getAbsolutePath();
+        }
+
+        String prefix = matcher.group(1);
+        for (int idx = 1; idx <= splitCount; idx++) {
+            File shardFile = new File(parentDir, String.format(Locale.US, "%s-%05d-of-%05d.gguf", prefix, idx, splitCount));
+            if (!shardFile.exists() || shardFile.length() <= 0) {
+                return shardFile.getAbsolutePath();
+            }
+        }
+
+        return null;
     }
 }
