@@ -900,6 +900,7 @@ public class SettingsActivity extends Activity {
                         && !"ollama.log".equals(file.getName())
                         && !"last_crash.txt".equals(file.getName())
                         && !"native_crash.txt".equals(file.getName())
+                        && !PendingModelLoadStore.isMarkerFile(file.getName())
                         && !containsFile(modelFiles, file)) {
                     modelFiles.add(file);
                 }

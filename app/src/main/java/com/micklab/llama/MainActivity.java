@@ -414,7 +414,7 @@ public class MainActivity extends Activity {
             }).start();
         });
 
-        showStartupInstructionsIfNeeded();
+        showStartupDialogs();
     }
     
     private void processGeneration(String userPrompt) {
@@ -998,6 +998,148 @@ public class MainActivity extends Activity {
                     }
                 })
                 .show();
+    }
+
+    private void showStartupDialogs() {
+        if (!showPendingLoadRecoveryIfNeeded()) {
+            showStartupInstructionsIfNeeded();
+        }
+    }
+
+    private boolean showPendingLoadRecoveryIfNeeded() {
+        final PendingModelLoadStore.PendingLoad pendingLoad;
+        try {
+            pendingLoad = PendingModelLoadStore.readPendingLoad(this);
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to read pending model load marker", e);
+            appendMessage("Failed to read pending model load marker: " + e.getMessage());
+            clearPendingModelLoadMarker();
+            showUnreadablePendingLoadDialog();
+            return true;
+        }
+
+        if (pendingLoad == null) {
+            return false;
+        }
+
+        String profileName = pendingLoad.getConfigName().trim().isEmpty()
+                ? localizedText("不明", "Unknown")
+                : pendingLoad.getConfigName().trim();
+        String modelName = pendingLoad.getDisplayModelName().isEmpty()
+                ? localizedText("不明", "Unknown")
+                : pendingLoad.getDisplayModelName();
+
+        String message = localizedText(
+                "前回のモデルロードは完了前に中断されました。\n\nプロファイル: " + profileName
+                        + "\nモデル: " + modelName + "\n\n再試行しますか？",
+                "The previous model load did not finish.\n\nProfile: " + profileName
+                        + "\nModel: " + modelName + "\n\nRetry now?");
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton(localizedText("再試行", "Retry"), (dialog, which) -> {
+                    clearPendingModelLoadMarker();
+                    retryPendingModelLoad(pendingLoad);
+                })
+                .setNegativeButton(localizedText("再試行しない", "Skip"), (dialog, which) -> {
+                    clearPendingModelLoadMarker();
+                    showStartupInstructionsIfNeeded();
+                })
+                .show();
+        return true;
+    }
+
+    private void showUnreadablePendingLoadDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
+                .setMessage(localizedText(
+                        "前回のモデルロード記録を読み取れなかったため、記録を削除しました。",
+                        "The previous model load record could not be read, so it has been cleared."))
+                .setCancelable(false)
+                .setPositiveButton("OK", (dialog, which) -> showStartupInstructionsIfNeeded())
+                .show();
+    }
+
+    private void clearPendingModelLoadMarker() {
+        try {
+            PendingModelLoadStore.deletePendingLoad(this);
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to delete pending model load marker", e);
+            appendMessage("Failed to delete pending model load marker: " + e.getMessage());
+        }
+    }
+
+    private void retryPendingModelLoad(PendingModelLoadStore.PendingLoad pendingLoad) {
+        final String configName = pendingLoad.getConfigName() != null
+                ? pendingLoad.getConfigName().trim()
+                : "";
+        if (configName.isEmpty()) {
+            showToast(localizedText(
+                    "再試行に必要なプロファイル情報がありません",
+                    "Recovery profile information is missing"));
+            showStartupInstructionsIfNeeded();
+            return;
+        }
+
+        if (!modelManager.tryAcquire()) {
+            appendMessage("Skipped interrupted model load retry because the model is busy.");
+            showToast(localizedText("モデルが使用中です", "Model is busy"));
+            showStartupInstructionsIfNeeded();
+            return;
+        }
+
+        updateSettingsButtonForBusyState();
+        appendMessage("Retrying interrupted model load for profile \"" + configName + "\"...");
+
+        new Thread(() -> {
+            try {
+                final ConfigurationManager.Configuration recoveredConfig;
+                try {
+                    recoveredConfig = configManager.loadConfiguration(configName);
+                } catch (IOException | JSONException e) {
+                    Log.e(TAG, "Failed to load recovery configuration: " + configName, e);
+                    runOnUiThread(() -> {
+                        appendMessage("Failed to load recovery configuration: " + e.getMessage());
+                        showToast(localizedText(
+                                "復旧対象の設定を読み込めませんでした",
+                                "Failed to load recovery configuration"));
+                        showStartupInstructionsIfNeeded();
+                    });
+                    return;
+                }
+
+                boolean success = modelManager.loadConfiguration(configName);
+                runOnUiThread(() -> {
+                    if (success) {
+                        currentConfig = recoveredConfig;
+                        appendMessage("Recovered model load completed for profile \"" + configName + "\".");
+                        showToast(localizedText(
+                                "中断されたモデルロードを再試行しました",
+                                "Retried the interrupted model load"));
+                    } else {
+                        appendMessage("Recovered model load failed for profile \"" + configName + "\".");
+                        showToast(localizedText(
+                                "モデルの再ロードに失敗しました",
+                                "Model reload failed"));
+                    }
+                    showStartupInstructionsIfNeeded();
+                });
+            } catch (Throwable t) {
+                Log.e(TAG, "Recovered model load error", t);
+                runOnUiThread(() -> {
+                    appendException("Recovered model load error", t);
+                    showToast(localizedText(
+                            "モデルの再ロード中にエラーが発生しました",
+                            "Model reload error"));
+                    showStartupInstructionsIfNeeded();
+                });
+            } finally {
+                modelManager.release();
+                runOnUiThread(this::updateSettingsButtonForBusyState);
+            }
+        }).start();
     }
     
     private void copyToClipboard(String label, String text) {

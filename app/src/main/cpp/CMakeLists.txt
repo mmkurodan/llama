@@ -23,14 +23,14 @@ set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 #   @BUILD_COMPILER@
 #   @BUILD_TARGET@
 # ---------------------------------------------------------
-set(LLAMA_BUILD_NUMBER 0         CACHE STRING "")
-set(LLAMA_BUILD_COMMIT "unknown" CACHE STRING "")
+set(LLAMA_BUILD_NUMBER 8653 CACHE STRING "")
+set(LLAMA_BUILD_COMMIT "1f34806c441f335f7d66e56fdb8ab3f5d09684e9" CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
 # ggml.c expects these string macros to be defined at compile time.
-set(GGML_VERSION      "0.9.7"   CACHE STRING "")
-set(GGML_BUILD_COMMIT "unknown" CACHE STRING "")
+set(GGML_VERSION      "0.9.11" CACHE STRING "")
+set(GGML_BUILD_COMMIT "1f34806c441f335f7d66e56fdb8ab3f5d09684e9" CACHE STRING "")
 
 # ---------------------------------------------------------
 # build-info.cpp を生成
@@ -71,7 +71,7 @@ set(LLAMA_SOURCES
 )
 
 # ---------------------------------------------------------
-# GGML sources (updated for llama.cpp b8204)
+# GGML sources (updated for llama.cpp b8653)
 # ---------------------------------------------------------
 set(GGML_SOURCES
     ${GGML_ROOT_DIR}/src/ggml.c

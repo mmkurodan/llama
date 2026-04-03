@@ -110,7 +110,7 @@ struct callback_data {
             auto diff_filtered = filter_nonzero_rows(v_pos[il]);
             v_diff_filtered.push_back(diff_filtered);
         }
-        return v_diff_filtered; // for convinient, we return the result std::vector
+        return v_diff_filtered; // for convenient, we return the result std::vector
     }
 
     // delete zero rows from a given 2D tensor
@@ -399,6 +399,8 @@ int main(int argc, char ** argv) {
     common_params params;
 
     params.out_file = "control_vector.gguf";
+
+    common_init();
 
     if (!common_params_parse(argc, argv, params, LLAMA_EXAMPLE_CVECTOR_GENERATOR, print_usage)) {
         return 1;
