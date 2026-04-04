@@ -1,16 +1,18 @@
 package com.micklab.llama;
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.BroadcastReceiver;
-import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.app.ActivityManager;
+import android.app.Activity;
+import android.app.AlarmManager;
+import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
@@ -51,10 +53,12 @@ public class MainActivity extends Activity {
     private static final int REQUEST_SETTINGS = 1;
     private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
     private static final int REQUEST_CREATE_LOG_FILE = 3;
+    private static final int REQUEST_RESTART_APP = 4;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
+    private static final long APP_RESTART_DELAY_MS = 250L;
     private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
             "show_startup_message",
             "show_quick_start"
@@ -114,6 +118,8 @@ public class MainActivity extends Activity {
     // API Server (via Foreground Service)
     private int apiPort = OllamaApiServer.DEFAULT_PORT;
     private boolean isServiceRunning = false;
+    private boolean pendingApiStartAfterPermission = false;
+    private boolean continueStartupDialogsAfterPermission = false;
     
     // Timestamp formatter for log messages
     private final SimpleDateFormat timestampFormat = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
@@ -241,9 +247,6 @@ public class MainActivity extends Activity {
         applyLocalizedUiText();
 
         appendMessage("UI ready.");
-
-        // Request notification permission for Android 13+
-        requestNotificationPermission();
 
         // Initialize ModelManager singleton
         modelManager = ModelManager.getInstance(this);
@@ -576,82 +579,11 @@ public class MainActivity extends Activity {
     }
     
     private void reinitializeModel() {
-        String currentModelPath = modelManager.getCurrentModelPath();
-        if (currentModelPath == null || currentModelPath.isEmpty()) {
-            showToast("No model path available. Please load a model in Settings first.");
-            return;
-        }
-        
-        appendMessage("Initializing model reload...");
-        
-        // Disable buttons during reinitialization
-        sendButton.setEnabled(false);
-        initModelButton.setEnabled(false);
-        
-        new Thread(() -> {
-            try {
-                // 1. Disconnect all API connections
-                appendMessage("Disconnecting all API connections...");
-                if (isServiceRunning) {
-                    Intent disconnectIntent = new Intent(this, OllamaForegroundService.class);
-                    disconnectIntent.setAction(OllamaForegroundService.ACTION_DISCONNECT_ALL);
-                    startService(disconnectIntent);
-                }
-                
-                // 2. Reset busy state (force clear any stuck 503 state)
-                appendMessage("Resetting busy state...");
-                modelManager.resetBusy();
-                
-                // Small delay to ensure connections are closed
-                Thread.sleep(200);
-                
-                // 3. Free and reload model
-                appendMessage("Freeing current model...");
-                modelManager.free();
-                runOnUiThread(() -> {
-                    appendMessage("Model freed.");
-                });
-                
-                // Small delay to ensure cleanup
-                Thread.sleep(500);
-                
-                // Re-initialize via loading default config
-                if (modelManager.tryAcquire()) {
-                    try {
-                        appendMessage("Re-initializing model...");
-                        boolean success = modelManager.loadConfiguration("default");
-                        
-                        runOnUiThread(() -> {
-                            if (success) {
-                                appendMessage("Model re-initialized successfully");
-                                showToast("Model re-initialized successfully");
-                            } else {
-                                appendMessage("Model re-initialization failed");
-                                showToast("Model re-initialization failed");
-                            }
-                            // Re-enable buttons
-                            sendButton.setEnabled(true);
-                            initModelButton.setEnabled(true);
-                        });
-                    } finally {
-                        modelManager.release();
-                    }
-                } else {
-                    runOnUiThread(() -> {
-                        appendMessage("Could not acquire model lock for reinitialization");
-                        sendButton.setEnabled(true);
-                        initModelButton.setEnabled(true);
-                    });
-                }
-            } catch (Throwable t) {
-                appendException("Model re-initialization error", t);
-                showToast("Error: " + t.getMessage());
-                runOnUiThread(() -> {
-                    sendButton.setEnabled(true);
-                    initModelButton.setEnabled(true);
-                });
-            }
-        }).start();
+        appendMessage("Force re-initializing model by restarting the app process...");
+        scheduleAppRestart();
+        finishAffinity();
+        android.os.Process.killProcess(android.os.Process.myPid());
+        System.exit(0);
     }
     
     private void viewLogFile() {
@@ -960,17 +892,19 @@ public class MainActivity extends Activity {
         messageView.setText(
                 "[日本語]\n" +
                 "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
+                "0) 起動時にAPI有効化ポップアップが表示された場合は、必要に応じて有効化してください。\n" +
                 "1) SettingsでモデルをLoad Modelしてください。\n" +
                 "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
                 "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
                 "[English]\n" +
                 "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
+                "0) If the API enablement popup appears at launch, enable it when needed.\n" +
                 "1) In Settings, load a model with Load Model.\n" +
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
                 "[TIPS]\n" +
-                "日本語: 大きなモデルを利用すると、Android OS のメモリ制約やプロセス管理によりクラッシュする可能性があります。もしクラッシュが発生した場合は、より小さいモデルを試すか、一度モデルを解放（例: Settings の Re-init Model）し、少し時間をおいてから再度モデルをロードしてください。\n\n" +
-                "English: When using very large models, Android OS memory limits or process management may cause the app to crash. If that occurs, try a smaller model, or free the current model (e.g., Re-init Model in Settings), wait a short while, and then attempt to load the model again.");
+                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に一時ファイルを削除して通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model はアプリを即時再起動して処理を中断します。\n\n" +
+                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app clears temporary load files on the next launch and shows a notice. If needed, try a smaller model or load the model again from Settings. Re-init Model immediately restarts the app process to interrupt the work.");
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
@@ -1001,6 +935,39 @@ public class MainActivity extends Activity {
     }
 
     private void showStartupDialogs() {
+        showApiEnablePromptIfNeeded();
+    }
+
+    private void showApiEnablePromptIfNeeded() {
+        if (isServiceRunning) {
+            continueStartupDialogsAfterApiPrompt();
+            return;
+        }
+
+        String message = localizedText(
+                "ローカルAPIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API を利用できます。後からメイン画面でも切り替えられます。",
+                "Enable the local API server?\n\nIf enabled, the API can be used from this device or the same local network. You can also change this later from the main screen.");
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("API有効化", "Enable API"))
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton(localizedText("有効化", "Enable"), (dialog, which) -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                        pendingApiStartAfterPermission = true;
+                        continueStartupDialogsAfterPermission = true;
+                        requestNotificationPermission();
+                        return;
+                    }
+                    startApiService();
+                    continueStartupDialogsAfterApiPrompt();
+                })
+                .setNegativeButton(localizedText("今回は無効", "Not now"), (dialog, which) -> continueStartupDialogsAfterApiPrompt())
+                .show();
+    }
+
+    private void continueStartupDialogsAfterApiPrompt() {
         if (!showPendingLoadRecoveryIfNeeded()) {
             showStartupInstructionsIfNeeded();
         }
@@ -1029,24 +996,21 @@ public class MainActivity extends Activity {
                 ? localizedText("不明", "Unknown")
                 : pendingLoad.getDisplayModelName();
 
+        clearPendingModelLoadMarker();
+
         String message = localizedText(
-                "前回のモデルロードは完了前に中断されました。\n\nプロファイル: " + profileName
-                        + "\nモデル: " + modelName + "\n\n再試行しますか？",
-                "The previous model load did not finish.\n\nProfile: " + profileName
-                        + "\nModel: " + modelName + "\n\nRetry now?");
+                "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: " + profileName
+                        + "\nモデル: " + modelName
+                        + "\n\n再試行は行わず、一時ファイルを削除しました。必要な場合は Settings から改めて Load Model を実行してください。",
+                "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: "
+                        + profileName + "\nModel: " + modelName
+                        + "\n\nNo automatic retry was performed. Temporary files were cleared. If needed, load the model again from Settings.");
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
                 .setMessage(message)
                 .setCancelable(false)
-                .setPositiveButton(localizedText("再試行", "Retry"), (dialog, which) -> {
-                    clearPendingModelLoadMarker();
-                    retryPendingModelLoad(pendingLoad);
-                })
-                .setNegativeButton(localizedText("再試行しない", "Skip"), (dialog, which) -> {
-                    clearPendingModelLoadMarker();
-                    showStartupInstructionsIfNeeded();
-                })
+                .setPositiveButton("OK", (dialog, which) -> showStartupInstructionsIfNeeded())
                 .show();
         return true;
     }
@@ -1055,8 +1019,8 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
                 .setMessage(localizedText(
-                        "前回のモデルロード記録を読み取れなかったため、記録を削除しました。",
-                        "The previous model load record could not be read, so it has been cleared."))
+                        "前回のモデルロード記録を読み取れなかったため、一時ファイルを削除しました。",
+                        "The previous model load record could not be read, so temporary files were cleared."))
                 .setCancelable(false)
                 .setPositiveButton("OK", (dialog, which) -> showStartupInstructionsIfNeeded())
                 .show();
@@ -1071,77 +1035,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void retryPendingModelLoad(PendingModelLoadStore.PendingLoad pendingLoad) {
-        final String configName = pendingLoad.getConfigName() != null
-                ? pendingLoad.getConfigName().trim()
-                : "";
-        if (configName.isEmpty()) {
-            showToast(localizedText(
-                    "再試行に必要なプロファイル情報がありません",
-                    "Recovery profile information is missing"));
-            showStartupInstructionsIfNeeded();
-            return;
-        }
-
-        if (!modelManager.tryAcquire()) {
-            appendMessage("Skipped interrupted model load retry because the model is busy.");
-            showToast(localizedText("モデルが使用中です", "Model is busy"));
-            showStartupInstructionsIfNeeded();
-            return;
-        }
-
-        updateSettingsButtonForBusyState();
-        appendMessage("Retrying interrupted model load for profile \"" + configName + "\"...");
-
-        new Thread(() -> {
-            try {
-                final ConfigurationManager.Configuration recoveredConfig;
-                try {
-                    recoveredConfig = configManager.loadConfiguration(configName);
-                } catch (IOException | JSONException e) {
-                    Log.e(TAG, "Failed to load recovery configuration: " + configName, e);
-                    runOnUiThread(() -> {
-                        appendMessage("Failed to load recovery configuration: " + e.getMessage());
-                        showToast(localizedText(
-                                "復旧対象の設定を読み込めませんでした",
-                                "Failed to load recovery configuration"));
-                        showStartupInstructionsIfNeeded();
-                    });
-                    return;
-                }
-
-                boolean success = modelManager.loadConfiguration(configName);
-                runOnUiThread(() -> {
-                    if (success) {
-                        currentConfig = recoveredConfig;
-                        appendMessage("Recovered model load completed for profile \"" + configName + "\".");
-                        showToast(localizedText(
-                                "中断されたモデルロードを再試行しました",
-                                "Retried the interrupted model load"));
-                    } else {
-                        appendMessage("Recovered model load failed for profile \"" + configName + "\".");
-                        showToast(localizedText(
-                                "モデルの再ロードに失敗しました",
-                                "Model reload failed"));
-                    }
-                    showStartupInstructionsIfNeeded();
-                });
-            } catch (Throwable t) {
-                Log.e(TAG, "Recovered model load error", t);
-                runOnUiThread(() -> {
-                    appendException("Recovered model load error", t);
-                    showToast(localizedText(
-                            "モデルの再ロード中にエラーが発生しました",
-                            "Model reload error"));
-                    showStartupInstructionsIfNeeded();
-                });
-            } finally {
-                modelManager.release();
-                runOnUiThread(this::updateSettingsButtonForBusyState);
-            }
-        }).start();
-    }
-    
     private void copyToClipboard(String label, String text) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText(label, text);
@@ -1264,6 +1157,7 @@ public class MainActivity extends Activity {
             // Check notification permission before starting service
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    pendingApiStartAfterPermission = true;
                     showToast("Notification permission required for background service");
                     requestNotificationPermission();
                     return;
@@ -1280,15 +1174,47 @@ public class MainActivity extends Activity {
             }
         }
     }
+
+    private void scheduleAppRestart() {
+        Intent restartIntent = new Intent(getApplicationContext(), MainActivity.class);
+        restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                getApplicationContext(),
+                REQUEST_RESTART_APP,
+                restartIntent,
+                PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null) {
+            Log.w(TAG, "AlarmManager unavailable; app will exit without automatic restart");
+            return;
+        }
+
+        long triggerAtMillis = System.currentTimeMillis() + APP_RESTART_DELAY_MS;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+        } else {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+        }
+    }
     
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted) {
                 appendMessage("Notification permission granted");
+                if (pendingApiStartAfterPermission && !isServiceRunning) {
+                    startApiService();
+                }
             } else {
                 appendMessage("Notification permission denied - background service may not show notifications");
+            }
+            pendingApiStartAfterPermission = false;
+            if (continueStartupDialogsAfterPermission) {
+                continueStartupDialogsAfterPermission = false;
+                continueStartupDialogsAfterApiPrompt();
             }
         }
     }

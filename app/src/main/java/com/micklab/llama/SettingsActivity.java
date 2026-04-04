@@ -103,7 +103,6 @@ public class SettingsActivity extends Activity {
     
     // API Server settings
     private EditText apiPortInput;
-    private TextView apiServerStatus;
     private TextView languageLabel;
     private Spinner languageSpinner;
     private Spinner logLevelSpinner;
@@ -233,7 +232,6 @@ public class SettingsActivity extends Activity {
         
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
-        apiServerStatus = findViewById(R.id.apiServerStatus);
         languageLabel = findViewById(R.id.languageLabel);
         languageSpinner = findViewById(R.id.languageSpinner);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
@@ -425,7 +423,6 @@ public class SettingsActivity extends Activity {
                 case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
                 case "Llama API Server": return "Llama APIサーバー";
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
-                case "Server: Stopped": return "サーバー: 停止中";
                 case "Log Settings": return "ログ設定";
                 case "Log Level:": return "ログレベル:";
                 case "Show License": return "ライセンス表示";

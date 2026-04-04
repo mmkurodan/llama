@@ -110,12 +110,8 @@ public class PromptTemplateManager {
         "<|im_start|>user\n{USER}<|im_end|>\n" +
         "<|im_start|>assistant\n";
     
-    private static final String GEMMA_TEMPLATE = 
+    private static final String GEMMA_TEMPLATE =
         "<start_of_turn>system\n{SYSTEM}\n<end_of_turn>\n" +
-        "<start_of_turn>user\n{USER}\n<end_of_turn>\n" +
-        "<start_of_turn>model\n";
-    
-    private static final String GEMMA_TEMPLATE_NO_SYSTEM = 
         "<start_of_turn>user\n{USER}\n<end_of_turn>\n" +
         "<start_of_turn>model\n";
     
@@ -202,7 +198,7 @@ public class PromptTemplateManager {
     public static String getTemplateForFamily(ModelFamily family, boolean hasSystem) {
         switch (family) {
             case GEMMA:
-                return hasSystem ? GEMMA_TEMPLATE : GEMMA_TEMPLATE_NO_SYSTEM;
+                return GEMMA_TEMPLATE;
             case LLAMA:
                 return hasSystem ? LLAMA_TEMPLATE : LLAMA_TEMPLATE_NO_SYSTEM;
             case MISTRAL:
@@ -242,9 +238,8 @@ public class PromptTemplateManager {
      * 
      * Priority:
      * 1. Custom template from settings
-     * 2. GGUF chat_template
-     * 3. Model family template
-     * 4. ChatML fallback
+     * 2. Model family template
+     * 3. ChatML fallback
      */
     public static String selectTemplate(
             String customTemplate,
@@ -659,12 +654,13 @@ public class PromptTemplateManager {
         return sb.toString();
     }
 
-    // Gemma multi-turn (system as separate block)
+    // Gemma family multi-turn. Emit the leading system turn even when empty so the
+    // prompt shape stays compatible with the required system/user/model protocol.
     private static String buildMultiTurnGemma(String system, List<Message> history) {
         StringBuilder sb = new StringBuilder();
-        if (system != null && !system.isEmpty()) {
-            sb.append("<start_of_turn>system\n").append(system).append("\n<end_of_turn>\n");
-        }
+        sb.append("<start_of_turn>system\n")
+                .append(system != null ? system : "")
+                .append("\n<end_of_turn>\n");
         for (Message msg : history) {
             if ("user".equals(msg.role)) {
                 sb.append("<start_of_turn>user\n")

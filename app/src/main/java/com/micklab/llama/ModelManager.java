@@ -143,6 +143,7 @@ public class ModelManager {
      * @return true if successful, false otherwise
      */
     public boolean loadConfiguration(String configName) {
+        boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
             
@@ -171,6 +172,7 @@ public class ModelManager {
             }
 
             if (requiresModelInit) {
+                shouldClearPendingLoad = true;
                 try {
                     PendingModelLoadStore.writePendingLoad(context, configName, modelPath, config.modelUrl);
                 } catch (IOException | JSONException e) {
@@ -182,76 +184,74 @@ public class ModelManager {
                 }
             }
 
-            try {
-                String fileAvailabilityError = ensureModelFilesAvailable(config, destFile);
-                if (fileAvailabilityError != null) {
-                    Log.e(TAG, fileAvailabilityError);
+            String fileAvailabilityError = ensureModelFilesAvailable(config, destFile);
+            if (fileAvailabilityError != null) {
+                Log.e(TAG, fileAvailabilityError);
+                if (listener != null) {
+                    listener.onError(fileAvailabilityError);
+                }
+                return false;
+            }
+
+            if (requiresModelInit) {
+                if (currentModelPath != null) {
+                    llama.free();
+                }
+
+                currentModelPath = null;
+                currentConfigName = null;
+                modelLoaded = false;
+
+                applyLoadParameters(config, PRELOAD_N_CTX);
+                String preloadResult = llama.init(modelPath);
+                if (!"ok".equals(preloadResult)) {
+                    Log.e(TAG, "Model preload failed: " + preloadResult);
                     if (listener != null) {
-                        listener.onError(fileAvailabilityError);
+                        listener.onError("Model preload failed: " + preloadResult);
                     }
                     return false;
                 }
 
-                if (requiresModelInit) {
-                    if (currentModelPath != null) {
-                        llama.free();
+                llama.free();
+                applyLoadParameters(config, config.nCtx);
+                String initResult = llama.init(modelPath);
+                if (!"ok".equals(initResult)) {
+                    Log.e(TAG, "Model init failed: " + initResult);
+                    if (listener != null) {
+                        listener.onError("Model init failed: " + initResult);
                     }
-
-                    currentModelPath = null;
-                    currentConfigName = null;
-                    modelLoaded = false;
-
-                    applyLoadParameters(config, PRELOAD_N_CTX);
-                    String preloadResult = llama.init(modelPath);
-                    if (!"ok".equals(preloadResult)) {
-                        Log.e(TAG, "Model preload failed: " + preloadResult);
-                        if (listener != null) {
-                            listener.onError("Model preload failed: " + preloadResult);
-                        }
-                        return false;
-                    }
-
-                    llama.free();
-                    applyLoadParameters(config, config.nCtx);
-                    String initResult = llama.init(modelPath);
-                    if (!"ok".equals(initResult)) {
-                        Log.e(TAG, "Model init failed: " + initResult);
-                        if (listener != null) {
-                            listener.onError("Model init failed: " + initResult);
-                        }
-                        return false;
-                    }
-
-                    currentModelPath = modelPath;
+                    return false;
                 }
 
-                // Set parameters from configuration
-                applyConfiguration(config);
-
-                currentConfigName = configName;
-                modelLoaded = true;
-
-                if (listener != null) {
-                    listener.onModelLoaded(configName);
-                }
-
-                Log.i(TAG, "Configuration loaded: " + configName);
-                return true;
-            } finally {
-                if (requiresModelInit) {
-                    try {
-                        PendingModelLoadStore.deletePendingLoad(context);
-                    } catch (IOException cleanupError) {
-                        Log.e(TAG, "Failed to clear pending model load marker", cleanupError);
-                    }
-                }
+                currentModelPath = modelPath;
             }
+
+            // Set parameters from configuration
+            applyConfiguration(config);
+
+            currentConfigName = configName;
+            modelLoaded = true;
+
+            if (listener != null) {
+                listener.onModelLoaded(configName);
+            }
+
+            Log.i(TAG, "Configuration loaded: " + configName);
+            return true;
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load configuration: " + configName, e);
             if (listener != null) {
                 listener.onError("Failed to load configuration: " + e.getMessage());
             }
             return false;
+        } finally {
+            if (shouldClearPendingLoad) {
+                try {
+                    PendingModelLoadStore.deletePendingLoad(context);
+                } catch (IOException cleanupError) {
+                    Log.e(TAG, "Failed to clear pending model load marker", cleanupError);
+                }
+            }
         }
     }
     

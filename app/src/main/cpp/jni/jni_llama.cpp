@@ -636,6 +636,8 @@ static bool download_file_with_curl(
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofs);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
 
     if (progress_data) {
         progress_data->last_percent = -1;
@@ -644,21 +646,6 @@ static bool download_file_with_curl(
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     } else {
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
-    }
-
-    bool disable_ssl = false;
-    std::string ssl_host;
-    if (url.rfind("https://huggingface.co/", 0) == 0) {
-        disable_ssl = true;
-        ssl_host = "huggingface.co";
-    } else if (url.rfind("https://github.com/", 0) == 0) {
-        disable_ssl = true;
-        ssl_host = "github.com";
-    }
-    if (disable_ssl) {
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        log_to_file(std::string("download: disabled SSL verification for ") + ssl_host);
     }
 
     curl_easy_setopt(curl, CURLOPT_USERAGENT,

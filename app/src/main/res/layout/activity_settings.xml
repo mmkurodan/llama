@@ -785,14 +785,6 @@
             android:inputType="number"
             android:text="11434" />
 
-        <TextView
-            android:id="@+id/apiServerStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Server: Stopped"
-            android:paddingTop="8dp"
-            android:textStyle="italic" />
-
         <!-- Divider -->
         <View
             android:layout_width="match_parent"

@@ -7,3 +7,5 @@ gradlew.bat
 .idea/
 local.properties
 build/
+/release.keystore
+/release.keystore.base64
