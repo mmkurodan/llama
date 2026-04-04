@@ -164,7 +164,7 @@ public class OllamaApiServer {
             int i = 0;
 
             while (i < text.length()) {
-                int markerPos = text.indexOf("<|", i);
+                int markerPos = ResponseMarkerSanitizer.findNextMarkerStart(text, i);
                 if (markerPos < 0) {
                     if (flushAll) {
                         output.append(text, i, text.length());
@@ -196,13 +196,13 @@ public class OllamaApiServer {
                 boolean matchesGenericEnd = ResponseMarkerSanitizer.startsWithGenericEndMarker(tailLower);
 
                 if (!matchesStart && !matchesImEnd && !matchesGenericEnd) {
-                    if (ResponseMarkerSanitizer.isPossiblePipeMarkerPrefix(tailLower)) {
+                    if (ResponseMarkerSanitizer.isPossibleMarkerPrefix(tailLower)) {
                         if (flushAll) {
                             return new ParseResult(output.toString(), "", false);
                         }
                         return new ParseResult(output.toString(), tail, false);
                     }
-                    output.append("<|");
+                    output.append(text, markerPos, markerPos + 2);
                     i = markerPos + 2;
                     continue;
                 }

@@ -5,12 +5,15 @@ import java.util.Locale;
 final class ResponseMarkerSanitizer {
     private static final String IM_START_MARKER_PREFIX = "<|im_start";
     private static final String IM_END_MARKER_PREFIX = "<|im_end";
-    private static final String GENERIC_END_MARKER_PREFIX = "<|end";
+    private static final String PIPE_GENERIC_END_MARKER_PREFIX = "<|end";
+    // Gemma-4 can emit a raw "<end" prefix before the stop marker is complete.
+    private static final String RAW_GENERIC_END_MARKER_PREFIX = "<end";
 
-    private static final String[] PARTIAL_PIPE_MARKER_PREFIXES = {
+    private static final String[] PARTIAL_MARKER_PREFIXES = {
             IM_START_MARKER_PREFIX,
             IM_END_MARKER_PREFIX,
-            GENERIC_END_MARKER_PREFIX
+            PIPE_GENERIC_END_MARKER_PREFIX,
+            RAW_GENERIC_END_MARKER_PREFIX
     };
 
     private static final String[] REMOVABLE_MARKERS = {
@@ -63,14 +66,29 @@ final class ResponseMarkerSanitizer {
     }
 
     static boolean startsWithGenericEndMarker(String tailLower) {
-        return tailLower != null && tailLower.startsWith(GENERIC_END_MARKER_PREFIX);
+        return tailLower != null && (
+                tailLower.startsWith(PIPE_GENERIC_END_MARKER_PREFIX)
+                        || tailLower.startsWith(RAW_GENERIC_END_MARKER_PREFIX)
+        );
     }
 
-    static boolean isPossiblePipeMarkerPrefix(String tailLower) {
+    static int findNextMarkerStart(String text, int fromIndex) {
+        if (text == null || text.isEmpty()) {
+            return -1;
+        }
+
+        String lower = text.toLowerCase(Locale.ROOT);
+        int candidate = -1;
+        candidate = minPositive(candidate, lower.indexOf("<|", Math.max(0, fromIndex)));
+        candidate = minPositive(candidate, lower.indexOf("<e", Math.max(0, fromIndex)));
+        return candidate;
+    }
+
+    static boolean isPossibleMarkerPrefix(String tailLower) {
         if (tailLower == null || tailLower.isEmpty()) {
             return false;
         }
-        for (String prefix : PARTIAL_PIPE_MARKER_PREFIXES) {
+        for (String prefix : PARTIAL_MARKER_PREFIXES) {
             if (prefix.startsWith(tailLower)) {
                 return true;
             }
@@ -82,19 +100,28 @@ final class ResponseMarkerSanitizer {
         String lower = text.toLowerCase(Locale.ROOT);
         int earliest = -1;
         earliest = minPositive(earliest, lower.indexOf(IM_END_MARKER_PREFIX));
-        earliest = minPositive(earliest, lower.indexOf(GENERIC_END_MARKER_PREFIX));
+        earliest = minPositive(earliest, lower.indexOf(PIPE_GENERIC_END_MARKER_PREFIX));
+        earliest = minPositive(earliest, lower.indexOf(RAW_GENERIC_END_MARKER_PREFIX));
         return earliest;
     }
 
     private static int findTrailingPartialMarkerStart(String text) {
         String lower = text.toLowerCase(Locale.ROOT);
-        int markerStart = lower.lastIndexOf("<|");
-        if (markerStart < 0) {
-            return -1;
-        }
+        int markerStart = findLatestValidMarkerPrefixStart(lower, "<|");
+        markerStart = Math.max(markerStart, findLatestValidMarkerPrefixStart(lower, "<e"));
+        return markerStart;
+    }
 
-        String tail = lower.substring(markerStart);
-        return isPossiblePipeMarkerPrefix(tail) ? markerStart : -1;
+    private static int findLatestValidMarkerPrefixStart(String lower, String needle) {
+        int markerStart = lower.lastIndexOf(needle);
+        while (markerStart >= 0) {
+            String tail = lower.substring(markerStart);
+            if (isPossibleMarkerPrefix(tail)) {
+                return markerStart;
+            }
+            markerStart = lower.lastIndexOf(needle, markerStart - 1);
+        }
+        return -1;
     }
 
     private static int minPositive(int current, int candidate) {
@@ -114,7 +141,7 @@ final class ResponseMarkerSanitizer {
                 maxLength = marker.length();
             }
         }
-        for (String prefix : PARTIAL_PIPE_MARKER_PREFIXES) {
+        for (String prefix : PARTIAL_MARKER_PREFIXES) {
             if (prefix.length() > maxLength) {
                 maxLength = prefix.length();
             }
