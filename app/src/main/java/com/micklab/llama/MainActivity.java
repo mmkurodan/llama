@@ -66,21 +66,8 @@ public class MainActivity extends Activity {
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final int LOG_LEVEL_INFO = 2;
     private static final int LOG_DISPLAY_MAX_LINES = 100;
-    private static final String[] STREAM_REMOVE_MARKERS = {
-            "<|im_start|>", "<|IM_START|>",
-            "<|im_end|>", "<|IM_END|>", "<|im_end|", "<|IM_END|", "<|im_end", "<|IM_END"
-    };
-    
     private static String stripResponseMarkers(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
-        }
-        String result = text;
-        for (String marker : STREAM_REMOVE_MARKERS) {
-            result = result.replace(marker, "");
-        }
-        result = result.replaceAll("(?is)<\\|im(?:_(?:start|end)?)?\\|?>?\\s*$", "");
-        return result;
+        return ResponseMarkerSanitizer.stripResponseMarkers(text);
     }
     
     private TextView logView;           // log view (append-only)
@@ -137,13 +124,7 @@ public class MainActivity extends Activity {
         private final int holdbackLength;
 
         StreamOutputFilter() {
-            int maxMarkerLength = 0;
-            for (String marker : STREAM_REMOVE_MARKERS) {
-                if (marker.length() > maxMarkerLength) {
-                    maxMarkerLength = marker.length();
-                }
-            }
-            holdbackLength = Math.max(0, maxMarkerLength - 1);
+            holdbackLength = ResponseMarkerSanitizer.getStreamingHoldbackLength();
         }
 
         String onToken(String token) {
@@ -903,8 +884,8 @@ public class MainActivity extends Activity {
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
                 "[TIPS]\n" +
-                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に一時ファイルを削除して通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model はアプリを即時再起動して処理を中断します。\n\n" +
-                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app clears temporary load files on the next launch and shows a notice. If needed, try a smaller model or load the model again from Settings. Re-init Model immediately restarts the app process to interrupt the work.");
+                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model はアプリを即時再起動して処理を中断します。\n\n" +
+                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model immediately restarts the app process to interrupt the work.");
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
@@ -1001,10 +982,10 @@ public class MainActivity extends Activity {
         String message = localizedText(
                 "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: " + profileName
                         + "\nモデル: " + modelName
-                        + "\n\n再試行は行わず、一時ファイルを削除しました。必要な場合は Settings から改めて Load Model を実行してください。",
+                        + "\n\n再試行は行いません。必要な場合は Settings から改めて Load Model を実行してください。",
                 "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: "
                         + profileName + "\nModel: " + modelName
-                        + "\n\nNo automatic retry was performed. Temporary files were cleared. If needed, load the model again from Settings.");
+                        + "\n\nNo automatic retry was performed. If needed, load the model again from Settings.");
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
@@ -1019,8 +1000,8 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
                 .setMessage(localizedText(
-                        "前回のモデルロード記録を読み取れなかったため、一時ファイルを削除しました。",
-                        "The previous model load record could not be read, so temporary files were cleared."))
+                        "前回のモデルロード記録を読み取れませんでした。必要な場合は Settings から改めて Load Model を実行してください。",
+                        "The previous model load record could not be read. If needed, load the model again from Settings."))
                 .setCancelable(false)
                 .setPositiveButton("OK", (dialog, which) -> showStartupInstructionsIfNeeded())
                 .show();

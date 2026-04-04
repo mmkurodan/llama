@@ -42,12 +42,6 @@ public class OllamaApiServer {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
-    private static final String[] STREAM_REMOVE_MARKERS = {
-            "<|IM_START|>", "<|im_start|>",
-            "<|IM_END|>", "<|im_end|>", "<|IM_END|", "<|im_end|", "<|IM_END", "<|im_end"
-    };
-    private static final String IM_START_MARKER_PREFIX = "<|im_start";
-    private static final String IM_END_MARKER_PREFIX = "<|im_end";
     private static final int MAX_BUSY_QUEUE_SIZE = 10;
     private static final long BUSY_QUEUE_WAIT_MS = 60_000L;
     private static final long BUSY_QUEUE_POLL_INTERVAL_MS = 100L;
@@ -78,23 +72,7 @@ public class OllamaApiServer {
     }
     
     private static String stripResponseMarkers(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
-        }
-        String result = text;
-        for (String marker : STREAM_REMOVE_MARKERS) {
-            result = result.replace(marker, "");
-        }
-        String lower = result.toLowerCase(Locale.ROOT);
-        int markerStart = lower.lastIndexOf("<|");
-        if (markerStart >= 0) {
-            String tail = lower.substring(markerStart);
-            if (IM_START_MARKER_PREFIX.startsWith(tail) || IM_END_MARKER_PREFIX.startsWith(tail)) {
-                result = result.substring(0, markerStart);
-            }
-        }
-        result = result.replaceAll("(?is)<\\|im(?:_(?:start|end)?)?\\|?>?\\s*$", "");
-        return result;
+        return ResponseMarkerSanitizer.stripResponseMarkers(text);
     }
 
     private static class StreamTokenFilter {
@@ -213,13 +191,12 @@ public class OllamaApiServer {
                 String tail = text.substring(markerPos);
                 String tailLower = tail.toLowerCase(Locale.ROOT);
 
-                boolean matchesStart = tailLower.startsWith(IM_START_MARKER_PREFIX);
-                boolean matchesEnd = tailLower.startsWith(IM_END_MARKER_PREFIX);
-                boolean maybeStart = IM_START_MARKER_PREFIX.startsWith(tailLower);
-                boolean maybeEnd = IM_END_MARKER_PREFIX.startsWith(tailLower);
+                boolean matchesStart = ResponseMarkerSanitizer.startsWithImStartMarker(tailLower);
+                boolean matchesImEnd = ResponseMarkerSanitizer.startsWithImEndMarker(tailLower);
+                boolean matchesGenericEnd = ResponseMarkerSanitizer.startsWithGenericEndMarker(tailLower);
 
-                if (!matchesStart && !matchesEnd) {
-                    if (maybeStart || maybeEnd) {
+                if (!matchesStart && !matchesImEnd && !matchesGenericEnd) {
+                    if (ResponseMarkerSanitizer.isPossiblePipeMarkerPrefix(tailLower)) {
                         if (flushAll) {
                             return new ParseResult(output.toString(), "", false);
                         }
@@ -230,16 +207,20 @@ public class OllamaApiServer {
                     continue;
                 }
 
+                if (matchesGenericEnd) {
+                    return new ParseResult(output.toString(), "", true);
+                }
+
                 int closePos = tailLower.indexOf("|>");
                 if (closePos < 0) {
                     if (flushAll) {
-                        return new ParseResult(output.toString(), "", matchesEnd);
+                        return new ParseResult(output.toString(), "", matchesImEnd);
                     }
                     return new ParseResult(output.toString(), tail, false);
                 }
 
                 i = markerPos + closePos + 2;
-                if (matchesEnd) {
+                if (matchesImEnd) {
                     return new ParseResult(output.toString(), "", true);
                 }
             }
