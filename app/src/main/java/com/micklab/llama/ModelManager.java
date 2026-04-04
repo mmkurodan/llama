@@ -6,8 +6,19 @@ import android.util.Log;
 
 import org.json.JSONException;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
+import java.util.Enumeration;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -32,6 +43,7 @@ public class ModelManager {
     private static final int GPU_LAYERS_DISABLED = 0;
     private static final int GPU_LAYERS_ENABLED_ALL = -1;
     private static final Pattern SPLIT_GGUF_PATTERN = Pattern.compile("^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$");
+    private static final String DOWNLOAD_CA_BUNDLE_FILENAME = "download-ca-bundle.pem";
     
     private static ModelManager instance;
     
@@ -379,6 +391,12 @@ public class ModelManager {
         }
 
         if (needsDownload) {
+            if (config.modelUrl != null && config.modelUrl.regionMatches(true, 0, "https://", 0, 8)) {
+                String trustStoreError = configureNativeDownloadTrustStore();
+                if (trustStoreError != null) {
+                    return trustStoreError;
+                }
+            }
             Log.i(TAG, "Downloading model from: " + config.modelUrl);
             String downloadResult = llama.download(config.modelUrl, destFile.getAbsolutePath());
             if (!"ok".equals(downloadResult)) {
@@ -395,6 +413,65 @@ public class ModelManager {
         }
 
         return null;
+    }
+
+    private synchronized String configureNativeDownloadTrustStore() {
+        File caBundleFile = new File(context.getFilesDir(), DOWNLOAD_CA_BUNDLE_FILENAME);
+        try {
+            writeAndroidCaBundle(caBundleFile);
+            llama.setDownloadCaBundlePath(caBundleFile.getAbsolutePath());
+            return null;
+        } catch (GeneralSecurityException | IOException e) {
+            Log.e(TAG, "Failed to prepare native HTTPS trust store", e);
+            return "Could not prepare HTTPS trust store: " + e.getMessage();
+        }
+    }
+
+    private void writeAndroidCaBundle(File outputFile) throws IOException, GeneralSecurityException {
+        File parent = outputFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+            throw new IOException("Could not create CA bundle directory: " + parent.getAbsolutePath());
+        }
+
+        KeyStore keyStore = KeyStore.getInstance("AndroidCAStore");
+        keyStore.load(null, null);
+
+        int certificateCount = 0;
+        try (Writer writer = new BufferedWriter(new OutputStreamWriter(
+                new FileOutputStream(outputFile, false), StandardCharsets.US_ASCII))) {
+            Enumeration<String> aliases = keyStore.aliases();
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                Certificate certificate = keyStore.getCertificate(alias);
+                if (!(certificate instanceof X509Certificate)) {
+                    continue;
+                }
+
+                writePemCertificate(writer, (X509Certificate) certificate);
+                certificateCount++;
+            }
+        }
+
+        if (certificateCount == 0) {
+            throw new GeneralSecurityException("Android CA store is empty");
+        }
+    }
+
+    private void writePemCertificate(Writer writer, X509Certificate certificate)
+            throws IOException, CertificateEncodingException {
+        writer.write("-----BEGIN CERTIFICATE-----\n");
+
+        String base64 = android.util.Base64.encodeToString(
+                certificate.getEncoded(),
+                android.util.Base64.NO_WRAP
+        );
+        for (int start = 0; start < base64.length(); start += 64) {
+            int end = Math.min(start + 64, base64.length());
+            writer.write(base64, start, end - start);
+            writer.write('\n');
+        }
+
+        writer.write("-----END CERTIFICATE-----\n");
     }
 
     private String findMissingSplitShardPath(File modelFile) {

@@ -43,6 +43,8 @@ static jmethodID g_token_onError = nullptr;
 static std::atomic<bool> g_cancel_generation(false);
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
+static std::mutex g_download_ca_bundle_mutex;
+static std::string g_download_ca_bundle_path;
 
 // ログ用
 static std::mutex g_log_mutex;
@@ -639,6 +641,18 @@ static bool download_file_with_curl(
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
 
+    std::string ca_bundle_path;
+    {
+        std::lock_guard<std::mutex> lock(g_download_ca_bundle_mutex);
+        ca_bundle_path = g_download_ca_bundle_path;
+    }
+    if (!ca_bundle_path.empty()) {
+        curl_easy_setopt(curl, CURLOPT_CAINFO, ca_bundle_path.c_str());
+        log_to_file(std::string("download: using CA bundle path=") + ca_bundle_path);
+    } else {
+        log_to_file("download: no CA bundle configured; using libcurl defaults", GGML_LOG_LEVEL_WARN);
+    }
+
     if (progress_data) {
         progress_data->last_percent = -1;
         curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo);
@@ -933,6 +947,23 @@ Java_com_micklab_llama_LlamaNative_setLogLevel(
     if (sanitized > GGML_LOG_LEVEL_ERROR) sanitized = GGML_LOG_LEVEL_ERROR;
     g_log_level.store(sanitized);
     log_to_file(std::string("log level set to ") + std::to_string(sanitized));
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setDownloadCaBundlePath(
+        JNIEnv * env, jobject, jstring jpath) {
+    const std::string path = jpath ? jstring_to_std(env, jpath) : "";
+    {
+        std::lock_guard<std::mutex> lock(g_download_ca_bundle_mutex);
+        g_download_ca_bundle_path = path;
+    }
+
+    if (path.empty()) {
+        log_to_file("download: cleared CA bundle path", GGML_LOG_LEVEL_WARN);
+    } else {
+        log_to_file(std::string("download: configured CA bundle path=") + path);
+    }
 }
 
 // ---------------- JNI: download ----------------
