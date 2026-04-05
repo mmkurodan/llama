@@ -161,8 +161,8 @@ public class DocumentsActivity extends Activity {
         sb.append("1) 初回起動時のQuick Startで「次回以降は表示しない」をチェックすると、次回起動以降は表示されません。\n");
         sb.append("2) メイン画面で「Settings」を開きます。\n");
         sb.append("   ※推論中（Busy）はSettingsボタンが無効化されます。処理完了後に自動で再有効化されます。\n");
-        sb.append("3) モデルURLを入力するか、Download / Android/media フォルダから .gguf ファイルを取り込み、「Load Model」を押してモデルを読み込みます。\n");
-        sb.append("   ※HTTP/HTTPS URLを利用でき、HTTPSでは通常のSSL/TLS証明書検証を行います。ローカル取り込み時は設定欄にファイル名のみが保存されます。\n");
+        sb.append("3) モデルURLを入力するか、ローカル端末から .gguf ファイルを取り込み、「Load Model」を押してモデルを読み込みます。\n");
+        sb.append("   ※ローカル取り込みのファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動して選択できます。HTTP/HTTPS URLを利用でき、HTTPSでは通常のSSL/TLS証明書検証を行います。ローカル取り込み時は設定欄にファイル名のみが保存されます。\n");
         sb.append("4) パラメータを調整する場合は各項目を編集し「Save Config」で保存します。\n");
         sb.append("5) 「SAVE & CLOSE」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
         sb.append("3. メイン画面\n");
@@ -178,7 +178,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Processing Status/Logs: タイムスタンプ付きでログが表示されます。\n\n");
         sb.append("4. 設定画面の操作\n");
         sb.append("- Configuration Management: 設定の保存/削除/読み込みを行います。\n");
-        sb.append("- Model Selection: モデルURLでの読み込みに加え、Download / Android/media から .gguf ファイルを取り込めます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。\n");
+        sb.append("- Model Selection: モデルURLでの読み込みに加え、ローカル端末から .gguf ファイルを取り込めます。ファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動できます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。\n");
         sb.append("- Model Parameters: 生成パラメータを設定します（GPU Offload スイッチを含む）。\n");
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
         sb.append("- Prompt Template: System Prompt、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はモデルファミリーから自動選択されます。\n");
@@ -251,8 +251,8 @@ public class DocumentsActivity extends Activity {
         sb.append("1) On first launch, if you check \"Don't show next time\" in Quick Start, it will not be shown on subsequent launches.\n");
         sb.append("2) Open \"Settings\" from the main screen.\n");
         sb.append("   * During inference (Busy), the Settings button is disabled and is re-enabled automatically when processing completes.\n");
-        sb.append("3) Enter the model URL or import a .gguf file from Downloads / Android/media, then tap \"Load Model\".\n");
-        sb.append("   * Reachable HTTP/HTTPS URLs can be used. HTTPS uses normal SSL/TLS certificate verification. Imported local files are saved as filenames only in Settings.\n");
+        sb.append("3) Enter the model URL or import a .gguf file from the local device, then tap \"Load Model\".\n");
+        sb.append("   * The local import picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Reachable HTTP/HTTPS URLs can be used. HTTPS uses normal SSL/TLS certificate verification. Imported local files are saved as filenames only in Settings.\n");
         sb.append("4) Edit parameters if needed and tap \"Save Config\".\n");
         sb.append("5) Tap \"SAVE & CLOSE\" to save settings and apply them to the model immediately.\n\n");
         sb.append("3. Main Screen\n");
@@ -268,7 +268,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Processing Status/Logs: Logs are displayed with timestamps.\n\n");
         sb.append("4. Settings Screen\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
-        sb.append("- Model Selection: Load models from a URL or import .gguf files from Downloads / Android/media. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification.\n");
+        sb.append("- Model Selection: Load models from a URL or import .gguf files from the local device. The picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification.\n");
         sb.append("- Model Parameters: Set generation parameters (including the GPU Offload switch).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, one is auto-selected based on model family.\n");

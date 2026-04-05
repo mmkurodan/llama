@@ -117,12 +117,6 @@
             android:minLines="2" />
 
         <Button
-            android:id="@+id/importModelButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Import GGUF (Downloads/Media)" />
-
-        <Button
             android:id="@+id/loadModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -133,6 +127,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="MAINTAIN MODEL" />
+
+        <Button
+            android:id="@+id/importModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="gguf import from local device" />
 
         <TextView
             android:id="@+id/modelFileInfo"

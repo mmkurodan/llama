@@ -52,8 +52,7 @@ public class SettingsActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
-    private static final int REQUEST_IMPORT_MODEL_DOWNLOADS = 1001;
-    private static final int REQUEST_IMPORT_MODEL_MEDIA = 1002;
+    private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
     
@@ -308,7 +307,7 @@ public class SettingsActivity extends Activity {
             if (isBusyActionBlocked()) {
                 return;
             }
-            showImportModelDialog();
+            launchLocalGgufPicker();
         });
         maintainModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
@@ -427,7 +426,7 @@ public class SettingsActivity extends Activity {
                 case "Load Selected Config": return "選択した設定を読み込む";
                 case "Model Selection": return "モデル選択";
                 case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
-                case "Import GGUF (Downloads/Media)": return "GGUFを取り込む（Download/Media）";
+                case "gguf import from local device": return "ローカル端末からggufを取り込む";
                 case "Load Model": return "モデルを読み込む";
                 case "MAINTAIN MODEL": return "モデル管理";
                 case "Model file: (none)": return "モデルファイル: （なし）";
@@ -1005,23 +1004,8 @@ public class SettingsActivity extends Activity {
         }
     }
 
-    private void showImportModelDialog() {
-        String[] sources = new String[] {
-                localizedText("Download フォルダ", "Downloads folder"),
-                localizedText("Android/media フォルダ", "Android/media folder")
-        };
-
-        new AlertDialog.Builder(this)
-                .setTitle(localizedText("GGUFを取り込む", "Import GGUF"))
-                .setItems(sources, (dialog, which) -> {
-                    if (which == 0) {
-                        launchGgufPicker(REQUEST_IMPORT_MODEL_DOWNLOADS, buildInitialImportUri(true));
-                    } else {
-                        launchGgufPicker(REQUEST_IMPORT_MODEL_MEDIA, buildInitialImportUri(false));
-                    }
-                })
-                .setNegativeButton(localizedText("閉じる", "Close"), null)
-                .show();
+    private void launchLocalGgufPicker() {
+        launchGgufPicker(REQUEST_IMPORT_MODEL_LOCAL_DEVICE, buildDefaultImportUri());
     }
 
     private void launchGgufPicker(int requestCode, Uri initialUri) {
@@ -1029,6 +1013,8 @@ public class SettingsActivity extends Activity {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
         intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         if (initialUri != null) {
             intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri);
         }
@@ -1043,8 +1029,8 @@ public class SettingsActivity extends Activity {
         }
     }
 
-    private Uri buildInitialImportUri(boolean downloadsFolder) {
-        String documentId = downloadsFolder ? "primary:Download" : "primary:Android/media";
+    private Uri buildDefaultImportUri() {
+        String documentId = "primary:Download";
         try {
             return DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", documentId);
         } catch (IllegalArgumentException e) {
@@ -1376,9 +1362,7 @@ public class SettingsActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        boolean isImportRequest = requestCode == REQUEST_IMPORT_MODEL_DOWNLOADS
-                || requestCode == REQUEST_IMPORT_MODEL_MEDIA;
-        if (!isImportRequest || resultCode != RESULT_OK) {
+        if (requestCode != REQUEST_IMPORT_MODEL_LOCAL_DEVICE || resultCode != RESULT_OK) {
             return;
         }
 
@@ -1386,6 +1370,16 @@ public class SettingsActivity extends Activity {
         if (selectedUri == null) {
             showToast(localizedText("選択したファイルを開けません", "Could not open the selected file"));
             return;
+        }
+
+        int grantedFlags = data != null ? data.getFlags() : 0;
+        int persistableReadFlags = grantedFlags & Intent.FLAG_GRANT_READ_URI_PERMISSION;
+        if (persistableReadFlags != 0) {
+            try {
+                getContentResolver().takePersistableUriPermission(selectedUri, persistableReadFlags);
+            } catch (SecurityException e) {
+                Log.w(TAG, "Persistable read permission unavailable for imported model URI", e);
+            }
         }
 
         importModelFromUri(selectedUri);

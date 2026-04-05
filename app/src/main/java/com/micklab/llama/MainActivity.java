@@ -17,11 +17,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.view.Gravity;
+import android.view.MotionEvent;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -222,6 +224,8 @@ public class MainActivity extends Activity {
         copyLogButton = findViewById(R.id.copyLogButton);
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
         applyLocalizedUiText();
+        configureScrollableTextView(outputView);
+        configureScrollableTextView(logView);
 
         appendMessage("UI ready.");
 
@@ -348,6 +352,7 @@ public class MainActivity extends Activity {
             }
             appendMessage("Running generate...");
             outputView.setText("");
+            scrollTextViewToTop(outputView);
         });
         
         LlamaNative.TokenListener tListener = null;
@@ -372,7 +377,10 @@ public class MainActivity extends Activity {
                         final String filteredToken = streamOutputFilter.onToken(token);
                         if (!filteredToken.isEmpty()) {
                             logMaxDebugPayload("direct.stream.filtered.token", filteredToken);
-                            runIfDirectGenerationSessionActive(generationSessionId, () -> outputView.append(filteredToken));
+                            runIfDirectGenerationSessionActive(generationSessionId, () -> {
+                                outputView.append(filteredToken);
+                                scrollTextViewToBottom(outputView);
+                            });
                         }
                     }
 
@@ -386,6 +394,7 @@ public class MainActivity extends Activity {
                             if (!tail.isEmpty()) {
                                 logMaxDebugPayload("direct.stream.tail", tail);
                                 outputView.append(tail);
+                                scrollTextViewToBottom(outputView);
                             }
                             appendMessage("streaming complete");
                         });
@@ -417,6 +426,7 @@ public class MainActivity extends Activity {
                 String safe = stripResponseMarkers(finalGen);
                 logMaxDebugPayload("direct.nonstream.output", safe);
                 outputView.setText(safe);
+                scrollTextViewToTop(outputView);
             });
         } catch (Throwable t) {
             if (shouldContinueDirectGeneration(generationSessionId)) {
@@ -554,6 +564,7 @@ public class MainActivity extends Activity {
             updateLogButton.setVisibility(Button.GONE);
             if (savedOutputText != null) {
                 outputView.setText(savedOutputText);
+                scrollTextViewToTop(outputView);
             }
         }
     }
@@ -570,6 +581,7 @@ public class MainActivity extends Activity {
                 final String logContent = readLatestLogLines(logFile, LOG_DISPLAY_MAX_LINES);
                 runOnUiThread(() -> {
                     outputView.setText(logContent);
+                    scrollTextViewToBottom(outputView);
                     showToast("Displaying latest " + LOG_DISPLAY_MAX_LINES + " log lines");
                 });
             } catch (IOException e) {
@@ -739,10 +751,56 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void configureScrollableTextView(TextView textView) {
+        if (textView == null) {
+            return;
+        }
+        textView.setMaxHeight(getResources().getDisplayMetrics().heightPixels);
+        textView.setVerticalScrollBarEnabled(true);
+        textView.setScrollbarFadingEnabled(false);
+        textView.setMovementMethod(new ScrollingMovementMethod());
+        textView.setOnTouchListener((v, event) -> {
+            if (v.getParent() == null) {
+                return false;
+            }
+            boolean canScroll = v.canScrollVertically(-1) || v.canScrollVertically(1);
+            int action = event.getActionMasked();
+            if (canScroll && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE)) {
+                v.getParent().requestDisallowInterceptTouchEvent(true);
+            } else if (action == MotionEvent.ACTION_UP
+                    || action == MotionEvent.ACTION_CANCEL
+                    || !canScroll) {
+                v.getParent().requestDisallowInterceptTouchEvent(false);
+            }
+            return false;
+        });
+    }
+
+    private void scrollTextViewToTop(TextView textView) {
+        if (textView == null) {
+            return;
+        }
+        textView.post(() -> textView.scrollTo(0, 0));
+    }
+
+    private void scrollTextViewToBottom(TextView textView) {
+        if (textView == null) {
+            return;
+        }
+        textView.post(() -> {
+            if (textView.getLayout() == null) {
+                return;
+            }
+            int scrollAmount = textView.getLayout().getLineTop(textView.getLineCount()) - textView.getHeight();
+            textView.scrollTo(0, Math.max(scrollAmount, 0));
+        });
+    }
+
     private void appendMessage(final String msg) {
         runOnUiThread(() -> {
             String timestamp = timestampFormat.format(new Date());
             logView.append("[" + timestamp + "] " + msg + "\n");
+            scrollTextViewToBottom(logView);
             if (mainScrollView != null) {
                 mainScrollView.post(() -> mainScrollView.fullScroll(ScrollView.FOCUS_DOWN));
             }
