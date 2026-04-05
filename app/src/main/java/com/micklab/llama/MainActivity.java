@@ -755,7 +755,8 @@ public class MainActivity extends Activity {
         if (textView == null) {
             return;
         }
-        textView.setMaxHeight(getResources().getDisplayMetrics().heightPixels);
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        textView.setMaxHeight(Math.max(1, screenHeight / 2));
         textView.setVerticalScrollBarEnabled(true);
         textView.setScrollbarFadingEnabled(false);
         textView.setMovementMethod(new ScrollingMovementMethod());
