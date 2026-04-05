@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
  */
 public class ModelManager {
     private static final String TAG = "ModelManager";
+    private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
@@ -206,13 +207,11 @@ public class ModelManager {
             }
 
             if (requiresModelInit) {
-                if (currentModelPath != null) {
-                    llama.free();
+                if (currentModelPath != null || modelLoaded) {
+                    unloadCurrentModelLocked();
+                } else {
+                    clearLoadedModelState();
                 }
-
-                currentModelPath = null;
-                currentConfigName = null;
-                modelLoaded = false;
 
                 applyLoadParameters(config, PRELOAD_N_CTX);
                 String preloadResult = llama.init(modelPath);
@@ -265,6 +264,28 @@ public class ModelManager {
                 }
             }
         }
+    }
+
+    /**
+     * Force reinitialize a configuration even when the same model is already loaded.
+     * Caller must hold the busy lock.
+     *
+     * @param configName Configuration name to reload
+     * @return true if successful, false otherwise
+     */
+    public boolean reinitializeConfiguration(String configName) {
+        String resolvedConfigName = (configName == null || configName.trim().isEmpty())
+                ? DEFAULT_CONFIG_NAME
+                : configName.trim();
+        Log.i(TAG, "Force reinitializing configuration: " + resolvedConfigName);
+
+        if (currentModelPath != null || modelLoaded) {
+            unloadCurrentModelLocked();
+        } else {
+            clearLoadedModelState();
+        }
+
+        return loadConfiguration(resolvedConfigName);
     }
     
     /**
@@ -355,14 +376,29 @@ public class ModelManager {
     public void free() {
         if (busy.compareAndSet(false, true)) {
             try {
-                llama.free();
-                currentModelPath = null;
-                currentConfigName = null;
-                modelLoaded = false;
+                if (currentModelPath != null || modelLoaded) {
+                    unloadCurrentModelLocked();
+                } else {
+                    clearLoadedModelState();
+                }
             } finally {
                 busy.set(false);
             }
         }
+    }
+
+    private void unloadCurrentModelLocked() {
+        try {
+            llama.free();
+        } finally {
+            clearLoadedModelState();
+        }
+    }
+
+    private void clearLoadedModelState() {
+        currentModelPath = null;
+        currentConfigName = null;
+        modelLoaded = false;
     }
     
     private String extractFilenameFromUrl(String url) {

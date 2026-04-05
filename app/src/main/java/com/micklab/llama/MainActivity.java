@@ -2,9 +2,7 @@ package com.micklab.llama;
 
 import android.app.ActivityManager;
 import android.app.Activity;
-import android.app.AlarmManager;
 import android.app.AlertDialog;
-import android.app.PendingIntent;
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
@@ -53,12 +51,10 @@ public class MainActivity extends Activity {
     private static final int REQUEST_SETTINGS = 1;
     private static final int REQUEST_NOTIFICATION_PERMISSION = 2;
     private static final int REQUEST_CREATE_LOG_FILE = 3;
-    private static final int REQUEST_RESTART_APP = 4;
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
-    private static final long APP_RESTART_DELAY_MS = 250L;
     private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
             "show_startup_message",
             "show_quick_start"
@@ -560,11 +556,40 @@ public class MainActivity extends Activity {
     }
     
     private void reinitializeModel() {
-        appendMessage("Force re-initializing model by restarting the app process...");
-        scheduleAppRestart();
-        finishAffinity();
-        android.os.Process.killProcess(android.os.Process.myPid());
-        System.exit(0);
+        if (!modelManager.tryAcquire()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
+
+        updateSettingsButtonForBusyState();
+
+        final String configName = resolveDirectInputConfigName();
+        appendMessage("Re-initializing model for profile \"" + configName + "\"...");
+
+        if (isServiceRunning(OllamaForegroundService.class)) {
+            disconnectApiClients();
+            appendMessage("Disconnected API clients before model re-initialization.");
+        }
+
+        new Thread(() -> {
+            try {
+                modelManager.getLlama().setTokenListener(null);
+                boolean success = modelManager.reinitializeConfiguration(configName);
+                if (success) {
+                    appendMessage("Model re-initialized successfully.");
+                    showToast("Model re-initialized successfully");
+                } else {
+                    appendMessage("Model re-initialization failed.");
+                    showToast("Model re-initialization failed");
+                }
+            } catch (Throwable t) {
+                appendException("Model re-initialization error", t);
+                showToast("Model re-initialization error: " + (t.getMessage() != null ? t.getMessage() : "unknown"));
+            } finally {
+                modelManager.release();
+                runOnUiThread(this::updateSettingsButtonForBusyState);
+            }
+        }).start();
     }
     
     private void viewLogFile() {
@@ -884,8 +909,8 @@ public class MainActivity extends Activity {
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
                 "[TIPS]\n" +
-                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model はアプリを即時再起動して処理を中断します。\n\n" +
-                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model immediately restarts the app process to interrupt the work.");
+                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model はアプリを終了せず、現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。\n\n" +
+                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model now reinitializes the current profile without terminating the app. If it fails, check the log or load the model again from Settings.");
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
@@ -1129,6 +1154,9 @@ public class MainActivity extends Activity {
         if (settingsButton != null) {
             settingsButton.setEnabled(!isBusy);
         }
+        if (initModelButton != null) {
+            initModelButton.setEnabled(!isBusy);
+        }
     }
     
     private void toggleApiServer() {
@@ -1156,29 +1184,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void scheduleAppRestart() {
-        Intent restartIntent = new Intent(getApplicationContext(), MainActivity.class);
-        restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-                getApplicationContext(),
-                REQUEST_RESTART_APP,
-                restartIntent,
-                PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        if (alarmManager == null) {
-            Log.w(TAG, "AlarmManager unavailable; app will exit without automatic restart");
-            return;
-        }
-
-        long triggerAtMillis = System.currentTimeMillis() + APP_RESTART_DELAY_MS;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
-        } else {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
-        }
-    }
-    
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -1224,6 +1229,12 @@ public class MainActivity extends Activity {
         isServiceRunning = false;
         updateApiServerUI();
         appendMessage("Stopping API server service");
+    }
+
+    private void disconnectApiClients() {
+        Intent serviceIntent = new Intent(this, OllamaForegroundService.class);
+        serviceIntent.setAction(OllamaForegroundService.ACTION_DISCONNECT_ALL);
+        startService(serviceIntent);
     }
     
     private boolean isServiceRunning(Class<?> serviceClass) {
