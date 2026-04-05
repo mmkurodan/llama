@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
+    private static final String PREF_SHOW_API_ENABLE_PROMPT = "show_api_enable_prompt";
     private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
             "show_startup_message",
             "show_quick_start"
@@ -756,7 +757,7 @@ public class MainActivity extends Activity {
             return;
         }
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        textView.setMaxHeight(Math.max(1, screenHeight / 2));
+        textView.setMaxHeight(Math.max(1, screenHeight / 4));
         textView.setVerticalScrollBarEnabled(true);
         textView.setScrollbarFadingEnabled(false);
         textView.setMovementMethod(new ScrollingMovementMethod());
@@ -906,13 +907,13 @@ public class MainActivity extends Activity {
         messageView.setText(
                 "[日本語]\n" +
                 "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
-                "0) 起動時にAPI有効化ポップアップが表示された場合は、必要に応じて有効化してください。\n" +
+                "0) 起動時にAPI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
                 "1) SettingsでモデルをLoad Modelしてください。\n" +
                 "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
                 "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
                 "[English]\n" +
                 "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
-                "0) If the API enablement popup appears at launch, enable it when needed.\n" +
+                "0) If the API enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
                 "1) In Settings, load a model with Load Model.\n" +
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
@@ -952,7 +953,20 @@ public class MainActivity extends Activity {
         showApiEnablePromptIfNeeded();
     }
 
+    private boolean shouldShowApiEnablePrompt(SharedPreferences prefs) {
+        if (prefs.contains(PREF_SHOW_API_ENABLE_PROMPT)) {
+            return prefs.getBoolean(PREF_SHOW_API_ENABLE_PROMPT, true);
+        }
+        return true;
+    }
+
     private void showApiEnablePromptIfNeeded() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (!shouldShowApiEnablePrompt(prefs)) {
+            continueStartupDialogsAfterApiPrompt();
+            return;
+        }
+
         if (isServiceRunning) {
             continueStartupDialogsAfterApiPrompt();
             return;
@@ -962,11 +976,33 @@ public class MainActivity extends Activity {
                 "ローカルAPIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API を利用できます。後からメイン画面でも切り替えられます。",
                 "Enable the local API server?\n\nIf enabled, the API can be used from this device or the same local network. You can also change this later from the main screen.");
 
+        TextView messageView = new TextView(this);
+        messageView.setText(message);
+        messageView.setTextSize(14f);
+        messageView.setLineSpacing(0f, 1.1f);
+
+        CheckBox doNotShowAgainCheckBox = new CheckBox(this);
+        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
+        doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
+
+        LinearLayout dialogContentLayout = new LinearLayout(this);
+        dialogContentLayout.setOrientation(LinearLayout.VERTICAL);
+        dialogContentLayout.setPadding(48, 32, 48, 16);
+        dialogContentLayout.addView(messageView);
+        dialogContentLayout.addView(doNotShowAgainCheckBox);
+
+        ScrollView dialogScrollView = new ScrollView(this);
+        dialogScrollView.setFillViewport(true);
+        dialogScrollView.addView(dialogContentLayout);
+
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("API有効化", "Enable API"))
-                .setMessage(message)
+                .setView(dialogScrollView)
                 .setCancelable(false)
                 .setPositiveButton(localizedText("有効化", "Enable"), (dialog, which) -> {
+                    if (doNotShowAgainCheckBox.isChecked()) {
+                        prefs.edit().putBoolean(PREF_SHOW_API_ENABLE_PROMPT, false).apply();
+                    }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                             && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                         pendingApiStartAfterPermission = true;
@@ -977,7 +1013,12 @@ public class MainActivity extends Activity {
                     startApiService();
                     continueStartupDialogsAfterApiPrompt();
                 })
-                .setNegativeButton(localizedText("今回は無効", "Not now"), (dialog, which) -> continueStartupDialogsAfterApiPrompt())
+                .setNegativeButton(localizedText("今回は無効", "Not now"), (dialog, which) -> {
+                    if (doNotShowAgainCheckBox.isChecked()) {
+                        prefs.edit().putBoolean(PREF_SHOW_API_ENABLE_PROMPT, false).apply();
+                    }
+                    continueStartupDialogsAfterApiPrompt();
+                })
                 .show();
     }
 

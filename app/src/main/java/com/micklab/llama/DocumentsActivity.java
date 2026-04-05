@@ -156,7 +156,7 @@ public class DocumentsActivity extends Activity {
         sb.append("本アプリは端末上でLLMを実行し、プロンプトに対する回答を生成します。\n");
         sb.append("必要に応じてOllama互換APIサーバーを起動できます。\n\n");
         sb.append("2. 初期設定（推奨手順）\n");
-        sb.append("0) アプリ起動時にAPI有効化ポップアップが表示された場合は、必要に応じて有効化します。\n");
+        sb.append("0) アプリ起動時にAPI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n");
         sb.append("1) 初回起動時のQuick Startで「次回以降は表示しない」をチェックすると、次回起動以降は表示されません。\n");
         sb.append("2) メイン画面で「設定」を開きます。\n");
         sb.append("   ※推論中（Busy）は設定ボタンが無効化されます。処理完了後に自動で再有効化されます。\n");
@@ -255,7 +255,7 @@ public class DocumentsActivity extends Activity {
         sb.append("This app runs an LLM on your device and generates responses to prompts.\n");
         sb.append("An Ollama-compatible API server can be started if needed.\n\n");
         sb.append("2. Recommended Setup\n");
-        sb.append("0) If the API enablement popup appears at launch, enable it when needed.\n");
+        sb.append("0) If the API enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n");
         sb.append("1) On first launch, if you check \"Don't show next time\" in Quick Start, it will not be shown on subsequent launches.\n");
         sb.append("2) Open \"Settings\" from the main screen.\n");
         sb.append("   * During inference (Busy), the Settings button is disabled and is re-enabled automatically when processing completes.\n");
@@ -335,7 +335,7 @@ public class DocumentsActivity extends Activity {
         sb.append("7. Stop Sequences\n");
         sb.append("Generation automatically stops when common chat template delimiters are detected in the output.\n\n");
         sb.append("8. API Server (Optional)\n");
-        sb.append("- On app launch, a popup asks whether to enable the local API server.\n");
+        sb.append("- On app launch, a popup asks whether to enable the local API server, and you can check \"Don't show next time\" to skip it on future launches.\n");
         sb.append("- Provides /api/chat, /api/generate, /api/tags on device.\n");
         sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 60 seconds; queue overflow or timeout returns 503.\n");
         sb.append("- Android 13+ may require notification permission.\n\n");
