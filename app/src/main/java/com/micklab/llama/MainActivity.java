@@ -35,6 +35,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import android.widget.EditText;
 import android.widget.Button;
@@ -103,6 +104,7 @@ public class MainActivity extends Activity {
     private boolean isServiceRunning = false;
     private boolean pendingApiStartAfterPermission = false;
     private boolean continueStartupDialogsAfterPermission = false;
+    private final AtomicInteger directGenerationSessionId = new AtomicInteger(0);
     
     // Timestamp formatter for log messages
     private final SimpleDateFormat timestampFormat = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
@@ -273,6 +275,7 @@ public class MainActivity extends Activity {
                 return;
             }
             updateSettingsButtonForBusyState();
+            final int generationSessionId = beginDirectGenerationSession();
             
             final String configName = resolveDirectInputConfigName();
             // If the selected configuration model is not loaded, load it first
@@ -285,17 +288,19 @@ public class MainActivity extends Activity {
                         boolean loadSuccess = modelManager.loadConfiguration(configName);
                         if (!loadSuccess) {
                             modelManager.release();
-                            runOnUiThread(() -> {
-                                showToast("Failed to load model. Please check Settings.");
-                                appendMessage("Model load failed.");
-                            });
+                            showToast("Failed to load model. Please check Settings.");
+                            appendMessage("Model load failed.");
                             return;
                         }
-                        runOnUiThread(() -> {
-                            appendMessage("Model loaded successfully. Processing prompt...");
-                        });
+                        if (!shouldContinueDirectGeneration(generationSessionId)) {
+                            modelManager.release();
+                            runOnUiThread(this::updateSettingsButtonForBusyState);
+                            appendMessage("Prompt cancelled before generation started.");
+                            return;
+                        }
+                        appendMessage("Model loaded successfully. Processing prompt...");
                         // Now proceed with generation
-                        processGeneration(userPrompt);
+                        processGeneration(userPrompt, generationSessionId);
                     } catch (Throwable t) {
                         modelManager.release();
                         appendException("Model load error", t);
@@ -304,100 +309,18 @@ public class MainActivity extends Activity {
                 }).start();
                 return;
             }
-
-            // Apply prompt template
-            final String chatPrompt;
-            try {
-                chatPrompt = applyPromptTemplate(userPrompt);
-            } catch (RuntimeException e) {
-                modelManager.release();
-                updateSettingsButtonForBusyState();
-                appendException("Prompt build error", e);
-                showToast("Prompt build error: " + (e.getMessage() != null ? e.getMessage() : "unknown"));
-                return;
-            }
-            logMaxDebugPayload("direct.prompt", chatPrompt);
-
-            appendMessage("Running generate...");
-            outputView.setText("");
-            new Thread(() -> {
-                LlamaNative.TokenListener tListener = null;
-                try {
-                    // Set parameters before generating
-                    if (currentConfig != null) {
-                        modelManager.applyConfiguration(currentConfig);
-                    }
-
-                    if (currentConfig != null && currentConfig.streaming) {
-                        final StreamOutputFilter streamOutputFilter = new StreamOutputFilter();
-                        tListener = new LlamaNative.TokenListener() {
-                            @Override
-                            public void onToken(String token) {
-                                if (BuildConfig.DEBUG) {
-                                    Log.d(TAG, "stream token len=" + (token != null ? token.length() : 0));
-                                }
-                                logMaxDebugPayload("direct.stream.model.token", token);
-                                final String filteredToken = streamOutputFilter.onToken(token);
-                                if (!filteredToken.isEmpty()) {
-                                    logMaxDebugPayload("direct.stream.filtered.token", filteredToken);
-                                    runOnUiThread(() -> outputView.append(filteredToken));
-                                }
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                if (BuildConfig.DEBUG) {
-                                    Log.d(TAG, "stream complete");
-                                }
-                                final String tail = streamOutputFilter.onComplete();
-                                runOnUiThread(() -> {
-                                    if (!tail.isEmpty()) {
-                                        logMaxDebugPayload("direct.stream.tail", tail);
-                                        outputView.append(tail);
-                                    }
-                                    appendMessage("streaming complete");
-                                });
-                            }
-
-                            @Override
-                            public void onError(String error) {
-                                if (BuildConfig.DEBUG) {
-                                    Log.d(TAG, "stream error: " + error);
-                                }
-                                final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
-                                        ? "unknown error" : error;
-                                runOnUiThread(() -> appendMessage("streaming error: " + safeError));
-                            }
-                        };
-                        modelManager.getLlama().setTokenListener(tListener);
-                    } else {
-                        modelManager.getLlama().setTokenListener(null);
-                    }
-
-                    String gen = modelManager.generate(chatPrompt);
-                    logMaxDebugPayload("direct.nonstream.model.raw", gen);
-                    final String finalGen = gen;
-                    runOnUiThread(() -> {
-                        appendMessage("generate() returned.");
-                        String safe = stripResponseMarkers(finalGen);
-                        logMaxDebugPayload("direct.nonstream.output", safe);
-                        outputView.setText(safe);
-                    });
-                } catch (Throwable t) {
-                    appendException("generate() threw", t);
-                    showToast("Generate error: " + t.getMessage());
-                } finally {
-                    modelManager.getLlama().setTokenListener(null);
-                    modelManager.release();
-                    runOnUiThread(this::updateSettingsButtonForBusyState);
-                }
-            }).start();
+            new Thread(() -> processGeneration(userPrompt, generationSessionId)).start();
         });
 
         showStartupDialogs();
     }
     
-    private void processGeneration(String userPrompt) {
+    private void processGeneration(String userPrompt, int generationSessionId) {
+        if (!shouldContinueDirectGeneration(generationSessionId)) {
+            modelManager.release();
+            runOnUiThread(this::updateSettingsButtonForBusyState);
+            return;
+        }
         final String chatPrompt;
         try {
             chatPrompt = applyPromptTemplate(userPrompt);
@@ -408,9 +331,17 @@ public class MainActivity extends Activity {
             runOnUiThread(this::updateSettingsButtonForBusyState);
             return;
         }
+        if (!shouldContinueDirectGeneration(generationSessionId)) {
+            modelManager.release();
+            runOnUiThread(this::updateSettingsButtonForBusyState);
+            return;
+        }
         logMaxDebugPayload("direct.prompt", chatPrompt);
         
         runOnUiThread(() -> {
+            if (!isDirectGenerationSessionActive(generationSessionId)) {
+                return;
+            }
             if (isViewingLog) {
                 isViewingLog = false;
                 viewLogButton.setText(localizedText("ログ表示", "View Log"));
@@ -423,6 +354,9 @@ public class MainActivity extends Activity {
         
         LlamaNative.TokenListener tListener = null;
         try {
+            if (!shouldContinueDirectGeneration(generationSessionId)) {
+                return;
+            }
             // Set parameters before generating
             if (currentConfig != null) {
                 modelManager.applyConfiguration(currentConfig);
@@ -440,7 +374,7 @@ public class MainActivity extends Activity {
                         final String filteredToken = streamOutputFilter.onToken(token);
                         if (!filteredToken.isEmpty()) {
                             logMaxDebugPayload("direct.stream.filtered.token", filteredToken);
-                            runOnUiThread(() -> outputView.append(filteredToken));
+                            runIfDirectGenerationSessionActive(generationSessionId, () -> outputView.append(filteredToken));
                         }
                     }
 
@@ -450,7 +384,7 @@ public class MainActivity extends Activity {
                             Log.d(TAG, "stream complete");
                         }
                         final String tail = streamOutputFilter.onComplete();
-                        runOnUiThread(() -> {
+                        runIfDirectGenerationSessionActive(generationSessionId, () -> {
                             if (!tail.isEmpty()) {
                                 logMaxDebugPayload("direct.stream.tail", tail);
                                 outputView.append(tail);
@@ -466,26 +400,31 @@ public class MainActivity extends Activity {
                         }
                         final String safeError = (error == null || "null".equalsIgnoreCase(error.trim()))
                                 ? "unknown error" : error;
-                        runOnUiThread(() -> appendMessage("streaming error: " + safeError));
+                        runIfDirectGenerationSessionActive(generationSessionId, () -> appendMessage("streaming error: " + safeError));
                     }
                 };
                 modelManager.getLlama().setTokenListener(tListener);
             } else {
                 modelManager.getLlama().setTokenListener(null);
             }
-            
+
+            if (!shouldContinueDirectGeneration(generationSessionId)) {
+                return;
+            }
             String gen = modelManager.generate(chatPrompt);
             logMaxDebugPayload("direct.nonstream.model.raw", gen);
             final String finalGen = gen;
-            runOnUiThread(() -> {
+            runIfDirectGenerationSessionActive(generationSessionId, () -> {
                 appendMessage("generate() returned.");
                 String safe = stripResponseMarkers(finalGen);
                 logMaxDebugPayload("direct.nonstream.output", safe);
                 outputView.setText(safe);
             });
         } catch (Throwable t) {
-            appendException("generate() threw", t);
-            showToast("Generate error: " + t.getMessage());
+            if (shouldContinueDirectGeneration(generationSessionId)) {
+                appendException("generate() threw", t);
+                showToast("Generate error: " + t.getMessage());
+            }
         } finally {
             modelManager.getLlama().setTokenListener(null);
             modelManager.release();
@@ -556,15 +495,16 @@ public class MainActivity extends Activity {
     }
     
     private void reinitializeModel() {
-        if (!modelManager.tryAcquire()) {
-            showToast("Model is busy processing another request");
-            return;
-        }
-
-        updateSettingsButtonForBusyState();
-
         final String configName = resolveDirectInputConfigName();
-        appendMessage("Re-initializing model for profile \"" + configName + "\"...");
+        final boolean wasBusy = modelManager.isBusy();
+        cancelDirectGenerationSessions();
+        if (!isViewingLog) {
+            outputView.setText("");
+        }
+        updateSettingsButtonForBusyState();
+        appendMessage(wasBusy
+                ? "Stopping current model work and re-initializing profile \"" + configName + "\"..."
+                : "Re-initializing model for profile \"" + configName + "\"...");
 
         if (isServiceRunning(OllamaForegroundService.class)) {
             disconnectApiClients();
@@ -573,11 +513,13 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
-                modelManager.getLlama().setTokenListener(null);
-                boolean success = modelManager.reinitializeConfiguration(configName);
-                if (success) {
+                ModelManager.ForceReinitializeResult result = modelManager.forceReinitializeConfiguration(configName);
+                if (result == ModelManager.ForceReinitializeResult.SUCCESS) {
                     appendMessage("Model re-initialized successfully.");
                     showToast("Model re-initialized successfully");
+                } else if (result == ModelManager.ForceReinitializeResult.ALREADY_PENDING) {
+                    appendMessage("Model re-initialization is already in progress.");
+                    showToast("Model re-initialization is already in progress");
                 } else {
                     appendMessage("Model re-initialization failed.");
                     showToast("Model re-initialization failed");
@@ -586,7 +528,6 @@ public class MainActivity extends Activity {
                 appendException("Model re-initialization error", t);
                 showToast("Model re-initialization error: " + (t.getMessage() != null ? t.getMessage() : "unknown"));
             } finally {
-                modelManager.release();
                 runOnUiThread(this::updateSettingsButtonForBusyState);
             }
         }).start();
@@ -692,6 +633,32 @@ public class MainActivity extends Activity {
             return "default";
         }
         return trimmed;
+    }
+
+    private int beginDirectGenerationSession() {
+        return directGenerationSessionId.incrementAndGet();
+    }
+
+    private void cancelDirectGenerationSessions() {
+        directGenerationSessionId.incrementAndGet();
+    }
+
+    private boolean isDirectGenerationSessionActive(int generationSessionId) {
+        return directGenerationSessionId.get() == generationSessionId;
+    }
+
+    private boolean shouldContinueDirectGeneration(int generationSessionId) {
+        return isDirectGenerationSessionActive(generationSessionId)
+                && modelManager != null
+                && !modelManager.isResetPendingOrInProgress();
+    }
+
+    private void runIfDirectGenerationSessionActive(int generationSessionId, Runnable action) {
+        runOnUiThread(() -> {
+            if (isDirectGenerationSessionActive(generationSessionId)) {
+                action.run();
+            }
+        });
     }
 
     private boolean shouldLoadConfigurationModelForDirectInput() {
@@ -909,8 +876,8 @@ public class MainActivity extends Activity {
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
                 "[TIPS]\n" +
-                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model はアプリを終了せず、現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。\n\n" +
-                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model now reinitializes the current profile without terminating the app. If it fails, check the log or load the model again from Settings.");
+                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。\n\n" +
+                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings.");
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
@@ -1155,7 +1122,7 @@ public class MainActivity extends Activity {
             settingsButton.setEnabled(!isBusy);
         }
         if (initModelButton != null) {
-            initModelButton.setEnabled(!isBusy);
+            initModelButton.setEnabled(true);
         }
     }
     

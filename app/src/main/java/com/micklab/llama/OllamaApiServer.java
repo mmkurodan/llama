@@ -459,6 +459,9 @@ public class OllamaApiServer {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
+                if (abortIfResetRequested(outputStream, "/api/generate")) {
+                    return;
+                }
                 
                 ConfigurationManager.Configuration config = null;
                 try {
@@ -490,6 +493,9 @@ public class OllamaApiServer {
                 logTemplateSelection("generate", promptResult.selection);
                 String promptToUse = promptResult.prompt;
                 logMaxDebugPayload("api.generate.prompt", promptToUse);
+                if (abortIfResetRequested(outputStream, "/api/generate")) {
+                    return;
+                }
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -693,6 +699,9 @@ public class OllamaApiServer {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
+                if (abortIfResetRequested(outputStream, "/api/chat")) {
+                    return;
+                }
                 
                 if (listener != null) {
                     listener.onGenerating(model);
@@ -724,6 +733,9 @@ public class OllamaApiServer {
                 logTemplateSelection("chat", promptResult.selection);
                 String promptToUse = promptResult.prompt;
                 logMaxDebugPayload("api.chat.prompt", promptToUse);
+                if (abortIfResetRequested(outputStream, "/api/chat")) {
+                    return;
+                }
 
                 if (stream) {
                     final boolean[] errorSent = { false };
@@ -919,6 +931,12 @@ public class OllamaApiServer {
     }
 
     private boolean acquireGenerationSlot(OutputStream outputStream, String endpoint) throws IOException {
+        if (modelManager.isResetPendingOrInProgress()) {
+            Log.i(TAG, "Rejecting request while model reset is pending for " + endpoint);
+            sendErrorResponse(outputStream, 503, "Model reset in progress");
+            return false;
+        }
+
         if (modelManager.tryAcquire()) {
             return true;
         }
@@ -935,6 +953,9 @@ public class OllamaApiServer {
         boolean acquired = false;
         try {
             while (System.currentTimeMillis() < deadline) {
+                if (modelManager.isResetPendingOrInProgress()) {
+                    break;
+                }
                 if (modelManager.tryAcquire()) {
                     acquired = true;
                     break;
@@ -950,12 +971,27 @@ public class OllamaApiServer {
             waitingRequestCount.decrementAndGet();
         }
 
+        if (modelManager.isResetPendingOrInProgress()) {
+            Log.i(TAG, "Aborting queued request while model reset is pending for " + endpoint);
+            sendErrorResponse(outputStream, 503, "Model reset in progress");
+            return false;
+        }
+
         if (!acquired) {
             Log.w(TAG, "Busy queue timeout for " + endpoint + " waitedMs=" + BUSY_QUEUE_WAIT_MS);
             sendErrorResponse(outputStream, 503, "Model is busy; queue wait timed out after 60 seconds");
             return false;
         }
 
+        return true;
+    }
+
+    private boolean abortIfResetRequested(OutputStream outputStream, String endpoint) throws IOException {
+        if (!modelManager.isResetPendingOrInProgress()) {
+            return false;
+        }
+        Log.i(TAG, endpoint + ": aborting request because model reset was requested");
+        sendErrorResponse(outputStream, 503, "Model reset requested");
         return true;
     }
     

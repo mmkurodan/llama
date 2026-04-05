@@ -169,7 +169,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Enter Prompt: プロンプトを入力します。\n");
         sb.append("- Send: 生成を開始します。モデル未ロード時は自動でロードを試みます。\n");
         sb.append("- Settings: 推論中（Busy）は自動的に無効化され、処理完了後に再び有効になります。\n");
-        sb.append("- Re-init Model: アプリを終了せず、現在のプロファイルのモデルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。\n");
+        sb.append("- Re-init Model: 実行中でも押せます。進行中の生成を停止して現在のプロファイルを即座に再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。\n");
         sb.append("- View Log: ログファイルの最新100行を出力欄に表示します。\n");
         sb.append("- Clear Log: ログファイルを空にします。\n");
         sb.append("- Start/Stop API Server: APIサーバーを起動/停止します。\n");
@@ -259,7 +259,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Enter Prompt: Type your prompt.\n");
         sb.append("- Send: Start generation. If the model is not loaded, it will be loaded automatically.\n");
         sb.append("- Settings: Automatically disabled while inference is busy, and re-enabled when busy is cleared.\n");
-        sb.append("- Re-init Model: Reinitialize the currently selected profile without terminating the app. If it fails, check the log or load the model again from Settings.\n");
+        sb.append("- Re-init Model: Available even while work is running. It stops the active generation and immediately reinitializes the current profile. If it fails, check the log or load the model again from Settings.\n");
         sb.append("- View Log: Show the latest 100 lines from the log file in the output area.\n");
         sb.append("- Clear Log: Clear the log file.\n");
         sb.append("- Start/Stop API Server: Toggle the API server.\n");

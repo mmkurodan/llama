@@ -54,9 +54,18 @@ public class ModelManager {
     
     // State tracking
     private final AtomicBoolean busy = new AtomicBoolean(false);
+    private final Object stateLock = new Object();
+    private boolean resetPending = false;
+    private boolean reinitializing = false;
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
     private volatile boolean modelLoaded = false;
+
+    public enum ForceReinitializeResult {
+        SUCCESS,
+        FAILED,
+        ALREADY_PENDING
+    }
     
     // Listener interface
     public interface ModelListener {
@@ -109,7 +118,15 @@ public class ModelManager {
     }
     
     public boolean isBusy() {
-        return busy.get();
+        synchronized (stateLock) {
+            return busy.get() || resetPending || reinitializing;
+        }
+    }
+
+    public boolean isResetPendingOrInProgress() {
+        synchronized (stateLock) {
+            return resetPending || reinitializing;
+        }
     }
     
     public boolean isModelLoaded() {
@@ -129,14 +146,23 @@ public class ModelManager {
      * @return true if lock acquired, false if already busy
      */
     public boolean tryAcquire() {
-        return busy.compareAndSet(false, true);
+        synchronized (stateLock) {
+            if (busy.get() || resetPending || reinitializing) {
+                return false;
+            }
+            busy.set(true);
+            return true;
+        }
     }
     
     /**
      * Release the busy lock.
      */
     public void release() {
-        busy.set(false);
+        synchronized (stateLock) {
+            busy.set(false);
+            stateLock.notifyAll();
+        }
     }
     
     /**
@@ -144,8 +170,56 @@ public class ModelManager {
      * This is used during model reinitialization to clear any stuck busy state.
      */
     public void resetBusy() {
-        busy.set(false);
+        synchronized (stateLock) {
+            busy.set(false);
+            stateLock.notifyAll();
+        }
         Log.i(TAG, "Busy state forcefully reset");
+    }
+
+    public ForceReinitializeResult forceReinitializeConfiguration(String configName) {
+        String resolvedConfigName = normalizeConfigName(configName);
+        boolean shouldInterruptCurrentWork;
+
+        synchronized (stateLock) {
+            if (resetPending || reinitializing) {
+                Log.i(TAG, "Force reinitialize already pending/in progress: " + resolvedConfigName);
+                return ForceReinitializeResult.ALREADY_PENDING;
+            }
+            resetPending = true;
+            shouldInterruptCurrentWork = busy.get();
+        }
+
+        if (shouldInterruptCurrentWork) {
+            Log.i(TAG, "Interrupting current model work before force reinitialize: " + resolvedConfigName);
+            llama.cancelGeneration();
+        }
+
+        try {
+            synchronized (stateLock) {
+                while (busy.get()) {
+                    try {
+                        stateLock.wait();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        Log.w(TAG, "Interrupted while waiting to force reinitialize", e);
+                        return ForceReinitializeResult.FAILED;
+                    }
+                }
+                resetPending = false;
+                reinitializing = true;
+            }
+
+            llama.setTokenListener(null);
+            boolean success = reinitializeConfiguration(resolvedConfigName);
+            return success ? ForceReinitializeResult.SUCCESS : ForceReinitializeResult.FAILED;
+        } finally {
+            synchronized (stateLock) {
+                resetPending = false;
+                reinitializing = false;
+                stateLock.notifyAll();
+            }
+        }
     }
     
     /**
@@ -268,15 +342,13 @@ public class ModelManager {
 
     /**
      * Force reinitialize a configuration even when the same model is already loaded.
-     * Caller must hold the busy lock.
+     * Caller must already have exclusive access to the model state.
      *
      * @param configName Configuration name to reload
      * @return true if successful, false otherwise
      */
     public boolean reinitializeConfiguration(String configName) {
-        String resolvedConfigName = (configName == null || configName.trim().isEmpty())
-                ? DEFAULT_CONFIG_NAME
-                : configName.trim();
+        String resolvedConfigName = normalizeConfigName(configName);
         Log.i(TAG, "Force reinitializing configuration: " + resolvedConfigName);
 
         if (currentModelPath != null || modelLoaded) {
@@ -374,16 +446,20 @@ public class ModelManager {
      * Free the model resources.
      */
     public void free() {
-        if (busy.compareAndSet(false, true)) {
-            try {
-                if (currentModelPath != null || modelLoaded) {
-                    unloadCurrentModelLocked();
-                } else {
-                    clearLoadedModelState();
-                }
-            } finally {
-                busy.set(false);
+        synchronized (stateLock) {
+            if (busy.get() || resetPending || reinitializing) {
+                return;
             }
+            busy.set(true);
+        }
+        try {
+            if (currentModelPath != null || modelLoaded) {
+                unloadCurrentModelLocked();
+            } else {
+                clearLoadedModelState();
+            }
+        } finally {
+            release();
         }
     }
 
@@ -399,6 +475,12 @@ public class ModelManager {
         currentModelPath = null;
         currentConfigName = null;
         modelLoaded = false;
+    }
+
+    private String normalizeConfigName(String configName) {
+        return (configName == null || configName.trim().isEmpty())
+                ? DEFAULT_CONFIG_NAME
+                : configName.trim();
     }
     
     private String extractFilenameFromUrl(String url) {
