@@ -2,12 +2,17 @@ package com.micklab.llama;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.DocumentsContract;
+import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -26,7 +31,10 @@ import android.widget.Toast;
 import org.json.JSONException;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,6 +52,10 @@ public class SettingsActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
+    private static final int REQUEST_IMPORT_MODEL_DOWNLOADS = 1001;
+    private static final int REQUEST_IMPORT_MODEL_MEDIA = 1002;
+    private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
+    private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
     
     private ConfigurationManager configManager;
     private ModelManager modelManager;
@@ -61,6 +73,7 @@ public class SettingsActivity extends Activity {
     private TextView autoSelectedTemplateView;
     private TextView modelFileInfo;
     private ProgressBar modelProgressBar;
+    private Button importModelButton;
     private Button loadModelButton;
     private Button maintainModelButton;
     
@@ -118,6 +131,7 @@ public class SettingsActivity extends Activity {
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
     private boolean modelLoadedSuccessfully = false;
+    private volatile boolean importInProgress = false;
     
     private volatile int lastDownloadProgress = 0;
     private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
@@ -128,6 +142,16 @@ public class SettingsActivity extends Activity {
             busyStateHandler.postDelayed(this, 200);
         }
     };
+
+    private static final class ImportedModelCandidate {
+        private final String displayName;
+        private final long sizeBytes;
+
+        private ImportedModelCandidate(String displayName, long sizeBytes) {
+            this.displayName = displayName;
+            this.sizeBytes = sizeBytes;
+        }
+    }
 
     @Override
     protected void attachBaseContext(Context newBase) {
@@ -182,6 +206,7 @@ public class SettingsActivity extends Activity {
         autoSelectedTemplateView = findViewById(R.id.autoSelectedTemplateView);
         modelFileInfo = findViewById(R.id.modelFileInfo);
         modelProgressBar = findViewById(R.id.modelProgressBar);
+        importModelButton = findViewById(R.id.importModelButton);
         loadModelButton = findViewById(R.id.loadModelButton);
         maintainModelButton = findViewById(R.id.maintainModelButton);
         
@@ -279,6 +304,12 @@ public class SettingsActivity extends Activity {
             }
             loadModel();
         });
+        importModelButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showImportModelDialog();
+        });
         maintainModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
                 return;
@@ -299,6 +330,11 @@ public class SettingsActivity extends Activity {
     }
 
     private boolean isBusyActionBlocked() {
+        if (importInProgress) {
+            updateActionButtonStateForBusy();
+            showToast(localizedText("モデル取込を実行中です", "Model import is already running"));
+            return true;
+        }
         if (modelManager != null && modelManager.isBusy()) {
             updateActionButtonStateForBusy();
             showToast("Model is busy processing another request");
@@ -308,11 +344,12 @@ public class SettingsActivity extends Activity {
     }
 
     private void updateActionButtonStateForBusy() {
-        boolean isBusy = modelManager != null && modelManager.isBusy();
+        boolean isBusy = importInProgress || (modelManager != null && modelManager.isBusy());
 
         if (saveConfigButton != null) saveConfigButton.setEnabled(!isBusy);
         if (loadConfigButton != null) loadConfigButton.setEnabled(!isBusy);
         if (deleteConfigButton != null) deleteConfigButton.setEnabled(!isBusy);
+        if (importModelButton != null) importModelButton.setEnabled(!isBusy);
         if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
         if (maintainModelButton != null) maintainModelButton.setEnabled(!isBusy);
 
@@ -364,11 +401,13 @@ public class SettingsActivity extends Activity {
     private String translateSettingsHint(String hint) {
         if (AppLanguageManager.isJapanese(this)) {
             if ("Enter configuration name".equals(hint)) return "設定名を入力";
+            if ("https://... or filename.gguf".equals(hint)) return "https://... または filename.gguf";
             if ("Enter system prompt (optional)".equals(hint)) return "システムプロンプトを入力（任意）";
             if ("Enter custom chat template (optional)".equals(hint)) return "カスタムチャットテンプレートを入力（任意）";
             if (hint.startsWith("Default: ")) return "既定値: " + hint.substring("Default: ".length());
         } else {
             if ("設定名を入力".equals(hint)) return "Enter configuration name";
+            if ("https://... または filename.gguf".equals(hint)) return "https://... or filename.gguf";
             if ("システムプロンプトを入力（任意）".equals(hint)) return "Enter system prompt (optional)";
             if ("カスタムチャットテンプレートを入力（任意）".equals(hint)) return "Enter custom chat template (optional)";
             if (hint.startsWith("既定値: ")) return "Default: " + hint.substring("既定値: ".length());
@@ -387,7 +426,8 @@ public class SettingsActivity extends Activity {
                 case "Load Configuration:": return "設定を読み込み:";
                 case "Load Selected Config": return "選択した設定を読み込む";
                 case "Model Selection": return "モデル選択";
-                case "Model Download URL:": return "モデルダウンロードURL:";
+                case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
+                case "Import GGUF (Downloads/Media)": return "GGUFを取り込む（Download/Media）";
                 case "Load Model": return "モデルを読み込む";
                 case "MAINTAIN MODEL": return "モデル管理";
                 case "Model file: (none)": return "モデルファイル: （なし）";
@@ -897,6 +937,7 @@ public class SettingsActivity extends Activity {
                         && !"ollama.log".equals(file.getName())
                         && !"last_crash.txt".equals(file.getName())
                         && !"native_crash.txt".equals(file.getName())
+                        && !file.getName().endsWith(IMPORT_TEMP_SUFFIX)
                         && !PendingModelLoadStore.isMarkerFile(file.getName())
                         && !containsFile(modelFiles, file)) {
                     modelFiles.add(file);
@@ -934,7 +975,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void deleteModelFile(File modelFile) {
-        if (modelManager.isBusy()) {
+        if (importInProgress || modelManager.isBusy()) {
             showToast("Model is busy processing another request");
             return;
         }
@@ -962,6 +1003,219 @@ public class SettingsActivity extends Activity {
         } else {
             showToast("Failed to delete model file: " + modelFile.getName());
         }
+    }
+
+    private void showImportModelDialog() {
+        String[] sources = new String[] {
+                localizedText("Download フォルダ", "Downloads folder"),
+                localizedText("Android/media フォルダ", "Android/media folder")
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("GGUFを取り込む", "Import GGUF"))
+                .setItems(sources, (dialog, which) -> {
+                    if (which == 0) {
+                        launchGgufPicker(REQUEST_IMPORT_MODEL_DOWNLOADS, buildInitialImportUri(true));
+                    } else {
+                        launchGgufPicker(REQUEST_IMPORT_MODEL_MEDIA, buildInitialImportUri(false));
+                    }
+                })
+                .setNegativeButton(localizedText("閉じる", "Close"), null)
+                .show();
+    }
+
+    private void launchGgufPicker(int requestCode, Uri initialUri) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true);
+        if (initialUri != null) {
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri);
+        }
+        try {
+            startActivityForResult(intent, requestCode);
+        } catch (ActivityNotFoundException e) {
+            Log.e(TAG, "No document picker available for GGUF import", e);
+            showToast(localizedText("ファイル選択画面を開けませんでした", "Could not open the file picker"));
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Failed to launch GGUF picker", e);
+            showToast(localizedText("ファイル選択画面を開けませんでした", "Could not open the file picker"));
+        }
+    }
+
+    private Uri buildInitialImportUri(boolean downloadsFolder) {
+        String documentId = downloadsFolder ? "primary:Download" : "primary:Android/media";
+        try {
+            return DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", documentId);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Failed to build initial picker URI for " + documentId, e);
+            return null;
+        }
+    }
+
+    private void importModelFromUri(Uri sourceUri) {
+        ImportedModelCandidate candidate = resolveImportedModelCandidate(sourceUri);
+        String displayName = candidate.displayName;
+        if (displayName == null || displayName.isEmpty()) {
+            showToast(localizedText("選択したファイル名を取得できません", "Could not determine the selected file name"));
+            return;
+        }
+        if (!ModelFileHelper.isGgufFilename(displayName)) {
+            showToast(localizedText(".gguf ファイルを選択してください", "Please select a .gguf file"));
+            return;
+        }
+
+        File destFile = new File(getModelStorageDir(), displayName);
+        String currentModelPath = modelManager.getCurrentModelPath();
+        if (currentModelPath != null && currentModelPath.equals(destFile.getAbsolutePath())) {
+            showToast(localizedText(
+                    "読み込み中のモデルは上書きできません。先に別モデルへ切り替えるか削除してください",
+                    "The currently loaded model cannot be replaced. Switch models or delete it first"));
+            return;
+        }
+
+        importInProgress = true;
+        updateActionButtonStateForBusy();
+        modelProgressBar.setIndeterminate(candidate.sizeBytes <= 0);
+        modelProgressBar.setProgress(0);
+        lastDownloadProgress = 0;
+        modelFileInfo.setText(localizedText("モデルを取り込み中... " + displayName, "Importing model... " + displayName));
+
+        new Thread(() -> {
+            String error = copyImportedModelToStorage(sourceUri, destFile, candidate.sizeBytes, displayName);
+            runOnUiThread(() -> {
+                importInProgress = false;
+                modelProgressBar.setIndeterminate(false);
+                updateActionButtonStateForBusy();
+
+                if (error != null) {
+                    modelProgressBar.setProgress(0);
+                    modelFileInfo.setText(localizedText("モデル取込に失敗しました", "Model import failed"));
+                    showToast(error);
+                    return;
+                }
+
+                loadedModelPath = null;
+                modelLoadedSuccessfully = false;
+                modelUrlInput.setText(displayName);
+                modelFileInfo.setText("Model file: " + displayName + " (" + destFile.length() + " bytes)");
+                modelProgressBar.setProgress(0);
+                currentConfig = getConfigFromUI();
+                showToast(localizedText("モデルファイルを取り込みました: " + displayName, "Imported model file: " + displayName));
+                updateAutoTemplatePreview(currentConfig);
+            });
+        }).start();
+    }
+
+    private ImportedModelCandidate resolveImportedModelCandidate(Uri sourceUri) {
+        String displayName = null;
+        long sizeBytes = -1L;
+
+        if ("content".equalsIgnoreCase(sourceUri.getScheme())) {
+            try (Cursor cursor = getContentResolver().query(
+                    sourceUri,
+                    new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE},
+                    null,
+                    null,
+                    null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (nameIndex >= 0 && !cursor.isNull(nameIndex)) {
+                        displayName = cursor.getString(nameIndex);
+                    }
+                    int sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE);
+                    if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+                        sizeBytes = cursor.getLong(sizeIndex);
+                    }
+                }
+            } catch (SecurityException | IllegalArgumentException e) {
+                Log.w(TAG, "Failed to query import source metadata", e);
+            }
+        }
+
+        if (displayName == null || displayName.trim().isEmpty()) {
+            displayName = sourceUri.getLastPathSegment();
+        }
+
+        displayName = ModelFileHelper.extractFilename(displayName);
+        return new ImportedModelCandidate(displayName, sizeBytes);
+    }
+
+    private String copyImportedModelToStorage(Uri sourceUri, File destFile, long sizeBytes, String displayName) {
+        File parentDir = destFile.getParentFile();
+        if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs() && !parentDir.isDirectory()) {
+            return "Failed to create model storage directory: " + parentDir.getAbsolutePath();
+        }
+
+        File tempFile = new File(
+                parentDir != null ? parentDir : getModelStorageDir(),
+                destFile.getName() + IMPORT_TEMP_SUFFIX);
+
+        if (tempFile.exists() && !tempFile.delete()) {
+            return "Failed to clear temporary import file: " + tempFile.getName();
+        }
+
+        try (InputStream inputStream = getContentResolver().openInputStream(sourceUri)) {
+            if (inputStream == null) {
+                return "Could not open selected file: " + displayName;
+            }
+
+            try (OutputStream outputStream = new FileOutputStream(tempFile, false)) {
+                byte[] buffer = new byte[MODEL_COPY_BUFFER_SIZE];
+                long copiedBytes = 0L;
+                int lastProgress = -1;
+                int read;
+                while ((read = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, read);
+                    copiedBytes += read;
+
+                    if (sizeBytes > 0) {
+                        int progress = (int) Math.min(100L, (copiedBytes * 100L) / sizeBytes);
+                        if (progress != lastProgress) {
+                            lastProgress = progress;
+                            int progressValue = progress;
+                            runOnUiThread(() -> {
+                                modelProgressBar.setIndeterminate(false);
+                                modelProgressBar.setProgress(progressValue);
+                                modelFileInfo.setText(localizedText(
+                                        "モデルを取り込み中... " + displayName + " (" + progressValue + "%)",
+                                        "Importing model... " + displayName + " (" + progressValue + "%)"));
+                            });
+                        }
+                    }
+                }
+                outputStream.flush();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to import model file", e);
+            if (tempFile.exists() && !tempFile.delete()) {
+                Log.w(TAG, "Failed to delete temporary import file: " + tempFile.getAbsolutePath());
+            }
+            return "Failed to import model file: " + e.getMessage();
+        }
+
+        if (!tempFile.exists() || tempFile.length() <= 0) {
+            if (tempFile.exists() && !tempFile.delete()) {
+                Log.w(TAG, "Failed to delete empty import file: " + tempFile.getAbsolutePath());
+            }
+            return "Imported model file is empty: " + displayName;
+        }
+
+        if (destFile.exists() && !destFile.delete()) {
+            if (!tempFile.delete()) {
+                Log.w(TAG, "Failed to delete temporary import file after replace failure: " + tempFile.getAbsolutePath());
+            }
+            return "Failed to replace existing model file: " + destFile.getName();
+        }
+
+        if (!tempFile.renameTo(destFile)) {
+            if (!tempFile.delete()) {
+                Log.w(TAG, "Failed to delete temporary import file after rename failure: " + tempFile.getAbsolutePath());
+            }
+            return "Failed to finalize imported model file: " + destFile.getName();
+        }
+
+        return null;
     }
     
     private void loadModel() {
@@ -1084,19 +1338,11 @@ public class SettingsActivity extends Activity {
     }
     
     private String extractFilenameFromUrl(String url) {
-        if (url == null) return null;
-        int q = url.indexOf('?');
-        String pure = (q >= 0) ? url.substring(0, q) : url;
-        int slash = pure.lastIndexOf('/');
-        if (slash >= 0 && slash + 1 < pure.length()) {
-            return pure.substring(slash + 1);
-        }
-        return null;
+        return ModelFileHelper.extractFilename(url);
     }
 
     private File getModelStorageDir() {
-        File externalDir = getExternalFilesDir(null);
-        return externalDir != null ? externalDir : getFilesDir();
+        return ModelFileHelper.getModelStorageDir(this);
     }
     
     private void showToast(final String msg) {
@@ -1124,6 +1370,25 @@ public class SettingsActivity extends Activity {
     protected void onPause() {
         super.onPause();
         busyStateHandler.removeCallbacks(busyStateUpdater);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        boolean isImportRequest = requestCode == REQUEST_IMPORT_MODEL_DOWNLOADS
+                || requestCode == REQUEST_IMPORT_MODEL_MEDIA;
+        if (!isImportRequest || resultCode != RESULT_OK) {
+            return;
+        }
+
+        Uri selectedUri = data != null ? data.getData() : null;
+        if (selectedUri == null) {
+            showToast(localizedText("選択したファイルを開けません", "Could not open the selected file"));
+            return;
+        }
+
+        importModelFromUri(selectedUri);
     }
 
     @Override

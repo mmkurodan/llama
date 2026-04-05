@@ -136,15 +136,7 @@ public final class PendingModelLoadStore {
     }
 
     private static String extractFilenameFromUrl(String url) {
-        if (url == null || url.isEmpty()) {
-            return "";
-        }
-        int q = url.indexOf('?');
-        String pure = q >= 0 ? url.substring(0, q) : url;
-        int slash = pure.lastIndexOf('/');
-        if (slash >= 0 && slash + 1 < pure.length()) {
-            return pure.substring(slash + 1);
-        }
-        return pure;
+        String filename = ModelFileHelper.extractFilename(url);
+        return filename != null ? filename : "";
     }
 }

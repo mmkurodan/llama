@@ -161,8 +161,8 @@ public class DocumentsActivity extends Activity {
         sb.append("1) 初回起動時のQuick Startで「次回以降は表示しない」をチェックすると、次回起動以降は表示されません。\n");
         sb.append("2) メイン画面で「Settings」を開きます。\n");
         sb.append("   ※推論中（Busy）はSettingsボタンが無効化されます。処理完了後に自動で再有効化されます。\n");
-        sb.append("3) モデルURLを入力し「Load Model」を押してモデルを読み込みます。\n");
-        sb.append("   ※任意のHTTP/HTTPS URLを利用できます。HTTPSでは通常のSSL/TLS証明書検証を行います。\n");
+        sb.append("3) モデルURLを入力するか、Download / Android/media フォルダから .gguf ファイルを取り込み、「Load Model」を押してモデルを読み込みます。\n");
+        sb.append("   ※HTTP/HTTPS URLを利用でき、HTTPSでは通常のSSL/TLS証明書検証を行います。ローカル取り込み時は設定欄にファイル名のみが保存されます。\n");
         sb.append("4) パラメータを調整する場合は各項目を編集し「Save Config」で保存します。\n");
         sb.append("5) 「SAVE & CLOSE」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
         sb.append("3. メイン画面\n");
@@ -178,7 +178,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Processing Status/Logs: タイムスタンプ付きでログが表示されます。\n\n");
         sb.append("4. 設定画面の操作\n");
         sb.append("- Configuration Management: 設定の保存/削除/読み込みを行います。\n");
-        sb.append("- Model Selection: モデルURLを指定して読み込みます。任意のHTTP/HTTPS URLを利用でき、HTTPSでは通常のSSL/TLS証明書検証を行います。\n");
+        sb.append("- Model Selection: モデルURLでの読み込みに加え、Download / Android/media から .gguf ファイルを取り込めます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。\n");
         sb.append("- Model Parameters: 生成パラメータを設定します（GPU Offload スイッチを含む）。\n");
         sb.append("- Output Settings: Streaming出力の有効/無効を切り替えます。\n");
         sb.append("- Prompt Template: System Prompt、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はモデルファミリーから自動選択されます。\n");
@@ -251,8 +251,8 @@ public class DocumentsActivity extends Activity {
         sb.append("1) On first launch, if you check \"Don't show next time\" in Quick Start, it will not be shown on subsequent launches.\n");
         sb.append("2) Open \"Settings\" from the main screen.\n");
         sb.append("   * During inference (Busy), the Settings button is disabled and is re-enabled automatically when processing completes.\n");
-        sb.append("3) Enter the model URL and tap \"Load Model\".\n");
-        sb.append("   * Any reachable HTTP/HTTPS URL can be used. HTTPS uses normal SSL/TLS certificate verification.\n");
+        sb.append("3) Enter the model URL or import a .gguf file from Downloads / Android/media, then tap \"Load Model\".\n");
+        sb.append("   * Reachable HTTP/HTTPS URLs can be used. HTTPS uses normal SSL/TLS certificate verification. Imported local files are saved as filenames only in Settings.\n");
         sb.append("4) Edit parameters if needed and tap \"Save Config\".\n");
         sb.append("5) Tap \"SAVE & CLOSE\" to save settings and apply them to the model immediately.\n\n");
         sb.append("3. Main Screen\n");
@@ -268,7 +268,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Processing Status/Logs: Logs are displayed with timestamps.\n\n");
         sb.append("4. Settings Screen\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
-        sb.append("- Model Selection: Set the model URL and load it. Any reachable HTTP/HTTPS URL can be used, and HTTPS uses normal SSL/TLS certificate verification.\n");
+        sb.append("- Model Selection: Load models from a URL or import .gguf files from Downloads / Android/media. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification.\n");
         sb.append("- Model Parameters: Set generation parameters (including the GPU Offload switch).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, one is auto-selected based on model family.\n");
@@ -424,7 +424,7 @@ public class DocumentsActivity extends Activity {
         sb.append("本アプリは、個人情報を外部サーバーへ送信しません。以下の情報を端末内に保存します。\n\n");
         sb.append("- 設定情報（モデルURL、各種パラメータ、APIポート、ログレベル）\n");
         sb.append("- 構成ファイル（configs/*.json）\n");
-        sb.append("- ダウンロードしたモデルファイル\n");
+        sb.append("- ダウンロードまたは取り込んだモデルファイル\n");
         sb.append("- ログファイル（ollama.log、Javaクラッシュ時は last_crash.txt、ネイティブクラッシュ時は native_crash.txt）\n\n");
 
         sb.append("また、アプリの生成機能を利用する際、ユーザーが入力したテキスト（会話内容）は、端末内または同一ローカルネットワーク内で動作するローカル API に送信されます。このデータは外部サーバーへ送信されず、保存も行いません。\n\n");
@@ -433,6 +433,7 @@ public class DocumentsActivity extends Activity {
 
         sb.append("2. 通信\n");
         sb.append("- モデルのダウンロード時に、ユーザーが入力した URL へ通信します。\n");
+        sb.append("- ローカル .gguf ファイルの取り込み時は、端末内の選択ファイルをアプリ保存領域へコピーします。外部サーバー通信は行いません。\n");
         sb.append("- HTTPS URL を使用する場合は、通常のSSL/TLS証明書検証を行います。\n");
         sb.append("- API サーバーを有効にした場合、端末内またはローカルネットワーク内のポート（0.0.0.0）でリクエストを受け付けます。\n");
         sb.append("- ユーザーの入力内容（会話全文）はローカル API に送信されますが、インターネットを経由して外部サーバーへ送信されることはありません。\n");
@@ -461,13 +462,14 @@ public class DocumentsActivity extends Activity {
         sb.append("This application does not transmit any personal information to external servers. The following data is stored locally on the device:\n\n");
         sb.append("- Configuration data (model URL, parameters, API port, log level)\n");
         sb.append("- Configuration files (configs/*.json)\n");
-        sb.append("- Downloaded model files\n");
+        sb.append("- Downloaded or imported model files\n");
         sb.append("- Log files (ollama.log, last_crash.txt for Java crashes, and native_crash.txt for native crashes)\n\n");
 
         sb.append("When using the generation features, the text entered by the user (conversation content) is sent to a local API running on the device or within the same local network. This data is not transmitted to external servers and is not stored.\n\n");
 
         sb.append("2. Communication\n");
         sb.append("- When downloading models, the application communicates with the URL entered by the user.\n");
+        sb.append("- When importing a local .gguf file, the app copies the selected file into the app storage area and does not communicate with any external server.\n");
         sb.append("- For HTTPS URLs, standard SSL/TLS certificate verification is used.\n");
         sb.append("- When the API server is enabled, it listens on a port (0.0.0.0) accessible within the device or the local network.\n");
         sb.append("- User input (full conversation text) is sent to the local API, but it is never transmitted over the internet or to any external server.\n");

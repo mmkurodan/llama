@@ -234,10 +234,10 @@ public class ModelManager {
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
             
-            // Extract filename from URL
+            // Extract filename from URL or imported local model reference
             String filename = extractFilenameFromUrl(config.modelUrl);
             if (filename == null || filename.isEmpty()) {
-                Log.e(TAG, "Cannot determine filename from URL: " + config.modelUrl);
+                Log.e(TAG, "Cannot determine filename from model reference: " + config.modelUrl);
                 return false;
             }
             
@@ -484,19 +484,11 @@ public class ModelManager {
     }
     
     private String extractFilenameFromUrl(String url) {
-        if (url == null) return null;
-        int q = url.indexOf('?');
-        String pure = (q >= 0) ? url.substring(0, q) : url;
-        int slash = pure.lastIndexOf('/');
-        if (slash >= 0 && slash + 1 < pure.length()) {
-            return pure.substring(slash + 1);
-        }
-        return null;
+        return ModelFileHelper.extractFilename(url);
     }
 
     private File getModelStorageDir() {
-        File externalDir = context.getExternalFilesDir(null);
-        return externalDir != null ? externalDir : context.getFilesDir();
+        return ModelFileHelper.getModelStorageDir(context);
     }
 
     private String ensureModelFilesAvailable(ConfigurationManager.Configuration config, File destFile) {
@@ -509,6 +501,13 @@ public class ModelManager {
         }
 
         if (needsDownload) {
+            if (!ModelFileHelper.isRemoteModelReference(config.modelUrl)) {
+                if (missingShardPath != null) {
+                    return "Incomplete imported split model, missing file: " + missingShardPath;
+                }
+                return "Imported model file not found: " + destFile.getAbsolutePath();
+            }
+
             if (config.modelUrl != null && config.modelUrl.regionMatches(true, 0, "https://", 0, 8)) {
                 String trustStoreError = configureNativeDownloadTrustStore();
                 if (trustStoreError != null) {

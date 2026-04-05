@@ -106,15 +106,21 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Model Download URL:" />
+            android:text="Model URL / Imported File:" />
 
         <EditText
             android:id="@+id/modelUrlInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="https://..."
-            android:inputType="textUri"
+            android:hint="https://... or filename.gguf"
+            android:inputType="text"
             android:minLines="2" />
+
+        <Button
+            android:id="@+id/importModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Import GGUF (Downloads/Media)" />
 
         <Button
             android:id="@+id/loadModelButton"

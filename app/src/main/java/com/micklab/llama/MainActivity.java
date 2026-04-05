@@ -68,9 +68,8 @@ public class MainActivity extends Activity {
     }
     
     private TextView logView;           // log view (append-only)
-    private ScrollView logScrollView;
+    private ScrollView mainScrollView;
     private TextView outputView;
-    private ScrollView outputScrollView;
     private TextView promptLabel;
     private TextView outputSectionLabel;
     private TextView processingSectionLabel;
@@ -204,10 +203,9 @@ public class MainActivity extends Activity {
         }
 
         // Initialize views from XML
+        mainScrollView = findViewById(R.id.mainScrollView);
         logView = findViewById(R.id.logView);
-        logScrollView = findViewById(R.id.logScrollView);
         outputView = findViewById(R.id.outputView);
-        outputScrollView = findViewById(R.id.outputScrollView);
         promptLabel = findViewById(R.id.promptLabel);
         outputSectionLabel = findViewById(R.id.outputSectionLabel);
         processingSectionLabel = findViewById(R.id.processingSectionLabel);
@@ -677,29 +675,11 @@ public class MainActivity extends Activity {
     }
 
     private String resolveConfiguredModelPath(String modelUrl) {
-        String filename = extractFilenameFromUrl(modelUrl);
-        if (filename == null || filename.isEmpty()) {
+        File modelFile = ModelFileHelper.resolveStoredModelFile(this, modelUrl);
+        if (modelFile == null) {
             return null;
         }
-        return new File(getModelStorageDir(), filename).getAbsolutePath();
-    }
-
-    private String extractFilenameFromUrl(String url) {
-        if (url == null) {
-            return null;
-        }
-        int q = url.indexOf('?');
-        String pure = (q >= 0) ? url.substring(0, q) : url;
-        int slash = pure.lastIndexOf('/');
-        if (slash >= 0 && slash + 1 < pure.length()) {
-            return pure.substring(slash + 1);
-        }
-        return null;
-    }
-
-    private File getModelStorageDir() {
-        File externalDir = getExternalFilesDir(null);
-        return externalDir != null ? externalDir : getFilesDir();
+        return modelFile.getAbsolutePath();
     }
     
     private String applyPromptTemplate(String userInput) {
@@ -763,7 +743,9 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> {
             String timestamp = timestampFormat.format(new Date());
             logView.append("[" + timestamp + "] " + msg + "\n");
-            logScrollView.post(() -> logScrollView.fullScroll(ScrollView.FOCUS_DOWN));
+            if (mainScrollView != null) {
+                mainScrollView.post(() -> mainScrollView.fullScroll(ScrollView.FOCUS_DOWN));
+            }
         });
     }
 
