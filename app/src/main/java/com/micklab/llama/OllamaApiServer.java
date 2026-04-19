@@ -3,6 +3,7 @@ package com.micklab.llama;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.AssetManager;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -10,21 +11,28 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Ollama-compatible API server that provides /api/chat and /api/generate endpoints.
+ * Ollama-compatible API server that provides /api/* plus llama.cpp WebUI-compatible routes.
  * Uses registered Configurations as model names.
  * Uses ModelManager for unified model management with busy state.
  */
@@ -45,6 +53,21 @@ public class OllamaApiServer {
     private static final int MAX_BUSY_QUEUE_SIZE = 10;
     private static final long BUSY_QUEUE_WAIT_MS = 60_000L;
     private static final long BUSY_QUEUE_POLL_INTERVAL_MS = 100L;
+    private static final String DEFAULT_CONFIG_NAME = "default";
+    private static final String SERVER_ROLE_MODEL = "model";
+    private static final String SERVER_ROLE_ROUTER = "router";
+    private static final String WEBUI_ASSET_ROOT = "webui/";
+    private static final String BUILD_INFO = "llama.cpp build 8653 (1f34806c441f335f7d66e56fdb8ab3f5d09684e9)";
+    private static final Map<String, String> WEBUI_CONTENT_TYPES;
+
+    static {
+        Map<String, String> contentTypes = new HashMap<>();
+        contentTypes.put("index.html", "text/html; charset=utf-8");
+        contentTypes.put("bundle.js", "application/javascript; charset=utf-8");
+        contentTypes.put("bundle.css", "text/css; charset=utf-8");
+        contentTypes.put("loading.html", "text/html; charset=utf-8");
+        WEBUI_CONTENT_TYPES = Collections.unmodifiableMap(contentTypes);
+    }
     
     private final Context context;
     private final ConfigurationManager configManager;
@@ -54,6 +77,7 @@ public class OllamaApiServer {
     private ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private static final Object TOKEN_COMPLETE = new Object();
+    private final Map<String, byte[]> webUiAssetCache = new ConcurrentHashMap<>();
     
     // Track active client connections for disconnectAll
     private final java.util.Set<Socket> activeConnections = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
@@ -368,7 +392,15 @@ public class OllamaApiServer {
             }
             
             String method = requestParts[0];
-            String path = requestParts[1];
+            String requestTarget = requestParts[1];
+            String path = requestTarget;
+            String query = "";
+            int queryIndex = requestTarget.indexOf('?');
+            if (queryIndex >= 0) {
+                path = requestTarget.substring(0, queryIndex);
+                query = requestTarget.substring(queryIndex + 1);
+            }
+            Map<String, String> queryParams = parseQueryParameters(query);
             
             Log.d(TAG, "Request: " + method + " " + path);
             if (listener != null) {
@@ -410,14 +442,32 @@ public class OllamaApiServer {
                     handleChat(outputStream, body);
                 } else if ("/api/tags".equals(path) || "/api/tags/".equals(path)) {
                     handleTags(outputStream);
+                } else if ("/v1/chat/completions".equals(path)) {
+                    handleOpenAiChat(outputStream, body);
+                } else if ("/models/load".equals(path)) {
+                    handleLoadModel(outputStream, body);
+                } else if ("/models/unload".equals(path)) {
+                    handleUnloadModel(outputStream, body);
                 } else {
                     sendErrorResponse(outputStream, 404, "Not Found");
                 }
             } else if ("GET".equals(method)) {
                 if ("/api/tags".equals(path) || "/api/tags/".equals(path)) {
                     handleTags(outputStream);
-                } else if ("/".equals(path) || "/api".equals(path)) {
+                } else if ("/".equals(path) || "/index.html".equals(path)) {
+                    handleWebUi(outputStream, path);
+                } else if ("/api".equals(path)) {
                     sendJsonResponse(outputStream, 200, "{\"status\":\"Ollama is running\"}");
+                } else if ("/health".equals(path) || "/v1/health".equals(path)) {
+                    handleHealth(outputStream);
+                } else if ("/v1/models".equals(path) || "/models".equals(path)) {
+                    handleModelsList(outputStream);
+                } else if ("/props".equals(path)) {
+                    handleProps(outputStream, queryParams);
+                } else if ("/slots".equals(path)) {
+                    handleSlots(outputStream, queryParams);
+                } else if (isWebUiPath(path)) {
+                    handleWebUi(outputStream, path);
                 } else {
                     sendErrorResponse(outputStream, 404, "Not Found");
                 }
@@ -435,6 +485,546 @@ public class OllamaApiServer {
             } catch (IOException ignored) {}
         } finally {
             activeConnections.remove(clientSocket);
+        }
+    }
+
+    private Map<String, String> parseQueryParameters(String query) {
+        Map<String, String> params = new HashMap<>();
+        if (query == null || query.isEmpty()) {
+            return params;
+        }
+
+        String[] pairs = query.split("&");
+        for (String pair : pairs) {
+            if (pair == null || pair.isEmpty()) {
+                continue;
+            }
+            int separator = pair.indexOf('=');
+            String key = separator >= 0 ? pair.substring(0, separator) : pair;
+            String value = separator >= 0 ? pair.substring(separator + 1) : "";
+            params.put(
+                    URLDecoder.decode(key, StandardCharsets.UTF_8),
+                    URLDecoder.decode(value, StandardCharsets.UTF_8)
+            );
+        }
+        return params;
+    }
+
+    private boolean isWebUiPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return false;
+        }
+        return !path.startsWith("/api")
+                && !path.startsWith("/v1/")
+                && !"/models".equals(path)
+                && !path.startsWith("/models/")
+                && !"/props".equals(path)
+                && !"/slots".equals(path)
+                && !"/health".equals(path)
+                && !"/metrics".equals(path)
+                && !"/cors-proxy".equals(path);
+    }
+
+    private String getServerRole() {
+        return configManager.listConfigurations().size() > 1 ? SERVER_ROLE_ROUTER : SERVER_ROLE_MODEL;
+    }
+
+    private String resolveRequestedModel(String requestedModel) {
+        if (requestedModel != null) {
+            String trimmed = requestedModel.trim();
+            if (!trimmed.isEmpty()) {
+                return trimmed;
+            }
+        }
+
+        String current = modelManager.getCurrentConfigName();
+        if (current != null && !current.trim().isEmpty()) {
+            return current.trim();
+        }
+
+        List<String> configs = configManager.listConfigurations();
+        if (configs.contains(DEFAULT_CONFIG_NAME)) {
+            return DEFAULT_CONFIG_NAME;
+        }
+        if (!configs.isEmpty()) {
+            return configs.get(0);
+        }
+        return DEFAULT_CONFIG_NAME;
+    }
+
+    private ConfigurationManager.Configuration loadResolvedConfiguration(String requestedModel) throws IOException, JSONException {
+        return configManager.loadConfiguration(resolveRequestedModel(requestedModel));
+    }
+
+    private void handleHealth(OutputStream outputStream) throws IOException {
+        try {
+            JSONObject response = new JSONObject();
+            response.put("status", "ok");
+            response.put("role", getServerRole());
+            response.put("webui", true);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to build health response", e);
+            sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    private void handleModelsList(OutputStream outputStream) throws IOException {
+        try {
+            List<String> configNames = new ArrayList<>(configManager.listConfigurations());
+            JSONArray data = new JSONArray();
+            JSONArray models = new JSONArray();
+            long created = System.currentTimeMillis() / 1000L;
+            String loadedConfig = modelManager.getCurrentConfigName();
+            boolean isLoaded = modelManager.isModelLoaded();
+
+            for (String configName : configNames) {
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                File modelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+                boolean thisConfigLoaded = isLoaded && configName.equals(loadedConfig);
+                PromptTemplateManager.ModelFamily family = PromptTemplateManager.detectModelFamily(
+                        modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
+
+                JSONObject dataEntry = new JSONObject();
+                dataEntry.put("id", configName);
+                dataEntry.put("name", configName);
+                dataEntry.put("object", "model");
+                dataEntry.put("owned_by", "llamacpp");
+                dataEntry.put("created", created);
+                dataEntry.put("in_cache", modelFile != null && modelFile.exists());
+                dataEntry.put("path", modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
+
+                JSONObject status = new JSONObject();
+                status.put("value", thisConfigLoaded ? "loaded" : "unloaded");
+                dataEntry.put("status", status);
+                dataEntry.put("tags", new JSONArray());
+                data.put(dataEntry);
+
+                JSONObject details = new JSONObject();
+                details.put("format", "gguf");
+                details.put("family", family.name().toLowerCase(Locale.US));
+                details.put("parameter_size", "unknown");
+                details.put("quantization_level", "unknown");
+
+                JSONObject modelEntry = new JSONObject();
+                modelEntry.put("name", configName);
+                modelEntry.put("model", configName);
+                modelEntry.put("modified_at", getTimestamp());
+                modelEntry.put("size", modelFile != null && modelFile.exists() ? modelFile.length() : 0);
+                modelEntry.put("capabilities", new JSONArray());
+                modelEntry.put("details", details);
+                models.put(modelEntry);
+            }
+
+            JSONObject response = new JSONObject();
+            response.put("object", "list");
+            response.put("data", data);
+            response.put("models", models);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to build models response", e);
+            sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    private void handleProps(OutputStream outputStream, Map<String, String> queryParams) throws IOException {
+        try {
+            String modelName = resolveRequestedModel(queryParams.get("model"));
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(modelName);
+            JSONObject response = buildPropsResponse(modelName, config);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to build props response", e);
+            sendErrorResponse(outputStream, 400, "Unknown model");
+        }
+    }
+
+    private JSONObject buildPropsResponse(String modelName, ConfigurationManager.Configuration config) throws JSONException {
+        File modelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+        JSONObject response = new JSONObject();
+        response.put("default_generation_settings", buildDefaultGenerationSettings(modelName, config));
+        response.put("total_slots", 1);
+        response.put("model_path", modelFile != null ? modelFile.getAbsolutePath() : "");
+        response.put("model_alias", modelName);
+        response.put("role", getServerRole());
+
+        JSONObject modalities = new JSONObject();
+        modalities.put("vision", false);
+        modalities.put("audio", false);
+        response.put("modalities", modalities);
+
+        String chatTemplate = "";
+        if (modelManager.isModelLoaded() && modelName.equals(modelManager.getCurrentConfigName())) {
+            chatTemplate = modelManager.getLlama().getChatTemplate();
+        }
+        if ((chatTemplate == null || chatTemplate.isEmpty()) && config.customChatTemplate != null) {
+            chatTemplate = config.customChatTemplate;
+        }
+        response.put("chat_template", chatTemplate != null ? chatTemplate : "");
+        response.put("bos_token", "");
+        response.put("eos_token", "");
+        response.put("build_info", BUILD_INFO);
+        response.put("webui_settings", buildWebUiSettings(config));
+        response.put("webui", true);
+        return response;
+    }
+
+    private JSONObject buildDefaultGenerationSettings(String modelName, ConfigurationManager.Configuration config) throws JSONException {
+        JSONObject settings = new JSONObject();
+        settings.put("id", 0);
+        settings.put("id_task", 0);
+        settings.put("n_ctx", Math.max(1, config.nCtx));
+        settings.put("speculative", false);
+        settings.put("is_processing", modelManager.isBusy() && modelName.equals(resolveRequestedModel(modelManager.getCurrentConfigName())));
+        settings.put("params", buildPropsParams(config));
+        settings.put("prompt", "");
+
+        JSONObject nextToken = new JSONObject();
+        nextToken.put("has_next_token", false);
+        nextToken.put("has_new_line", false);
+        nextToken.put("n_remain", 0);
+        nextToken.put("n_decoded", 0);
+        nextToken.put("stopping_word", "");
+        settings.put("next_token", nextToken);
+        return settings;
+    }
+
+    private JSONObject buildPropsParams(ConfigurationManager.Configuration config) throws JSONException {
+        JSONObject params = new JSONObject();
+        params.put("n_predict", 1024);
+        params.put("seed", -1);
+        params.put("temperature", config.temp);
+        params.put("dynatemp_range", config.dynatempRange);
+        params.put("dynatemp_exponent", config.dynatempExponent);
+        params.put("top_k", config.topK);
+        params.put("top_p", config.topP);
+        params.put("min_p", config.minP);
+        params.put("top_n_sigma", config.topNSigma);
+        params.put("xtc_probability", config.xtcProbability);
+        params.put("xtc_threshold", config.xtcThreshold);
+        params.put("typ_p", config.typicalP);
+        params.put("repeat_last_n", config.penaltyLastN);
+        params.put("repeat_penalty", config.penaltyRepeat);
+        params.put("presence_penalty", config.penaltyPresent);
+        params.put("frequency_penalty", config.penaltyFreq);
+        params.put("dry_multiplier", config.dryMultiplier);
+        params.put("dry_base", config.dryBase);
+        params.put("dry_allowed_length", config.dryAllowedLength);
+        params.put("dry_penalty_last_n", config.dryPenaltyLastN);
+        params.put("dry_sequence_breakers", stringListToJsonArray(parseDrySequenceBreakers(config.drySequenceBreakers)));
+        params.put("mirostat", config.mirostat);
+        params.put("mirostat_tau", config.mirostatTau);
+        params.put("mirostat_eta", config.mirostatEta);
+        params.put("stop", new JSONArray());
+        params.put("max_tokens", 1024);
+        params.put("n_keep", 0);
+        params.put("n_discard", 0);
+        params.put("ignore_eos", false);
+        params.put("stream", config.streaming);
+        params.put("logit_bias", new JSONArray());
+        params.put("n_probs", 0);
+        params.put("min_keep", 0);
+        params.put("grammar", "");
+        params.put("grammar_lazy", false);
+        params.put("grammar_triggers", new JSONArray());
+        params.put("preserved_tokens", new JSONArray());
+        params.put("chat_format", PromptTemplateManager.detectModelFamily(config.modelUrl).name().toLowerCase(Locale.US));
+        params.put("reasoning_format", "none");
+        params.put("reasoning_in_content", false);
+        params.put("generation_prompt", "");
+        params.put("samplers", stringListToJsonArray(defaultSamplers()));
+        params.put("backend_sampling", false);
+        params.put("speculative.n_max", 0);
+        params.put("speculative.n_min", 0);
+        params.put("speculative.p_min", 0);
+        params.put("timings_per_token", false);
+        params.put("post_sampling_probs", false);
+        params.put("lora", new JSONArray());
+        return params;
+    }
+
+    private JSONObject buildWebUiSettings(ConfigurationManager.Configuration config) throws JSONException {
+        JSONObject settings = new JSONObject();
+        settings.put("systemMessage", config.systemPrompt != null ? config.systemPrompt : "");
+        settings.put("showSystemMessage", config.systemPrompt != null && !config.systemPrompt.isEmpty());
+        settings.put("showThoughtInProgress", config.enableThinking);
+        settings.put("excludeReasoningFromContext", false);
+        settings.put("sendOnEnter", false);
+        settings.put("showRawModelNames", false);
+        return settings;
+    }
+
+    private void handleSlots(OutputStream outputStream, Map<String, String> queryParams) throws IOException {
+        try {
+            String modelName = resolveRequestedModel(queryParams.get("model"));
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(modelName);
+            JSONArray response = new JSONArray();
+
+            JSONObject slot = new JSONObject();
+            slot.put("id", 0);
+            slot.put("id_task", 0);
+            slot.put("n_ctx", Math.max(1, config.nCtx));
+            slot.put("speculative", false);
+            slot.put("is_processing", modelManager.isBusy() && modelName.equals(modelManager.getCurrentConfigName()));
+            slot.put("params", buildSlotParams(config));
+
+            JSONObject nextToken = new JSONObject();
+            nextToken.put("has_next_token", false);
+            nextToken.put("has_new_line", false);
+            nextToken.put("n_remain", 0);
+            nextToken.put("n_decoded", 0);
+            slot.put("next_token", nextToken);
+
+            response.put(slot);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to build slots response", e);
+            sendErrorResponse(outputStream, 400, "Unknown model");
+        }
+    }
+
+    private JSONObject buildSlotParams(ConfigurationManager.Configuration config) throws JSONException {
+        JSONObject params = new JSONObject();
+        params.put("n_predict", 1024);
+        params.put("seed", -1);
+        params.put("temperature", config.temp);
+        params.put("dynatemp_range", config.dynatempRange);
+        params.put("dynatemp_exponent", config.dynatempExponent);
+        params.put("top_k", config.topK);
+        params.put("top_p", config.topP);
+        params.put("min_p", config.minP);
+        params.put("top_n_sigma", config.topNSigma);
+        params.put("xtc_probability", config.xtcProbability);
+        params.put("xtc_threshold", config.xtcThreshold);
+        params.put("typical_p", config.typicalP);
+        params.put("repeat_last_n", config.penaltyLastN);
+        params.put("repeat_penalty", config.penaltyRepeat);
+        params.put("presence_penalty", config.penaltyPresent);
+        params.put("frequency_penalty", config.penaltyFreq);
+        params.put("dry_multiplier", config.dryMultiplier);
+        params.put("dry_base", config.dryBase);
+        params.put("dry_allowed_length", config.dryAllowedLength);
+        params.put("dry_penalty_last_n", config.dryPenaltyLastN);
+        params.put("mirostat", config.mirostat);
+        params.put("mirostat_tau", config.mirostatTau);
+        params.put("mirostat_eta", config.mirostatEta);
+        params.put("max_tokens", 1024);
+        params.put("n_keep", 0);
+        params.put("n_discard", 0);
+        params.put("ignore_eos", false);
+        params.put("stream", config.streaming);
+        params.put("n_probs", 0);
+        params.put("min_keep", 0);
+        params.put("chat_format", PromptTemplateManager.detectModelFamily(config.modelUrl).name().toLowerCase(Locale.US));
+        params.put("reasoning_format", "none");
+        params.put("reasoning_in_content", false);
+        params.put("generation_prompt", "");
+        params.put("samplers", stringListToJsonArray(defaultSamplers()));
+        params.put("backend_sampling", false);
+        params.put("speculative.n_max", 0);
+        params.put("speculative.n_min", 0);
+        params.put("speculative.p_min", 0);
+        params.put("timings_per_token", false);
+        params.put("post_sampling_probs", false);
+        params.put("lora", new JSONArray());
+        return params;
+    }
+
+    private JSONArray stringListToJsonArray(List<String> values) {
+        JSONArray array = new JSONArray();
+        if (values == null) {
+            return array;
+        }
+        for (String value : values) {
+            array.put(value);
+        }
+        return array;
+    }
+
+    private List<String> parseDrySequenceBreakers(String raw) {
+        List<String> values = new ArrayList<>();
+        if (raw == null || raw.trim().isEmpty()) {
+            return values;
+        }
+        String[] parts = raw.split(",");
+        for (String part : parts) {
+            if (part == null) {
+                continue;
+            }
+            String normalized = part.replace("\\n", "\n").trim();
+            if (!normalized.isEmpty()) {
+                values.add(normalized);
+            }
+        }
+        return values;
+    }
+
+    private List<String> defaultSamplers() {
+        List<String> samplers = new ArrayList<>();
+        samplers.add("top_k");
+        samplers.add("typ_p");
+        samplers.add("top_p");
+        samplers.add("min_p");
+        samplers.add("temperature");
+        return samplers;
+    }
+
+    private void handleLoadModel(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            if (!acquireGenerationSlot(outputStream, "/models/load")) {
+                return;
+            }
+            try {
+                boolean success = modelManager.loadConfiguration(model);
+                JSONObject response = new JSONObject();
+                response.put("success", success);
+                if (!success) {
+                    response.put("error", "Failed to load model");
+                }
+                sendJsonResponse(outputStream, success ? 200 : 500, response.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Invalid load-model request", e);
+            sendErrorResponse(outputStream, 400, "Invalid JSON");
+        }
+    }
+
+    private void handleUnloadModel(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            if (modelManager.isBusy()) {
+                sendErrorResponse(outputStream, 503, "Model is busy");
+                return;
+            }
+            if (modelManager.isModelLoaded() && model.equals(modelManager.getCurrentConfigName())) {
+                modelManager.free();
+            }
+            JSONObject response = new JSONObject();
+            response.put("success", true);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            Log.e(TAG, "Invalid unload-model request", e);
+            sendErrorResponse(outputStream, 400, "Invalid JSON");
+        }
+    }
+
+    private void applyRequestOverrides(ConfigurationManager.Configuration config, JSONObject request) {
+        if (config == null || request == null) {
+            return;
+        }
+
+        if (request.has("temperature")) {
+            config.temp = request.optDouble("temperature", config.temp);
+        }
+        if (request.has("top_k")) {
+            config.topK = request.optInt("top_k", config.topK);
+        }
+        if (request.has("top_p")) {
+            config.topP = request.optDouble("top_p", config.topP);
+        }
+        if (request.has("min_p")) {
+            config.minP = request.optDouble("min_p", config.minP);
+        }
+        if (request.has("dynatemp_range")) {
+            config.dynatempRange = request.optDouble("dynatemp_range", config.dynatempRange);
+        }
+        if (request.has("dynatemp_exponent")) {
+            config.dynatempExponent = request.optDouble("dynatemp_exponent", config.dynatempExponent);
+        }
+        if (request.has("xtc_probability")) {
+            config.xtcProbability = request.optDouble("xtc_probability", config.xtcProbability);
+        }
+        if (request.has("xtc_threshold")) {
+            config.xtcThreshold = request.optDouble("xtc_threshold", config.xtcThreshold);
+        }
+        if (request.has("typ_p")) {
+            config.typicalP = request.optDouble("typ_p", config.typicalP);
+        }
+        if (request.has("repeat_last_n")) {
+            config.penaltyLastN = request.optInt("repeat_last_n", config.penaltyLastN);
+        }
+        if (request.has("repeat_penalty")) {
+            config.penaltyRepeat = request.optDouble("repeat_penalty", config.penaltyRepeat);
+        }
+        if (request.has("presence_penalty")) {
+            config.penaltyPresent = request.optDouble("presence_penalty", config.penaltyPresent);
+        }
+        if (request.has("frequency_penalty")) {
+            config.penaltyFreq = request.optDouble("frequency_penalty", config.penaltyFreq);
+        }
+        if (request.has("dry_multiplier")) {
+            config.dryMultiplier = request.optDouble("dry_multiplier", config.dryMultiplier);
+        }
+        if (request.has("dry_base")) {
+            config.dryBase = request.optDouble("dry_base", config.dryBase);
+        }
+        if (request.has("dry_allowed_length")) {
+            config.dryAllowedLength = request.optInt("dry_allowed_length", config.dryAllowedLength);
+        }
+        if (request.has("dry_penalty_last_n")) {
+            config.dryPenaltyLastN = request.optInt("dry_penalty_last_n", config.dryPenaltyLastN);
+        }
+        if (request.has("mirostat")) {
+            config.mirostat = request.optInt("mirostat", config.mirostat);
+        }
+        if (request.has("mirostat_tau")) {
+            config.mirostatTau = request.optDouble("mirostat_tau", config.mirostatTau);
+        }
+        if (request.has("mirostat_eta")) {
+            config.mirostatEta = request.optDouble("mirostat_eta", config.mirostatEta);
+        }
+    }
+
+    private void handleWebUi(OutputStream outputStream, String path) throws IOException {
+        String assetName = resolveWebUiAssetName(path);
+        byte[] assetBytes;
+        try {
+            assetBytes = loadWebUiAsset(assetName);
+        } catch (IOException e) {
+            Log.w(TAG, "WebUI asset not found: " + assetName, e);
+            sendErrorResponse(outputStream, 404, "Not Found");
+            return;
+        }
+        if (assetBytes == null) {
+            sendErrorResponse(outputStream, 404, "Not Found");
+            return;
+        }
+        sendBinaryResponse(outputStream, 200, WEBUI_CONTENT_TYPES.get(assetName), assetBytes);
+    }
+
+    private String resolveWebUiAssetName(String path) {
+        if (path == null || path.isEmpty() || "/".equals(path) || "/index.html".equals(path)) {
+            return "index.html";
+        }
+        String normalized = path.startsWith("/") ? path.substring(1) : path;
+        if (WEBUI_CONTENT_TYPES.containsKey(normalized)) {
+            return normalized;
+        }
+        return "index.html";
+    }
+
+    private byte[] loadWebUiAsset(String assetName) throws IOException {
+        byte[] cached = webUiAssetCache.get(assetName);
+        if (cached != null) {
+            return cached;
+        }
+
+        AssetManager assetManager = context.getAssets();
+        try (InputStream inputStream = assetManager.open(WEBUI_ASSET_ROOT + assetName);
+             ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = inputStream.read(chunk)) != -1) {
+                buffer.write(chunk, 0, read);
+            }
+            byte[] bytes = buffer.toByteArray();
+            webUiAssetCache.put(assetName, bytes);
+            return bytes;
         }
     }
     
@@ -930,10 +1520,187 @@ public class OllamaApiServer {
         }
     }
 
+    private void handleOpenAiChat(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            JSONArray messages = request.optJSONArray("messages");
+            boolean stream = request.optBoolean("stream", true);
+            boolean preEncodeOnly = request.has("n_predict") && request.optInt("n_predict", -1) == 0;
+
+            if (messages == null || messages.length() == 0) {
+                sendOpenAiErrorResponse(outputStream, 400, "No messages provided", "invalid_request_error");
+                return;
+            }
+
+            if (!acquireGenerationSlot(outputStream, "/v1/chat/completions", true)) {
+                return;
+            }
+
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
+                    return;
+                }
+                if (modelManager.isResetPendingOrInProgress()) {
+                    sendOpenAiErrorResponse(outputStream, 503, "Model reset requested", "unavailable_error");
+                    return;
+                }
+
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                    applyRequestOverrides(config, request);
+                    modelManager.applyConfiguration(config);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not apply OpenAI request overrides", e);
+                }
+
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String customTemplate = config != null ? config.customChatTemplate : null;
+                String settingsSystemPrompt = config != null ? config.systemPrompt : null;
+                boolean enableThinking = config == null || config.enableThinking;
+                String modelPath = modelManager.getCurrentModelPath();
+
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptFromMessagesWithSelection(
+                                messages,
+                                customTemplate,
+                                ggufChatTemplate,
+                                settingsSystemPrompt,
+                                modelPath,
+                                enableThinking);
+                logTemplateSelection("chat.completions", promptResult.selection);
+                String promptToUse = promptResult.prompt;
+                logMaxDebugPayload("openai.chat.prompt", promptToUse);
+
+                if (preEncodeOnly) {
+                    sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, "").toString());
+                    return;
+                }
+
+                if (stream) {
+                    String header = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: text/event-stream\r\n" +
+                            "Cache-Control: no-cache\r\n" +
+                            "Connection: keep-alive\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "\r\n";
+                    outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
+                    sendSseEvent(outputStream, buildOpenAiRoleChunk(model).toString());
+
+                    final Object writeLock = new Object();
+                    final boolean[] errorSent = { false };
+                    final AtomicBoolean clientDisconnected = new AtomicBoolean(false);
+                    final Runnable onClientDisconnected = () -> {
+                        if (clientDisconnected.compareAndSet(false, true)) {
+                            Log.w(TAG, "Client disconnected during /v1/chat/completions stream");
+                            modelManager.getLlama().cancelGeneration();
+                        }
+                    };
+                    final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue = new java.util.concurrent.LinkedBlockingQueue<>();
+                    final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(
+                            tokenQueue,
+                            () -> modelManager.getLlama().cancelGeneration()
+                    );
+                    final Thread writerThread = new Thread(() -> {
+                        try {
+                            while (true) {
+                                Object ev = tokenQueue.take();
+                                if (ev == TOKEN_COMPLETE) {
+                                    synchronized (writeLock) {
+                                        sendSseEvent(outputStream, buildOpenAiStreamChunk(model, "", true).toString());
+                                        sendSseEvent(outputStream, "[DONE]");
+                                    }
+                                    break;
+                                } else if (ev instanceof TokenError) {
+                                    TokenError tokenError = (TokenError) ev;
+                                    errorSent[0] = true;
+                                    synchronized (writeLock) {
+                                        sendSseEvent(outputStream, buildOpenAiErrorObject(500, tokenError.error, "server_error").toString());
+                                        sendSseEvent(outputStream, "[DONE]");
+                                    }
+                                    break;
+                                } else {
+                                    String token = stripResponseMarkers((String) ev);
+                                    if (token.isEmpty()) {
+                                        continue;
+                                    }
+                                    synchronized (writeLock) {
+                                        sendSseEvent(outputStream, buildOpenAiStreamChunk(model, token, false).toString());
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error writing OpenAI chat stream", e);
+                            onClientDisconnected.run();
+                        } finally {
+                            try {
+                                outputStream.flush();
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    }, "OpenAiApiWriter-" + Thread.currentThread().getId());
+                    writerThread.start();
+
+                    modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
+                        @Override
+                        public void onToken(String token) {
+                            streamTokenFilter.onToken(token);
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            streamTokenFilter.onComplete();
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            streamTokenFilter.onError(error);
+                        }
+                    });
+
+                    try {
+                        modelManager.generate(promptToUse);
+                    } finally {
+                        modelManager.getLlama().setTokenListener(null);
+                        if (!errorSent[0] && !clientDisconnected.get()) {
+                            tokenQueue.offer(TOKEN_COMPLETE);
+                        }
+                    }
+
+                    try {
+                        writerThread.join(5000);
+                        if (writerThread.isAlive()) {
+                            Log.w(TAG, "OpenAI writer thread did not finish before timeout");
+                        }
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        Log.w(TAG, "OpenAI writer thread join interrupted", ie);
+                    }
+                } else {
+                    String rawResponse = modelManager.generate(promptToUse);
+                    String response = stripResponseMarkers(rawResponse);
+                    sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, response).toString());
+                }
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Invalid JSON in OpenAI chat request", e);
+            sendOpenAiErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage(), "invalid_request_error");
+        }
+    }
+
     private boolean acquireGenerationSlot(OutputStream outputStream, String endpoint) throws IOException {
+        return acquireGenerationSlot(outputStream, endpoint, false);
+    }
+
+    private boolean acquireGenerationSlot(OutputStream outputStream, String endpoint, boolean openAiStyle) throws IOException {
         if (modelManager.isResetPendingOrInProgress()) {
             Log.i(TAG, "Rejecting request while model reset is pending for " + endpoint);
-            sendErrorResponse(outputStream, 503, "Model reset in progress");
+            sendBusyResponse(outputStream, 503, "Model reset in progress", openAiStyle);
             return false;
         }
 
@@ -945,7 +1712,7 @@ public class OllamaApiServer {
         if (queued > MAX_BUSY_QUEUE_SIZE) {
             waitingRequestCount.decrementAndGet();
             Log.w(TAG, "Busy queue full for " + endpoint + " queued=" + queued);
-            sendErrorResponse(outputStream, 503, "Model busy queue is full (max 10)");
+            sendBusyResponse(outputStream, 503, "Model busy queue is full (max 10)", openAiStyle);
             return false;
         }
 
@@ -973,17 +1740,26 @@ public class OllamaApiServer {
 
         if (modelManager.isResetPendingOrInProgress()) {
             Log.i(TAG, "Aborting queued request while model reset is pending for " + endpoint);
-            sendErrorResponse(outputStream, 503, "Model reset in progress");
+            sendBusyResponse(outputStream, 503, "Model reset in progress", openAiStyle);
             return false;
         }
 
         if (!acquired) {
             Log.w(TAG, "Busy queue timeout for " + endpoint + " waitedMs=" + BUSY_QUEUE_WAIT_MS);
-            sendErrorResponse(outputStream, 503, "Model is busy; queue wait timed out after 60 seconds");
+            sendBusyResponse(outputStream, 503, "Model is busy; queue wait timed out after 60 seconds", openAiStyle);
             return false;
         }
 
         return true;
+    }
+
+    private void sendBusyResponse(OutputStream outputStream, int statusCode, String message, boolean openAiStyle)
+            throws IOException {
+        if (openAiStyle) {
+            sendOpenAiErrorResponse(outputStream, statusCode, message, "unavailable_error");
+        } else {
+            sendErrorResponse(outputStream, statusCode, message);
+        }
     }
 
     private boolean abortIfResetRequested(OutputStream outputStream, String endpoint) throws IOException {
@@ -1095,7 +1871,107 @@ public class OllamaApiServer {
         outputStream.write(response.getBytes(StandardCharsets.UTF_8));
         outputStream.flush();
     }
-    
+
+    private void sendBinaryResponse(OutputStream outputStream, int statusCode, String contentType, byte[] body)
+            throws IOException {
+        String status = statusCode == 200 ? "OK" : (statusCode == 404 ? "Not Found" : "Error");
+        String response = "HTTP/1.1 " + statusCode + " " + status + "\r\n" +
+                "Content-Type: " + contentType + "\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Content-Length: " + body.length + "\r\n" +
+                "Cross-Origin-Embedder-Policy: require-corp\r\n" +
+                "Cross-Origin-Opener-Policy: same-origin\r\n" +
+                "\r\n";
+        outputStream.write(response.getBytes(StandardCharsets.UTF_8));
+        outputStream.write(body);
+        outputStream.flush();
+    }
+
+    private void sendSseEvent(OutputStream outputStream, String data) throws IOException {
+        outputStream.write(("data: " + data + "\n\n").getBytes(StandardCharsets.UTF_8));
+        outputStream.flush();
+    }
+
+    private JSONObject buildOpenAiChatResponse(String model, String content) throws JSONException {
+        JSONObject response = new JSONObject();
+        response.put("object", "chat.completion");
+        response.put("model", model);
+
+        JSONObject message = new JSONObject();
+        message.put("role", "assistant");
+        message.put("content", content);
+
+        JSONObject choice = new JSONObject();
+        choice.put("index", 0);
+        choice.put("message", message);
+        choice.put("finish_reason", "stop");
+
+        JSONArray choices = new JSONArray();
+        choices.put(choice);
+        response.put("choices", choices);
+        return response;
+    }
+
+    private JSONObject buildOpenAiStreamChunk(String model, String content, boolean done) throws JSONException {
+        JSONObject response = new JSONObject();
+        response.put("object", "chat.completion.chunk");
+        response.put("model", model);
+
+        JSONObject delta = new JSONObject();
+        if (!done && content != null && !content.isEmpty()) {
+            delta.put("content", content);
+        }
+
+        JSONObject choice = new JSONObject();
+        choice.put("index", 0);
+        choice.put("delta", delta);
+        choice.put("finish_reason", done ? "stop" : JSONObject.NULL);
+
+        JSONArray choices = new JSONArray();
+        choices.put(choice);
+        response.put("choices", choices);
+        return response;
+    }
+
+    private JSONObject buildOpenAiRoleChunk(String model) throws JSONException {
+        JSONObject response = new JSONObject();
+        response.put("object", "chat.completion.chunk");
+        response.put("model", model);
+
+        JSONObject delta = new JSONObject();
+        delta.put("role", "assistant");
+
+        JSONObject choice = new JSONObject();
+        choice.put("index", 0);
+        choice.put("delta", delta);
+        choice.put("finish_reason", JSONObject.NULL);
+
+        JSONArray choices = new JSONArray();
+        choices.put(choice);
+        response.put("choices", choices);
+        return response;
+    }
+
+    private JSONObject buildOpenAiErrorObject(int statusCode, String message, String type) throws JSONException {
+        JSONObject error = new JSONObject();
+        error.put("message", message);
+        error.put("type", type);
+        error.put("code", statusCode);
+
+        JSONObject wrapper = new JSONObject();
+        wrapper.put("error", error);
+        return wrapper;
+    }
+
+    private void sendOpenAiErrorResponse(OutputStream outputStream, int statusCode, String message, String type)
+            throws IOException {
+        try {
+            sendJsonResponse(outputStream, statusCode, buildOpenAiErrorObject(statusCode, message, type).toString());
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, statusCode, message);
+        }
+    }
+     
     private void sendStreamingResponse(OutputStream outputStream, String body) throws IOException {
         String response = "HTTP/1.1 200 OK\r\n" +
             "Content-Type: application/x-ndjson\r\n" +

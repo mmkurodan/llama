@@ -11,7 +11,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 /**
- * Foreground service that keeps the Llama API server running in the background.
+ * Foreground service that keeps the Llama API/WebUI server running in the background.
  * Uses a persistent notification to maintain the service.
  */
 public class OllamaForegroundService extends Service {
@@ -67,7 +67,7 @@ public class OllamaForegroundService extends Service {
                 Log.i(TAG, "Disconnect all action received");
                 if (apiServer != null) {
                     apiServer.disconnectAll();
-                    sendLog("API: All connections disconnected");
+                    sendLog("API/WebUI: All connections disconnected");
                 }
                 return START_STICKY;
             }
@@ -76,10 +76,10 @@ public class OllamaForegroundService extends Service {
         }
         
         // Start foreground with notification
-        Notification notification = createNotification("Llama API Server", "Starting...");
+        Notification notification = createNotification("Llama API + WebUI Server", "Starting...");
         startForeground(NOTIFICATION_ID, notification);
         
-        // Start API server
+        // Start API/WebUI server
         startApiServer();
         
         return START_STICKY;
@@ -101,10 +101,10 @@ public class OllamaForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Llama API Server",
+                "Llama API + WebUI Server",
                 NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Keeps the Llama API server running in the background");
+            channel.setDescription("Keeps the Llama API/WebUI server running in the background");
             channel.setShowBadge(false);
             
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -154,7 +154,7 @@ public class OllamaForegroundService extends Service {
     }
     
     private void updateNotification(String content) {
-        Notification notification = createNotification("Llama API Server", content);
+        Notification notification = createNotification("Llama API + WebUI Server", content);
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {
             manager.notify(NOTIFICATION_ID, notification);
@@ -163,7 +163,7 @@ public class OllamaForegroundService extends Service {
     
     private void startApiServer() {
         if (apiServer != null && apiServer.isRunning()) {
-            Log.w(TAG, "API server already running");
+            Log.w(TAG, "API/WebUI server already running");
             return;
         }
         
@@ -172,49 +172,49 @@ public class OllamaForegroundService extends Service {
         apiServer.setListener(new OllamaApiServer.ServerListener() {
             @Override
             public void onServerStarted(int port) {
-                Log.i(TAG, "API server started on port " + port);
-                updateNotification("Running on port " + port);
-                sendLog("API server started on port " + port);
+                Log.i(TAG, "API/WebUI server started on port " + port);
+                updateNotification("API + WebUI on port " + port);
+                sendLog("API/WebUI server started on port " + port + " (WebUI: /)");
                 sendStatusChanged("running", port);
             }
             
             @Override
             public void onServerStopped() {
-                Log.i(TAG, "API server stopped");
+                Log.i(TAG, "API/WebUI server stopped");
                 updateNotification("Stopped");
-                sendLog("API server stopped");
+                sendLog("API/WebUI server stopped");
                 sendStatusChanged("stopped", port);
             }
             
             @Override
             public void onServerError(String error) {
-                Log.e(TAG, "API server error: " + error);
+                Log.e(TAG, "API/WebUI server error: " + error);
                 updateNotification("Error: " + error);
-                sendLog("API Server Error: " + error);
+                sendLog("API/WebUI Server Error: " + error);
             }
             
             @Override
             public void onRequest(String method, String path) {
                 Log.d(TAG, "Request: " + method + " " + path);
-                sendLog("API Request: " + method + " " + path);
+                sendLog("API/WebUI Request: " + method + " " + path);
             }
             
             @Override
             public void onModelLoading(String configName) {
                 updateNotification("Loading: " + configName);
-                sendLog("API: Loading configuration: " + configName);
+                sendLog("API/WebUI: Loading configuration: " + configName);
             }
             
             @Override
             public void onModelLoaded(String configName) {
                 updateNotification("Ready: " + configName);
-                sendLog("API: Model loaded for configuration: " + configName);
+                sendLog("API/WebUI: Model loaded for configuration: " + configName);
             }
             
             @Override
             public void onGenerating(String configName) {
                 updateNotification("Generating...");
-                sendLog("API: Generating with configuration: " + configName);
+                sendLog("API/WebUI: Generating with configuration: " + configName);
             }
         });
         

@@ -907,13 +907,13 @@ public class MainActivity extends Activity {
         messageView.setText(
                 "[日本語]\n" +
                 "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
-                "0) 起動時にAPI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
+                "0) 起動時にAPI/WebUI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
                 "1) SettingsでモデルをLoad Modelしてください。\n" +
                 "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
                 "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
                 "[English]\n" +
                 "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
-                "0) If the API enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
+                "0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
                 "1) In Settings, load a model with Load Model.\n" +
                 "2) Tap SAVE & CLOSE to return to the main screen.\n" +
                 "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
@@ -973,8 +973,8 @@ public class MainActivity extends Activity {
         }
 
         String message = localizedText(
-                "ローカルAPIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API を利用できます。後からメイン画面でも切り替えられます。",
-                "Enable the local API server?\n\nIf enabled, the API can be used from this device or the same local network. You can also change this later from the main screen.");
+                "ローカルAPI/WebUIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API と WebUI を利用できます。WebUIはブラウザで http://<端末IP>:" + apiPort + "/ から開けます。後からメイン画面でも切り替えられます。",
+                "Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:" + apiPort + "/ . You can also change this later from the main screen.");
 
         TextView messageView = new TextView(this);
         messageView.setText(message);
@@ -996,7 +996,7 @@ public class MainActivity extends Activity {
         dialogScrollView.addView(dialogContentLayout);
 
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("API有効化", "Enable API"))
+                .setTitle(localizedText("API/WebUI有効化", "Enable API/WebUI"))
                 .setView(dialogScrollView)
                 .setCancelable(false)
                 .setPositiveButton(localizedText("有効化", "Enable"), (dialog, which) -> {
@@ -1185,16 +1185,18 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         apiPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         
-        appendMessage("API server initialized (port: " + apiPort + ")");
+        appendMessage("API/WebUI server initialized (port: " + apiPort + ")");
     }
     
     private void updateApiServerUI() {
         if (isServiceRunning) {
-            apiServerButton.setText(localizedText("APIサーバー停止", "Stop API Server"));
-            apiServerStatusMain.setText(localizedText("API: ポート " + apiPort + " で稼働中", "API: Running on port " + apiPort));
+            apiServerButton.setText(localizedText("API/WebUI停止", "Stop API/WebUI"));
+            apiServerStatusMain.setText(localizedText(
+                    "API/WebUI: ポート " + apiPort + " で稼働中 (WebUI: /)",
+                    "API/WebUI: Running on port " + apiPort + " (WebUI: /)"));
         } else {
-            apiServerButton.setText(localizedText("APIサーバー開始", "Start API Server"));
-            apiServerStatusMain.setText(localizedText("API: 停止中", "API: Stopped"));
+            apiServerButton.setText(localizedText("API/WebUI開始", "Start API/WebUI"));
+            apiServerStatusMain.setText(localizedText("API/WebUI: 停止中", "API/WebUI: Stopped"));
         }
     }
 
@@ -1267,7 +1269,7 @@ public class MainActivity extends Activity {
         
         isServiceRunning = true;
         updateApiServerUI();
-        appendMessage("Starting API server service on port " + apiPort);
+        appendMessage("Starting API/WebUI server service on port " + apiPort + " (WebUI: /)");
     }
     
     private void stopApiService() {
@@ -1277,7 +1279,7 @@ public class MainActivity extends Activity {
         
         isServiceRunning = false;
         updateApiServerUI();
-        appendMessage("Stopping API server service");
+        appendMessage("Stopping API/WebUI server service");
     }
 
     private void disconnectApiClients() {

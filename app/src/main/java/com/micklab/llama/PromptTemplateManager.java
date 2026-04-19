@@ -14,7 +14,7 @@ import java.util.Locale;
  * 
  * Template selection priority:
  * 1. Custom prompt template (Settings)
- * 2. Model family estimation (Qwen/LLaMA/Mistral/Gemma/Phi/Zephyr/Hermes)
+ * 2. GGUF chat template metadata / model family estimation (Qwen/LLaMA/Mistral/Gemma/Phi/Bonsai/Zephyr/Hermes)
  * 3. Fallback: ChatML generic template
  * 
  * System prompt priority:
@@ -33,6 +33,7 @@ public class PromptTemplateManager {
         MISTRAL,
         QWEN,
         PHI,
+        BONSAI,
         ZEPHYR,
         HERMES
     }
@@ -142,6 +143,15 @@ public class PromptTemplateManager {
     private static final String PHI_TEMPLATE_NO_SYSTEM = 
         "<|user|>\n{USER}\n<|end|>\n" +
         "<|assistant|>\n";
+
+    private static final String BONSAI_TEMPLATE =
+        "<|system|>\n{SYSTEM}\n<|end|>\n" +
+        "<|user|>\n{USER}\n<|end|>\n" +
+        "<|assistant|>\n";
+
+    private static final String BONSAI_TEMPLATE_NO_SYSTEM =
+        "<|user|>\n{USER}\n<|end|>\n" +
+        "<|assistant|>\n";
     
     private static final String ZEPHYR_TEMPLATE = 
         "<|system|>\n{SYSTEM}</s>\n" +
@@ -181,6 +191,8 @@ public class PromptTemplateManager {
             return ModelFamily.MISTRAL;
         } else if (lowerPath.contains("llama")) {
             return ModelFamily.LLAMA;
+        } else if (lowerPath.contains("bonsai")) {
+            return ModelFamily.BONSAI;
         } else if (lowerPath.contains("phi")) {
             return ModelFamily.PHI;
         } else if (lowerPath.contains("zephyr")) {
@@ -207,6 +219,8 @@ public class PromptTemplateManager {
                 return hasSystem ? QWEN_TEMPLATE : QWEN_TEMPLATE_NO_SYSTEM;
             case PHI:
                 return hasSystem ? PHI_TEMPLATE : PHI_TEMPLATE_NO_SYSTEM;
+            case BONSAI:
+                return hasSystem ? BONSAI_TEMPLATE : BONSAI_TEMPLATE_NO_SYSTEM;
             case ZEPHYR:
                 return hasSystem ? ZEPHYR_TEMPLATE : ZEPHYR_TEMPLATE_NO_SYSTEM;
             case HERMES:
@@ -228,9 +242,56 @@ public class PromptTemplateManager {
             return new TemplateSelectionResult(customTemplate, "custom", null, hasSystem, systemSource);
         }
 
-        ModelFamily family = detectModelFamily(modelPath);
+        ModelFamily family = detectModelFamilyFromGgufTemplate(ggufChatTemplate, modelPath);
+        String source = "gguf-chat-template";
+        if (family == null) {
+            family = detectModelFamily(modelPath);
+            source = "model-family";
+        }
         String template = getTemplateForFamily(family, hasSystem);
-        return new TemplateSelectionResult(template, "model-family", family, hasSystem, systemSource);
+        return new TemplateSelectionResult(template, source, family, hasSystem, systemSource);
+    }
+
+    private static ModelFamily detectModelFamilyFromGgufTemplate(String ggufChatTemplate, String modelPath) {
+        if (ggufChatTemplate == null || ggufChatTemplate.trim().isEmpty()) {
+            return null;
+        }
+
+        String lowerTemplate = ggufChatTemplate.toLowerCase(Locale.US);
+        ModelFamily pathFamily = detectModelFamily(modelPath);
+
+        if (lowerTemplate.contains("<start_of_turn>") && lowerTemplate.contains("<end_of_turn>")) {
+            return ModelFamily.GEMMA;
+        }
+        if (lowerTemplate.contains("[inst]")) {
+            return ModelFamily.MISTRAL;
+        }
+        if (lowerTemplate.contains("<|system|>") && lowerTemplate.contains("<|user|>")
+                && lowerTemplate.contains("<|assistant|>") && lowerTemplate.contains("<|end|>")) {
+            return pathFamily == ModelFamily.BONSAI ? ModelFamily.BONSAI : ModelFamily.PHI;
+        }
+        if (lowerTemplate.contains("<|user|>") && lowerTemplate.contains("<|assistant|>")
+                && lowerTemplate.contains("<|end|>")) {
+            return pathFamily == ModelFamily.BONSAI ? ModelFamily.BONSAI
+                    : (pathFamily == ModelFamily.PHI ? ModelFamily.PHI : ModelFamily.BONSAI);
+        }
+        if (lowerTemplate.contains("</s>") && lowerTemplate.contains("<|assistant|>")) {
+            return ModelFamily.ZEPHYR;
+        }
+        if (lowerTemplate.contains("<|im_start|>") && lowerTemplate.contains("<|im_end|>")) {
+            if (pathFamily == ModelFamily.QWEN) {
+                return ModelFamily.QWEN;
+            }
+            if (pathFamily == ModelFamily.HERMES) {
+                return ModelFamily.HERMES;
+            }
+            if (pathFamily == ModelFamily.LLAMA) {
+                return ModelFamily.LLAMA;
+            }
+            return ModelFamily.CHATML;
+        }
+
+        return null;
     }
     
     /**
@@ -441,7 +502,7 @@ public class PromptTemplateManager {
             prompt = applyTemplate(selection.template, systemResult.prompt, conversationText);
         } else {
             // Build prompt using model-family-specific multi-turn formatting
-            ModelFamily family = detectModelFamily(modelPath);
+            ModelFamily family = selection.family != null ? selection.family : detectModelFamily(modelPath);
             prompt = buildMultiTurnPrompt(family, systemResult.prompt, conversationHistory);
         }
         prompt = applyThinkingToggle(prompt, selection, enableThinking);
@@ -630,6 +691,8 @@ public class PromptTemplateManager {
                 return buildMultiTurnMistral(systemPrompt, history);
             case PHI:
                 return buildMultiTurnPhi(systemPrompt, history);
+            case BONSAI:
+                return buildMultiTurnBonsai(systemPrompt, history);
             case ZEPHYR:
                 return buildMultiTurnZephyr(systemPrompt, history);
             case QWEN:
@@ -714,6 +777,23 @@ public class PromptTemplateManager {
 
     // Phi multi-turn
     private static String buildMultiTurnPhi(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder();
+        if (system != null && !system.isEmpty()) {
+            sb.append("<|system|>\n").append(system).append("\n<|end|>\n");
+        }
+        for (Message msg : history) {
+            if ("user".equals(msg.role)) {
+                sb.append("<|user|>\n").append(msg.content).append("\n<|end|>\n");
+            } else if ("assistant".equals(msg.role)) {
+                sb.append("<|assistant|>\n").append(msg.content).append("\n<|end|>\n");
+            }
+        }
+        sb.append("<|assistant|>\n");
+        return sb.toString();
+    }
+
+    // Bonsai multi-turn
+    private static String buildMultiTurnBonsai(String system, List<Message> history) {
         StringBuilder sb = new StringBuilder();
         if (system != null && !system.isEmpty()) {
             sb.append("<|system|>\n").append(system).append("\n<|end|>\n");
