@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
+import android.util.Base64;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -21,6 +22,8 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -57,6 +60,8 @@ public class OllamaApiServer {
     private static final String SERVER_ROLE_MODEL = "model";
     private static final String SERVER_ROLE_ROUTER = "router";
     private static final String WEBUI_ASSET_ROOT = "webui/";
+    private static final String MTMD_MEDIA_MARKER = "<__media__>";
+    private static final int MAX_REMOTE_MEDIA_BYTES = 10 * 1024 * 1024;
     private static final String BUILD_INFO = "llama.cpp build 8653 (1f34806c441f335f7d66e56fdb8ab3f5d09684e9)";
     private static final Map<String, String> WEBUI_CONTENT_TYPES;
 
@@ -97,6 +102,170 @@ public class OllamaApiServer {
     
     private static String stripResponseMarkers(String text) {
         return ResponseMarkerSanitizer.stripResponseMarkers(text);
+    }
+
+    private static final class PreparedMessages {
+        final JSONArray messages;
+        final List<byte[]> mediaFiles;
+
+        PreparedMessages(JSONArray messages, List<byte[]> mediaFiles) {
+            this.messages = messages;
+            this.mediaFiles = mediaFiles;
+        }
+
+        boolean hasMedia() {
+            return mediaFiles != null && !mediaFiles.isEmpty();
+        }
+
+        byte[][] toMediaArray() {
+            if (!hasMedia()) {
+                return new byte[0][];
+            }
+            return mediaFiles.toArray(new byte[0][]);
+        }
+    }
+
+    private static final class InvalidMediaException extends Exception {
+        InvalidMediaException(String message) {
+            super(message);
+        }
+
+        InvalidMediaException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    private static JSONObject copyJsonObject(JSONObject source) throws JSONException {
+        JSONObject copy = new JSONObject();
+        if (source == null) {
+            return copy;
+        }
+        java.util.Iterator<String> keys = source.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            copy.put(key, source.opt(key));
+        }
+        return copy;
+    }
+
+    private static byte[] readAllBytesLimited(InputStream inputStream, int maxBytes) throws IOException {
+        try (InputStream in = inputStream; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                total += read;
+                if (total > maxBytes) {
+                    throw new IOException("Remote media exceeds size limit");
+                }
+                output.write(buffer, 0, read);
+            }
+            return output.toByteArray();
+        }
+    }
+
+    private static byte[] decodeImageUrl(JSONObject imageUrl) throws InvalidMediaException {
+        if (imageUrl == null) {
+            throw new InvalidMediaException("image_url is required");
+        }
+        String url = imageUrl.optString("url", "");
+        if (url.isEmpty()) {
+            throw new InvalidMediaException("image_url.url is required");
+        }
+
+        if (url.regionMatches(true, 0, "http://", 0, 7) || url.regionMatches(true, 0, "https://", 0, 8)) {
+            try {
+                URLConnection connection = new URL(url).openConnection();
+                connection.setConnectTimeout(10_000);
+                connection.setReadTimeout(10_000);
+                return readAllBytesLimited(connection.getInputStream(), MAX_REMOTE_MEDIA_BYTES);
+            } catch (IOException e) {
+                throw new InvalidMediaException("Failed to download image input", e);
+            }
+        }
+
+        int commaIndex = url.indexOf(',');
+        if (commaIndex <= 0) {
+            throw new InvalidMediaException("Invalid image_url.url");
+        }
+        String header = url.substring(0, commaIndex).toLowerCase(Locale.ROOT);
+        if (!header.startsWith("data:image/") || !header.endsWith(";base64")) {
+            throw new InvalidMediaException("image_url.url must be a base64 data URL");
+        }
+        try {
+            return Base64.decode(url.substring(commaIndex + 1), Base64.DEFAULT);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidMediaException("image_url.url contains invalid base64 data", e);
+        }
+    }
+
+    private static byte[] decodeInputAudio(JSONObject inputAudio) throws InvalidMediaException {
+        if (inputAudio == null) {
+            throw new InvalidMediaException("input_audio is required");
+        }
+        String data = inputAudio.optString("data", "");
+        String format = inputAudio.optString("format", "").toLowerCase(Locale.ROOT);
+        if (data.isEmpty()) {
+            throw new InvalidMediaException("input_audio.data is required");
+        }
+        if (!"wav".equals(format) && !"mp3".equals(format)) {
+            throw new InvalidMediaException("input_audio.format must be either 'wav' or 'mp3'");
+        }
+        try {
+            return Base64.decode(data, Base64.DEFAULT);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidMediaException("input_audio.data contains invalid base64 data", e);
+        }
+    }
+
+    private static PreparedMessages normalizeMessagesForMedia(
+            JSONArray messages,
+            boolean allowVision,
+            boolean allowAudio
+    ) throws JSONException, InvalidMediaException {
+        JSONArray normalizedMessages = new JSONArray();
+        List<byte[]> mediaFiles = new ArrayList<>();
+
+        for (int i = 0; i < messages.length(); i++) {
+            JSONObject original = messages.getJSONObject(i);
+            JSONObject normalized = copyJsonObject(original);
+            Object rawContent = original.opt("content");
+            if (!(rawContent instanceof JSONArray)) {
+                normalizedMessages.put(normalized);
+                continue;
+            }
+
+            JSONArray contentParts = (JSONArray) rawContent;
+            StringBuilder textContent = new StringBuilder();
+            for (int partIndex = 0; partIndex < contentParts.length(); partIndex++) {
+                JSONObject part = contentParts.getJSONObject(partIndex);
+                String type = part.optString("type", "");
+                if ("text".equals(type) || "input_text".equals(type) || ("".equals(type) && part.has("text"))) {
+                    textContent.append(part.optString("text", ""));
+                } else if ("image_url".equals(type)) {
+                    if (!allowVision) {
+                        throw new InvalidMediaException("image input is not supported by the current model");
+                    }
+                    mediaFiles.add(decodeImageUrl(part.optJSONObject("image_url")));
+                    textContent.append(MTMD_MEDIA_MARKER);
+                } else if ("input_audio".equals(type)) {
+                    if (!allowAudio) {
+                        throw new InvalidMediaException("audio input is not supported by the current model");
+                    }
+                    mediaFiles.add(decodeInputAudio(part.optJSONObject("input_audio")));
+                    textContent.append(MTMD_MEDIA_MARKER);
+                } else if ("media_marker".equals(type)) {
+                    textContent.append(MTMD_MEDIA_MARKER);
+                } else {
+                    throw new InvalidMediaException("unsupported content[].type: " + type);
+                }
+            }
+
+            normalized.put("content", textContent.toString());
+            normalizedMessages.put(normalized);
+        }
+
+        return new PreparedMessages(normalizedMessages, mediaFiles);
     }
 
     private static class StreamTokenFilter {
@@ -611,7 +780,13 @@ public class OllamaApiServer {
                 modelEntry.put("model", configName);
                 modelEntry.put("modified_at", getTimestamp());
                 modelEntry.put("size", modelFile != null && modelFile.exists() ? modelFile.length() : 0);
-                modelEntry.put("capabilities", new JSONArray());
+                JSONObject modalities = buildModelModalities(configName);
+                JSONArray capabilities = new JSONArray();
+                if (modalities.optBoolean("vision", false) || modalities.optBoolean("audio", false)) {
+                    capabilities.put("multimodal");
+                }
+                modelEntry.put("capabilities", capabilities);
+                modelEntry.put("modalities", modalities);
                 modelEntry.put("details", details);
                 models.put(modelEntry);
             }
@@ -648,10 +823,7 @@ public class OllamaApiServer {
         response.put("model_alias", modelName);
         response.put("role", getServerRole());
 
-        JSONObject modalities = new JSONObject();
-        modalities.put("vision", false);
-        modalities.put("audio", false);
-        response.put("modalities", modalities);
+        response.put("modalities", buildModelModalities(modelName));
 
         String chatTemplate = "";
         if (modelManager.isModelLoaded() && modelName.equals(modelManager.getCurrentConfigName())) {
@@ -667,6 +839,16 @@ public class OllamaApiServer {
         response.put("webui_settings", buildWebUiSettings(config));
         response.put("webui", true);
         return response;
+    }
+
+    private JSONObject buildModelModalities(String modelName) throws JSONException {
+        JSONObject modalities = new JSONObject();
+        boolean isLoadedCurrentModel = modelManager.isModelLoaded()
+                && modelName != null
+                && modelName.equals(modelManager.getCurrentConfigName());
+        modalities.put("vision", isLoadedCurrentModel && modelManager.supportsVision());
+        modalities.put("audio", isLoadedCurrentModel && modelManager.supportsAudio());
+        return modalities;
     }
 
     private JSONObject buildDefaultGenerationSettings(String modelName, ConfigurationManager.Configuration config) throws JSONException {
@@ -1293,10 +1475,6 @@ public class OllamaApiServer {
                     return;
                 }
                 
-                if (listener != null) {
-                    listener.onGenerating(model);
-                }
-                
                 // Get configuration for prompt template settings
                 ConfigurationManager.Configuration config = null;
                 try {
@@ -1311,10 +1489,15 @@ public class OllamaApiServer {
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
                 boolean enableThinking = config == null || config.enableThinking;
                 String modelPath = modelManager.getCurrentModelPath();
+                PreparedMessages preparedMessages = normalizeMessagesForMedia(
+                        messages,
+                        modelManager.supportsVision(),
+                        modelManager.supportsAudio()
+                );
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
                         PromptTemplateManager.buildPromptFromMessagesWithSelection(
-                                messages,
+                                preparedMessages.messages,
                                 customTemplate,
                                 ggufChatTemplate,
                                 settingsSystemPrompt,
@@ -1325,6 +1508,10 @@ public class OllamaApiServer {
                 logMaxDebugPayload("api.chat.prompt", promptToUse);
                 if (abortIfResetRequested(outputStream, "/api/chat")) {
                     return;
+                }
+
+                if (listener != null) {
+                    listener.onGenerating(model);
                 }
 
                 if (stream) {
@@ -1475,7 +1662,7 @@ public class OllamaApiServer {
                     });
 
                     try {
-                        modelManager.generate(promptToUse);
+                        modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
@@ -1493,7 +1680,7 @@ public class OllamaApiServer {
                     }
                 } else {
                     // Non-streaming response
-                    String rawResponse = modelManager.generate(promptToUse);
+                    String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
                     String response = stripResponseMarkers(rawResponse);
                     logMaxDebugPayload("api.chat.nonstream.response", response);
@@ -1517,6 +1704,9 @@ public class OllamaApiServer {
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in chat request", e);
             sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
+        } catch (InvalidMediaException e) {
+            Log.e(TAG, "Invalid media in chat request", e);
+            sendErrorResponse(outputStream, 400, e.getMessage());
         }
     }
 
@@ -1561,10 +1751,15 @@ public class OllamaApiServer {
                 String settingsSystemPrompt = config != null ? config.systemPrompt : null;
                 boolean enableThinking = config == null || config.enableThinking;
                 String modelPath = modelManager.getCurrentModelPath();
+                PreparedMessages preparedMessages = normalizeMessagesForMedia(
+                        messages,
+                        modelManager.supportsVision(),
+                        modelManager.supportsAudio()
+                );
 
                 PromptTemplateManager.PromptBuildResult promptResult =
                         PromptTemplateManager.buildPromptFromMessagesWithSelection(
-                                messages,
+                                preparedMessages.messages,
                                 customTemplate,
                                 ggufChatTemplate,
                                 settingsSystemPrompt,
@@ -1662,7 +1857,7 @@ public class OllamaApiServer {
                     });
 
                     try {
-                        modelManager.generate(promptToUse);
+                        modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
@@ -1680,7 +1875,7 @@ public class OllamaApiServer {
                         Log.w(TAG, "OpenAI writer thread join interrupted", ie);
                     }
                 } else {
-                    String rawResponse = modelManager.generate(promptToUse);
+                    String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     String response = stripResponseMarkers(rawResponse);
                     sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, response).toString());
                 }
@@ -1690,6 +1885,9 @@ public class OllamaApiServer {
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in OpenAI chat request", e);
             sendOpenAiErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage(), "invalid_request_error");
+        } catch (InvalidMediaException e) {
+            Log.e(TAG, "Invalid media in OpenAI chat request", e);
+            sendOpenAiErrorResponse(outputStream, 400, e.getMessage(), "invalid_request_error");
         }
     }
 

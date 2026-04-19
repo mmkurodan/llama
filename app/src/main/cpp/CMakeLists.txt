@@ -63,10 +63,39 @@ file(GLOB LLAMA_MODEL_FILES
     ${LLAMA_ROOT_DIR}/src/models/*.cpp
 )
 
+set(MTMD_SOURCES
+    ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-audio.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-image.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-helper.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/clip.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/cogvlm.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/conformer.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/gemma4v.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/glm4v.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/internvl.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/kimivl.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/kimik25.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/nemotron-v2-vl.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/llama4.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/llava.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/minicpmv.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/paddleocr.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/pixtral.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/qwen2vl.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/qwen3vl.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/siglip.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/whisper-enc.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/deepseekocr.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/mobilenetv5.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/youtuvl.cpp
+)
+
 set(LLAMA_SOURCES
     ${LLAMA_ROOT_FILES}
     ${LLAMA_SRC_FILES}
     ${LLAMA_MODEL_FILES}
+    ${MTMD_SOURCES}
     ${CMAKE_CURRENT_BINARY_DIR}/build-info.cpp
 )
 
@@ -138,6 +167,7 @@ target_include_directories(
     ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/common
     ${LLAMA_ROOT_DIR}/vendor
+    ${LLAMA_ROOT_DIR}/tools/mtmd
 
     ${GGML_ROOT_DIR}/include
     ${GGML_ROOT_DIR}/src
@@ -204,3 +234,7 @@ target_link_libraries(
     dl
     atomic
 )
+
+if (NOT MSVC)
+    target_compile_options(llama_jni PRIVATE -Wno-cast-qual)
+endif()

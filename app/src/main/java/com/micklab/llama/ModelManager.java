@@ -20,6 +20,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +60,7 @@ public class ModelManager {
     private boolean reinitializing = false;
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
+    private volatile String currentMmprojPath = null;
     private volatile boolean modelLoaded = false;
 
     public enum ForceReinitializeResult {
@@ -139,6 +141,14 @@ public class ModelManager {
     
     public String getCurrentModelPath() {
         return currentModelPath;
+    }
+
+    public boolean supportsVision() {
+        return modelLoaded && llama.supportsVision();
+    }
+
+    public boolean supportsAudio() {
+        return modelLoaded && llama.supportsAudio();
     }
     
     /**
@@ -243,16 +253,20 @@ public class ModelManager {
             
             File destFile = new File(getModelStorageDir(), filename);
             String modelPath = destFile.getAbsolutePath();
+            String mmprojPath = resolveMultimodalProjectorPath(config);
             
             // If same model is already loaded, just re-apply parameters
-            if (modelPath.equals(currentModelPath) && modelLoaded) {
+            if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentMmprojPath) && modelLoaded) {
                 Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
                 applyConfiguration(config);
                 currentConfigName = configName;
                 return true;
             }
 
-            final boolean requiresModelInit = !modelPath.equals(currentModelPath) || !modelLoaded;
+            final boolean requiresModelInit =
+                    !modelPath.equals(currentModelPath)
+                            || !Objects.equals(mmprojPath, currentMmprojPath)
+                            || !modelLoaded;
             
             if (listener != null) {
                 listener.onModelLoading(configName);
@@ -280,6 +294,15 @@ public class ModelManager {
                 return false;
             }
 
+            String mmprojAvailabilityError = ensureMultimodalProjectorAvailable(config, mmprojPath);
+            if (mmprojAvailabilityError != null) {
+                Log.e(TAG, mmprojAvailabilityError);
+                if (listener != null) {
+                    listener.onError(mmprojAvailabilityError);
+                }
+                return false;
+            }
+
             if (requiresModelInit) {
                 if (currentModelPath != null || modelLoaded) {
                     unloadCurrentModelLocked();
@@ -288,7 +311,7 @@ public class ModelManager {
                 }
 
                 applyLoadParameters(config, PRELOAD_N_CTX);
-                String preloadResult = llama.init(modelPath);
+                String preloadResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
                 if (!"ok".equals(preloadResult)) {
                     Log.e(TAG, "Model preload failed: " + preloadResult);
                     if (listener != null) {
@@ -299,7 +322,7 @@ public class ModelManager {
 
                 llama.free();
                 applyLoadParameters(config, config.nCtx);
-                String initResult = llama.init(modelPath);
+                String initResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
                 if (!"ok".equals(initResult)) {
                     Log.e(TAG, "Model init failed: " + initResult);
                     if (listener != null) {
@@ -309,6 +332,7 @@ public class ModelManager {
                 }
 
                 currentModelPath = modelPath;
+                currentMmprojPath = mmprojPath;
             }
 
             // Set parameters from configuration
@@ -414,6 +438,10 @@ public class ModelManager {
      * @return Generated text or error message
      */
     public String generate(String prompt) {
+        return generate(prompt, null);
+    }
+
+    public String generate(String prompt, byte[][] mediaFiles) {
         if (!modelLoaded) {
             return "Model not loaded";
         }
@@ -424,7 +452,9 @@ public class ModelManager {
         
         String result;
         try {
-            result = llama.generate(prompt);
+            result = (mediaFiles == null || mediaFiles.length == 0)
+                    ? llama.generate(prompt)
+                    : llama.generateWithMedia(prompt, mediaFiles);
         } catch (Throwable t) {
             // Log full stack trace and notify listener so the server can respond gracefully
             Log.e(TAG, "Exception during generate", t);
@@ -473,6 +503,7 @@ public class ModelManager {
 
     private void clearLoadedModelState() {
         currentModelPath = null;
+        currentMmprojPath = null;
         currentConfigName = null;
         modelLoaded = false;
     }
@@ -529,6 +560,56 @@ public class ModelManager {
             return "Model file missing after download: " + destFile.getAbsolutePath();
         }
 
+        return null;
+    }
+
+    private String resolveMultimodalProjectorPath(ConfigurationManager.Configuration config) {
+        if (config.multimodalProjectorUrl != null && !config.multimodalProjectorUrl.trim().isEmpty()) {
+            File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+            return configuredFile != null ? configuredFile.getAbsolutePath() : null;
+        }
+
+        File autoDetected = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(context, config.modelUrl);
+        if (autoDetected != null) {
+            Log.i(TAG, "Auto-detected multimodal projector: " + autoDetected.getAbsolutePath());
+            return autoDetected.getAbsolutePath();
+        }
+        return null;
+    }
+
+    private String ensureMultimodalProjectorAvailable(
+            ConfigurationManager.Configuration config,
+            String mmprojPath) {
+        if (mmprojPath == null || mmprojPath.isEmpty()) {
+            return null;
+        }
+
+        File mmprojFile = new File(mmprojPath);
+        if (mmprojFile.exists() && mmprojFile.length() > 0) {
+            return null;
+        }
+
+        String mmprojReference = config.multimodalProjectorUrl;
+        if (mmprojReference == null || mmprojReference.trim().isEmpty()) {
+            return "Configured multimodal projector file not found: " + mmprojPath;
+        }
+
+        if (!ModelFileHelper.isRemoteModelReference(mmprojReference)) {
+            return "Imported multimodal projector file not found: " + mmprojPath;
+        }
+
+        if (mmprojReference.regionMatches(true, 0, "https://", 0, 8)) {
+            String trustStoreError = configureNativeDownloadTrustStore();
+            if (trustStoreError != null) {
+                return trustStoreError;
+            }
+        }
+
+        Log.i(TAG, "Downloading multimodal projector from: " + mmprojReference);
+        String downloadResult = llama.download(mmprojReference, mmprojFile.getAbsolutePath());
+        if (!"ok".equals(downloadResult)) {
+            return "Multimodal projector download failed: " + downloadResult;
+        }
         return null;
     }
 

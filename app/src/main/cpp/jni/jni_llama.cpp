@@ -28,12 +28,15 @@
 #include "ggml-backend.h"
 #include "ggml-backend-impl.h"   // ★ これが必要
 #include "ggml-cpu.h"
+#include "mtmd.h"
+#include "mtmd-helper.h"
 #include <curl/curl.h>
 
 // ---------------- グローバル ----------------
 static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
+static mtmd_context  *g_mtmd  = nullptr;
 static JavaVM *g_jvm = nullptr;
 // Token listener global ref and method IDs
 static jobject g_token_listener = nullptr;
@@ -43,6 +46,9 @@ static jmethodID g_token_onError = nullptr;
 static std::atomic<bool> g_cancel_generation(false);
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
+static std::string g_current_mmproj_path;
+static bool g_supports_vision = false;
+static bool g_supports_audio = false;
 static std::mutex g_download_ca_bundle_mutex;
 static std::string g_download_ca_bundle_path;
 
@@ -869,6 +875,14 @@ static void llama_jni_free() {
 
     log_to_file("llama_jni_free: freeing resources (explicit)");
 
+    if (g_mtmd) {
+        mtmd_free(g_mtmd);
+        g_mtmd = nullptr;
+        g_current_mmproj_path.clear();
+        g_supports_vision = false;
+        g_supports_audio = false;
+        log_to_file("Multimodal context freed");
+    }
     if (g_ctx) {
         llama_free(g_ctx);
         g_ctx = nullptr;
@@ -1227,6 +1241,237 @@ Java_com_micklab_llama_LlamaNative_init(
     }
 }
 
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_initWithMmproj(
+        JNIEnv *env, jobject,
+        jstring jModelPath,
+        jstring jMmprojPath
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    ensure_fatal_signal_handlers_installed();
+
+    auto clear_partial_init = []() {
+        if (g_mtmd) {
+            mtmd_free(g_mtmd);
+            g_mtmd = nullptr;
+        }
+        if (g_ctx) {
+            llama_free(g_ctx);
+            g_ctx = nullptr;
+        }
+        if (g_model) {
+            llama_model_free(g_model);
+            g_model = nullptr;
+        }
+        g_current_model_path.clear();
+        g_current_mmproj_path.clear();
+        g_supports_vision = false;
+        g_supports_audio = false;
+    };
+
+    try {
+        log_to_file("initWithMmproj: start");
+
+        llama_log_set(llama_log_callback, nullptr);
+        mtmd_helper_log_set(llama_log_callback, nullptr);
+        log_to_file("initWithMmproj: llama/mtmd log callbacks registered");
+
+        std::string model_path = jstring_to_std(env, jModelPath);
+        std::string mmproj_path = jMmprojPath ? jstring_to_std(env, jMmprojPath) : "";
+
+        {
+            std::ostringstream ss;
+            ss << "initWithMmproj: model_path=" << model_path
+               << " mmproj_path=" << (mmproj_path.empty() ? "<none>" : mmproj_path);
+            log_to_file(ss.str());
+        }
+
+        if (!g_current_model_path.empty()
+                && g_current_model_path == model_path
+                && g_current_mmproj_path == mmproj_path
+                && g_model && g_ctx
+                && (mmproj_path.empty() || g_mtmd != nullptr)) {
+            std::ostringstream ss;
+            ss << "initWithMmproj: model already initialized at path=" << model_path
+               << " mmproj=" << (mmproj_path.empty() ? "<none>" : mmproj_path)
+               << "; skipping init";
+            log_to_file(ss.str());
+            return env->NewStringUTF("ok");
+        }
+
+        if (g_mtmd) {
+            log_to_file("initWithMmproj: freeing existing multimodal context before re-init");
+            mtmd_free(g_mtmd);
+            g_mtmd = nullptr;
+        }
+        g_current_mmproj_path.clear();
+        g_supports_vision = false;
+        g_supports_audio = false;
+        if (g_ctx) {
+            log_to_file("initWithMmproj: freeing existing context before re-init");
+            llama_free(g_ctx);
+            g_ctx = nullptr;
+        }
+        if (g_model) {
+            log_to_file("initWithMmproj: freeing existing model before re-init");
+            llama_model_free(g_model);
+            g_model = nullptr;
+        }
+        if (!g_current_model_path.empty()) {
+            log_to_file("initWithMmproj: clearing previous model path");
+            g_current_model_path.clear();
+        }
+
+        {
+            std::ifstream ifs(model_path, std::ios::binary | std::ios::ate);
+            if (!ifs) {
+                std::ostringstream ss;
+                ss << "initWithMmproj: model file cannot be opened: " << model_path
+                   << " errno=" << errno << " strerror=" << std::strerror(errno);
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("model file open failed");
+            } else {
+                auto sz = ifs.tellg();
+                std::ostringstream ss;
+                ss << "initWithMmproj: model file exists, size=" << sz << " bytes";
+                log_to_file(ss.str());
+                ifs.close();
+            }
+        }
+
+        if (!mmproj_path.empty()) {
+            std::ifstream ifs(mmproj_path, std::ios::binary | std::ios::ate);
+            if (!ifs) {
+                std::ostringstream ss;
+                ss << "initWithMmproj: mmproj file cannot be opened: " << mmproj_path
+                   << " errno=" << errno << " strerror=" << std::strerror(errno);
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("mmproj file open failed");
+            } else {
+                auto sz = ifs.tellg();
+                std::ostringstream ss;
+                ss << "initWithMmproj: mmproj file exists, size=" << sz << " bytes";
+                log_to_file(ss.str());
+                ifs.close();
+            }
+        }
+
+        {
+            std::string missing_split_path;
+            if (find_missing_split_shard_path(model_path, missing_split_path)) {
+                std::ostringstream ss;
+                ss << "initWithMmproj: missing split shard: " << missing_split_path;
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF(ss.str().c_str());
+            }
+        }
+
+        if (env->GetJavaVM(&g_jvm) != JNI_OK) {
+            g_jvm = nullptr;
+            log_to_file("initWithMmproj: GetJavaVM failed", GGML_LOG_LEVEL_WARN);
+        } else {
+            log_to_file("initWithMmproj: JavaVM stored");
+        }
+
+        llama_backend_init();
+
+        const size_t backend_count = ggml_backend_reg_count();
+        log_to_file(std::string("initWithMmproj: backend init complete, ") + summarize_registered_backends(),
+                    backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
+        if (backend_count == 0) {
+            return env->NewStringUTF("no ggml backends registered");
+        }
+
+        llama_model_params mparams = llama_model_default_params();
+        mparams.n_gpu_layers = g_n_gpu_layers;
+
+        {
+            using namespace std::chrono;
+            auto t0 = high_resolution_clock::now();
+            g_model = llama_model_load_from_file(model_path.c_str(), mparams);
+            auto t1 = high_resolution_clock::now();
+            auto ms = duration_cast<milliseconds>(t1 - t0).count();
+
+            std::ostringstream ss;
+            if (!g_model) {
+                ss << "initWithMmproj: failed to load model (returned null) after "
+                   << ms << " ms. path_len=" << model_path.size();
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("failed to load model");
+            } else {
+                ss << "initWithMmproj: model loaded successfully in " << ms << " ms";
+                log_to_file(ss.str());
+            }
+        }
+
+        llama_context_params cparams = llama_context_default_params();
+        cparams.n_ctx           = g_n_ctx;
+        cparams.n_threads       = g_n_threads;
+        cparams.n_batch         = g_n_batch;
+        cparams.n_threads_batch = g_n_threads;
+
+        {
+            using namespace std::chrono;
+            auto t0 = high_resolution_clock::now();
+            g_ctx = llama_init_from_model(g_model, cparams);
+            auto t1 = high_resolution_clock::now();
+            auto ms = duration_cast<milliseconds>(t1 - t0).count();
+
+            std::ostringstream ss;
+            if (!g_ctx) {
+                ss << "initWithMmproj: failed to create context (returned null) after "
+                   << ms << " ms";
+                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("failed to create context");
+            } else {
+                ss << "initWithMmproj: context created successfully in " << ms << " ms";
+                log_to_file(ss.str());
+            }
+        }
+
+        if (!mmproj_path.empty()) {
+            mtmd_context_params mparams_mtmd = mtmd_context_params_default();
+            mparams_mtmd.use_gpu = g_n_gpu_layers != 0;
+            mparams_mtmd.print_timings = false;
+            mparams_mtmd.n_threads = g_n_threads;
+            mparams_mtmd.warmup = true;
+
+            g_mtmd = mtmd_init_from_file(mmproj_path.c_str(), g_model, mparams_mtmd);
+            if (!g_mtmd) {
+                log_to_file("initWithMmproj: failed to load multimodal projector", GGML_LOG_LEVEL_ERROR);
+                return env->NewStringUTF("failed to load multimodal projector");
+            }
+
+            g_supports_vision = mtmd_support_vision(g_mtmd);
+            g_supports_audio = mtmd_support_audio(g_mtmd);
+
+            {
+                std::ostringstream ss;
+                ss << "initWithMmproj: multimodal projector loaded vision=" << g_supports_vision
+                   << " audio=" << g_supports_audio;
+                log_to_file(ss.str());
+            }
+        }
+
+        g_current_model_path = model_path;
+        g_current_mmproj_path = mmproj_path;
+        log_to_file("initWithMmproj: initialization complete");
+
+        return env->NewStringUTF("ok");
+    } catch (const std::exception & e) {
+        std::ostringstream ss;
+        ss << "initWithMmproj: exception: " << e.what();
+        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+        clear_partial_init();
+        return env->NewStringUTF("init exception");
+    } catch (...) {
+        log_to_file("initWithMmproj: unknown native exception", GGML_LOG_LEVEL_ERROR);
+        clear_partial_init();
+        return env->NewStringUTF("init unknown exception");
+    }
+}
+
 // ---------------- JNI: setLoadParameters ----------------
 extern "C"
 JNIEXPORT void JNICALL
@@ -1375,190 +1620,288 @@ Java_com_micklab_llama_LlamaNative_cancelGeneration(
     log_to_file("cancelGeneration: cancellation requested", GGML_LOG_LEVEL_WARN);
 }
 
-// ---------------- JNI: generate ----------------
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_micklab_llama_LlamaNative_generate(
-        JNIEnv *env, jobject,
-        jstring jPrompt
-) {
-    std::lock_guard<std::mutex> lock(g_mutex);
-
-    if (!g_ctx || !g_model) {
-        log_to_file("generate: not initialized", GGML_LOG_LEVEL_ERROR);
-        return env->NewStringUTF("not initialized");
+static void notify_token_error(const char * errmsg) {
+    if (!errmsg || !g_jvm || !g_token_listener || !g_token_onError) {
+        return;
     }
-
-    g_cancel_generation.store(false);
-
-    std::string prompt = jstring_to_std(env, jPrompt);
-    {
-        std::ostringstream ss;
-        ss << "generate: prompt_len=" << prompt.size();
-        log_to_file(ss.str());
+    JNIEnv * env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            attached = true;
+        } else {
+            env = nullptr;
+        }
     }
-    {
-        std::ostringstream ss;
-        ss << "generate: prompt=\n" << prompt;
-        log_to_file(ss.str());
+    if (env) {
+        jstring jerr = env->NewStringUTF(errmsg);
+        if (!jerr) {
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            jerr = env->NewStringUTF("unknown error");
+        }
+        if (jerr) {
+            env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            env->DeleteLocalRef(jerr);
+        }
     }
-    const int max_tokens = 1024;
-
-    llama_memory_t mem = llama_get_memory(g_ctx);
-    llama_memory_clear(mem, false);
-    {
-        std::ostringstream ss;
-        ss << "generate: memory cleared; ctx=" << g_n_ctx;
-        log_to_file(ss.str());
+    if (attached) {
+        g_jvm->DetachCurrentThread();
     }
+}
 
-    std::vector<llama_token> tokens;
-    tokens.resize(g_n_ctx);
+static void notify_token_delta(const std::string & delta) {
+    if (delta.empty() || !g_jvm || !g_token_listener || !g_token_onToken) {
+        return;
+    }
+    JNIEnv * env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            attached = true;
+        } else {
+            env = nullptr;
+        }
+    }
+    if (env) {
+        jstring jdelta = env->NewStringUTF(delta.c_str());
+        if (jdelta) {
+            env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            env->DeleteLocalRef(jdelta);
+        } else if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+        }
+    }
+    if (attached) {
+        g_jvm->DetachCurrentThread();
+    }
+}
 
-    const llama_vocab * vocab = llama_model_get_vocab(g_model);
-    
+static void notify_token_complete() {
+    if (!g_jvm || !g_token_listener || !g_token_onComplete) {
+        return;
+    }
+    JNIEnv * env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            attached = true;
+        } else {
+            env = nullptr;
+        }
+    }
+    if (env) {
+        env->CallVoidMethod(g_token_listener, g_token_onComplete);
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+    if (attached) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+static bool prefill_text_prompt_locked(
+        const llama_vocab * vocab,
+        const std::string & prompt,
+        size_t & n_prompt_tokens,
+        llama_pos & n_past,
+        std::string & error_message) {
+    std::vector<llama_token> tokens(g_n_ctx);
     int32_t n_tokens = llama_tokenize(
             vocab,
             prompt.c_str(),
-            (int)prompt.size(),
+            static_cast<int>(prompt.size()),
             tokens.data(),
-            (int)tokens.size(),
+            static_cast<int>(tokens.size()),
             false,
             true
     );
 
     if (n_tokens <= 0) {
-        log_to_file("generate: tokenize failed", GGML_LOG_LEVEL_ERROR);
-        return env->NewStringUTF("tokenize failed");
+        error_message = "tokenize failed";
+        return false;
     }
-
-    {
-        std::ostringstream ss;
-        ss << "generate: n_tokens=" << n_tokens;
-        log_to_file(ss.str());
-    }
-
     if (n_tokens >= g_n_ctx) {
-        std::ostringstream ss;
-        ss << "generate: n_tokens(" << n_tokens << ") exceeds ctx(" << g_n_ctx << ")";
-        log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
-        return env->NewStringUTF("token count exceeds context");
+        error_message = "token count exceeds context";
+        return false;
     }
 
     tokens.resize(n_tokens);
+    n_prompt_tokens = static_cast<size_t>(n_tokens);
+    n_past = n_tokens;
 
-    std::string output;
-    output.reserve(max_tokens * 4);
+    for (int i = 0; i < n_tokens; i += g_n_batch) {
+        if (g_cancel_generation.load()) {
+            error_message = "generation cancelled";
+            return false;
+        }
+
+        const int batch_size = std::min(g_n_batch, n_tokens - i);
+        llama_batch batch = llama_batch_init(batch_size, 0, 1);
+        batch.n_tokens = batch_size;
+
+        for (int j = 0; j < batch_size; ++j) {
+            batch.token[j] = tokens[i + j];
+            batch.pos[j] = i + j;
+            batch.n_seq_id[j] = 1;
+            batch.seq_id[j][0] = 0;
+            batch.logits[j] = (i + j == n_tokens - 1) ? 1 : 0;
+        }
+
+        const int rc = llama_decode(g_ctx, batch);
+        llama_batch_free(batch);
+        if (rc != 0) {
+            error_message = "decode failed (prompt)";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool prefill_multimodal_prompt_locked(
+        const std::string & prompt,
+        const std::vector<std::vector<uint8_t>> & media_files,
+        size_t & n_prompt_tokens,
+        llama_pos & n_past,
+        std::string & error_message) {
+    if (!g_mtmd) {
+        error_message = "multimodal projector not initialized";
+        return false;
+    }
+
+    std::vector<mtmd_bitmap *> bitmaps;
+    bitmaps.reserve(media_files.size());
+
+    mtmd_input_chunks * chunks = mtmd_input_chunks_init();
+    if (!chunks) {
+        error_message = "failed to allocate multimodal chunks";
+        return false;
+    }
+
+    auto cleanup = [&]() {
+        for (mtmd_bitmap * bitmap : bitmaps) {
+            if (bitmap) {
+                mtmd_bitmap_free(bitmap);
+            }
+        }
+        mtmd_input_chunks_free(chunks);
+    };
+
+    for (const auto & file : media_files) {
+        mtmd_bitmap * bitmap = mtmd_helper_bitmap_init_from_buf(g_mtmd, file.data(), file.size());
+        if (!bitmap) {
+            error_message = "failed to decode multimodal input";
+            cleanup();
+            return false;
+        }
+        bitmaps.push_back(bitmap);
+    }
+
+    std::vector<const mtmd_bitmap *> bitmap_ptrs(bitmaps.begin(), bitmaps.end());
+    mtmd_input_text input_text = {
+            prompt.c_str(),
+            true,
+            true
+    };
+
+    const int32_t tokenized = mtmd_tokenize(
+            g_mtmd,
+            chunks,
+            &input_text,
+            bitmap_ptrs.data(),
+            bitmap_ptrs.size()
+    );
+    if (tokenized != 0) {
+        error_message = "failed to tokenize multimodal prompt";
+        cleanup();
+        return false;
+    }
+
+    n_prompt_tokens = mtmd_helper_get_n_tokens(chunks);
+    const int32_t eval_rc = mtmd_helper_eval_chunks(
+            g_mtmd,
+            g_ctx,
+            chunks,
+            0,
+            0,
+            g_n_batch,
+            true,
+            &n_past
+    );
+    if (eval_rc != 0) {
+        error_message = "decode failed (multimodal prompt)";
+        cleanup();
+        return false;
+    }
+
+    cleanup();
+    return true;
+}
+
+static jstring generate_locked(
+        JNIEnv * env,
+        const std::string & prompt,
+        const std::vector<std::vector<uint8_t>> * media_files) {
+    if (!g_ctx || !g_model) {
+        log_to_file("generate: not initialized", GGML_LOG_LEVEL_ERROR);
+        notify_token_error("not initialized");
+        return env->NewStringUTF("not initialized");
+    }
+
+    g_cancel_generation.store(false);
 
     {
-        log_to_file("generate: processing prompt in batches");
-        if (g_log_ofs.is_open()) g_log_ofs.flush();
-        
-        auto t_decode0 = std::chrono::high_resolution_clock::now();
-        
-        // Process prompt in chunks of g_n_batch size to avoid OOM on Android
-        for (int i = 0; i < n_tokens; i += g_n_batch) {
-            if (g_cancel_generation.load()) {
-                log_to_file("generate: cancelled during prompt decode", GGML_LOG_LEVEL_WARN);
-                return env->NewStringUTF("generation cancelled");
-            }
-
-            int batch_size = std::min(g_n_batch, n_tokens - i);
-            
-            {
-                std::ostringstream ss;
-                ss << "generate: processing batch " << (i / g_n_batch + 1) 
-                   << " (tokens " << i << "-" << (i + batch_size - 1) << ")";
-                log_to_file(ss.str());
-            }
-            
-            llama_batch batch = llama_batch_init(batch_size, 0, 1);
-            batch.n_tokens = batch_size;
-            
-            for (int j = 0; j < batch_size; j++) {
-                batch.token[j] = tokens[i + j];
-                batch.pos[j] = i + j;
-                batch.n_seq_id[j] = 1;
-                batch.seq_id[j][0] = 0;
-                // Only compute logits for the last token of the entire prompt
-                batch.logits[j] = (i + j == n_tokens - 1) ? 1 : 0;
-            }
-            
-            int rc = llama_decode(g_ctx, batch);
-            llama_batch_free(batch);
-            
-            if (rc != 0) {
-                std::ostringstream ss;
-                ss << "generate: decode failed at batch " << (i / g_n_batch + 1) 
-                   << " (rc=" << rc << ")";
-                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                if (g_log_ofs.is_open()) g_log_ofs.flush();
-                // Notify Java listener about error
-                if (g_jvm && g_token_listener && g_token_onError) {
-                    JNIEnv* env = nullptr;
-                    bool attached = false;
-                    if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-                        if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-                            attached = true;
-                        } else {
-                            env = nullptr;
-                        }
-                    }
-                    if (env) {
-                        const char *errmsg = "decode failed (prompt)";
-                        jstring jerr = env->NewStringUTF(errmsg);
-                        if (!jerr) {
-                            if (env->ExceptionCheck()) env->ExceptionClear();
-                            jerr = env->NewStringUTF("unknown error");
-                        }
-                        if (jerr) {
-                            if (should_log_debug()) {
-                                LOGD("token listener onError (prompt) sending");
-                            }
-                            env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
-                            if (env->ExceptionCheck()) env->ExceptionClear();
-                            env->DeleteLocalRef(jerr);
-                        }
-                    }
-                    if (attached) g_jvm->DetachCurrentThread();
-                }
-                return env->NewStringUTF("decode failed (prompt)");
-            }
-        }
-        
-        auto t_decode1 = std::chrono::high_resolution_clock::now();
-        auto ms_prompt = std::chrono::duration_cast<std::chrono::milliseconds>(t_decode1 - t_decode0).count();
-        {
-            std::ostringstream ss;
-            ss << "generate: prompt decode complete, ms=" << ms_prompt;
-            log_to_file(ss.str());
-        }
-        
-        log_to_file("generate: prompt processed with chunked batch decode");
-        if (g_log_ofs.is_open()) g_log_ofs.flush();
+        std::ostringstream ss;
+        ss << "generate: prompt_len=" << prompt.size()
+           << " media_count=" << (media_files ? media_files->size() : 0);
+        log_to_file(ss.str());
+    }
+    if (is_max_debug_mode()) {
+        log_to_file(std::string("generate: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
     }
 
+    const int max_tokens = 1024;
+    llama_memory_t mem = llama_get_memory(g_ctx);
+    llama_memory_clear(mem, false);
+
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    size_t n_prompt_tokens = 0;
+    llama_pos n_past = 0;
+    std::string prefill_error;
+
+    const bool has_media = media_files != nullptr && !media_files->empty();
+    const bool prefill_ok = has_media
+            ? prefill_multimodal_prompt_locked(prompt, *media_files, n_prompt_tokens, n_past, prefill_error)
+            : prefill_text_prompt_locked(vocab, prompt, n_prompt_tokens, n_past, prefill_error);
+
+    if (!prefill_ok) {
+        log_to_file(std::string("generate: prompt prefill failed: ") + prefill_error, GGML_LOG_LEVEL_ERROR);
+        notify_token_error(prefill_error.c_str());
+        return env->NewStringUTF(prefill_error.c_str());
+    }
+
+    if (n_past >= g_n_ctx) {
+        const char * errmsg = "prompt exceeds context";
+        log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_WARN);
+        notify_token_error(errmsg);
+        return env->NewStringUTF(errmsg);
+    }
+
+    const llama_pos generation_base_pos = n_past;
     const int n_vocab = llama_vocab_n_tokens(vocab);
-    
-    // Build sampler chain based on parameters
+
     auto sparams = llama_sampler_chain_default_params();
     llama_sampler * smpl = llama_sampler_chain_init(sparams);
-    
-    // 1. Add penalties sampler (if enabled)
+
     if (g_penalty_last_n > 0 && (g_penalty_repeat != 1.0f || g_penalty_freq != 0.0f || g_penalty_present != 0.0f)) {
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(
-            g_penalty_last_n, g_penalty_repeat, g_penalty_freq, g_penalty_present));
-        log_to_file("generate: added penalties sampler");
+                g_penalty_last_n, g_penalty_repeat, g_penalty_freq, g_penalty_present));
     }
-    
-    // 2. Add DRY sampler (if enabled)
+
     if (g_dry_multiplier > 0.0f) {
-        // Parse comma-separated sequence breakers with escape sequence support
-        // Users input escape sequences like "\n" (two characters: backslash + n)
-        // We need to convert them to actual characters (one character: newline)
         std::vector<std::string> breaker_strings;
-        std::vector<const char*> breaker_ptrs;
-        
+        std::vector<const char *> breaker_ptrs;
         std::string temp = g_dry_sequence_breakers;
         size_t pos = 0;
         while ((pos = temp.find(',')) != std::string::npos) {
@@ -1568,138 +1911,80 @@ Java_com_micklab_llama_LlamaNative_generate(
             }
             temp.erase(0, pos + 1);
         }
-        // Don't forget the last token
         if (!temp.empty()) {
             breaker_strings.push_back(process_escape_sequences(temp));
         }
-        
-        // Convert to const char* array
-        for (const auto& s : breaker_strings) {
+        for (const auto & s : breaker_strings) {
             breaker_ptrs.push_back(s.c_str());
         }
-        
         if (!breaker_ptrs.empty()) {
             llama_sampler_chain_add(smpl, llama_sampler_init_dry(
-                vocab, g_n_ctx, g_dry_multiplier, g_dry_base, 
-                g_dry_allowed_length, g_dry_penalty_last_n, 
-                breaker_ptrs.data(), breaker_ptrs.size()));
-            
-            std::ostringstream ss;
-            ss << "generate: added DRY sampler with " << breaker_ptrs.size() << " breakers";
-            log_to_file(ss.str());
+                    vocab, g_n_ctx, g_dry_multiplier, g_dry_base,
+                    g_dry_allowed_length, g_dry_penalty_last_n,
+                    breaker_ptrs.data(), breaker_ptrs.size()));
         }
     }
-    
-    // 3. Add top-n-sigma (if enabled)
+
     if (g_top_n_sigma > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_top_n_sigma(g_top_n_sigma));
-        log_to_file("generate: added top-n-sigma sampler");
     }
-    
-    // 4. Add top-k (if enabled)
     if (g_top_k > 0) {
         llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_top_k));
-        log_to_file("generate: added top-k sampler");
     }
-    
-    // 5. Add typical-p (if enabled)
     if (g_typical_p < 1.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_typical(g_typical_p, 1));
-        log_to_file("generate: added typical-p sampler");
     }
-    
-    // 6. Add top-p (if enabled)
     if (g_top_p < 1.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_top_p(g_top_p, 1));
-        log_to_file("generate: added top-p sampler");
     }
-    
-    // 7. Add min-p (if enabled)
     if (g_min_p > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_min_p(g_min_p, 1));
-        log_to_file("generate: added min-p sampler");
     }
-    
-    // 8. Add XTC (if enabled)
     if (g_xtc_probability > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_xtc(
-            g_xtc_probability, g_xtc_threshold, 1, LLAMA_DEFAULT_SEED));
-        log_to_file("generate: added XTC sampler");
+                g_xtc_probability, g_xtc_threshold, 1, LLAMA_DEFAULT_SEED));
     }
-    
-    // 9. Add temperature sampler
     if (g_dynatemp_range > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_temp_ext(
-            g_temp, g_dynatemp_range, g_dynatemp_exponent));
-        log_to_file("generate: added dynamic temperature sampler");
+                g_temp, g_dynatemp_range, g_dynatemp_exponent));
     } else {
         llama_sampler_chain_add(smpl, llama_sampler_init_temp(g_temp));
-        log_to_file("generate: added temperature sampler");
     }
-    
-    // 10. Add mirostat or distribution sampler
     if (g_mirostat == 1) {
         llama_sampler_chain_add(smpl, llama_sampler_init_mirostat(
-            n_vocab, LLAMA_DEFAULT_SEED, g_mirostat_tau, g_mirostat_eta, 100));
-        log_to_file("generate: added mirostat v1 sampler");
+                n_vocab, LLAMA_DEFAULT_SEED, g_mirostat_tau, g_mirostat_eta, 100));
     } else if (g_mirostat == 2) {
         llama_sampler_chain_add(smpl, llama_sampler_init_mirostat_v2(
-            LLAMA_DEFAULT_SEED, g_mirostat_tau, g_mirostat_eta));
-        log_to_file("generate: added mirostat v2 sampler");
+                LLAMA_DEFAULT_SEED, g_mirostat_tau, g_mirostat_eta));
     } else {
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-        log_to_file("generate: added distribution sampler");
     }
 
-    log_to_file("generate: sampler chain initialized");
-
-// detokenize 用にトークン列を保持
+    std::string output;
+    output.reserve(max_tokens * 4);
     std::vector<llama_token> out_tokens;
     out_tokens.reserve(max_tokens);
+    std::string prev_text;
 
-    std::string prev_text;   // ★ 差分抽出用
-
-    log_to_file("generate: entering decode loop");
     for (int i = 0; i < max_tokens; ++i) {
         if (g_cancel_generation.load()) {
-            log_to_file("generate: cancellation requested, stopping", GGML_LOG_LEVEL_WARN);
             break;
         }
 
-        {
-            std::ostringstream ss;
-            ss << "generate: step=" << i << " out_tokens=" << out_tokens.size();
-            log_to_file(ss.str());
-        }
-        // Get logits for the last token (index -1 means last position)
         const llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
-        {
-            std::ostringstream ss;
-            ss << "generate: sampled token id=" << id;
-            log_to_file(ss.str());
-        }
-
-        // Accept the token
         llama_sampler_accept(smpl, id);
-
-        // check eos
         if (llama_vocab_is_eog(vocab, id)) {
-            log_to_file("generate: reached EOS");
             break;
         }
 
-        // ★ 生成トークンを累積
         out_tokens.push_back(id);
-
-        // ★ ctx の残量チェック（安全マージン 32）
-        if ((int)out_tokens.size() >= g_n_ctx - 32) {
+        if (generation_base_pos + static_cast<llama_pos>(out_tokens.size()) >= g_n_ctx - 32) {
             log_to_file("generate: reached ctx safety limit, stopping early");
             break;
         }
-        // ★ 累積トークン列を detokenize して全文を得る
+
         std::string full;
         int n_chars = detokenize_with_resize(vocab, out_tokens, full);
-
         if (n_chars > 0) {
             size_t safe_len = validate_utf8(full);
             if (safe_len < full.size()) {
@@ -1716,7 +2001,6 @@ Java_com_micklab_llama_LlamaNative_generate(
                 stop_hit = true;
             }
 
-            // Compute delta from previous text
             std::string delta;
             if (full.size() > prev_text.size()) {
                 delta = full.substr(prev_text.size());
@@ -1726,163 +2010,47 @@ Java_com_micklab_llama_LlamaNative_generate(
                 output = full;
             }
 
-            // Call token listener with delta if available
-            if (!delta.empty() && g_token_listener && g_token_onToken && g_jvm) {
-                if (is_max_debug_mode()) {
-                    log_to_file(std::string("generate: token delta=\"") + delta + "\"", GGML_LOG_LEVEL_DEBUG);
-                }
-                JNIEnv* env = nullptr;
-                bool attached = false;
-                if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-                    if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-                        attached = true;
-                    } else {
-                        env = nullptr;
-                    }
-                }
-                if (env) {
-                    jstring jdelta = env->NewStringUTF(delta.c_str());
-                    if (jdelta) {
-                        if (should_log_debug()) {
-                            LOGD("token listener onToken delta_len=%zu", delta.size());
-                        }
-                        env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
-                        if (env->ExceptionCheck()) env->ExceptionClear();
-                        env->DeleteLocalRef(jdelta);
-                    } else {
-                        if (env->ExceptionCheck()) env->ExceptionClear();
-                        log_to_file("token listener onToken: failed to create jstring", GGML_LOG_LEVEL_WARN);
-                    }
-                }
-                if (attached) g_jvm->DetachCurrentThread();
+            if (!delta.empty()) {
+                notify_token_delta(delta);
             }
 
             prev_text = full;
-            {
-                std::ostringstream ss;
-                ss << "generate: detok chars=" << n_chars
-                   << " output_len=" << output.size()
-                   << " full_len=" << full.size()
-                   << " step=" << i;
-                log_to_file(ss.str());
-            }
             if (stop_hit) {
-                std::ostringstream ss;
-                ss << "generate: stop sequence hit \"" << stop_seq << "\" at pos=" << stop_pos;
-                log_to_file(ss.str());
                 break;
-            }
-        } else {
-            // Only log if detokenize fails (unusual case)
-            if (n_chars < 0) {
-                std::ostringstream ss;
-                ss << "generate: detokenize error n_chars=" << n_chars;
-                log_to_file(ss.str());
             }
         }
 
-        // feed token into model for next step using llama_batch_init
         llama_batch batch = llama_batch_init(1, 0, 1);
         batch.n_tokens = 1;
         batch.token[0] = id;
-        batch.pos[0] = n_tokens + i;  // position = prompt length + step
+        batch.pos[0] = generation_base_pos + i;
         batch.n_seq_id[0] = 1;
         batch.seq_id[0][0] = 0;
-        batch.logits[0] = 1;  // compute logits for this token
-        {
-            std::ostringstream ss;
-            ss << "generate: calling decode for next token, id=" << id
-               << " pos=" << (n_tokens + i) << " step=" << i;
-            log_to_file(ss.str());
-        }
-        auto t_step0 = std::chrono::high_resolution_clock::now();
-        int rc_step = llama_decode(g_ctx, batch);
-        auto t_step1 = std::chrono::high_resolution_clock::now();
-        auto ms_step = std::chrono::duration_cast<std::chrono::milliseconds>(t_step1 - t_step0).count();
+        batch.logits[0] = 1;
+
+        const int rc_step = llama_decode(g_ctx, batch);
         llama_batch_free(batch);
-        {
-            std::ostringstream ss;
-            ss << "generate: decode rc=" << rc_step << " ms=" << ms_step << " step=" << i;
-            log_to_file(ss.str());
-        }
         if (rc_step != 0) {
-            log_to_file("generate: decode failed (generation)", GGML_LOG_LEVEL_ERROR);
-            if (g_log_ofs.is_open()) g_log_ofs.flush();
-            // Notify Java listener about error
-            if (g_jvm && g_token_listener && g_token_onError) {
-                JNIEnv* env = nullptr;
-                bool attached = false;
-                if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-                    if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-                        attached = true;
-                    } else {
-                        env = nullptr;
-                    }
-                }
-                if (env) {
-                    const char *errmsg = "decode failed (generation)";
-                    jstring jerr = env->NewStringUTF(errmsg);
-                    if (!jerr) {
-                        if (env->ExceptionCheck()) env->ExceptionClear();
-                        jerr = env->NewStringUTF("unknown error");
-                    }
-                    if (jerr) {
-                        if (should_log_debug()) {
-                            LOGD("token listener onError (generation) sending");
-                        }
-                        env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
-                        if (env->ExceptionCheck()) env->ExceptionClear();
-                        env->DeleteLocalRef(jerr);
-                    }
-                }
-                if (attached) g_jvm->DetachCurrentThread();
-            }
+            const char * errmsg = "decode failed (generation)";
+            log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
+            notify_token_error(errmsg);
             llama_sampler_free(smpl);
-            return env->NewStringUTF("decode failed (generation)");
+            return env->NewStringUTF(errmsg);
         }
     }
 
     const bool was_cancelled = g_cancel_generation.load();
-
-    // Notify Java listener that generation is complete
-    if (!was_cancelled && g_jvm && g_token_listener && g_token_onComplete) {
-        JNIEnv* env = nullptr;
-        bool attached = false;
-        if (g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-            if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-                attached = true;
-            } else {
-                env = nullptr;
-            }
-        }
-        if (env) {
-            if (should_log_debug()) {
-                LOGD("token listener onComplete sending");
-            }
-            env->CallVoidMethod(g_token_listener, g_token_onComplete);
-            if (env->ExceptionCheck()) env->ExceptionClear();
-        }
-        if (attached) g_jvm->DetachCurrentThread();
-    }
-
-    if (was_cancelled) {
+    if (!was_cancelled) {
+        notify_token_complete();
+    } else {
         log_to_file("generate: completed with cancellation", GGML_LOG_LEVEL_WARN);
     }
 
-    // Free the sampler chain
     llama_sampler_free(smpl);
 
-    {
-        size_t safe_len = validate_utf8(output);
-        if (safe_len < output.size()) {
-            output.resize(safe_len);
-        }
-    }
-
-    {
-        std::ostringstream ss;
-        ss << "generate: finished, output_len=" << output.size();
-        log_to_file(ss.str());
+    size_t safe_len = validate_utf8(output);
+    if (safe_len < output.size()) {
+        output.resize(safe_len);
     }
 
     if (is_max_debug_mode()) {
@@ -1890,6 +2058,49 @@ Java_com_micklab_llama_LlamaNative_generate(
     }
 
     return env->NewStringUTF(output.c_str());
+}
+
+// ---------------- JNI: generate ----------------
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_generate(
+        JNIEnv *env, jobject,
+        jstring jPrompt
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return generate_locked(env, jstring_to_std(env, jPrompt), nullptr);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_generateWithMedia(
+        JNIEnv *env, jobject,
+        jstring jPrompt,
+        jobjectArray jMediaFiles
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    std::vector<std::vector<uint8_t>> media_files;
+    if (jMediaFiles != nullptr) {
+        const jsize count = env->GetArrayLength(jMediaFiles);
+        media_files.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            auto * byte_array = reinterpret_cast<jbyteArray>(env->GetObjectArrayElement(jMediaFiles, i));
+            if (!byte_array) {
+                media_files.emplace_back();
+                continue;
+            }
+            const jsize len = env->GetArrayLength(byte_array);
+            std::vector<uint8_t> bytes(static_cast<size_t>(len));
+            if (len > 0) {
+                env->GetByteArrayRegion(byte_array, 0, len, reinterpret_cast<jbyte *>(bytes.data()));
+            }
+            media_files.push_back(std::move(bytes));
+            env->DeleteLocalRef(byte_array);
+        }
+    }
+
+    return generate_locked(env, jstring_to_std(env, jPrompt), &media_files);
 }
 
 // ---------------- JNI: free ----------------
@@ -1925,4 +2136,22 @@ Java_com_micklab_llama_LlamaNative_getChatTemplate(
     
     log_to_file("getChatTemplate: no chat template in model metadata");
     return env->NewStringUTF("");
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_micklab_llama_LlamaNative_supportsVision(
+        JNIEnv *, jobject /*thiz*/
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_supports_vision ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_micklab_llama_LlamaNative_supportsAudio(
+        JNIEnv *, jobject /*thiz*/
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_supports_audio ? JNI_TRUE : JNI_FALSE;
 }

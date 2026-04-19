@@ -39,6 +39,7 @@ public class ConfigurationManager {
         // New settings for prompt generation
         public String systemPrompt;          // 前提プロンプト (system prompt)
         public String customChatTemplate;    // カスタムプロンプトテンプレート
+        public String multimodalProjectorUrl; // Optional multimodal projector (mmproj) reference
         
         // Penalty parameters
         public int penaltyLastN;
@@ -123,6 +124,7 @@ public class ConfigurationManager {
             // New prompt settings defaults
             systemPrompt = "";           // Empty by default
             customChatTemplate = "";     // Empty by default (use auto-detection)
+            multimodalProjectorUrl = ""; // Empty by default (use auto-discovery)
         }
         
         public Configuration(String name) {
@@ -180,6 +182,7 @@ public class ConfigurationManager {
             // New prompt settings
             json.put("systemPrompt", systemPrompt);
             json.put("customChatTemplate", customChatTemplate);
+            json.put("multimodalProjectorUrl", multimodalProjectorUrl);
             
             return json;
         }
@@ -238,6 +241,7 @@ public class ConfigurationManager {
             // New prompt settings (with defaults for backward compatibility)
             config.systemPrompt = json.optString("systemPrompt", "");
             config.customChatTemplate = json.optString("customChatTemplate", "");
+            config.multimodalProjectorUrl = json.optString("multimodalProjectorUrl", "");
             
             return config;
         }

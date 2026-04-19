@@ -26,8 +26,10 @@ public class LlamaNative {
     public native String download(String url, String path);
     public native void setDownloadCaBundlePath(String path);
     public native String init(String modelPath);
+    public native String initWithMmproj(String modelPath, String mmprojPath);
     public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
     public native String generate(String prompt);
+    public native String generateWithMedia(String prompt, byte[][] mediaFiles);
     public native void cancelGeneration();
     public native void free();
 
@@ -52,6 +54,8 @@ public class LlamaNative {
     
     // Get chat template from loaded GGUF model metadata
     public native String getChatTemplate();
+    public native boolean supportsVision();
+    public native boolean supportsAudio();
 
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;
