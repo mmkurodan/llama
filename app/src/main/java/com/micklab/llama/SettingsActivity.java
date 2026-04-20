@@ -108,8 +108,6 @@ public class SettingsActivity extends Activity {
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
     private Switch enableThinkingSwitch;
-    private Switch forceVisionSupportSwitch;
-    private Switch forceAudioSupportSwitch;
     
     // New prompt settings
     private EditText systemPromptInput;
@@ -251,8 +249,6 @@ public class SettingsActivity extends Activity {
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
-        forceVisionSupportSwitch = findViewById(R.id.forceVisionSupportSwitch);
-        forceAudioSupportSwitch = findViewById(R.id.forceAudioSupportSwitch);
         
         // New prompt settings
         systemPromptInput = findViewById(R.id.systemPromptInput);
@@ -459,10 +455,6 @@ public class SettingsActivity extends Activity {
                 case "System Prompt:": return "システムプロンプト:";
                 case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
                 case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
-                case "Manual Modality Overrides": return "モダリティ手動上書き";
-                case "Use these when a model supports multimodal input but auto-detection does not enable it.": return "モデルがマルチモーダル対応なのに自動判定で有効にならない場合に使用します。";
-                case "Force-enable Vision input:": return "Vision入力を手動で有効化:";
-                case "Force-enable Audio input:": return "Audio入力を手動で有効化:";
                 case "Custom Chat Template:": return "カスタムチャットテンプレート:";
                 case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
                 case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
@@ -649,8 +641,6 @@ public class SettingsActivity extends Activity {
         gpuLayersSeekBar.setProgress(displayLayers);
         gpuLayersValue.setText(String.valueOf(displayLayers > 39 ? -1 : displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
-        forceVisionSupportSwitch.setChecked(config.forceVisionSupport);
-        forceAudioSupportSwitch.setChecked(config.forceAudioSupport);
         
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
@@ -852,8 +842,6 @@ public class SettingsActivity extends Activity {
         int progress = gpuLayersSeekBar.getProgress();
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
-        config.forceVisionSupport = forceVisionSupportSwitch.isChecked();
-        config.forceAudioSupport = forceAudioSupportSwitch.isChecked();
         
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();

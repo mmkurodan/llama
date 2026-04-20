@@ -74,8 +74,6 @@ public class ConfigurationManager {
         // Runtime behavior switches
         public int gpuOffloadLayers;
         public boolean enableThinking;
-        public boolean forceVisionSupport;
-        public boolean forceAudioSupport;
         
         public Configuration() {
             // Default values - Gemma 1B assistant
@@ -122,8 +120,6 @@ public class ConfigurationManager {
             // Runtime behavior defaults
             gpuOffloadLayers = 0;
             enableThinking = true;
-            forceVisionSupport = false;
-            forceAudioSupport = false;
             
             // New prompt settings defaults
             systemPrompt = "";           // Empty by default
@@ -182,8 +178,6 @@ public class ConfigurationManager {
             json.put("gpuOffloadLayers", gpuOffloadLayers);
             json.put("gpuOffloadEnabled", gpuOffloadLayers != 0);
             json.put("enableThinking", enableThinking);
-            json.put("forceVisionSupport", forceVisionSupport);
-            json.put("forceAudioSupport", forceAudioSupport);
             
             // New prompt settings
             json.put("systemPrompt", systemPrompt);
@@ -243,8 +237,6 @@ public class ConfigurationManager {
                 config.gpuOffloadLayers = enabled ? -1 : 0;
             }
             config.enableThinking = json.optBoolean("enableThinking", true);
-            config.forceVisionSupport = json.optBoolean("forceVisionSupport", false);
-            config.forceAudioSupport = json.optBoolean("forceAudioSupport", false);
             
             // New prompt settings (with defaults for backward compatibility)
             config.systemPrompt = json.optString("systemPrompt", "");

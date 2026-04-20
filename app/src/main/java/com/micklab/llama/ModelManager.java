@@ -62,9 +62,6 @@ public class ModelManager {
     private volatile String currentModelPath = null;
     private volatile String currentMmprojPath = null;
     private volatile boolean modelLoaded = false;
-    private volatile boolean currentForceVisionSupport = false;
-    private volatile boolean currentForceAudioSupport = false;
-
     public enum ForceReinitializeResult {
         SUCCESS,
         FAILED,
@@ -146,11 +143,11 @@ public class ModelManager {
     }
 
     public boolean supportsVision() {
-        return modelLoaded && (llama.supportsVision() || currentForceVisionSupport);
+        return modelLoaded && llama.supportsVision();
     }
 
     public boolean supportsAudio() {
-        return modelLoaded && (llama.supportsAudio() || currentForceAudioSupport);
+        return modelLoaded && llama.supportsAudio();
     }
     
     /**
@@ -242,6 +239,10 @@ public class ModelManager {
      * @return true if successful, false otherwise
      */
     public boolean loadConfiguration(String configName) {
+        return loadConfiguration(configName, false, false);
+    }
+
+    public boolean loadConfiguration(String configName, boolean preferVisionProjector, boolean preferAudioProjector) {
         boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
@@ -255,7 +256,10 @@ public class ModelManager {
             
             File destFile = new File(getModelStorageDir(), filename);
             String modelPath = destFile.getAbsolutePath();
-            String mmprojPath = resolveMultimodalProjectorPath(config);
+            String mmprojPath = resolveMultimodalProjectorPath(
+                    config,
+                    preferVisionProjector,
+                    preferAudioProjector);
             
             // If same model is already loaded, just re-apply parameters
             if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentMmprojPath) && modelLoaded) {
@@ -390,8 +394,6 @@ public class ModelManager {
      * Apply configuration parameters to the model.
      */
     public void applyConfiguration(ConfigurationManager.Configuration config) {
-        currentForceVisionSupport = config.forceVisionSupport;
-        currentForceAudioSupport = config.forceAudioSupport;
         llama.setParameters(
             config.penaltyLastN,
             (float)config.penaltyRepeat,
@@ -510,8 +512,6 @@ public class ModelManager {
         currentMmprojPath = null;
         currentConfigName = null;
         modelLoaded = false;
-        currentForceVisionSupport = false;
-        currentForceAudioSupport = false;
     }
 
     private String normalizeConfigName(String configName) {
@@ -569,13 +569,20 @@ public class ModelManager {
         return null;
     }
 
-    private String resolveMultimodalProjectorPath(ConfigurationManager.Configuration config) {
+    private String resolveMultimodalProjectorPath(
+            ConfigurationManager.Configuration config,
+            boolean preferVisionProjector,
+            boolean preferAudioProjector) {
         if (config.multimodalProjectorUrl != null && !config.multimodalProjectorUrl.trim().isEmpty()) {
             File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
             return configuredFile != null ? configuredFile.getAbsolutePath() : null;
         }
 
-        File autoDetected = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(context, config.modelUrl);
+        File autoDetected = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(
+                context,
+                config.modelUrl,
+                preferVisionProjector,
+                preferAudioProjector);
         if (autoDetected != null) {
             Log.i(TAG, "Auto-detected multimodal projector: " + autoDetected.getAbsolutePath());
             return autoDetected.getAbsolutePath();

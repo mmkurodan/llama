@@ -8,6 +8,24 @@ import java.util.List;
 import java.util.Locale;
 
 public final class ModelFileHelper {
+    public static final class InferredModalities {
+        private final boolean vision;
+        private final boolean audio;
+
+        public InferredModalities(boolean vision, boolean audio) {
+            this.vision = vision;
+            this.audio = audio;
+        }
+
+        public boolean supportsVision() {
+            return vision;
+        }
+
+        public boolean supportsAudio() {
+            return audio;
+        }
+    }
+
     private ModelFileHelper() {
     }
 
@@ -57,6 +75,14 @@ public final class ModelFileHelper {
     }
 
     public static File findAutoDetectedMultimodalProjectorFile(Context context, String modelReference) {
+        return findAutoDetectedMultimodalProjectorFile(context, modelReference, false, false);
+    }
+
+    public static File findAutoDetectedMultimodalProjectorFile(
+            Context context,
+            String modelReference,
+            boolean preferVision,
+            boolean preferAudio) {
         File storageDir = getModelStorageDir(context);
         File[] files = storageDir.listFiles();
         if (files == null || files.length == 0) {
@@ -69,15 +95,12 @@ public final class ModelFileHelper {
                 continue;
             }
             String lowerName = file.getName().toLowerCase(Locale.US);
-            if (isGgufFilename(lowerName) && lowerName.contains("mmproj")) {
+            if (isLikelyProjectorFilename(lowerName)) {
                 candidates.add(file);
             }
         }
         if (candidates.isEmpty()) {
             return null;
-        }
-        if (candidates.size() == 1) {
-            return candidates.get(0);
         }
 
         String modelFilename = extractFilename(modelReference);
@@ -89,18 +112,7 @@ public final class ModelFileHelper {
         boolean ambiguous = false;
         for (File candidate : candidates) {
             String candidateStem = stripGgufSuffix(candidate.getName()).toLowerCase(Locale.US);
-            int score = 100;
-            for (String token : tokens) {
-                if (candidateStem.contains(token)) {
-                    score += token.length() >= 4 ? 20 : 10;
-                }
-            }
-            if (candidateStem.contains(modelStem)) {
-                score += 80;
-            }
-            if (candidateStem.startsWith("mmproj-")) {
-                score += 10;
-            }
+            int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio);
             if (score > bestScore) {
                 best = candidate;
                 bestScore = score;
@@ -110,6 +122,46 @@ public final class ModelFileHelper {
             }
         }
         return ambiguous || bestScore < 130 ? null : best;
+    }
+
+    public static InferredModalities inferAutoDetectedModalities(Context context, String modelReference) {
+        File storageDir = getModelStorageDir(context);
+        File[] files = storageDir.listFiles();
+        if (files == null || files.length == 0) {
+            return new InferredModalities(false, false);
+        }
+
+        String modelFilename = extractFilename(modelReference);
+        String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
+        List<String> tokens = tokenizeModelStem(modelStem);
+        boolean vision = false;
+        boolean audio = false;
+
+        for (File file : files) {
+            if (file == null || !file.isFile()) {
+                continue;
+            }
+            String lowerName = file.getName().toLowerCase(Locale.US);
+            if (!isLikelyProjectorFilename(lowerName)) {
+                continue;
+            }
+
+            String candidateStem = stripGgufSuffix(lowerName);
+            if (scoreProjectorCandidate(candidateStem, modelStem, tokens, false, false) < 130) {
+                continue;
+            }
+
+            boolean audioHint = hasAudioProjectorHint(candidateStem);
+            boolean visionHint = hasVisionProjectorHint(candidateStem);
+            if (visionHint || (!audioHint && candidateStem.contains("mmproj"))) {
+                vision = true;
+            }
+            if (audioHint) {
+                audio = true;
+            }
+        }
+
+        return new InferredModalities(vision, audio);
     }
 
     private static String stripGgufSuffix(String filename) {
@@ -136,5 +188,108 @@ public final class ModelFileHelper {
             tokens.add(part);
         }
         return tokens;
+    }
+
+    private static boolean isLikelyProjectorFilename(String lowerName) {
+        return isGgufFilename(lowerName)
+                && (lowerName.contains("mmproj")
+                || lowerName.contains("projector")
+                || lowerName.contains("gemma4a")
+                || lowerName.contains("gemma4v"));
+    }
+
+    private static int scoreProjectorCandidate(
+            String candidateStem,
+            String modelStem,
+            List<String> tokens,
+            boolean preferVision,
+            boolean preferAudio) {
+        int score = 100;
+        for (String token : tokens) {
+            if (candidateStem.contains(token)) {
+                score += token.length() >= 4 ? 20 : 10;
+            }
+        }
+        if (candidateStem.contains(modelStem)) {
+            score += 80;
+        }
+        if (candidateStem.startsWith("mmproj-")) {
+            score += 10;
+        }
+        if (candidateStem.contains("mmproj")) {
+            score += 10;
+        }
+
+        boolean audioHint = hasAudioProjectorHint(candidateStem);
+        boolean visionHint = hasVisionProjectorHint(candidateStem);
+
+        if (preferVision && preferAudio) {
+            if (audioHint && visionHint) {
+                score += 220;
+            } else if (!audioHint && !visionHint) {
+                score += 120;
+            } else {
+                score -= 200;
+            }
+            return score;
+        }
+
+        if (preferAudio) {
+            if (audioHint) {
+                score += 160;
+            }
+            if (visionHint && !audioHint) {
+                score -= 120;
+            }
+            return score;
+        }
+
+        if (preferVision) {
+            if (visionHint) {
+                score += 160;
+            }
+            if (audioHint && !visionHint) {
+                score -= 120;
+            }
+            return score;
+        }
+
+        if (audioHint || visionHint) {
+            score += 20;
+        }
+        return score;
+    }
+
+    private static boolean hasAudioProjectorHint(String candidateStem) {
+        return containsAny(candidateStem,
+                "audio",
+                "gemma4a",
+                "qwen2a",
+                "qwen25o",
+                "voxtral",
+                "ultravox",
+                "glma",
+                "lfm2a",
+                "whisper");
+    }
+
+    private static boolean hasVisionProjectorHint(String candidateStem) {
+        return containsAny(candidateStem,
+                "vision",
+                "image",
+                "gemma4v",
+                "siglip",
+                "llava",
+                "glm4v",
+                "minicpmv");
+    }
+
+    private static boolean containsAny(String candidateStem, String... needles) {
+        for (String needle : needles) {
+            if (candidateStem.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

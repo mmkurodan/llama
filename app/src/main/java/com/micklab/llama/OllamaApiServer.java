@@ -125,6 +125,16 @@ public class OllamaApiServer {
         }
     }
 
+    private static final class RequestedModalities {
+        final boolean vision;
+        final boolean audio;
+
+        RequestedModalities(boolean vision, boolean audio) {
+            this.vision = vision;
+            this.audio = audio;
+        }
+    }
+
     private static final class InvalidMediaException extends Exception {
         InvalidMediaException(String message) {
             super(message);
@@ -266,6 +276,31 @@ public class OllamaApiServer {
         }
 
         return new PreparedMessages(normalizedMessages, mediaFiles);
+    }
+
+    private static RequestedModalities detectRequestedModalities(JSONArray messages) throws JSONException {
+        boolean vision = false;
+        boolean audio = false;
+        for (int i = 0; i < messages.length(); i++) {
+            Object rawContent = messages.getJSONObject(i).opt("content");
+            if (!(rawContent instanceof JSONArray)) {
+                continue;
+            }
+
+            JSONArray contentParts = (JSONArray) rawContent;
+            for (int partIndex = 0; partIndex < contentParts.length(); partIndex++) {
+                String type = contentParts.getJSONObject(partIndex).optString("type", "");
+                if ("image_url".equals(type)) {
+                    vision = true;
+                } else if ("input_audio".equals(type)) {
+                    audio = true;
+                }
+                if (vision && audio) {
+                    return new RequestedModalities(true, true);
+                }
+            }
+        }
+        return new RequestedModalities(vision, audio);
     }
 
     private static class StreamTokenFilter {
@@ -849,10 +884,17 @@ public class OllamaApiServer {
         boolean isLoadedCurrentModel = modelManager.isModelLoaded()
                 && modelName != null
                 && modelName.equals(modelManager.getCurrentConfigName());
-        boolean configuredVision = config != null && config.forceVisionSupport;
-        boolean configuredAudio = config != null && config.forceAudioSupport;
-        modalities.put("vision", isLoadedCurrentModel ? modelManager.supportsVision() : configuredVision);
-        modalities.put("audio", isLoadedCurrentModel ? modelManager.supportsAudio() : configuredAudio);
+        if (isLoadedCurrentModel) {
+            modalities.put("vision", modelManager.supportsVision());
+            modalities.put("audio", modelManager.supportsAudio());
+            return modalities;
+        }
+
+        ModelFileHelper.InferredModalities inferred = ModelFileHelper.inferAutoDetectedModalities(
+                context,
+                config != null ? config.modelUrl : null);
+        modalities.put("vision", inferred.supportsVision());
+        modalities.put("audio", inferred.supportsAudio());
         return modalities;
     }
 
@@ -1471,8 +1513,13 @@ public class OllamaApiServer {
             }
             
             try {
+                RequestedModalities requestedModalities = detectRequestedModalities(messages);
+
                 // Load model/configuration if needed (will be fast if same config already loaded)
-                if (!modelManager.loadConfiguration(model)) {
+                if (!modelManager.loadConfiguration(
+                        model,
+                        requestedModalities.vision,
+                        requestedModalities.audio)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
@@ -1733,7 +1780,12 @@ public class OllamaApiServer {
             }
 
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                RequestedModalities requestedModalities = detectRequestedModalities(messages);
+
+                if (!modelManager.loadConfiguration(
+                        model,
+                        requestedModalities.vision,
+                        requestedModalities.audio)) {
                     sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
                     return;
                 }
