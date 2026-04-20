@@ -780,7 +780,7 @@ public class OllamaApiServer {
                 modelEntry.put("model", configName);
                 modelEntry.put("modified_at", getTimestamp());
                 modelEntry.put("size", modelFile != null && modelFile.exists() ? modelFile.length() : 0);
-                JSONObject modalities = buildModelModalities(configName);
+                JSONObject modalities = buildModelModalities(configName, config);
                 JSONArray capabilities = new JSONArray();
                 if (modalities.optBoolean("vision", false) || modalities.optBoolean("audio", false)) {
                     capabilities.put("multimodal");
@@ -823,7 +823,7 @@ public class OllamaApiServer {
         response.put("model_alias", modelName);
         response.put("role", getServerRole());
 
-        response.put("modalities", buildModelModalities(modelName));
+        response.put("modalities", buildModelModalities(modelName, config));
 
         String chatTemplate = "";
         if (modelManager.isModelLoaded() && modelName.equals(modelManager.getCurrentConfigName())) {
@@ -841,13 +841,18 @@ public class OllamaApiServer {
         return response;
     }
 
-    private JSONObject buildModelModalities(String modelName) throws JSONException {
+    private JSONObject buildModelModalities(
+            String modelName,
+            ConfigurationManager.Configuration config
+    ) throws JSONException {
         JSONObject modalities = new JSONObject();
         boolean isLoadedCurrentModel = modelManager.isModelLoaded()
                 && modelName != null
                 && modelName.equals(modelManager.getCurrentConfigName());
-        modalities.put("vision", isLoadedCurrentModel && modelManager.supportsVision());
-        modalities.put("audio", isLoadedCurrentModel && modelManager.supportsAudio());
+        boolean configuredVision = config != null && config.forceVisionSupport;
+        boolean configuredAudio = config != null && config.forceAudioSupport;
+        modalities.put("vision", isLoadedCurrentModel ? modelManager.supportsVision() : configuredVision);
+        modalities.put("audio", isLoadedCurrentModel ? modelManager.supportsAudio() : configuredAudio);
         return modalities;
     }
 

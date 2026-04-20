@@ -62,6 +62,8 @@ public class ModelManager {
     private volatile String currentModelPath = null;
     private volatile String currentMmprojPath = null;
     private volatile boolean modelLoaded = false;
+    private volatile boolean currentForceVisionSupport = false;
+    private volatile boolean currentForceAudioSupport = false;
 
     public enum ForceReinitializeResult {
         SUCCESS,
@@ -144,11 +146,11 @@ public class ModelManager {
     }
 
     public boolean supportsVision() {
-        return modelLoaded && llama.supportsVision();
+        return modelLoaded && (llama.supportsVision() || currentForceVisionSupport);
     }
 
     public boolean supportsAudio() {
-        return modelLoaded && llama.supportsAudio();
+        return modelLoaded && (llama.supportsAudio() || currentForceAudioSupport);
     }
     
     /**
@@ -388,6 +390,8 @@ public class ModelManager {
      * Apply configuration parameters to the model.
      */
     public void applyConfiguration(ConfigurationManager.Configuration config) {
+        currentForceVisionSupport = config.forceVisionSupport;
+        currentForceAudioSupport = config.forceAudioSupport;
         llama.setParameters(
             config.penaltyLastN,
             (float)config.penaltyRepeat,
@@ -506,6 +510,8 @@ public class ModelManager {
         currentMmprojPath = null;
         currentConfigName = null;
         modelLoaded = false;
+        currentForceVisionSupport = false;
+        currentForceAudioSupport = false;
     }
 
     private String normalizeConfigName(String configName) {
