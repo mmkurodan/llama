@@ -256,10 +256,11 @@ public class ModelManager {
             
             File destFile = new File(getModelStorageDir(), filename);
             String modelPath = destFile.getAbsolutePath();
-            String mmprojPath = resolveMultimodalProjectorPath(
+            String resolvedMmprojPath = resolveMultimodalProjectorPath(
                     config,
                     preferVisionProjector,
                     preferAudioProjector);
+            String mmprojPath = ensureMultimodalProjectorAvailable(config, resolvedMmprojPath);
             
             // If same model is already loaded, just re-apply parameters
             if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentMmprojPath) && modelLoaded) {
@@ -296,15 +297,6 @@ public class ModelManager {
                 Log.e(TAG, fileAvailabilityError);
                 if (listener != null) {
                     listener.onError(fileAvailabilityError);
-                }
-                return false;
-            }
-
-            String mmprojAvailabilityError = ensureMultimodalProjectorAvailable(config, mmprojPath);
-            if (mmprojAvailabilityError != null) {
-                Log.e(TAG, mmprojAvailabilityError);
-                if (listener != null) {
-                    listener.onError(mmprojAvailabilityError);
                 }
                 return false;
             }
@@ -599,31 +591,39 @@ public class ModelManager {
 
         File mmprojFile = new File(mmprojPath);
         if (mmprojFile.exists() && mmprojFile.length() > 0) {
-            return null;
+            return mmprojFile.getAbsolutePath();
         }
 
         String mmprojReference = config.multimodalProjectorUrl;
         if (mmprojReference == null || mmprojReference.trim().isEmpty()) {
-            return "Configured multimodal projector file not found: " + mmprojPath;
+            Log.w(TAG, "Auto-detected multimodal projector file not available: " + mmprojPath);
+            return null;
         }
 
         if (!ModelFileHelper.isRemoteModelReference(mmprojReference)) {
-            return "Imported multimodal projector file not found: " + mmprojPath;
+            Log.w(TAG, "Imported multimodal projector file not found: " + mmprojPath);
+            return null;
         }
 
         if (mmprojReference.regionMatches(true, 0, "https://", 0, 8)) {
             String trustStoreError = configureNativeDownloadTrustStore();
             if (trustStoreError != null) {
-                return trustStoreError;
+                Log.w(TAG, "Skipping multimodal projector download: " + trustStoreError);
+                return null;
             }
         }
 
         Log.i(TAG, "Downloading multimodal projector from: " + mmprojReference);
         String downloadResult = llama.download(mmprojReference, mmprojFile.getAbsolutePath());
         if (!"ok".equals(downloadResult)) {
-            return "Multimodal projector download failed: " + downloadResult;
+            Log.w(TAG, "Multimodal projector download failed: " + downloadResult);
+            return null;
         }
-        return null;
+        if (!mmprojFile.exists() || mmprojFile.length() == 0) {
+            Log.w(TAG, "Multimodal projector still unavailable after download: " + mmprojFile.getAbsolutePath());
+            return null;
+        }
+        return mmprojFile.getAbsolutePath();
     }
 
     private synchronized String configureNativeDownloadTrustStore() {

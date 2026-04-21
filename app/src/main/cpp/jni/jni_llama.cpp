@@ -13,7 +13,9 @@
 #include <cstring>
 #include <cctype>
 #include <exception>
+#include <dirent.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -444,6 +446,283 @@ static std::string jstring_to_std(JNIEnv *env, jstring jstr) {
     std::string result(chars ? chars : "");
     env->ReleaseStringUTFChars(jstr, chars);
     return result;
+}
+
+static std::string to_lower_ascii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return value;
+}
+
+static std::string path_filename(const std::string & path) {
+    const size_t slash = path.find_last_of("/\\");
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+static std::string path_parent_directory(const std::string & path) {
+    const size_t slash = path.find_last_of("/\\");
+    return slash == std::string::npos ? "" : path.substr(0, slash);
+}
+
+static std::string path_join(const std::string & dir, const std::string & name) {
+    if (dir.empty()) {
+        return name;
+    }
+    if (dir.back() == '/' || dir.back() == '\\') {
+        return dir + name;
+    }
+    return dir + "/" + name;
+}
+
+static bool is_regular_file_path(const std::string & path) {
+    struct stat st = {};
+    return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static std::string strip_gguf_suffix(const std::string & filename) {
+    std::string lower = to_lower_ascii(path_filename(filename));
+    if (lower.size() > 5 && lower.compare(lower.size() - 5, 5, ".gguf") == 0) {
+        lower.resize(lower.size() - 5);
+    }
+    return lower;
+}
+
+static std::vector<std::string> tokenize_stem(const std::string & stem) {
+    std::vector<std::string> tokens;
+    std::string token;
+    for (char ch : stem) {
+        if (std::isalnum(static_cast<unsigned char>(ch))) {
+            token.push_back(ch);
+            continue;
+        }
+        if (token.size() >= 2 && token != "mmproj" && token != "gguf") {
+            tokens.push_back(token);
+        }
+        token.clear();
+    }
+    if (token.size() >= 2 && token != "mmproj" && token != "gguf") {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
+static bool contains_any_substring(const std::string & haystack, const std::vector<std::string> & needles) {
+    for (const auto & needle : needles) {
+        if (!needle.empty() && haystack.find(needle) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool has_audio_projector_hint(const std::string & candidate_stem) {
+    return contains_any_substring(candidate_stem, {
+            "audio", "gemma4a", "qwen2a", "qwen25o", "voxtral",
+            "ultravox", "glma", "lfm2a", "whisper"
+    });
+}
+
+static bool has_vision_projector_hint(const std::string & candidate_stem) {
+    return contains_any_substring(candidate_stem, {
+            "vision", "image", "gemma4v", "siglip", "llava", "glm4v", "minicpmv"
+    });
+}
+
+static bool is_likely_projector_filename(const std::string & lower_name) {
+    return lower_name.size() > 5
+            && lower_name.compare(lower_name.size() - 5, 5, ".gguf") == 0
+            && (lower_name.find("mmproj") != std::string::npos
+            || lower_name.find("projector") != std::string::npos
+            || lower_name.find("gemma4a") != std::string::npos
+            || lower_name.find("gemma4v") != std::string::npos);
+}
+
+static int score_projector_candidate(
+        const std::string & candidate_stem,
+        const std::string & model_stem,
+        const std::vector<std::string> & tokens) {
+    int score = 100;
+    for (const auto & token : tokens) {
+        if (candidate_stem.find(token) != std::string::npos) {
+            score += token.size() >= 4 ? 20 : 10;
+        }
+    }
+    if (!model_stem.empty() && candidate_stem.find(model_stem) != std::string::npos) {
+        score += 80;
+    }
+    if (candidate_stem.find("mmproj") != std::string::npos) {
+        score += 10;
+    }
+    if (candidate_stem.rfind("mmproj-", 0) == 0) {
+        score += 10;
+    }
+    if (has_audio_projector_hint(candidate_stem) || has_vision_projector_hint(candidate_stem)) {
+        score += 20;
+    }
+    return score;
+}
+
+static bool contains_path(const std::vector<std::string> & paths, const std::string & path) {
+    return std::find(paths.begin(), paths.end(), path) != paths.end();
+}
+
+static std::vector<std::string> collect_multimodal_projector_candidates(
+        const std::string & model_path,
+        const std::string & requested_mmproj_path) {
+    std::vector<std::string> result;
+    if (!requested_mmproj_path.empty() && is_regular_file_path(requested_mmproj_path)) {
+        result.push_back(requested_mmproj_path);
+    }
+
+    const std::string parent_dir = path_parent_directory(model_path);
+    if (parent_dir.empty()) {
+        return result;
+    }
+
+    DIR * dir = opendir(parent_dir.c_str());
+    if (!dir) {
+        return result;
+    }
+
+    const std::string model_filename = to_lower_ascii(path_filename(model_path));
+    const std::string model_stem = strip_gguf_suffix(model_path);
+    const std::vector<std::string> model_tokens = tokenize_stem(model_stem);
+    std::vector<std::pair<int, std::string>> scored_candidates;
+
+    struct dirent * entry = nullptr;
+    while ((entry = readdir(dir)) != nullptr) {
+        const std::string name = entry->d_name ? entry->d_name : "";
+        if (name.empty()) {
+            continue;
+        }
+        const std::string lower_name = to_lower_ascii(name);
+        if (lower_name == model_filename || !is_likely_projector_filename(lower_name)) {
+            continue;
+        }
+
+        const std::string full_path = path_join(parent_dir, name);
+        if (!is_regular_file_path(full_path) || contains_path(result, full_path)) {
+            continue;
+        }
+
+        const std::string candidate_stem = strip_gguf_suffix(lower_name);
+        scored_candidates.emplace_back(
+                score_projector_candidate(candidate_stem, model_stem, model_tokens),
+                full_path);
+    }
+    closedir(dir);
+
+    std::stable_sort(scored_candidates.begin(), scored_candidates.end(),
+                     [](const std::pair<int, std::string> & lhs, const std::pair<int, std::string> & rhs) {
+                         if (lhs.first != rhs.first) {
+                             return lhs.first > rhs.first;
+                         }
+                         return lhs.second < rhs.second;
+                     });
+
+    for (const auto & entry : scored_candidates) {
+        result.push_back(entry.second);
+    }
+    return result;
+}
+
+static bool is_likely_multimodal_model_path(const std::string & model_path) {
+    const std::string lower_name = strip_gguf_suffix(model_path);
+    return contains_any_substring(lower_name, {
+            "gemma-4", "gemma4", "gemma-3n", "gemma3n", "llava", "vision",
+            "audio", "qwen2-vl", "qwen25vl", "qwen2vl", "qwen2.5-vl",
+            "qwen2-audio", "qwen2audio", "qwen2.5-omni", "qwen25omni",
+            "glm-4v", "glm4v", "minicpm-v", "minicpmv", "voxtral", "ultravox"
+    });
+}
+
+static std::string initialize_optional_multimodal_support_locked(
+        const std::string & model_path,
+        const std::string & requested_mmproj_path,
+        const char * log_prefix) {
+    if (g_mtmd) {
+        mtmd_free(g_mtmd);
+        g_mtmd = nullptr;
+    }
+    g_supports_vision = false;
+    g_supports_audio = false;
+
+    const bool likely_multimodal_model = is_likely_multimodal_model_path(model_path);
+    const auto candidates = collect_multimodal_projector_candidates(model_path, requested_mmproj_path);
+
+    if (requested_mmproj_path.empty() && !candidates.empty()) {
+        std::ostringstream ss;
+        ss << log_prefix << ": auto-detected " << candidates.size()
+           << " multimodal projector candidate(s) next to the model";
+        log_to_file(ss.str());
+    }
+
+    if (candidates.empty()) {
+        if (!requested_mmproj_path.empty()) {
+            std::ostringstream ss;
+            ss << log_prefix << ": requested mmproj is unavailable or not a regular file: "
+               << requested_mmproj_path << "; loading text-only";
+            log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
+        } else if (likely_multimodal_model) {
+            std::ostringstream ss;
+            ss << log_prefix << ": likely multimodal model detected but no mmproj was found next to the model: "
+               << model_path << "; multimodal support disabled";
+            log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
+        }
+        return "";
+    }
+
+    for (const auto & candidate_path : candidates) {
+        std::ostringstream start_ss;
+        start_ss << log_prefix << ": trying multimodal projector " << candidate_path;
+        log_to_file(start_ss.str());
+
+        mtmd_context_params mparams_mtmd = mtmd_context_params_default();
+        mparams_mtmd.use_gpu = g_n_gpu_layers != 0;
+        mparams_mtmd.print_timings = false;
+        mparams_mtmd.n_threads = g_n_threads;
+        mparams_mtmd.warmup = true;
+
+        mtmd_context * mtmd = mtmd_init_from_file(candidate_path.c_str(), g_model, mparams_mtmd);
+        if (!mtmd) {
+            std::ostringstream fail_ss;
+            fail_ss << log_prefix << ": failed to initialize multimodal projector " << candidate_path
+                    << "; trying next candidate if available";
+            log_to_file(fail_ss.str(), GGML_LOG_LEVEL_WARN);
+            continue;
+        }
+
+        const bool supports_vision = mtmd_support_vision(mtmd);
+        const bool supports_audio = mtmd_support_audio(mtmd);
+        if (!supports_vision && !supports_audio) {
+            std::ostringstream fail_ss;
+            fail_ss << log_prefix << ": projector initialized but exposed no supported modalities: "
+                    << candidate_path;
+            log_to_file(fail_ss.str(), GGML_LOG_LEVEL_WARN);
+            mtmd_free(mtmd);
+            continue;
+        }
+
+        g_mtmd = mtmd;
+        g_supports_vision = supports_vision;
+        g_supports_audio = supports_audio;
+
+        std::ostringstream ok_ss;
+        ok_ss << log_prefix << ": multimodal projector loaded path=" << candidate_path
+              << " vision=" << g_supports_vision
+              << " audio=" << g_supports_audio;
+        log_to_file(ok_ss.str());
+        return candidate_path;
+    }
+
+    if (likely_multimodal_model || !requested_mmproj_path.empty()) {
+        std::ostringstream ss;
+        ss << log_prefix << ": no usable multimodal projector could be initialized for model "
+           << model_path << "; multimodal support disabled";
+        log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
+    }
+    return "";
 }
 
 static void throw_java_exception(JNIEnv *env, const char *msg) {
@@ -1058,6 +1337,10 @@ Java_com_micklab_llama_LlamaNative_init(
     ensure_fatal_signal_handlers_installed();
 
     auto clear_partial_init = []() {
+        if (g_mtmd) {
+            mtmd_free(g_mtmd);
+            g_mtmd = nullptr;
+        }
         if (g_ctx) {
             llama_free(g_ctx);
             g_ctx = nullptr;
@@ -1067,6 +1350,9 @@ Java_com_micklab_llama_LlamaNative_init(
             g_model = nullptr;
         }
         g_current_model_path.clear();
+        g_current_mmproj_path.clear();
+        g_supports_vision = false;
+        g_supports_audio = false;
     };
 
     try {
@@ -1093,6 +1379,14 @@ Java_com_micklab_llama_LlamaNative_init(
         }
 
         // Defensively free existing resources before loading a new model
+        if (g_mtmd) {
+            log_to_file("init: freeing existing multimodal context before re-init");
+            mtmd_free(g_mtmd);
+            g_mtmd = nullptr;
+        }
+        g_current_mmproj_path.clear();
+        g_supports_vision = false;
+        g_supports_audio = false;
         if (g_ctx) {
             log_to_file("init: freeing existing context before re-init");
             llama_free(g_ctx);
@@ -1225,15 +1519,8 @@ Java_com_micklab_llama_LlamaNative_init(
         }
 
         g_current_model_path = model_path;
-        log_to_file("init: context created");
-
-        // For Gemma-4 models without a projector, enable multimodal support by default
-        if ((model_path.find("gemma") != std::string::npos || model_path.find("Gemma") != std::string::npos || model_path.find("GEMMA") != std::string::npos)
-            && model_path.find("4") != std::string::npos) {
-            g_supports_vision = true;
-            g_supports_audio = true;
-            log_to_file("init: Gemma-4 model detected, enabling vision and audio support");
-        }
+        g_current_mmproj_path = initialize_optional_multimodal_support_locked(model_path, "", "init");
+        log_to_file("init: initialization complete");
 
         return env->NewStringUTF("ok");
     } catch (const std::exception & e) {
@@ -1297,12 +1584,12 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
 
         if (!g_current_model_path.empty()
                 && g_current_model_path == model_path
-                && g_current_mmproj_path == mmproj_path
                 && g_model && g_ctx
-                && (mmproj_path.empty() || g_mtmd != nullptr)) {
+                && ((mmproj_path.empty() && (g_current_mmproj_path.empty() || g_mtmd != nullptr))
+                || g_current_mmproj_path == mmproj_path)) {
             std::ostringstream ss;
             ss << "initWithMmproj: model already initialized at path=" << model_path
-               << " mmproj=" << (mmproj_path.empty() ? "<none>" : mmproj_path)
+               << " mmproj=" << (g_current_mmproj_path.empty() ? "<none>" : g_current_mmproj_path)
                << "; skipping init";
             log_to_file(ss.str());
             return env->NewStringUTF("ok");
@@ -1354,8 +1641,8 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 std::ostringstream ss;
                 ss << "initWithMmproj: mmproj file cannot be opened: " << mmproj_path
                    << " errno=" << errno << " strerror=" << std::strerror(errno);
-                log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("mmproj file open failed");
+                log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
+                mmproj_path.clear();
             } else {
                 auto sz = ifs.tellg();
                 std::ostringstream ss;
@@ -1438,40 +1725,13 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             }
         }
 
-        if (!mmproj_path.empty()) {
-            mtmd_context_params mparams_mtmd = mtmd_context_params_default();
-            mparams_mtmd.use_gpu = g_n_gpu_layers != 0;
-            mparams_mtmd.print_timings = false;
-            mparams_mtmd.n_threads = g_n_threads;
-            mparams_mtmd.warmup = true;
-
-            g_mtmd = mtmd_init_from_file(mmproj_path.c_str(), g_model, mparams_mtmd);
-            if (!g_mtmd) {
-                log_to_file("initWithMmproj: failed to load multimodal projector", GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("failed to load multimodal projector");
-            }
-
-            g_supports_vision = mtmd_support_vision(g_mtmd);
-            g_supports_audio = mtmd_support_audio(g_mtmd);
-
-            {
-                std::ostringstream ss;
-                ss << "initWithMmproj: multimodal projector loaded vision=" << g_supports_vision
-                   << " audio=" << g_supports_audio;
-                log_to_file(ss.str());
-            }
-        } else {
-            // For Gemma-4 models without explicit projector, enable multimodal support by default
-            if ((model_path.find("gemma") != std::string::npos || model_path.find("Gemma") != std::string::npos || model_path.find("GEMMA") != std::string::npos)
-                && model_path.find("4") != std::string::npos) {
-                g_supports_vision = true;
-                g_supports_audio = true;
-                log_to_file("initWithMmproj: Gemma-4 model detected, enabling vision and audio support");
-            }
-        }
+        const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
+                model_path,
+                mmproj_path,
+                "initWithMmproj");
 
         g_current_model_path = model_path;
-        g_current_mmproj_path = mmproj_path;
+        g_current_mmproj_path = selected_mmproj_path;
         log_to_file("initWithMmproj: initialization complete");
 
         return env->NewStringUTF("ok");

@@ -83,8 +83,8 @@ public final class ModelFileHelper {
             String modelReference,
             boolean preferVision,
             boolean preferAudio) {
-        File storageDir = getModelStorageDir(context);
-        File[] files = storageDir.listFiles();
+        File searchDir = getProjectorSearchDir(context, modelReference);
+        File[] files = searchDir.listFiles();
         if (files == null || files.length == 0) {
             return null;
         }
@@ -109,24 +109,23 @@ public final class ModelFileHelper {
 
         File best = null;
         int bestScore = Integer.MIN_VALUE;
-        boolean ambiguous = false;
         for (File candidate : candidates) {
             String candidateStem = stripGgufSuffix(candidate.getName()).toLowerCase(Locale.US);
             int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio);
             if (score > bestScore) {
                 best = candidate;
                 bestScore = score;
-                ambiguous = false;
-            } else if (score == bestScore) {
-                ambiguous = true;
             }
         }
-        return ambiguous || bestScore < 130 ? null : best;
+        if (best == null) {
+            return null;
+        }
+        return (bestScore >= 130 || candidates.size() == 1) ? best : null;
     }
 
     public static InferredModalities inferAutoDetectedModalities(Context context, String modelReference) {
-        File storageDir = getModelStorageDir(context);
-        File[] files = storageDir.listFiles();
+        File searchDir = getProjectorSearchDir(context, modelReference);
+        File[] files = searchDir.listFiles();
         if (files == null || files.length == 0) {
             return new InferredModalities(false, false);
         }
@@ -136,6 +135,17 @@ public final class ModelFileHelper {
         List<String> tokens = tokenizeModelStem(modelStem);
         boolean vision = false;
         boolean audio = false;
+
+        int candidateCount = 0;
+        for (File file : files) {
+            if (file == null || !file.isFile()) {
+                continue;
+            }
+            String lowerName = file.getName().toLowerCase(Locale.US);
+            if (isLikelyProjectorFilename(lowerName)) {
+                candidateCount++;
+            }
+        }
 
         for (File file : files) {
             if (file == null || !file.isFile()) {
@@ -147,7 +157,8 @@ public final class ModelFileHelper {
             }
 
             String candidateStem = stripGgufSuffix(lowerName);
-            if (scoreProjectorCandidate(candidateStem, modelStem, tokens, false, false) < 130) {
+            int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, false, false);
+            if (score < 130 && candidateCount > 1) {
                 continue;
             }
 
@@ -162,6 +173,27 @@ public final class ModelFileHelper {
         }
 
         return new InferredModalities(vision, audio);
+    }
+
+    private static File getProjectorSearchDir(Context context, String modelReference) {
+        if (modelReference != null) {
+            String trimmed = modelReference.trim();
+            if (!trimmed.isEmpty()) {
+                File directFile = new File(trimmed);
+                File directParent = directFile.getParentFile();
+                if (directFile.isAbsolute() && directParent != null) {
+                    return directParent;
+                }
+            }
+        }
+        File modelFile = resolveStoredModelFile(context, modelReference);
+        if (modelFile != null) {
+            File parent = modelFile.getParentFile();
+            if (parent != null) {
+                return parent;
+            }
+        }
+        return getModelStorageDir(context);
     }
 
     private static String stripGgufSuffix(String filename) {
