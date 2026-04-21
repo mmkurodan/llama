@@ -1227,6 +1227,14 @@ Java_com_micklab_llama_LlamaNative_init(
         g_current_model_path = model_path;
         log_to_file("init: context created");
 
+        // For Gemma-4 models without a projector, enable multimodal support by default
+        if ((model_path.find("gemma") != std::string::npos || model_path.find("Gemma") != std::string::npos || model_path.find("GEMMA") != std::string::npos)
+            && model_path.find("4") != std::string::npos) {
+            g_supports_vision = true;
+            g_supports_audio = true;
+            log_to_file("init: Gemma-4 model detected, enabling vision and audio support");
+        }
+
         return env->NewStringUTF("ok");
     } catch (const std::exception & e) {
         std::ostringstream ss;
@@ -1451,6 +1459,14 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 ss << "initWithMmproj: multimodal projector loaded vision=" << g_supports_vision
                    << " audio=" << g_supports_audio;
                 log_to_file(ss.str());
+            }
+        } else {
+            // For Gemma-4 models without explicit projector, enable multimodal support by default
+            if ((model_path.find("gemma") != std::string::npos || model_path.find("Gemma") != std::string::npos || model_path.find("GEMMA") != std::string::npos)
+                && model_path.find("4") != std::string::npos) {
+                g_supports_vision = true;
+                g_supports_audio = true;
+                log_to_file("initWithMmproj: Gemma-4 model detected, enabling vision and audio support");
             }
         }
 
