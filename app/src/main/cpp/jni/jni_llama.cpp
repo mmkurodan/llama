@@ -30,9 +30,13 @@
 #include "ggml-backend.h"
 #include "ggml-backend-impl.h"   // ★ これが必要
 #include "ggml-cpu.h"
+#include "chat.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
+#include "sampling.h"
 #include <curl/curl.h>
+
+using json = nlohmann::ordered_json;
 
 // ---------------- グローバル ----------------
 static std::mutex g_mutex;
@@ -749,6 +753,108 @@ static std::string process_escape_sequences(const std::string& input) {
         }
     }
     return result;
+}
+
+static std::vector<std::string> parse_dry_sequence_breakers() {
+    std::vector<std::string> breaker_strings;
+    std::string temp = g_dry_sequence_breakers;
+    size_t pos = 0;
+    while ((pos = temp.find(',')) != std::string::npos) {
+        std::string token = temp.substr(0, pos);
+        if (!token.empty()) {
+            breaker_strings.push_back(process_escape_sequences(token));
+        }
+        temp.erase(0, pos + 1);
+    }
+    if (!temp.empty()) {
+        breaker_strings.push_back(process_escape_sequences(temp));
+    }
+    return breaker_strings;
+}
+
+static bool find_stop_sequence_in_list(
+        const std::vector<std::string> & stop_sequences,
+        const std::string & text,
+        size_t * stop_pos,
+        std::string * stop_seq) {
+    size_t earliest = std::string::npos;
+    std::string found;
+    for (const auto & seq : stop_sequences) {
+        if (seq.empty()) {
+            continue;
+        }
+        size_t pos = text.find(seq);
+        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
+            earliest = pos;
+            found = seq;
+        }
+    }
+    if (earliest != std::string::npos) {
+        if (stop_pos) *stop_pos = earliest;
+        if (stop_seq) *stop_seq = found;
+        return true;
+    }
+    return false;
+}
+
+static common_params_sampling build_chat_sampling_params_locked(const common_chat_params & chat_params) {
+    common_params_sampling params;
+    params.seed               = LLAMA_DEFAULT_SEED;
+    params.top_k              = g_top_k;
+    params.top_p              = g_top_p;
+    params.min_p              = g_min_p;
+    params.xtc_probability    = g_xtc_probability;
+    params.xtc_threshold      = g_xtc_threshold;
+    params.typ_p              = g_typical_p;
+    params.temp               = g_temp;
+    params.dynatemp_range     = g_dynatemp_range;
+    params.dynatemp_exponent  = g_dynatemp_exponent;
+    params.penalty_last_n     = g_penalty_last_n > 0 ? g_penalty_last_n : g_n_ctx;
+    params.penalty_repeat     = g_penalty_repeat;
+    params.penalty_freq       = g_penalty_freq;
+    params.penalty_present    = g_penalty_present;
+    params.dry_multiplier     = g_dry_multiplier;
+    params.dry_base           = g_dry_base;
+    params.dry_allowed_length = g_dry_allowed_length;
+    params.dry_penalty_last_n = g_dry_penalty_last_n > 0 ? g_dry_penalty_last_n : g_n_ctx;
+    params.mirostat           = g_mirostat;
+    params.mirostat_tau       = g_mirostat_tau;
+    params.mirostat_eta       = g_mirostat_eta;
+    params.top_n_sigma        = g_top_n_sigma;
+    params.dry_sequence_breakers = parse_dry_sequence_breakers();
+    params.n_prev             = std::max(32, params.penalty_last_n);
+    params.grammar_lazy       = chat_params.grammar_lazy;
+    params.generation_prompt  = chat_params.generation_prompt;
+    params.backend_sampling   = false;
+
+    if (!chat_params.grammar.empty()) {
+        params.grammar = { COMMON_GRAMMAR_TYPE_TOOL_CALLS, chat_params.grammar };
+    }
+    for (const auto & trigger : chat_params.grammar_triggers) {
+        params.grammar_triggers.push_back(trigger);
+    }
+
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    for (const auto & token_text : chat_params.preserved_tokens) {
+        auto ids = common_tokenize(vocab, token_text, false, true);
+        if (ids.size() == 1) {
+            params.preserved_tokens.insert(ids[0]);
+        }
+    }
+    return params;
+}
+
+static std::vector<std::string> build_chat_stop_sequences(const common_chat_params & chat_params) {
+    std::vector<std::string> stop_sequences = DEFAULT_STOP_SEQUENCES;
+    for (const auto & stop : chat_params.additional_stops) {
+        if (stop.empty()) {
+            continue;
+        }
+        if (std::find(stop_sequences.begin(), stop_sequences.end(), stop) == stop_sequences.end()) {
+            stop_sequences.push_back(stop);
+        }
+    }
+    return stop_sequences;
 }
 
 // ---------------- download() 用 ----------------
@@ -2336,6 +2442,219 @@ static jstring generate_locked(
     return env->NewStringUTF(output.c_str());
 }
 
+static jstring generate_openai_chat_completion_locked(
+        JNIEnv * env,
+        const std::string & messages_json_text,
+        const std::string & tools_json_text,
+        const std::string & chat_template_override,
+        const std::string & tool_choice_json_text,
+        bool parallel_tool_calls,
+        bool enable_thinking,
+        const std::vector<std::vector<uint8_t>> * media_files) {
+    auto build_error = [&](const std::string & message) -> jstring {
+        log_to_file(std::string("generateOpenAiChatCompletion: ") + message, GGML_LOG_LEVEL_ERROR);
+        json error_json = {
+                {"error", message},
+        };
+        return env->NewStringUTF(error_json.dump().c_str());
+    };
+
+    if (!g_ctx || !g_model) {
+        return build_error("not initialized");
+    }
+
+    g_cancel_generation.store(false);
+
+    try {
+        json messages_json = json::parse(messages_json_text.empty() ? "[]" : messages_json_text);
+        json tools_json = tools_json_text.empty() ? json::array() : json::parse(tools_json_text);
+        json tool_choice_json = tool_choice_json_text.empty() ? json() : json::parse(tool_choice_json_text);
+
+        auto messages = common_chat_msgs_parse_oaicompat(messages_json);
+        auto tools = common_chat_tools_parse_oaicompat(tools_json);
+        common_chat_tool_choice tool_choice = COMMON_CHAT_TOOL_CHOICE_AUTO;
+
+        if (!tool_choice_json.is_null()) {
+            if (tool_choice_json.is_string()) {
+                tool_choice = common_chat_tool_choice_parse_oaicompat(tool_choice_json.get<std::string>());
+            } else if (tool_choice_json.is_object()) {
+                if (tool_choice_json.value("type", std::string()) != "function") {
+                    throw std::runtime_error("unsupported tool_choice object type");
+                }
+                const auto & function = tool_choice_json.at("function");
+                const std::string forced_tool_name = function.at("name").get<std::string>();
+                std::vector<common_chat_tool> filtered_tools;
+                for (const auto & tool : tools) {
+                    if (tool.name == forced_tool_name) {
+                        filtered_tools.push_back(tool);
+                    }
+                }
+                if (filtered_tools.empty()) {
+                    throw std::runtime_error("tool_choice function not found in tools");
+                }
+                tools = std::move(filtered_tools);
+                tool_choice = COMMON_CHAT_TOOL_CHOICE_REQUIRED;
+            } else {
+                throw std::runtime_error("tool_choice must be a string or object");
+            }
+        }
+
+        common_chat_templates_inputs inputs;
+        inputs.messages = std::move(messages);
+        inputs.tools = std::move(tools);
+        inputs.tool_choice = tool_choice;
+        inputs.parallel_tool_calls = parallel_tool_calls;
+        inputs.enable_thinking = enable_thinking;
+        inputs.add_generation_prompt = true;
+        inputs.use_jinja = true;
+
+        auto chat_templates = common_chat_templates_init(g_model, chat_template_override);
+        auto chat_params = common_chat_templates_apply(chat_templates.get(), inputs);
+
+        common_chat_parser_params parser_params(chat_params);
+        parser_params.parse_tool_calls = true;
+        if (!chat_params.parser.empty()) {
+            parser_params.parser.load(chat_params.parser);
+        }
+
+        const std::string & prompt = chat_params.prompt;
+        const auto stop_sequences = build_chat_stop_sequences(chat_params);
+
+        if (is_max_debug_mode()) {
+            log_to_file(std::string("generateOpenAiChatCompletion: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
+        }
+
+        llama_memory_t mem = llama_get_memory(g_ctx);
+        llama_memory_clear(mem, false);
+
+        const llama_vocab * vocab = llama_model_get_vocab(g_model);
+        size_t n_prompt_tokens = 0;
+        llama_pos n_past = 0;
+        std::string prefill_error;
+
+        const bool has_media = media_files != nullptr && !media_files->empty();
+        const bool prefill_ok = has_media
+                ? prefill_multimodal_prompt_locked(prompt, *media_files, n_prompt_tokens, n_past, prefill_error)
+                : prefill_text_prompt_locked(vocab, prompt, n_prompt_tokens, n_past, prefill_error);
+
+        if (!prefill_ok) {
+            return build_error(prefill_error);
+        }
+
+        if (n_past >= g_n_ctx) {
+            return build_error("prompt exceeds context");
+        }
+
+        common_params_sampling sampling_params = build_chat_sampling_params_locked(chat_params);
+        common_sampler_ptr sampler(common_sampler_init(g_model, sampling_params));
+        if (!sampler) {
+            return build_error("failed to initialize sampler");
+        }
+
+        const llama_pos generation_base_pos = n_past;
+        const int max_tokens = 1024;
+
+        std::string output;
+        output.reserve(max_tokens * 4);
+        std::vector<llama_token> out_tokens;
+        out_tokens.reserve(max_tokens);
+        std::string prev_text;
+
+        for (int i = 0; i < max_tokens; ++i) {
+            if (g_cancel_generation.load()) {
+                break;
+            }
+
+            const llama_token id = common_sampler_sample(sampler.get(), g_ctx, -1);
+            common_sampler_accept(sampler.get(), id, true);
+            if (llama_vocab_is_eog(vocab, id)) {
+                break;
+            }
+
+            out_tokens.push_back(id);
+            if (generation_base_pos + static_cast<llama_pos>(out_tokens.size()) >= g_n_ctx - 32) {
+                log_to_file("generateOpenAiChatCompletion: reached ctx safety limit, stopping early");
+                break;
+            }
+
+            std::string full;
+            int n_chars = detokenize_with_resize(vocab, out_tokens, full);
+            if (n_chars > 0) {
+                size_t safe_len = validate_utf8(full);
+                if (safe_len < full.size()) {
+                    full.resize(safe_len);
+                }
+
+                size_t stop_pos = std::string::npos;
+                std::string stop_seq;
+                if (find_stop_sequence_in_list(stop_sequences, full, &stop_pos, &stop_seq)) {
+                    if (stop_pos < full.size()) {
+                        full.resize(stop_pos);
+                    }
+                    output = full;
+                    prev_text = full;
+                    break;
+                }
+
+                if (full.size() > prev_text.size()) {
+                    output += full.substr(prev_text.size());
+                }
+                prev_text = full;
+            }
+
+            llama_batch batch = llama_batch_init(1, 0, 1);
+            batch.n_tokens = 1;
+            batch.token[0] = id;
+            batch.pos[0] = generation_base_pos + i;
+            batch.n_seq_id[0] = 1;
+            batch.seq_id[0][0] = 0;
+            batch.logits[0] = 1;
+
+            const int rc_step = llama_decode(g_ctx, batch);
+            llama_batch_free(batch);
+            if (rc_step != 0) {
+                return build_error("decode failed (generation)");
+            }
+        }
+
+        size_t safe_len = validate_utf8(output);
+        if (safe_len < output.size()) {
+            output.resize(safe_len);
+        }
+
+        common_chat_msg parsed_msg;
+        try {
+            parsed_msg = common_chat_parse(output, false, parser_params);
+        } catch (const std::exception & e) {
+            log_to_file(std::string("generateOpenAiChatCompletion: parser fallback: ") + e.what(), GGML_LOG_LEVEL_WARN);
+            parsed_msg.content = output;
+        }
+        if (parsed_msg.empty() && !output.empty()) {
+            parsed_msg.content = output;
+        }
+
+        json result = {
+                {"content", parsed_msg.content},
+                {"finish_reason", parsed_msg.tool_calls.empty() ? "stop" : "tool_calls"},
+        };
+        if (!parsed_msg.reasoning_content.empty()) {
+            result["reasoning_content"] = parsed_msg.reasoning_content;
+        }
+        if (!parsed_msg.tool_calls.empty()) {
+            auto msg_json = parsed_msg.to_json_oaicompat(false);
+            result["tool_calls"] = msg_json["tool_calls"];
+        }
+
+        if (is_max_debug_mode()) {
+            log_to_file(std::string("generateOpenAiChatCompletion: result=\n") + result.dump(2), GGML_LOG_LEVEL_DEBUG);
+        }
+
+        return env->NewStringUTF(result.dump().c_str());
+    } catch (const std::exception & e) {
+        return build_error(e.what());
+    }
+}
+
 // ---------------- JNI: generate ----------------
 extern "C"
 JNIEXPORT jstring JNICALL
@@ -2377,6 +2696,51 @@ Java_com_micklab_llama_LlamaNative_generateWithMedia(
     }
 
     return generate_locked(env, jstring_to_std(env, jPrompt), &media_files);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_generateOpenAiChatCompletion(
+        JNIEnv *env, jobject,
+        jstring jMessagesJson,
+        jstring jToolsJson,
+        jstring jChatTemplateOverride,
+        jstring jToolChoiceJson,
+        jboolean jParallelToolCalls,
+        jboolean jEnableThinking,
+        jobjectArray jMediaFiles
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    std::vector<std::vector<uint8_t>> media_files;
+    if (jMediaFiles != nullptr) {
+        const jsize count = env->GetArrayLength(jMediaFiles);
+        media_files.reserve(static_cast<size_t>(count));
+        for (jsize i = 0; i < count; ++i) {
+            auto * byte_array = reinterpret_cast<jbyteArray>(env->GetObjectArrayElement(jMediaFiles, i));
+            if (!byte_array) {
+                media_files.emplace_back();
+                continue;
+            }
+            const jsize len = env->GetArrayLength(byte_array);
+            std::vector<uint8_t> bytes(static_cast<size_t>(len));
+            if (len > 0) {
+                env->GetByteArrayRegion(byte_array, 0, len, reinterpret_cast<jbyte *>(bytes.data()));
+            }
+            media_files.push_back(std::move(bytes));
+            env->DeleteLocalRef(byte_array);
+        }
+    }
+
+    return generate_openai_chat_completion_locked(
+            env,
+            jstring_to_std(env, jMessagesJson),
+            jstring_to_std(env, jToolsJson),
+            jstring_to_std(env, jChatTemplateOverride),
+            jstring_to_std(env, jToolChoiceJson),
+            jParallelToolCalls == JNI_TRUE,
+            jEnableThinking == JNI_TRUE,
+            &media_files);
 }
 
 // ---------------- JNI: free ----------------

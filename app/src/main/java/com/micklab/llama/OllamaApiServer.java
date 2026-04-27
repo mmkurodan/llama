@@ -303,6 +303,142 @@ public class OllamaApiServer {
         return new RequestedModalities(vision, audio);
     }
 
+    private static final class NativeChatCompletionResult {
+        final String content;
+        final String reasoningContent;
+        final JSONArray toolCalls;
+        final String finishReason;
+
+        NativeChatCompletionResult(
+                String content,
+                String reasoningContent,
+                JSONArray toolCalls,
+                String finishReason
+        ) {
+            this.content = content;
+            this.reasoningContent = reasoningContent;
+            this.toolCalls = toolCalls;
+            this.finishReason = finishReason;
+        }
+    }
+
+    private static JSONArray prepareMessagesForNativeChat(
+            JSONArray messages,
+            String settingsSystemPrompt
+    ) throws JSONException {
+        JSONArray normalizedMessages = new JSONArray();
+        String apiSystemPrompt = null;
+
+        for (int i = 0; i < messages.length(); i++) {
+            JSONObject original = messages.getJSONObject(i);
+            JSONObject normalized = copyJsonObject(original);
+
+            Object rawContent = normalized.opt("content");
+            if (rawContent instanceof String) {
+                normalized.put(
+                        "content",
+                        PromptTemplateManager.stripTemplateMarkers((String) rawContent)
+                );
+            }
+
+            if ("system".equals(normalized.optString("role", ""))) {
+                Object systemContent = normalized.opt("content");
+                if (systemContent == JSONObject.NULL || systemContent == null) {
+                    apiSystemPrompt = null;
+                } else if (systemContent instanceof String) {
+                    apiSystemPrompt = (String) systemContent;
+                } else {
+                    apiSystemPrompt = String.valueOf(systemContent);
+                }
+                continue;
+            }
+
+            normalizedMessages.put(normalized);
+        }
+
+        String resolvedSystemPrompt = PromptTemplateManager.resolveSystemPrompt(
+                apiSystemPrompt,
+                settingsSystemPrompt
+        );
+        if (resolvedSystemPrompt == null || resolvedSystemPrompt.isEmpty()) {
+            return normalizedMessages;
+        }
+
+        JSONArray withSystem = new JSONArray();
+        JSONObject systemMessage = new JSONObject();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", resolvedSystemPrompt);
+        withSystem.put(systemMessage);
+        for (int i = 0; i < normalizedMessages.length(); i++) {
+            withSystem.put(normalizedMessages.getJSONObject(i));
+        }
+        return withSystem;
+    }
+
+    private static String serializeToolChoice(Object toolChoice) {
+        if (toolChoice == null || toolChoice == JSONObject.NULL) {
+            return null;
+        }
+        if (toolChoice instanceof JSONObject || toolChoice instanceof JSONArray) {
+            return toolChoice.toString();
+        }
+        if (toolChoice instanceof String) {
+            return JSONObject.quote((String) toolChoice);
+        }
+        return null;
+    }
+
+    private static NativeChatCompletionResult parseNativeChatCompletionResult(String rawJson)
+            throws JSONException {
+        JSONObject json = new JSONObject(rawJson);
+        String error = json.optString("error", "");
+        if (!error.isEmpty()) {
+            throw new RuntimeException(error);
+        }
+
+        JSONArray toolCalls = json.optJSONArray("tool_calls");
+        String finishReason = json.optString(
+                "finish_reason",
+                toolCalls != null && toolCalls.length() > 0 ? "tool_calls" : "stop"
+        );
+        return new NativeChatCompletionResult(
+                json.optString("content", ""),
+                json.optString("reasoning_content", null),
+                toolCalls,
+                finishReason
+        );
+    }
+
+    private static JSONArray buildToolCallDeltas(JSONArray toolCalls) throws JSONException {
+        JSONArray deltas = new JSONArray();
+        if (toolCalls == null) {
+            return deltas;
+        }
+
+        for (int i = 0; i < toolCalls.length(); i++) {
+            JSONObject toolCall = toolCalls.getJSONObject(i);
+            JSONObject delta = new JSONObject();
+            delta.put("index", i);
+            if (toolCall.has("id") && !toolCall.isNull("id")) {
+                delta.put("id", toolCall.get("id"));
+            }
+            delta.put("type", toolCall.optString("type", "function"));
+            JSONObject function = toolCall.optJSONObject("function");
+            if (function != null) {
+                JSONObject functionDelta = new JSONObject();
+                if (function.has("name") && !function.isNull("name")) {
+                    functionDelta.put("name", function.getString("name"));
+                }
+                if (function.has("arguments") && !function.isNull("arguments")) {
+                    functionDelta.put("arguments", function.getString("arguments"));
+                }
+                delta.put("function", functionDelta);
+            }
+            deltas.put(delta);
+        }
+        return deltas;
+    }
+
     private static class StreamTokenFilter {
         private static class ParseResult {
             final String output;
@@ -1767,11 +1903,16 @@ public class OllamaApiServer {
             JSONObject request = new JSONObject(body);
             String model = resolveRequestedModel(request.optString("model", null));
             JSONArray messages = request.optJSONArray("messages");
+            JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
             boolean preEncodeOnly = request.has("n_predict") && request.optInt("n_predict", -1) == 0;
 
             if (messages == null || messages.length() == 0) {
                 sendOpenAiErrorResponse(outputStream, 400, "No messages provided", "invalid_request_error");
+                return;
+            }
+            if (request.has("tools") && tools == null) {
+                sendOpenAiErrorResponse(outputStream, 400, "'tools' must be an array", "invalid_request_error");
                 return;
             }
 
@@ -1807,13 +1948,88 @@ public class OllamaApiServer {
                 String customTemplate = config != null ? config.customChatTemplate : null;
                 String settingsSystemPrompt = config != null ? config.systemPrompt : null;
                 boolean enableThinking = config == null || config.enableThinking;
-                String modelPath = modelManager.getCurrentModelPath();
                 PreparedMessages preparedMessages = normalizeMessagesForMedia(
                         messages,
                         modelManager.supportsVision(),
                         modelManager.supportsAudio()
                 );
 
+                if (preEncodeOnly) {
+                    sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, "").toString());
+                    return;
+                }
+
+                if (tools != null && tools.length() > 0) {
+                    JSONArray nativeMessages = prepareMessagesForNativeChat(
+                            preparedMessages.messages,
+                            settingsSystemPrompt
+                    );
+                    String nativeResultJson = modelManager.getLlama().generateOpenAiChatCompletion(
+                            nativeMessages.toString(),
+                            tools.toString(),
+                            customTemplate,
+                            serializeToolChoice(request.opt("tool_choice")),
+                            request.optBoolean("parallel_tool_calls", false),
+                            enableThinking,
+                            preparedMessages.toMediaArray()
+                    );
+                    NativeChatCompletionResult nativeResult =
+                            parseNativeChatCompletionResult(nativeResultJson);
+
+                    if (stream) {
+                        String header = "HTTP/1.1 200 OK\r\n" +
+                                "Content-Type: text/event-stream\r\n" +
+                                "Cache-Control: no-cache\r\n" +
+                                "Connection: keep-alive\r\n" +
+                                "Access-Control-Allow-Origin: *\r\n" +
+                                "\r\n";
+                        outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+                        outputStream.flush();
+                        sendSseEvent(outputStream, buildOpenAiRoleChunk(model).toString());
+
+                        if ((nativeResult.content != null && !nativeResult.content.isEmpty())
+                                || (nativeResult.reasoningContent != null && !nativeResult.reasoningContent.isEmpty())
+                                || (nativeResult.toolCalls != null && nativeResult.toolCalls.length() > 0)) {
+                            sendSseEvent(
+                                    outputStream,
+                                    buildOpenAiStreamChunk(
+                                            model,
+                                            nativeResult.content,
+                                            nativeResult.reasoningContent,
+                                            buildToolCallDeltas(nativeResult.toolCalls),
+                                            null
+                                    ).toString()
+                            );
+                        }
+
+                        sendSseEvent(
+                                outputStream,
+                                buildOpenAiStreamChunk(
+                                        model,
+                                        "",
+                                        null,
+                                        null,
+                                        nativeResult.finishReason
+                                ).toString()
+                        );
+                        sendSseEvent(outputStream, "[DONE]");
+                    } else {
+                        sendJsonResponse(
+                                outputStream,
+                                200,
+                                buildOpenAiChatResponse(
+                                        model,
+                                        nativeResult.content,
+                                        nativeResult.reasoningContent,
+                                        nativeResult.toolCalls,
+                                        nativeResult.finishReason
+                                ).toString()
+                        );
+                    }
+                    return;
+                }
+
+                String modelPath = modelManager.getCurrentModelPath();
                 PromptTemplateManager.PromptBuildResult promptResult =
                         PromptTemplateManager.buildPromptFromMessagesWithSelection(
                                 preparedMessages.messages,
@@ -1825,11 +2041,6 @@ public class OllamaApiServer {
                 logTemplateSelection("chat.completions", promptResult.selection);
                 String promptToUse = promptResult.prompt;
                 logMaxDebugPayload("openai.chat.prompt", promptToUse);
-
-                if (preEncodeOnly) {
-                    sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, "").toString());
-                    return;
-                }
 
                 if (stream) {
                     String header = "HTTP/1.1 200 OK\r\n" +
@@ -1862,7 +2073,10 @@ public class OllamaApiServer {
                                 Object ev = tokenQueue.take();
                                 if (ev == TOKEN_COMPLETE) {
                                     synchronized (writeLock) {
-                                        sendSseEvent(outputStream, buildOpenAiStreamChunk(model, "", true).toString());
+                                        sendSseEvent(
+                                                outputStream,
+                                                buildOpenAiStreamChunk(model, "", null, null, "stop").toString()
+                                        );
                                         sendSseEvent(outputStream, "[DONE]");
                                     }
                                     break;
@@ -1880,7 +2094,10 @@ public class OllamaApiServer {
                                         continue;
                                     }
                                     synchronized (writeLock) {
-                                        sendSseEvent(outputStream, buildOpenAiStreamChunk(model, token, false).toString());
+                                        sendSseEvent(
+                                                outputStream,
+                                                buildOpenAiStreamChunk(model, token, null, null, null).toString()
+                                        );
                                     }
                                 }
                             }
@@ -1945,6 +2162,9 @@ public class OllamaApiServer {
         } catch (InvalidMediaException e) {
             Log.e(TAG, "Invalid media in OpenAI chat request", e);
             sendOpenAiErrorResponse(outputStream, 400, e.getMessage(), "invalid_request_error");
+        } catch (RuntimeException e) {
+            Log.e(TAG, "OpenAI chat request failed", e);
+            sendOpenAiErrorResponse(outputStream, 500, e.getMessage(), "server_error");
         }
     }
 
@@ -2148,18 +2368,34 @@ public class OllamaApiServer {
     }
 
     private JSONObject buildOpenAiChatResponse(String model, String content) throws JSONException {
+        return buildOpenAiChatResponse(model, content, null, null, "stop");
+    }
+
+    private JSONObject buildOpenAiChatResponse(
+            String model,
+            String content,
+            String reasoningContent,
+            JSONArray toolCalls,
+            String finishReason
+    ) throws JSONException {
         JSONObject response = new JSONObject();
         response.put("object", "chat.completion");
         response.put("model", model);
 
         JSONObject message = new JSONObject();
         message.put("role", "assistant");
-        message.put("content", content);
+        message.put("content", content != null ? content : "");
+        if (reasoningContent != null && !reasoningContent.isEmpty()) {
+            message.put("reasoning_content", reasoningContent);
+        }
+        if (toolCalls != null && toolCalls.length() > 0) {
+            message.put("tool_calls", toolCalls);
+        }
 
         JSONObject choice = new JSONObject();
         choice.put("index", 0);
         choice.put("message", message);
-        choice.put("finish_reason", "stop");
+        choice.put("finish_reason", finishReason != null ? finishReason : "stop");
 
         JSONArray choices = new JSONArray();
         choices.put(choice);
@@ -2168,19 +2404,35 @@ public class OllamaApiServer {
     }
 
     private JSONObject buildOpenAiStreamChunk(String model, String content, boolean done) throws JSONException {
+        return buildOpenAiStreamChunk(model, content, null, null, done ? "stop" : null);
+    }
+
+    private JSONObject buildOpenAiStreamChunk(
+            String model,
+            String content,
+            String reasoningContent,
+            JSONArray toolCalls,
+            String finishReason
+    ) throws JSONException {
         JSONObject response = new JSONObject();
         response.put("object", "chat.completion.chunk");
         response.put("model", model);
 
         JSONObject delta = new JSONObject();
-        if (!done && content != null && !content.isEmpty()) {
+        if (content != null && !content.isEmpty()) {
             delta.put("content", content);
+        }
+        if (reasoningContent != null && !reasoningContent.isEmpty()) {
+            delta.put("reasoning_content", reasoningContent);
+        }
+        if (toolCalls != null && toolCalls.length() > 0) {
+            delta.put("tool_calls", toolCalls);
         }
 
         JSONObject choice = new JSONObject();
         choice.put("index", 0);
         choice.put("delta", delta);
-        choice.put("finish_reason", done ? "stop" : JSONObject.NULL);
+        choice.put("finish_reason", finishReason != null ? finishReason : JSONObject.NULL);
 
         JSONArray choices = new JSONArray();
         choices.put(choice);
