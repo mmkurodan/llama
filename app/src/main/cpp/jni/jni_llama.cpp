@@ -25,6 +25,8 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
+#include <nlohmann/json.hpp>
+
 #include "llama.h"
 #include "gguf.h"
 #include "ggml-backend.h"
@@ -596,7 +598,7 @@ static std::vector<std::string> collect_multimodal_projector_candidates(
 
     struct dirent * entry = nullptr;
     while ((entry = readdir(dir)) != nullptr) {
-        const std::string name = entry->d_name ? entry->d_name : "";
+        const std::string name(entry->d_name);
         if (name.empty()) {
             continue;
         }
