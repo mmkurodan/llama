@@ -5,6 +5,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Threads REQUIRED)
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -55,6 +57,10 @@ file(GLOB LLAMA_COMMON_JINJA_FILES
     ${LLAMA_ROOT_DIR}/common/jinja/*.cpp
 )
 
+set(LLAMA_VENDOR_FILES
+    ${LLAMA_ROOT_DIR}/vendor/cpp-httplib/httplib.cpp
+)
+
 file(GLOB LLAMA_SRC_FILES
     ${LLAMA_ROOT_DIR}/src/*.cpp
 )
@@ -93,9 +99,12 @@ set(MTMD_SOURCES
 
 set(LLAMA_SOURCES
     ${LLAMA_ROOT_FILES}
+    ${LLAMA_COMMON_FILES}
+    ${LLAMA_COMMON_JINJA_FILES}
     ${LLAMA_SRC_FILES}
     ${LLAMA_MODEL_FILES}
     ${MTMD_SOURCES}
+    ${LLAMA_VENDOR_FILES}
     ${CMAKE_CURRENT_BINARY_DIR}/build-info.cpp
 )
 
@@ -226,6 +235,7 @@ target_link_libraries(
     mbedtls
     mbedcrypto
     mbedx509
+    Threads::Threads
 
     log
     android
