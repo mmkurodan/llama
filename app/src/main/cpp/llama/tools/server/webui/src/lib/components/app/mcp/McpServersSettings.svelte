@@ -10,6 +10,7 @@
 	import { HealthCheckStatus } from '$lib/enums';
 
 	let servers = $derived(mcpStore.getServersSorted());
+	let hasAppManagedServers = $derived(servers.some((server) => server.source === 'app'));
 
 	let initialLoadComplete = $state(false);
 
@@ -81,6 +82,11 @@
 	<div class="flex items-start justify-between gap-4">
 		<div>
 			<h4 class="text-base font-semibold">Manage Servers</h4>
+			{#if hasAppManagedServers}
+				<p class="mt-1 text-xs text-muted-foreground">
+					Servers provided by the app settings are shown here too and are read-only in WebUI.
+				</p>
+			{/if}
 		</div>
 
 		{#if !isAddingServer}
@@ -139,6 +145,7 @@
 						{server}
 						faviconUrl={mcpStore.getServerFavicon(server.id)}
 						enabled={conversationsStore.isMcpServerEnabledForChat(server.id)}
+						readOnly={server.source === 'app'}
 						onToggle={async () => await conversationsStore.toggleMcpServerForChat(server.id)}
 						onUpdate={(updates) => mcpStore.updateServer(server.id, updates)}
 						onDelete={() => mcpStore.removeServer(server.id)}

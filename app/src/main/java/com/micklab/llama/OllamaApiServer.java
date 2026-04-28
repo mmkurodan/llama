@@ -1116,6 +1116,9 @@ public class OllamaApiServer {
         settings.put("excludeReasoningFromContext", false);
         settings.put("sendOnEnter", false);
         settings.put("showRawModelNames", false);
+        settings.put(
+                McpSettingsHelper.WEBUI_SHARED_MCP_SERVERS_KEY,
+                McpSettingsHelper.getSharedMcpServersJson(context));
         return settings;
     }
 

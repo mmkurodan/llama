@@ -22,6 +22,7 @@
 import { browser } from '$app/environment';
 import { base } from '$app/paths';
 import { MCPService } from '$lib/services/mcp.service';
+import { serverStore } from '$lib/stores/server.svelte';
 import { config, settingsStore } from '$lib/stores/settings.svelte';
 import { mcpResourceStore } from '$lib/stores/mcp-resources.svelte';
 import { mode } from 'mode-watcher';
@@ -81,6 +82,7 @@ import type { DatabaseMessageExtraMcpResource, McpServerOverride } from '$lib/ty
 import type { SettingsConfigType } from '$lib/types/settings';
 
 class MCPStore {
+	private static readonly APP_MANAGED_SERVER_ID_PREFIX = `${MCP_SERVER_ID_PREFIX}-app`;
 	private _isInitializing = $state(false);
 	private _error = $state<string | null>(null);
 	private _toolCount = $state(0);
@@ -128,6 +130,48 @@ class MCPStore {
 		}
 
 		return `${MCP_SERVER_ID_PREFIX}-${index + 1}`;
+	}
+
+	#generateAppManagedServerId(id: string, index: number): string {
+		const normalizedId = id.trim() || `${index + 1}`;
+		return `${MCPStore.APP_MANAGED_SERVER_ID_PREFIX}-${normalizedId}`;
+	}
+
+	#buildServerIdentityKey(server: Pick<MCPServerSettingsEntry, 'url' | 'headers' | 'useProxy'>): string {
+		return JSON.stringify({
+			url: server.url.trim().toLowerCase(),
+			headers: server.headers?.trim() || '',
+			useProxy: Boolean(server.useProxy)
+		});
+	}
+
+	#getLocalServers(rawServers: unknown = config().mcpServers): MCPServerSettingsEntry[] {
+		return parseMcpServerSettings(rawServers).map((server) => ({
+			...server,
+			source: 'local' as const
+		}));
+	}
+
+	#getAppManagedServers(): MCPServerSettingsEntry[] {
+		const rawServers = serverStore.webuiSettings?.sharedMcpServers;
+		return parseMcpServerSettings(rawServers).map((server, index) => ({
+			...server,
+			id: this.#generateAppManagedServerId(server.id, index),
+			source: 'app' as const
+		}));
+	}
+
+	#serializeLocalServers(servers: MCPServerSettingsEntry[]): string {
+		return JSON.stringify(
+			servers.map((server) => ({
+				id: server.id,
+				enabled: server.enabled,
+				url: server.url.trim(),
+				name: server.name,
+				headers: server.headers?.trim() || undefined,
+				useProxy: server.useProxy
+			}))
+		);
 	}
 
 	/**
@@ -227,7 +271,7 @@ class MCPStore {
 		cfg: SettingsConfigType,
 		perChatOverrides?: McpServerOverride[]
 	): MCPClientConfig | undefined {
-		const rawServers = this.#parseServerSettings(cfg.mcpServers);
+		const rawServers = this.getServers(cfg.mcpServers);
 		if (!rawServers.length) {
 			return undefined;
 		}
@@ -372,8 +416,13 @@ class MCPStore {
 		this._error = null;
 	}
 
-	getServers(): MCPServerSettingsEntry[] {
-		return parseMcpServerSettings(config().mcpServers);
+	getServers(rawLocalServers: unknown = config().mcpServers): MCPServerSettingsEntry[] {
+		const localServers = this.#getLocalServers(rawLocalServers);
+		const localServerKeys = new Set(localServers.map((server) => this.#buildServerIdentityKey(server)));
+		const appManagedServers = this.#getAppManagedServers().filter(
+			(server) => !localServerKeys.has(this.#buildServerIdentityKey(server))
+		);
+		return [...appManagedServers, ...localServers];
 	}
 
 	/**
@@ -524,7 +573,7 @@ class MCPStore {
 	addServer(
 		serverData: Omit<MCPServerSettingsEntry, 'id' | 'requestTimeoutSeconds'> & { id?: string }
 	): void {
-		const servers = this.getServers();
+		const servers = this.#getLocalServers();
 		const newServer: MCPServerSettingsEntry = {
 			id: serverData.id || (uuid() ?? `server-${Date.now()}`),
 			enabled: serverData.enabled,
@@ -534,27 +583,40 @@ class MCPStore {
 			requestTimeoutSeconds: DEFAULT_MCP_CONFIG.requestTimeoutSeconds,
 			useProxy: serverData.useProxy
 		};
-		settingsStore.updateConfig('mcpServers', JSON.stringify([...servers, newServer]));
+		settingsStore.updateConfig('mcpServers', this.#serializeLocalServers([...servers, newServer]));
 	}
 
 	updateServer(id: string, updates: Partial<MCPServerSettingsEntry>): void {
-		const servers = this.getServers();
-		settingsStore.updateConfig(
-			'mcpServers',
-			JSON.stringify(
-				servers.map((server) => (server.id === id ? { ...server, ...updates } : server))
-			)
-		);
+		if (this.isAppManagedServer(id)) {
+			console.warn(`[MCP] Ignoring update for app-managed server: ${id}`);
+			return;
+		}
+
+		const servers = this.#getLocalServers();
+		settingsStore.updateConfig('mcpServers', this.#serializeLocalServers(
+			servers.map((server) => (server.id === id ? { ...server, ...updates } : server))
+		));
 	}
 
 	removeServer(id: string): void {
-		const servers = this.getServers();
-		settingsStore.updateConfig('mcpServers', JSON.stringify(servers.filter((s) => s.id !== id)));
+		if (this.isAppManagedServer(id)) {
+			console.warn(`[MCP] Ignoring delete for app-managed server: ${id}`);
+			return;
+		}
+
+		const servers = this.#getLocalServers();
+		settingsStore.updateConfig('mcpServers', this.#serializeLocalServers(
+			servers.filter((s) => s.id !== id)
+		));
 		this.clearHealthCheck(id);
 	}
 
 	hasAvailableServers(): boolean {
-		return parseMcpServerSettings(config().mcpServers).some((s) => s.enabled && s.url.trim());
+		return this.getServers().some((s) => s.enabled && s.url.trim());
+	}
+
+	isAppManagedServer(serverId: string): boolean {
+		return this.getServers().some((server) => server.id === serverId && server.source === 'app');
 	}
 	hasEnabledServers(perChatOverrides?: McpServerOverride[]): boolean {
 		return Boolean(this.#buildMcpClientConfig(config(), perChatOverrides));

@@ -19,12 +19,13 @@
 		server: MCPServerSettingsEntry;
 		faviconUrl: string | null;
 		enabled?: boolean;
+		readOnly?: boolean;
 		onToggle: (enabled: boolean) => void;
 		onUpdate: (updates: Partial<MCPServerSettingsEntry>) => void;
 		onDelete: () => void;
 	}
 
-	let { server, faviconUrl, enabled, onToggle, onUpdate, onDelete }: Props = $props();
+	let { server, faviconUrl, enabled, readOnly = false, onToggle, onUpdate, onDelete }: Props = $props();
 
 	let healthState = $derived<HealthCheckState>(mcpStore.getHealthCheckState(server.id));
 	let displayName = $derived(mcpStore.getServerLabel(server));
@@ -176,6 +177,7 @@
 
 			<McpServerCardActions
 				{isHealthChecking}
+				{readOnly}
 				onEdit={startEditing}
 				onRefresh={handleHealthCheck}
 				onDelete={handleDeleteClick}

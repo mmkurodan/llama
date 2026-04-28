@@ -215,6 +215,7 @@ export type MCPServerSettingsEntry = {
 	name?: string;
 	iconUrl?: string;
 	useProxy?: boolean;
+	source?: 'local' | 'app';
 };
 
 export interface MCPHostManagerConfig {

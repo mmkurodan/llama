@@ -115,6 +115,7 @@ public class SettingsActivity extends Activity {
     
     // API Server settings
     private EditText apiPortInput;
+    private EditText mcpConfigJsonInput;
     private TextView languageLabel;
     private Spinner languageSpinner;
     private Spinner logLevelSpinner;
@@ -256,6 +257,7 @@ public class SettingsActivity extends Activity {
         
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
+        mcpConfigJsonInput = findViewById(R.id.mcpConfigJsonInput);
         languageLabel = findViewById(R.id.languageLabel);
         languageSpinner = findViewById(R.id.languageSpinner);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
@@ -266,6 +268,8 @@ public class SettingsActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         int savedPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         apiPortInput.setText(String.valueOf(savedPort));
+        mcpConfigJsonInput.setText(McpSettingsHelper.getSharedMcpServersJson(this));
+        mcpConfigJsonInput.setHint(McpSettingsHelper.getSharedMcpServersHint());
         int defaultLogLevel = 2;
         int savedLogLevel = prefs.contains(PREF_LOG_LEVEL)
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
@@ -462,6 +466,10 @@ public class SettingsActivity extends Activity {
                 case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
                 case "Llama API Server": return "Llama APIサーバー";
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
+                case "MCP Settings": return "MCP設定";
+                case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
+                case "Shared app-wide setting. Used together with WebUI MCP settings and not tied to a model configuration.": return "アプリ全体で共有される設定です。WebUIのMCP設定と合わせて参照され、モデル設定には紐づきません。";
+                case "Leave blank to rely only on WebUI MCP settings. When blank, an SSE example is shown as a hint.": return "空欄の場合はWebUI側のMCP設定のみを使います。空欄時はSSE設定例がヒント表示されます。";
                 case "Log Settings": return "ログ設定";
                 case "Log Level:": return "ログレベル:";
                 case "Show License": return "ライセンス表示";
@@ -849,8 +857,38 @@ public class SettingsActivity extends Activity {
         
         return config;
     }
+
+    private int resolveApiPortFromUi() {
+        int apiPort = OllamaApiServer.DEFAULT_PORT;
+        try {
+            apiPort = Integer.parseInt(apiPortInput.getText().toString());
+        } catch (NumberFormatException e) {
+            // Use default
+        }
+        return apiPort;
+    }
+
+    private boolean saveSharedSettings() {
+        String rawMcpConfigJson = mcpConfigJsonInput != null
+                ? mcpConfigJsonInput.getText().toString()
+                : "";
+        if (!McpSettingsHelper.isSharedMcpServersJsonValid(rawMcpConfigJson)) {
+            showToast(localizedText(
+                    "MCPコンフィグJSONはJSON配列で入力してください",
+                    "MCP config JSON must be a JSON array"));
+            return false;
+        }
+
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().putInt(PREF_API_PORT, resolveApiPortFromUi()).apply();
+        McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
+        return true;
+    }
     
     private void saveCurrentConfiguration() {
+        if (!saveSharedSettings()) {
+            return;
+        }
         ConfigurationManager.Configuration config = getConfigFromUI();
         
         try {
@@ -1387,15 +1425,10 @@ public class SettingsActivity extends Activity {
 
     @Override
     public void finish() {
-        // Save API port to preferences
-        int apiPort = OllamaApiServer.DEFAULT_PORT;
-        try {
-            apiPort = Integer.parseInt(apiPortInput.getText().toString());
-        } catch (NumberFormatException e) {
-            // Use default
+        if (!saveSharedSettings()) {
+            return;
         }
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putInt(PREF_API_PORT, apiPort).apply();
+        int apiPort = resolveApiPortFromUi();
         
         // Save current UI configuration before returning
         ConfigurationManager.Configuration config = getConfigFromUI();

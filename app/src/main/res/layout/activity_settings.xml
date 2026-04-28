@@ -791,6 +791,53 @@
             android:inputType="number"
             android:text="11434" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MCP Settings"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MCP Config JSON (shared):" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Shared app-wide setting. Used together with WebUI MCP settings and not tied to a model configuration."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Leave blank to rely only on WebUI MCP settings. When blank, an SSE example is shown as a hint."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/mcpConfigJsonInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:gravity="top|start"
+            android:hint=""
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:minLines="6" />
+
         <!-- Divider -->
         <View
             android:layout_width="match_parent"
