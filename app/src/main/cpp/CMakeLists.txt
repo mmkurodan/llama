@@ -35,6 +35,23 @@ set(GGML_VERSION      "0.9.11" CACHE STRING "")
 set(GGML_BUILD_COMMIT "1f34806c441f335f7d66e56fdb8ab3f5d09684e9" CACHE STRING "")
 
 # ---------------------------------------------------------
+# embedded license text for --license in common/arg.cpp
+# ---------------------------------------------------------
+include(${LLAMA_ROOT_DIR}/cmake/license.cmake)
+license_add_file("llama.cpp" "${LLAMA_ROOT_DIR}/LICENSE")
+license_add_file("cpp-httplib" "${LLAMA_ROOT_DIR}/vendor/cpp-httplib/LICENSE")
+
+file(GLOB LLAMA_EXTRA_LICENSES
+    ${LLAMA_ROOT_DIR}/licenses/LICENSE-*
+)
+
+foreach(FILE_PATH ${LLAMA_EXTRA_LICENSES})
+    get_filename_component(FILE_NAME "${FILE_PATH}" NAME)
+    string(REGEX REPLACE "^LICENSE-" "" LICENSE_NAME "${FILE_NAME}")
+    license_add_file("${LICENSE_NAME}" "${FILE_PATH}")
+endforeach()
+
+# ---------------------------------------------------------
 # build-info.cpp を生成
 # ---------------------------------------------------------
 configure_file(
@@ -152,6 +169,8 @@ add_library(
     ${LLAMA_SOURCES}
     ${GGML_SOURCES}
 )
+
+license_generate(llama_jni)
 
 # ---------------------------------------------------------
 # compile definitions
