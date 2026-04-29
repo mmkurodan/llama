@@ -836,18 +836,7 @@ final class SharedToolManager {
             if (responseCode < 200 || responseCode >= 300) {
                 throw new IOException("HTTP " + responseCode + (responseBody.isEmpty() ? "" : ": " + responseBody));
             }
-            if (!expectJsonResponse && responseBody.isEmpty()) {
-                return null;
-            }
-            if (responseBody.isEmpty()) {
-                throw new IOException("Empty MCP response");
-            }
-
-            Object parsed = new JSONTokener(responseBody).nextValue();
-            if (!(parsed instanceof JSONObject)) {
-                throw new IOException("Unexpected MCP response body");
-            }
-            return (JSONObject) parsed;
+            return parseHttpResponseBody(targetUrl, responseBody, expectJsonResponse);
         }
 
         private static String readResponseBody(HttpURLConnection connection, int responseCode) throws IOException {
@@ -865,6 +854,63 @@ final class SharedToolManager {
                 }
                 return buffer.toString(StandardCharsets.UTF_8.name()).trim();
             }
+        }
+
+        private JSONObject parseHttpResponseBody(
+                String targetUrl,
+                String responseBody,
+                boolean expectJsonResponse
+        ) throws IOException, JSONException {
+            if (responseBody.isEmpty()) {
+                if (!expectJsonResponse) {
+                    return null;
+                }
+                throw new IOException("Empty MCP response");
+            }
+
+            Object parsed;
+            try {
+                parsed = new JSONTokener(responseBody).nextValue();
+            } catch (JSONException e) {
+                if (!expectJsonResponse) {
+                    Log.d(TAG, "Ignoring non-JSON inline MCP response from " + targetUrl + ": " + abbreviateForLog(responseBody));
+                    return null;
+                }
+                throw e;
+            }
+            if (parsed instanceof JSONObject) {
+                return (JSONObject) parsed;
+            }
+            if (parsed instanceof JSONArray) {
+                JSONArray responseArray = (JSONArray) parsed;
+                if (responseArray.length() == 1) {
+                    JSONObject singleResponse = responseArray.optJSONObject(0);
+                    if (singleResponse != null) {
+                        return singleResponse;
+                    }
+                }
+                if (!expectJsonResponse) {
+                    Log.d(TAG, "Ignoring non-object MCP response array from " + targetUrl);
+                    return null;
+                }
+                throw new IOException("Unexpected MCP response array");
+            }
+            if (!expectJsonResponse) {
+                Log.d(TAG, "Ignoring non-JSON inline MCP response from " + targetUrl + ": " + abbreviateForLog(responseBody));
+                return null;
+            }
+            throw new IOException("Unexpected MCP response body");
+        }
+
+        private static String abbreviateForLog(String value) {
+            if (value == null) {
+                return "";
+            }
+            String trimmed = value.trim();
+            if (trimmed.length() <= 120) {
+                return trimmed;
+            }
+            return trimmed.substring(0, 117) + "...";
         }
 
         private void failPendingResponses(String message) {
