@@ -376,16 +376,7 @@ public class OllamaApiServer {
     }
 
     private static String serializeToolChoice(Object toolChoice) {
-        if (toolChoice == null || toolChoice == JSONObject.NULL) {
-            return null;
-        }
-        if (toolChoice instanceof JSONObject || toolChoice instanceof JSONArray) {
-            return toolChoice.toString();
-        }
-        if (toolChoice instanceof String) {
-            return JSONObject.quote((String) toolChoice);
-        }
-        return null;
+        return SharedToolManager.serializeToolChoice(toolChoice);
     }
 
     private static NativeChatCompletionResult parseNativeChatCompletionResult(String rawJson)
@@ -1119,6 +1110,9 @@ public class OllamaApiServer {
         settings.put(
                 McpSettingsHelper.WEBUI_SHARED_MCP_SERVERS_KEY,
                 McpSettingsHelper.getSharedMcpServersJson(context));
+        settings.put(
+                McpSettingsHelper.WEBUI_SHARED_FUNCTION_DEFINITIONS_KEY,
+                McpSettingsHelper.getSharedFunctionDefinitionsJson(context));
         return settings;
     }
 
@@ -1640,10 +1634,17 @@ public class OllamaApiServer {
             JSONObject request = new JSONObject(body);
             String model = request.optString("model", "default");
             JSONArray messages = request.optJSONArray("messages");
+            JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
+            boolean hasSharedToolConfig = !McpSettingsHelper.getSharedMcpServersJson(context).isEmpty()
+                    || !McpSettingsHelper.getSharedFunctionDefinitionsJson(context).isEmpty();
             
             if (messages == null || messages.length() == 0) {
                 sendErrorResponse(outputStream, 400, "No messages provided");
+                return;
+            }
+            if (request.has("tools") && tools == null) {
+                sendErrorResponse(outputStream, 400, "'tools' must be an array");
                 return;
             }
             
@@ -1703,6 +1704,27 @@ public class OllamaApiServer {
 
                 if (listener != null) {
                     listener.onGenerating(model);
+                }
+
+                if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
+                    SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                            context,
+                            modelManager.getLlama(),
+                            preparedMessages.messages,
+                            tools,
+                            customTemplate,
+                            settingsSystemPrompt,
+                            serializeToolChoice(request.opt("tool_choice")),
+                            request.optBoolean("parallel_tool_calls", false),
+                            enableThinking,
+                            preparedMessages.toMediaArray(),
+                            true,
+                            true
+                    );
+                    if (toolResult != null) {
+                        sendOllamaChatToolResponse(outputStream, model, stream, toolResult);
+                        return;
+                    }
                 }
 
                 if (stream) {
@@ -1898,6 +1920,9 @@ public class OllamaApiServer {
         } catch (InvalidMediaException e) {
             Log.e(TAG, "Invalid media in chat request", e);
             sendErrorResponse(outputStream, 400, e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Tool-enabled chat request failed", e);
+            sendErrorResponse(outputStream, 500, e.getMessage() != null ? e.getMessage() : "Tool-enabled chat failed");
         }
     }
 
@@ -1962,74 +1987,76 @@ public class OllamaApiServer {
                     return;
                 }
 
-                if (tools != null && tools.length() > 0) {
-                    JSONArray nativeMessages = prepareMessagesForNativeChat(
+                boolean hasSharedToolConfig = !McpSettingsHelper.getSharedMcpServersJson(context).isEmpty()
+                        || !McpSettingsHelper.getSharedFunctionDefinitionsJson(context).isEmpty();
+                if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
+                    SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                            context,
+                            modelManager.getLlama(),
                             preparedMessages.messages,
-                            settingsSystemPrompt
-                    );
-                    String nativeResultJson = modelManager.getLlama().generateOpenAiChatCompletion(
-                            nativeMessages.toString(),
-                            tools.toString(),
+                            tools,
                             customTemplate,
+                            settingsSystemPrompt,
                             serializeToolChoice(request.opt("tool_choice")),
                             request.optBoolean("parallel_tool_calls", false),
                             enableThinking,
-                            preparedMessages.toMediaArray()
+                            preparedMessages.toMediaArray(),
+                            true,
+                            true
                     );
-                    NativeChatCompletionResult nativeResult =
-                            parseNativeChatCompletionResult(nativeResultJson);
+                    if (toolResult != null) {
+                        if (stream) {
+                            String header = "HTTP/1.1 200 OK\r\n" +
+                                    "Content-Type: text/event-stream\r\n" +
+                                    "Cache-Control: no-cache\r\n" +
+                                    "Connection: keep-alive\r\n" +
+                                    "Access-Control-Allow-Origin: *\r\n" +
+                                    "\r\n";
+                            outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+                            outputStream.flush();
+                            sendSseEvent(outputStream, buildOpenAiRoleChunk(model).toString());
 
-                    if (stream) {
-                        String header = "HTTP/1.1 200 OK\r\n" +
-                                "Content-Type: text/event-stream\r\n" +
-                                "Cache-Control: no-cache\r\n" +
-                                "Connection: keep-alive\r\n" +
-                                "Access-Control-Allow-Origin: *\r\n" +
-                                "\r\n";
-                        outputStream.write(header.getBytes(StandardCharsets.UTF_8));
-                        outputStream.flush();
-                        sendSseEvent(outputStream, buildOpenAiRoleChunk(model).toString());
+                            if ((toolResult.content != null && !toolResult.content.isEmpty())
+                                    || (toolResult.reasoningContent != null && !toolResult.reasoningContent.isEmpty())
+                                    || (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0)) {
+                                sendSseEvent(
+                                        outputStream,
+                                        buildOpenAiStreamChunk(
+                                                model,
+                                                toolResult.content,
+                                                toolResult.reasoningContent,
+                                                buildToolCallDeltas(toolResult.toolCalls),
+                                                null
+                                        ).toString()
+                                );
+                            }
 
-                        if ((nativeResult.content != null && !nativeResult.content.isEmpty())
-                                || (nativeResult.reasoningContent != null && !nativeResult.reasoningContent.isEmpty())
-                                || (nativeResult.toolCalls != null && nativeResult.toolCalls.length() > 0)) {
                             sendSseEvent(
                                     outputStream,
                                     buildOpenAiStreamChunk(
                                             model,
-                                            nativeResult.content,
-                                            nativeResult.reasoningContent,
-                                            buildToolCallDeltas(nativeResult.toolCalls),
-                                            null
+                                            "",
+                                            null,
+                                            null,
+                                            toolResult.finishReason
+                                    ).toString()
+                            );
+                            sendSseEvent(outputStream, "[DONE]");
+                        } else {
+                            sendJsonResponse(
+                                    outputStream,
+                                    200,
+                                    buildOpenAiChatResponse(
+                                            model,
+                                            toolResult.content,
+                                            toolResult.reasoningContent,
+                                            toolResult.toolCalls,
+                                            toolResult.finishReason
                                     ).toString()
                             );
                         }
-
-                        sendSseEvent(
-                                outputStream,
-                                buildOpenAiStreamChunk(
-                                        model,
-                                        "",
-                                        null,
-                                        null,
-                                        nativeResult.finishReason
-                                ).toString()
-                        );
-                        sendSseEvent(outputStream, "[DONE]");
-                    } else {
-                        sendJsonResponse(
-                                outputStream,
-                                200,
-                                buildOpenAiChatResponse(
-                                        model,
-                                        nativeResult.content,
-                                        nativeResult.reasoningContent,
-                                        nativeResult.toolCalls,
-                                        nativeResult.finishReason
-                                ).toString()
-                        );
+                        return;
                     }
-                    return;
                 }
 
                 String modelPath = modelManager.getCurrentModelPath();
@@ -2165,9 +2192,13 @@ public class OllamaApiServer {
         } catch (InvalidMediaException e) {
             Log.e(TAG, "Invalid media in OpenAI chat request", e);
             sendOpenAiErrorResponse(outputStream, 400, e.getMessage(), "invalid_request_error");
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             Log.e(TAG, "OpenAI chat request failed", e);
-            sendOpenAiErrorResponse(outputStream, 500, e.getMessage(), "server_error");
+            sendOpenAiErrorResponse(
+                    outputStream,
+                    500,
+                    e.getMessage() != null ? e.getMessage() : "OpenAI chat request failed",
+                    "server_error");
         }
     }
 
@@ -2372,6 +2403,59 @@ public class OllamaApiServer {
 
     private JSONObject buildOpenAiChatResponse(String model, String content) throws JSONException {
         return buildOpenAiChatResponse(model, content, null, null, "stop");
+    }
+
+    private void sendOllamaChatToolResponse(
+            OutputStream outputStream,
+            String model,
+            boolean stream,
+            SharedToolManager.ChatResult toolResult
+    ) throws IOException, JSONException {
+        JSONObject chunk = buildOllamaChatResponse(model, toolResult);
+        if (!stream) {
+            sendJsonResponse(outputStream, 200, chunk.toString());
+            return;
+        }
+
+        String header = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: application/x-ndjson\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Transfer-Encoding: chunked\r\n" +
+                "\r\n";
+        outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+        outputStream.flush();
+
+        byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+        String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+        outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+        outputStream.write(chunkBytes);
+        outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        outputStream.flush();
+    }
+
+    private JSONObject buildOllamaChatResponse(
+            String model,
+            SharedToolManager.ChatResult toolResult
+    ) throws JSONException {
+        JSONObject result = new JSONObject();
+        result.put("model", model);
+        result.put("created_at", getTimestamp());
+
+        JSONObject message = new JSONObject();
+        message.put("role", "assistant");
+        message.put("content", toolResult.content != null ? toolResult.content : "");
+        if (toolResult.reasoningContent != null && !toolResult.reasoningContent.isEmpty()) {
+            message.put("reasoning_content", toolResult.reasoningContent);
+        }
+        if (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0) {
+            message.put("tool_calls", toolResult.toolCalls);
+        }
+
+        result.put("message", message);
+        result.put("done", true);
+        result.put("done_reason", toolResult.finishReason != null ? toolResult.finishReason : "stop");
+        return result;
     }
 
     private JSONObject buildOpenAiChatResponse(

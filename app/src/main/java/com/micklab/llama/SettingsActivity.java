@@ -116,6 +116,7 @@ public class SettingsActivity extends Activity {
     // API Server settings
     private EditText apiPortInput;
     private EditText mcpConfigJsonInput;
+    private EditText functionDefinitionsJsonInput;
     private TextView languageLabel;
     private Spinner languageSpinner;
     private Spinner logLevelSpinner;
@@ -258,6 +259,7 @@ public class SettingsActivity extends Activity {
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
         mcpConfigJsonInput = findViewById(R.id.mcpConfigJsonInput);
+        functionDefinitionsJsonInput = findViewById(R.id.functionDefinitionsJsonInput);
         languageLabel = findViewById(R.id.languageLabel);
         languageSpinner = findViewById(R.id.languageSpinner);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
@@ -270,6 +272,8 @@ public class SettingsActivity extends Activity {
         apiPortInput.setText(String.valueOf(savedPort));
         mcpConfigJsonInput.setText(McpSettingsHelper.getSharedMcpServersJson(this));
         mcpConfigJsonInput.setHint(McpSettingsHelper.getSharedMcpServersHint());
+        functionDefinitionsJsonInput.setText(McpSettingsHelper.getSharedFunctionDefinitionsJson(this));
+        functionDefinitionsJsonInput.setHint(McpSettingsHelper.getSharedFunctionDefinitionsHint());
         int defaultLogLevel = 2;
         int savedLogLevel = prefs.contains(PREF_LOG_LEVEL)
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
@@ -468,8 +472,7 @@ public class SettingsActivity extends Activity {
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
                 case "MCP Settings": return "MCP設定";
                 case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
-                case "Shared app-wide setting. Used together with WebUI MCP settings and not tied to a model configuration.": return "アプリ全体で共有される設定です。WebUIのMCP設定と合わせて参照され、モデル設定には紐づきません。";
-                case "Leave blank to rely only on WebUI MCP settings. When blank, an SSE example is shown as a hint.": return "空欄の場合はWebUI側のMCP設定のみを使います。空欄時はSSE設定例がヒント表示されます。";
+                case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
                 case "Log Settings": return "ログ設定";
                 case "Log Level:": return "ログレベル:";
                 case "Show License": return "ライセンス表示";
@@ -878,10 +881,20 @@ public class SettingsActivity extends Activity {
                     "MCP config JSON must be a JSON array"));
             return false;
         }
+        String rawFunctionDefinitionsJson = functionDefinitionsJsonInput != null
+                ? functionDefinitionsJsonInput.getText().toString()
+                : "";
+        if (!McpSettingsHelper.isSharedFunctionDefinitionsJsonValid(rawFunctionDefinitionsJson)) {
+            showToast(localizedText(
+                    "Function Definitions JSONはJSON配列で入力し、各要素に name を含めてください",
+                    "Function Definitions JSON must be a JSON array whose items include a name"));
+            return false;
+        }
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit().putInt(PREF_API_PORT, resolveApiPortFromUi()).apply();
         McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
+        McpSettingsHelper.saveSharedFunctionDefinitionsJson(this, rawFunctionDefinitionsJson);
         return true;
     }
     

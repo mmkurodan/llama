@@ -44,7 +44,9 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 
+import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 
@@ -324,23 +326,6 @@ public class MainActivity extends Activity {
             runOnUiThread(this::updateSettingsButtonForBusyState);
             return;
         }
-        final String chatPrompt;
-        try {
-            chatPrompt = applyPromptTemplate(userPrompt);
-        } catch (RuntimeException e) {
-            appendException("Prompt build error", e);
-            showToast("Prompt build error: " + (e.getMessage() != null ? e.getMessage() : "unknown"));
-            modelManager.release();
-            runOnUiThread(this::updateSettingsButtonForBusyState);
-            return;
-        }
-        if (!shouldContinueDirectGeneration(generationSessionId)) {
-            modelManager.release();
-            runOnUiThread(this::updateSettingsButtonForBusyState);
-            return;
-        }
-        logMaxDebugPayload("direct.prompt", chatPrompt);
-        
         runOnUiThread(() -> {
             if (!isDirectGenerationSessionActive(generationSessionId)) {
                 return;
@@ -365,6 +350,52 @@ public class MainActivity extends Activity {
             if (currentConfig != null) {
                 modelManager.applyConfiguration(currentConfig);
             }
+
+            if (!McpSettingsHelper.getSharedMcpServersJson(this).isEmpty()) {
+                SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                        this,
+                        modelManager.getLlama(),
+                        buildDirectInputMessages(userPrompt),
+                        null,
+                        currentConfig != null ? currentConfig.customChatTemplate : null,
+                        currentConfig != null ? currentConfig.systemPrompt : null,
+                        null,
+                        false,
+                        currentConfig == null || currentConfig.enableThinking,
+                        new byte[0][],
+                        false,
+                        true
+                );
+                if (toolResult != null) {
+                    final String renderedOutput;
+                    if (toolResult.content != null && !toolResult.content.isEmpty()) {
+                        renderedOutput = stripResponseMarkers(toolResult.content);
+                    } else if (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0) {
+                        renderedOutput = toolResult.toolCalls.toString();
+                    } else {
+                        renderedOutput = "";
+                    }
+                    runIfDirectGenerationSessionActive(generationSessionId, () -> {
+                        appendMessage("shared MCP generation complete");
+                        outputView.setText(renderedOutput);
+                        scrollTextViewToTop(outputView);
+                    });
+                    return;
+                }
+            }
+
+            final String chatPrompt;
+            try {
+                chatPrompt = applyPromptTemplate(userPrompt);
+            } catch (RuntimeException e) {
+                appendException("Prompt build error", e);
+                showToast("Prompt build error: " + (e.getMessage() != null ? e.getMessage() : "unknown"));
+                return;
+            }
+            if (!shouldContinueDirectGeneration(generationSessionId)) {
+                return;
+            }
+            logMaxDebugPayload("direct.prompt", chatPrompt);
 
             if (currentConfig != null && currentConfig.streaming) {
                 final StreamOutputFilter streamOutputFilter = new StreamOutputFilter();
@@ -439,6 +470,15 @@ public class MainActivity extends Activity {
             modelManager.release();
             runOnUiThread(this::updateSettingsButtonForBusyState);
         }
+    }
+
+    private JSONArray buildDirectInputMessages(String userPrompt) throws JSONException {
+        JSONArray messages = new JSONArray();
+        JSONObject userMessage = new JSONObject();
+        userMessage.put("role", "user");
+        userMessage.put("content", userPrompt);
+        messages.put(userMessage);
+        return messages;
     }
     
     private void openSettings() {
