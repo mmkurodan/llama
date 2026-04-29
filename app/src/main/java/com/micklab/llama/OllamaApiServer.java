@@ -380,8 +380,7 @@ public class OllamaApiServer {
     }
 
     private boolean hasSharedToolConfig() {
-        return !McpSettingsHelper.getSharedMcpServersJson(context).isEmpty()
-                || !McpSettingsHelper.getSharedFunctionDefinitionsJson(context).isEmpty();
+        return McpSettingsHelper.hasSharedToolConfigForNonWebUi(context);
     }
 
     private static JSONArray buildGenerateMessages(String prompt, String apiSystem) throws JSONException {

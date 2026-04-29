@@ -736,8 +736,7 @@ public class MainActivity extends Activity {
     }
     
     private boolean hasSharedToolConfig() {
-        return !McpSettingsHelper.getSharedMcpServersJson(this).isEmpty()
-                || !McpSettingsHelper.getSharedFunctionDefinitionsJson(this).isEmpty();
+        return McpSettingsHelper.hasSharedToolConfigForNonWebUi(this);
     }
 
     private String applyPromptTemplate(String userInput) {

@@ -21,6 +21,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.Switch;
@@ -117,6 +118,8 @@ public class SettingsActivity extends Activity {
     private EditText apiPortInput;
     private EditText mcpConfigJsonInput;
     private EditText functionDefinitionsJsonInput;
+    private Switch sharedMcpEnabledSwitch;
+    private Switch sharedFunctionCallingEnabledSwitch;
     private TextView languageLabel;
     private Spinner languageSpinner;
     private Spinner logLevelSpinner;
@@ -127,12 +130,14 @@ public class SettingsActivity extends Activity {
     private Button deleteConfigButton;
     private Button backButton;
     private Button cancelButton;
+    private LinearLayout settingsContentContainer;
     
     private ConfigurationManager.Configuration currentConfig;
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
+    private final List<CollapsibleSectionController> collapsibleSections = new ArrayList<>();
     
     private volatile int lastDownloadProgress = 0;
     private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
@@ -151,6 +156,17 @@ public class SettingsActivity extends Activity {
         private ImportedModelCandidate(String displayName, long sizeBytes) {
             this.displayName = displayName;
             this.sizeBytes = sizeBytes;
+        }
+    }
+
+    private static final class CollapsibleSectionController {
+        private final TextView indicatorView;
+        private final View contentView;
+        private boolean expanded;
+
+        private CollapsibleSectionController(TextView indicatorView, View contentView) {
+            this.indicatorView = indicatorView;
+            this.contentView = contentView;
         }
     }
 
@@ -260,9 +276,12 @@ public class SettingsActivity extends Activity {
         apiPortInput = findViewById(R.id.apiPortInput);
         mcpConfigJsonInput = findViewById(R.id.mcpConfigJsonInput);
         functionDefinitionsJsonInput = findViewById(R.id.functionDefinitionsJsonInput);
+        sharedMcpEnabledSwitch = findViewById(R.id.sharedMcpEnabledSwitch);
+        sharedFunctionCallingEnabledSwitch = findViewById(R.id.sharedFunctionCallingEnabledSwitch);
         languageLabel = findViewById(R.id.languageLabel);
         languageSpinner = findViewById(R.id.languageSpinner);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
+        settingsContentContainer = findViewById(R.id.settingsContentContainer);
         licenseButton = findViewById(R.id.licenseButton);
         documentsButton = findViewById(R.id.documentsButton);
         
@@ -274,6 +293,9 @@ public class SettingsActivity extends Activity {
         mcpConfigJsonInput.setHint(McpSettingsHelper.getSharedMcpServersHint());
         functionDefinitionsJsonInput.setText(McpSettingsHelper.getSharedFunctionDefinitionsJson(this));
         functionDefinitionsJsonInput.setHint(McpSettingsHelper.getSharedFunctionDefinitionsHint());
+        sharedMcpEnabledSwitch.setChecked(McpSettingsHelper.isSharedMcpEnabledOutsideWebUi(this));
+        sharedFunctionCallingEnabledSwitch.setChecked(
+                McpSettingsHelper.isSharedFunctionDefinitionsEnabledOutsideWebUi(this));
         int defaultLogLevel = 2;
         int savedLogLevel = prefs.contains(PREF_LOG_LEVEL)
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
@@ -327,6 +349,7 @@ public class SettingsActivity extends Activity {
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
+        setupCollapsibleSections();
         applyLocalizedUiText();
         updateActionButtonStateForBusy();
     }
@@ -471,6 +494,9 @@ public class SettingsActivity extends Activity {
                 case "Llama API Server": return "Llama APIサーバー";
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
                 case "MCP Settings": return "MCP設定";
+                case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
+                case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
+                case "Available only in Web UI when disabled.": return "無効時は Web UI でのみ利用されます。";
                 case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
                 case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
                 case "Log Settings": return "ログ設定";
@@ -487,6 +513,133 @@ public class SettingsActivity extends Activity {
                 default: return text;
             }
         }
+    }
+
+    private void setupCollapsibleSections() {
+        if (settingsContentContainer == null) {
+            return;
+        }
+
+        int[] headerIds = new int[]{
+                R.id.configurationManagementHeader,
+                R.id.modelSelectionHeader,
+                R.id.modelParametersHeader,
+                R.id.penaltyParametersHeader,
+                R.id.mirostatParametersHeader,
+                R.id.additionalSamplingParametersHeader,
+                R.id.dryParametersHeader,
+                R.id.outputSettingsHeader,
+                R.id.promptTemplateHeader,
+                R.id.apiServerHeader,
+                R.id.mcpSettingsHeader,
+                R.id.logSettingsHeader
+        };
+
+        List<View> originalChildren = new ArrayList<>();
+        for (int i = 0; i < settingsContentContainer.getChildCount(); i++) {
+            originalChildren.add(settingsContentContainer.getChildAt(i));
+        }
+
+        int footerStartIndex = findChildIndexById(originalChildren, R.id.licenseButton);
+        if (footerStartIndex < 0) {
+            footerStartIndex = originalChildren.size();
+        }
+
+        int[] headerIndices = new int[headerIds.length];
+        for (int i = 0; i < headerIds.length; i++) {
+            headerIndices[i] = findChildIndexById(originalChildren, headerIds[i]);
+            if (headerIndices[i] < 0) {
+                return;
+            }
+        }
+
+        settingsContentContainer.removeAllViews();
+        collapsibleSections.clear();
+
+        for (int i = 0; i < headerIds.length; i++) {
+            View headerCandidate = originalChildren.get(headerIndices[i]);
+            if (!(headerCandidate instanceof TextView)) {
+                continue;
+            }
+            TextView headerView = (TextView) headerCandidate;
+
+            int contentStart = headerIndices[i] + 1;
+            int contentEnd = (i + 1 < headerIds.length) ? headerIndices[i + 1] : footerStartIndex;
+
+            LinearLayout sectionLayout = new LinearLayout(this);
+            sectionLayout.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams sectionParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            if (i > 0) {
+                sectionParams.topMargin = dpToPx(8);
+            }
+            sectionLayout.setLayoutParams(sectionParams);
+
+            LinearLayout headerRow = new LinearLayout(this);
+            headerRow.setOrientation(LinearLayout.HORIZONTAL);
+            headerRow.setGravity(Gravity.CENTER_VERTICAL);
+            headerRow.setClickable(true);
+            headerRow.setFocusable(true);
+            headerRow.setPadding(0, dpToPx(4), 0, dpToPx(4));
+
+            headerView.setLayoutParams(new LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+            ));
+
+            TextView indicatorView = new TextView(this);
+            indicatorView.setTextSize(18f);
+            indicatorView.setPadding(dpToPx(8), 0, 0, 0);
+
+            headerRow.addView(headerView);
+            headerRow.addView(indicatorView);
+
+            LinearLayout contentLayout = new LinearLayout(this);
+            contentLayout.setOrientation(LinearLayout.VERTICAL);
+            contentLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+
+            for (int childIndex = contentStart; childIndex < contentEnd; childIndex++) {
+                contentLayout.addView(originalChildren.get(childIndex));
+            }
+
+            CollapsibleSectionController controller = new CollapsibleSectionController(indicatorView, contentLayout);
+            headerRow.setOnClickListener(v -> setSectionExpanded(controller, !controller.expanded));
+            setSectionExpanded(controller, true);
+
+            sectionLayout.addView(headerRow);
+            sectionLayout.addView(contentLayout);
+            settingsContentContainer.addView(sectionLayout);
+            collapsibleSections.add(controller);
+        }
+
+        for (int i = footerStartIndex; i < originalChildren.size(); i++) {
+            settingsContentContainer.addView(originalChildren.get(i));
+        }
+    }
+
+    private void setSectionExpanded(CollapsibleSectionController controller, boolean expanded) {
+        controller.expanded = expanded;
+        controller.contentView.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        controller.indicatorView.setText(expanded ? "v" : ">");
+    }
+
+    private int findChildIndexById(List<View> children, int id) {
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i).getId() == id) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void setupLanguageSpinner() {
@@ -895,6 +1048,12 @@ public class SettingsActivity extends Activity {
         prefs.edit().putInt(PREF_API_PORT, resolveApiPortFromUi()).apply();
         McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
         McpSettingsHelper.saveSharedFunctionDefinitionsJson(this, rawFunctionDefinitionsJson);
+        McpSettingsHelper.saveSharedMcpEnabledOutsideWebUi(
+                this,
+                sharedMcpEnabledSwitch != null && sharedMcpEnabledSwitch.isChecked());
+        McpSettingsHelper.saveSharedFunctionDefinitionsEnabledOutsideWebUi(
+                this,
+                sharedFunctionCallingEnabledSwitch != null && sharedFunctionCallingEnabledSwitch.isChecked());
         return true;
     }
     

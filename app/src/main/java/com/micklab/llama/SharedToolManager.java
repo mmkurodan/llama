@@ -273,7 +273,7 @@ final class SharedToolManager {
         }
 
         private void addSharedFunctionDefinitions(Context context) throws JSONException {
-            String rawJson = McpSettingsHelper.getSharedFunctionDefinitionsJson(context);
+            String rawJson = McpSettingsHelper.getSharedFunctionDefinitionsJsonForNonWebUi(context);
             if (rawJson.isEmpty()) {
                 return;
             }
@@ -298,7 +298,7 @@ final class SharedToolManager {
         }
 
         private void addSharedMcpTools(Context context) {
-            String rawJson = McpSettingsHelper.getSharedMcpServersJson(context);
+            String rawJson = McpSettingsHelper.getSharedMcpServersJsonForNonWebUi(context);
             if (rawJson.isEmpty()) {
                 return;
             }

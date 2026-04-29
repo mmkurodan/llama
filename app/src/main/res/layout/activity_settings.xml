@@ -6,12 +6,14 @@
     android:padding="16dp">
 
     <LinearLayout
+        android:id="@+id/settingsContentContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
         <!-- Configuration Management Section -->
         <TextView
+            android:id="@+id/configurationManagementHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Configuration Management"
@@ -96,6 +98,7 @@
 
         <!-- Model Selection Section -->
         <TextView
+            android:id="@+id/modelSelectionHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Model Selection"
@@ -159,6 +162,7 @@
 
         <!-- Model Parameters Section -->
         <TextView
+            android:id="@+id/modelParametersHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Model Parameters"
@@ -295,6 +299,7 @@
 
         <!-- Penalty Parameters Section -->
         <TextView
+            android:id="@+id/penaltyParametersHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Penalty Parameters"
@@ -367,6 +372,7 @@
 
         <!-- Mirostat Parameters Section -->
         <TextView
+            android:id="@+id/mirostatParametersHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Mirostat Parameters"
@@ -425,6 +431,7 @@
 
         <!-- Additional Sampling Parameters Section -->
         <TextView
+            android:id="@+id/additionalSamplingParametersHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Additional Sampling Parameters"
@@ -539,6 +546,7 @@
 
         <!-- DRY Parameters Section -->
         <TextView
+            android:id="@+id/dryParametersHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="DRY (Don't Repeat Yourself) Parameters"
@@ -625,6 +633,7 @@
 
         <!-- Streaming Setting Section -->
         <TextView
+            android:id="@+id/outputSettingsHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Output Settings"
@@ -661,6 +670,7 @@
 
         <!-- Prompt Template Section -->
         <TextView
+            android:id="@+id/promptTemplateHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Prompt Template"
@@ -771,6 +781,7 @@
 
         <!-- Llama API Server Section -->
         <TextView
+            android:id="@+id/apiServerHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Llama API Server"
@@ -799,12 +810,40 @@
             android:layout_marginBottom="16dp" />
 
         <TextView
+            android:id="@+id/mcpSettingsHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="MCP Settings"
             android:textSize="18sp"
             android:textStyle="bold"
             android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Enable MCP outside Web UI:" />
+
+            <Switch
+                android:id="@+id/sharedMcpEnabledSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Available only in Web UI when disabled."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -821,11 +860,39 @@
             android:inputType="textMultiLine|textNoSuggestions"
             android:minLines="6" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="12dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Enable Function Calling outside Web UI:" />
+
+            <Switch
+                android:id="@+id/sharedFunctionCallingEnabledSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Available only in Web UI when disabled."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:paddingBottom="4dp" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Function Definitions JSON (shared):"
-            android:paddingTop="12dp" />
+            android:paddingTop="8dp" />
 
         <EditText
             android:id="@+id/functionDefinitionsJsonInput"
@@ -847,6 +914,7 @@
 
         <!-- Log Settings Section -->
         <TextView
+            android:id="@+id/logSettingsHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Log Settings"

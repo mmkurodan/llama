@@ -11,6 +11,8 @@ final class McpSettingsHelper {
     static final String PREFS_NAME = "ollama_prefs";
     static final String PREF_SHARED_MCP_SERVERS_JSON = "shared_mcp_servers_json";
     static final String PREF_SHARED_FUNCTION_DEFINITIONS_JSON = "shared_function_definitions_json";
+    static final String PREF_SHARED_MCP_ENABLED = "shared_mcp_enabled";
+    static final String PREF_SHARED_FUNCTION_DEFINITIONS_ENABLED = "shared_function_definitions_enabled";
     static final String WEBUI_SHARED_MCP_SERVERS_KEY = "sharedMcpServers";
     static final String WEBUI_SHARED_FUNCTION_DEFINITIONS_KEY = "sharedFunctionDefinitions";
 
@@ -72,6 +74,45 @@ final class McpSettingsHelper {
         prefs.edit()
                 .putString(PREF_SHARED_FUNCTION_DEFINITIONS_JSON, normalizeStoredJson(rawJson))
                 .apply();
+    }
+
+    static boolean isSharedMcpEnabledOutsideWebUi(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(PREF_SHARED_MCP_ENABLED, false);
+    }
+
+    static boolean isSharedFunctionDefinitionsEnabledOutsideWebUi(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getBoolean(PREF_SHARED_FUNCTION_DEFINITIONS_ENABLED, false);
+    }
+
+    static void saveSharedMcpEnabledOutsideWebUi(Context context, boolean enabled) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit()
+                .putBoolean(PREF_SHARED_MCP_ENABLED, enabled)
+                .apply();
+    }
+
+    static void saveSharedFunctionDefinitionsEnabledOutsideWebUi(Context context, boolean enabled) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit()
+                .putBoolean(PREF_SHARED_FUNCTION_DEFINITIONS_ENABLED, enabled)
+                .apply();
+    }
+
+    static String getSharedMcpServersJsonForNonWebUi(Context context) {
+        return isSharedMcpEnabledOutsideWebUi(context) ? getSharedMcpServersJson(context) : "";
+    }
+
+    static String getSharedFunctionDefinitionsJsonForNonWebUi(Context context) {
+        return isSharedFunctionDefinitionsEnabledOutsideWebUi(context)
+                ? getSharedFunctionDefinitionsJson(context)
+                : "";
+    }
+
+    static boolean hasSharedToolConfigForNonWebUi(Context context) {
+        return !getSharedMcpServersJsonForNonWebUi(context).isEmpty()
+                || !getSharedFunctionDefinitionsJsonForNonWebUi(context).isEmpty();
     }
 
     static boolean isSharedMcpServersJsonValid(String rawJson) {
