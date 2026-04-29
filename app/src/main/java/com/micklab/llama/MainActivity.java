@@ -351,7 +351,7 @@ public class MainActivity extends Activity {
                 modelManager.applyConfiguration(currentConfig);
             }
 
-            if (!McpSettingsHelper.getSharedMcpServersJson(this).isEmpty()) {
+            if (hasSharedToolConfig()) {
                 SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
                         this,
                         modelManager.getLlama(),
@@ -363,7 +363,7 @@ public class MainActivity extends Activity {
                         false,
                         currentConfig == null || currentConfig.enableThinking,
                         new byte[0][],
-                        false,
+                        true,
                         true
                 );
                 if (toolResult != null) {
@@ -735,6 +735,11 @@ public class MainActivity extends Activity {
         return modelFile.getAbsolutePath();
     }
     
+    private boolean hasSharedToolConfig() {
+        return !McpSettingsHelper.getSharedMcpServersJson(this).isEmpty()
+                || !McpSettingsHelper.getSharedFunctionDefinitionsJson(this).isEmpty();
+    }
+
     private String applyPromptTemplate(String userInput) {
         // Use PromptTemplateManager for direct input
         String ggufChatTemplate = modelManager.getLlama().getChatTemplate();

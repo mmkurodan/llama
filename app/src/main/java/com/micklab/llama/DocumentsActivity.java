@@ -185,7 +185,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 出力設定: ストリーミング出力の有効/無効を切り替えます。\n");
         sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
         sb.append("- Llama APIサーバー: サーバーポートを指定します。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
-        sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。共有MCP設定はWebUIだけでなく、メイン画面のプロンプト入力、/api/chat、/v1/chat/completions でも利用されます。Function Definitions JSON は共通の function calling 定義としてAPI連携でも利用されます。\n");
+        sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。共有MCP設定はWebUIだけでなく、メイン画面のプロンプト入力、/api/chat、/v1/chat/completions でも利用されます。Function Definitions JSON も共通の function calling 定義として、メイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions で利用されます。\n");
         sb.append("- 表示言語: 日本語/English の表示言語を切り替えます。初回は端末設定から自動選択され、次回以降は選択が保存されます。\n");
         sb.append("- ログ設定: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
         sb.append("- ライセンス表示: ライセンス文面を表示します。\n");
@@ -242,7 +242,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- WebUIは同じポートの http://<端末IP>:<ポート>/ で利用できます。\n");
         sb.append("- アプリ設定で保存したMCPコンフィグJSONは共通設定として /props 経由でWebUIにも渡され、WebUIのローカルMCP設定と合わせて利用されます。\n");
         sb.append("- 共有MCP設定はWebUIに加えて、メイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions の内部ツール実行にも利用されます。\n");
-        sb.append("- Function Definitions JSON を設定すると、共通の function calling 定義として /api/chat、/api/generate、/v1/chat/completions に自動で追加されます。\n");
+        sb.append("- Function Definitions JSON を設定すると、共通の function calling 定義としてメイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions に自動で追加されます。\n");
         sb.append("- 同時生成は1件のみです。ビジー時は最大10件までキューに入り、最大60秒待機します。60秒超過またはキュー満杯時は503を返します。\n");
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("9. 🧭 GGUFファイルの探し方\n\n");
@@ -311,7 +311,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
         sb.append("- Llama API Server: Set the server port. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
-        sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. Shared MCP settings are used not only by the WebUI but also by the main prompt input, /api/chat, and /v1/chat/completions. Function Definitions JSON provides shared function-calling definitions for API integrations.\n");
+        sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. Shared MCP settings are used not only by the WebUI but also by the main prompt input, /api/chat, and /v1/chat/completions. Function Definitions JSON is also used as shared function-calling definitions by the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Display Language: Switch UI language between Japanese and English. On first launch it follows your device locale, and your choice is saved for later launches.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
         sb.append("- Show License: Display license text.\n");
@@ -368,7 +368,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- The WebUI is available at http://<device-ip>:<port>/ on the same port.\n");
         sb.append("- MCP config JSON saved in the app settings is exposed to the WebUI through /props as a shared setting and is used together with the WebUI's local MCP settings.\n");
         sb.append("- Shared MCP settings are also used by the main prompt input, /api/chat, /api/generate, and /v1/chat/completions for internal tool execution.\n");
-        sb.append("- Function Definitions JSON is automatically added as shared function-calling definitions for /api/chat, /api/generate, and /v1/chat/completions.\n");
+        sb.append("- Function Definitions JSON is automatically added as shared function-calling definitions for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 60 seconds; queue overflow or timeout returns 503.\n");
         sb.append("- Android 13+ may require notification permission.\n\n");
         sb.append("9. 🧭 Finding GGUF Files\n\n");
