@@ -241,8 +241,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots と WebUI の静的ファイルを提供します。\n");
         sb.append("- WebUIは同じポートの http://<端末IP>:<ポート>/ で利用できます。\n");
         sb.append("- アプリ設定で保存したMCPコンフィグJSONは共通設定として /props 経由でWebUIにも渡され、WebUIのローカルMCP設定と合わせて利用されます。\n");
-        sb.append("- 共有MCP設定はWebUIに加えて、メイン画面のプロンプト入力、/api/chat、/v1/chat/completions の内部ツール実行にも利用されます。\n");
-        sb.append("- Function Definitions JSON を設定すると、共通の function calling 定義として /api/chat と /v1/chat/completions に自動で追加されます。\n");
+        sb.append("- 共有MCP設定はWebUIに加えて、メイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions の内部ツール実行にも利用されます。\n");
+        sb.append("- Function Definitions JSON を設定すると、共通の function calling 定義として /api/chat、/api/generate、/v1/chat/completions に自動で追加されます。\n");
         sb.append("- 同時生成は1件のみです。ビジー時は最大10件までキューに入り、最大60秒待機します。60秒超過またはキュー満杯時は503を返します。\n");
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("9. 🧭 GGUFファイルの探し方\n\n");
@@ -367,8 +367,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Provides /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots, and the bundled WebUI on device.\n");
         sb.append("- The WebUI is available at http://<device-ip>:<port>/ on the same port.\n");
         sb.append("- MCP config JSON saved in the app settings is exposed to the WebUI through /props as a shared setting and is used together with the WebUI's local MCP settings.\n");
-        sb.append("- Shared MCP settings are also used by the main prompt input, /api/chat, and /v1/chat/completions for internal tool execution.\n");
-        sb.append("- Function Definitions JSON is automatically added as shared function-calling definitions for /api/chat and /v1/chat/completions.\n");
+        sb.append("- Shared MCP settings are also used by the main prompt input, /api/chat, /api/generate, and /v1/chat/completions for internal tool execution.\n");
+        sb.append("- Function Definitions JSON is automatically added as shared function-calling definitions for /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 60 seconds; queue overflow or timeout returns 503.\n");
         sb.append("- Android 13+ may require notification permission.\n\n");
         sb.append("9. 🧭 Finding GGUF Files\n\n");

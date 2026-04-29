@@ -379,6 +379,27 @@ public class OllamaApiServer {
         return SharedToolManager.serializeToolChoice(toolChoice);
     }
 
+    private boolean hasSharedToolConfig() {
+        return !McpSettingsHelper.getSharedMcpServersJson(context).isEmpty()
+                || !McpSettingsHelper.getSharedFunctionDefinitionsJson(context).isEmpty();
+    }
+
+    private static JSONArray buildGenerateMessages(String prompt, String apiSystem) throws JSONException {
+        JSONArray messages = new JSONArray();
+        if (apiSystem != null) {
+            JSONObject systemMessage = new JSONObject();
+            systemMessage.put("role", "system");
+            systemMessage.put("content", apiSystem);
+            messages.put(systemMessage);
+        }
+
+        JSONObject userMessage = new JSONObject();
+        userMessage.put("role", "user");
+        userMessage.put("content", prompt != null ? prompt : "");
+        messages.put(userMessage);
+        return messages;
+    }
+
     private static NativeChatCompletionResult parseNativeChatCompletionResult(String rawJson)
             throws JSONException {
         JSONObject json = new JSONObject(rawJson);
@@ -1396,9 +1417,15 @@ public class OllamaApiServer {
             String model = request.optString("model", "default");
             String prompt = request.optString("prompt", "");
             String apiSystem = request.optString("system", null); // Optional system from API
+            JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
+            boolean hasSharedToolConfig = hasSharedToolConfig();
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "generate request model=" + model + " stream=" + stream + " promptLen=" + prompt.length());
+            }
+            if (request.has("tools") && tools == null) {
+                sendErrorResponse(outputStream, 400, "'tools' must be an array");
+                return;
             }
             
             if (!acquireGenerationSlot(outputStream, "/api/generate")) {
@@ -1432,6 +1459,27 @@ public class OllamaApiServer {
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
                 boolean enableThinking = config == null || config.enableThinking;
                 String modelPath = modelManager.getCurrentModelPath();
+
+                if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
+                    SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                            context,
+                            modelManager.getLlama(),
+                            buildGenerateMessages(prompt, apiSystem),
+                            tools,
+                            customTemplate,
+                            settingsSystemPrompt,
+                            serializeToolChoice(request.opt("tool_choice")),
+                            request.optBoolean("parallel_tool_calls", false),
+                            enableThinking,
+                            new byte[0][],
+                            true,
+                            true
+                    );
+                    if (toolResult != null) {
+                        sendOllamaGenerateToolResponse(outputStream, model, stream, toolResult);
+                        return;
+                    }
+                }
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
                         PromptTemplateManager.buildPromptForGenerateWithSelection(
@@ -1626,6 +1674,9 @@ public class OllamaApiServer {
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in generate request", e);
             sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Tool-enabled generate request failed", e);
+            sendErrorResponse(outputStream, 500, e.getMessage() != null ? e.getMessage() : "Tool-enabled generate failed");
         }
     }
     
@@ -1636,8 +1687,7 @@ public class OllamaApiServer {
             JSONArray messages = request.optJSONArray("messages");
             JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
-            boolean hasSharedToolConfig = !McpSettingsHelper.getSharedMcpServersJson(context).isEmpty()
-                    || !McpSettingsHelper.getSharedFunctionDefinitionsJson(context).isEmpty();
+            boolean hasSharedToolConfig = hasSharedToolConfig();
             
             if (messages == null || messages.length() == 0) {
                 sendErrorResponse(outputStream, 400, "No messages provided");
@@ -1987,8 +2037,7 @@ public class OllamaApiServer {
                     return;
                 }
 
-                boolean hasSharedToolConfig = !McpSettingsHelper.getSharedMcpServersJson(context).isEmpty()
-                        || !McpSettingsHelper.getSharedFunctionDefinitionsJson(context).isEmpty();
+                boolean hasSharedToolConfig = hasSharedToolConfig();
                 if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
                     SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
                             context,
@@ -2434,6 +2483,35 @@ public class OllamaApiServer {
         outputStream.flush();
     }
 
+    private void sendOllamaGenerateToolResponse(
+            OutputStream outputStream,
+            String model,
+            boolean stream,
+            SharedToolManager.ChatResult toolResult
+    ) throws IOException, JSONException {
+        JSONObject chunk = buildOllamaGenerateResponse(model, toolResult);
+        if (!stream) {
+            sendJsonResponse(outputStream, 200, chunk.toString());
+            return;
+        }
+
+        String header = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: application/x-ndjson\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Transfer-Encoding: chunked\r\n" +
+                "\r\n";
+        outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+        outputStream.flush();
+
+        byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+        String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
+        outputStream.write(chunkSize.getBytes(StandardCharsets.UTF_8));
+        outputStream.write(chunkBytes);
+        outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        outputStream.flush();
+    }
+
     private JSONObject buildOllamaChatResponse(
             String model,
             SharedToolManager.ChatResult toolResult
@@ -2453,6 +2531,28 @@ public class OllamaApiServer {
         }
 
         result.put("message", message);
+        result.put("done", true);
+        result.put("done_reason", toolResult.finishReason != null ? toolResult.finishReason : "stop");
+        return result;
+    }
+
+    private JSONObject buildOllamaGenerateResponse(
+            String model,
+            SharedToolManager.ChatResult toolResult
+    ) throws JSONException {
+        JSONObject result = new JSONObject();
+        result.put("model", model);
+        result.put("created_at", getTimestamp());
+        result.put(
+                "response",
+                stripResponseMarkers(toolResult.content != null ? toolResult.content : "")
+        );
+        if (toolResult.reasoningContent != null && !toolResult.reasoningContent.isEmpty()) {
+            result.put("reasoning_content", toolResult.reasoningContent);
+        }
+        if (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0) {
+            result.put("tool_calls", toolResult.toolCalls);
+        }
         result.put("done", true);
         result.put("done_reason", toolResult.finishReason != null ? toolResult.finishReason : "stop");
         return result;
