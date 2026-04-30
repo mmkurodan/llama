@@ -18,8 +18,9 @@ import java.util.regex.Pattern;
  * Supports patterns like:
  * <|channel>thought ... <|tool_call>call:web_search{...}<|tool_call|>
  * 
- * Handles Gemma-4 escape sequences:
- * <|tool_call>call:get_time{format:<|"|>readable<|"|>}<|tool_call|>
+ * Handles escape sequences from various models:
+ * - Gemma-4: <|tool_call>call:get_time{format:<|"|>readable<|"|>}<|tool_call|>
+ * - Standard: <|tool_call>call:web_search{query="search term"}<|tool_call|>
  */
 class ToolCallExtractor {
     private static final String TAG = "ToolCallExtractor";
@@ -127,8 +128,8 @@ class ToolCallExtractor {
                 continue;
             }
             
-            String key = GemmaParamUtil.extractKey(pair);
-            String value = GemmaParamUtil.extractValue(pair);
+            String key = ParameterEscapeUtil.extractKey(pair);
+            String value = ParameterEscapeUtil.extractValue(pair);
             
             if (!key.isEmpty()) {
                 if (DEBUG) {
