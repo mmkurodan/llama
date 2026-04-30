@@ -71,6 +71,23 @@ final class SharedToolManager {
                 throw new IOExceptionWrappedException(error);
             }
             JSONArray toolCalls = json.optJSONArray("tool_calls");
+            
+            // If no direct tool_calls field, try to extract from thinking content
+            if ((toolCalls == null || toolCalls.length() == 0)) {
+                String reasoningContent = json.optString("reasoning_content", "");
+                String content = json.optString("content", "");
+                
+                // Try to extract from thinking log patterns
+                JSONArray extractedCalls = ToolCallExtractor.extractToolCalls(reasoningContent);
+                if (extractedCalls == null && !content.isEmpty()) {
+                    extractedCalls = ToolCallExtractor.extractToolCalls(content);
+                }
+                
+                if (extractedCalls != null) {
+                    toolCalls = extractedCalls;
+                }
+            }
+            
             return new ChatResult(
                     json.optString("content", ""),
                     json.optString("reasoning_content", null),
