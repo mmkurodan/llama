@@ -121,8 +121,11 @@ final class SharedToolManager {
 
             JSONArray conversation = prepareMessagesForNativeChat(messages, settingsSystemPrompt);
             String currentToolChoice = serializedToolChoice;
+            // Cache tool definition to avoid toString() on every turn
             String toolsJson = catalog.combinedTools.toString();
 
+            int toolExecFailures = 0;
+            
             for (int turn = 0; turn < MAX_AUTO_TOOL_TURNS; turn++) {
                 String rawResult = llama.generateOpenAiChatCompletion(
                         conversation.toString(),
@@ -134,15 +137,43 @@ final class SharedToolManager {
                         mediaFiles
                 );
                 ChatResult result = ChatResult.fromJson(rawResult);
+                
+                // Diagnostics: log tool extraction results
+                if (result.toolCalls != null && result.toolCalls.length() > 0) {
+                    Log.d(TAG, "Turn " + turn + ": Extracted " + result.toolCalls.length() + " tool calls");
+                } else {
+                    Log.d(TAG, "Turn " + turn + ": No tool calls (finish_reason=" + result.finishReason + ")");
+                }
+                
                 if (result.toolCalls == null || result.toolCalls.length() == 0 || !autoExecuteSharedTools) {
                     return result;
                 }
                 if (!catalog.canExecuteAll(result.toolCalls)) {
+                    Log.w(TAG, "Turn " + turn + ": Cannot execute all tool calls - returning result");
                     return result;
                 }
 
+                // Execute tool calls
                 appendAssistantToolCallMessage(conversation, result);
-                catalog.appendToolResults(conversation, result.toolCalls);
+                try {
+                    catalog.appendToolResults(conversation, result.toolCalls);
+                    toolExecFailures = 0; // Reset on successful execution
+                } catch (Exception e) {
+                    toolExecFailures++;
+                    Log.e(TAG, "Turn " + turn + ": Tool execution error (attempt " + toolExecFailures + ")", e);
+                    
+                    // Dump tool calls for diagnostics on first failure
+                    if (toolExecFailures == 1) {
+                        Log.e(TAG, "Tool calls dump:\n" + result.toolCalls.toString(2));
+                    }
+                    
+                    // Exit early if too many failures
+                    if (toolExecFailures >= 2) {
+                        Log.e(TAG, "Tool execution failed twice - aborting");
+                        throw e;
+                    }
+                }
+                
                 currentToolChoice = null;
             }
         }
@@ -159,7 +190,8 @@ final class SharedToolManager {
             assistantMessage.put("reasoning_content", result.reasoningContent);
         }
         if (result.toolCalls != null && result.toolCalls.length() > 0) {
-            assistantMessage.put("tool_calls", new JSONArray(result.toolCalls.toString()));
+            // Optimization: Directly use JSONArray instead of toString/parse cycle
+            assistantMessage.put("tool_calls", result.toolCalls);
         }
         conversation.put(assistantMessage);
     }
@@ -413,13 +445,20 @@ final class SharedToolManager {
 
                 ToolExecutor executor = executableTools.get(toolName);
                 String resultContent;
+                
                 if (executor == null) {
-                    resultContent = buildErrorToolContent("No executor for tool: " + toolName);
+                    String errorMsg = "No executor for tool: " + toolName;
+                    Log.w(TAG, errorMsg + " | Available tools: " + executableTools.keySet());
+                    resultContent = buildErrorToolContent(errorMsg);
                 } else {
                     try {
+                        Log.d(TAG, "Executing tool: " + toolName + " | Arguments: " + argumentsJson);
                         resultContent = executor.execute(argumentsJson);
+                        Log.d(TAG, "Tool execution succeeded: " + toolName);
                     } catch (Exception e) {
-                        Log.w(TAG, "Tool execution failed: " + toolName, e);
+                        String errorMsg = "Tool execution failed: " + toolName + " | Arguments: " + argumentsJson;
+                        Log.e(TAG, errorMsg, e);
+                        Log.e(TAG, "Tool call dump (index " + i + "): " + toolCall.toString(2));
                         resultContent = buildErrorToolContent(e.getMessage());
                     }
                 }
