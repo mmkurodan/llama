@@ -16,11 +16,11 @@ import java.util.regex.Pattern;
  * - Tool call patterns from reasoning/thinking logs
  * 
  * Supports patterns like:
- * <|channel>thought ... <|tool_call>call:web_search{...}<|tool_call|>
+ * <|channel>thought ... <|tool_call>call:web_search{...}<tool_call|>
  * 
  * Handles escape sequences from various models:
- * - Gemma-4: <|tool_call>call:get_time{format:<|"|>readable<|"|>}<|tool_call|>
- * - Standard: <|tool_call>call:web_search{query="search term"}<|tool_call|>
+ * - Gemma-4: <|tool_call>call:get_time{format:<|"|>readable<|"|>}<tool_call|>
+ * - Standard: <|tool_call>call:web_search{query="search term"}<tool_call|>
  */
 class ToolCallExtractor {
     private static final String TAG = "ToolCallExtractor";
@@ -28,12 +28,13 @@ class ToolCallExtractor {
     
     /**
      * Pattern for extracting tool calls from thinking logs:
-     * <|tool_call>call:TOOL_NAME{...}<|tool_call|>
+     * <|tool_call>call:TOOL_NAME{...}<tool_call|>
      * 
-     * This pattern is lenient to handle various closing braces and escapes.
+     * This pattern is lenient to handle multiline reasoning text, nested braces in
+     * arguments, and both Gemma/native closing marker variants.
      */
     private static final Pattern TOOL_CALL_PATTERN = 
-        Pattern.compile("<\\|tool_call>call:([a-zA-Z_][a-zA-Z0-9_]*)\\{([^}]*)\\}<\\|tool_call\\|>");
+        Pattern.compile("<\\|tool_call>call:([a-zA-Z_][a-zA-Z0-9_]*)\\{([\\s\\S]*?)\\}(?:<tool_call\\|>|<\\|tool_call\\|>)");
     
     private ToolCallExtractor() {
     }
@@ -210,7 +211,7 @@ class ToolCallExtractor {
         }
         
         // Look for thinking markers
-        Pattern thinkingPattern = Pattern.compile("<\\|channel>thought([^<]*)<\\|channel\\|>");
+        Pattern thinkingPattern = Pattern.compile("<\\|channel>thought\\s*([\\s\\S]*?)<channel\\|>");
         Matcher matcher = thinkingPattern.matcher(content);
         
         if (matcher.find()) {

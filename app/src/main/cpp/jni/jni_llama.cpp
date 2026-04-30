@@ -2507,6 +2507,9 @@ static jstring generate_openai_chat_completion_locked(
         inputs.tool_choice = tool_choice;
         inputs.parallel_tool_calls = parallel_tool_calls;
         inputs.enable_thinking = enable_thinking;
+        if (enable_thinking) {
+            inputs.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
+        }
         inputs.add_generation_prompt = true;
         inputs.use_jinja = true;
 

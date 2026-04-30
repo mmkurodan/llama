@@ -10,13 +10,15 @@ final class ResponseMarkerSanitizer {
     private static final String RAW_GENERIC_END_MARKER_PREFIX = "<end";
     // Gemma-4 uses channel markers for reasoning (thought, action, etc)
     private static final String CHANNEL_MARKER_PREFIX = "<|channel";
+    private static final String CHANNEL_END_MARKER_PREFIX = "<channel|";
 
     private static final String[] PARTIAL_MARKER_PREFIXES = {
             IM_START_MARKER_PREFIX,
             IM_END_MARKER_PREFIX,
             PIPE_GENERIC_END_MARKER_PREFIX,
             RAW_GENERIC_END_MARKER_PREFIX,
-            CHANNEL_MARKER_PREFIX
+            CHANNEL_MARKER_PREFIX,
+            CHANNEL_END_MARKER_PREFIX
     };
 
     private static final String[] REMOVABLE_MARKERS = {
@@ -26,11 +28,12 @@ final class ResponseMarkerSanitizer {
             "<|end_of_turn|>", "<|END_OF_TURN|>",
             "<|end_of_turn|", "<|END_OF_TURN|",
             "<|end_of_turn", "<|END_OF_TURN",
-            // Gemma-4 channel markers (thought, action, observation, etc)
-            "<|channel>thought|>", "<|CHANNEL>THOUGHT|>",
-            "<|channel>action|>", "<|CHANNEL>ACTION|>",
-            "<|channel>observation|>", "<|CHANNEL>OBSERVATION|>",
-            "<|channel>", "<|CHANNEL>"
+            // Gemma-4 reasoning channel markers
+            "<|channel>thought", "<|CHANNEL>THOUGHT",
+            "<|channel>action", "<|CHANNEL>ACTION",
+            "<|channel>observation", "<|CHANNEL>OBSERVATION",
+            "<|channel>", "<|CHANNEL>",
+            "<channel|>", "<CHANNEL|>", "<channel|", "<CHANNEL|>"
     };
 
     private static final int STREAMING_HOLDBACK_LENGTH = computeStreamingHoldbackLength();
