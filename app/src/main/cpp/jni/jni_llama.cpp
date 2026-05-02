@@ -339,6 +339,34 @@ static bool find_stop_sequence(const std::string& text, size_t * stop_pos, std::
     return false;
 }
 
+static void log_requested_load_params(const char * log_prefix) {
+    std::ostringstream ss;
+    ss << log_prefix
+       << ": requested load params n_ctx=" << g_n_ctx
+       << " n_threads=" << g_n_threads
+       << " n_batch=" << g_n_batch
+       << " n_gpu_layers=" << g_n_gpu_layers
+       << " temp=" << g_temp
+       << " top_p=" << g_top_p
+       << " top_k=" << g_top_k;
+    log_to_file(ss.str());
+}
+
+static std::string build_model_load_failure_message(const char * log_prefix) {
+    std::ostringstream ss;
+    ss << log_prefix
+       << ": failed to load model (possible mmap/address-space exhaustion or low_4GB fragmentation)";
+    return ss.str();
+}
+
+static std::string build_context_load_failure_message(const char * log_prefix) {
+    std::ostringstream ss;
+    ss << log_prefix
+       << ": failed to create context (n_ctx=" << g_n_ctx
+       << ", possible commit/address-space exhaustion)";
+    return ss.str();
+}
+
 static std::string summarize_registered_backends() {
     const size_t backend_count = ggml_backend_reg_count();
     std::ostringstream ss;
@@ -1281,6 +1309,9 @@ static void llama_jni_free() {
         g_current_model_path.clear();
         log_to_file("Model freed");
     }
+    g_current_mmproj_path.clear();
+    g_supports_vision = false;
+    g_supports_audio = false;
 
     llama_backend_free();
     log_to_file("Backend freed (log kept open for re-init)");
@@ -1571,6 +1602,7 @@ Java_com_micklab_llama_LlamaNative_init(
         }
 
         llama_backend_init();
+        log_requested_load_params("init");
 
         const size_t backend_count = ggml_backend_reg_count();
         log_to_file(std::string("init: backend init complete, ") + summarize_registered_backends(),
@@ -1581,6 +1613,8 @@ Java_com_micklab_llama_LlamaNative_init(
 
         llama_model_params mparams = llama_model_default_params();
         mparams.n_gpu_layers = g_n_gpu_layers;
+        mparams.use_mmap = true;
+        mparams.use_mlock = false;
 
         {
             using namespace std::chrono;
@@ -1591,10 +1625,11 @@ Java_com_micklab_llama_LlamaNative_init(
 
             std::ostringstream ss;
             if (!g_model) {
-                ss << "init: failed to load model (returned null) after "
+                const std::string hint = build_model_load_failure_message("init");
+                ss << hint << " after "
                    << ms << " ms. path_len=" << model_path.size();
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("failed to load model");
+                return env->NewStringUTF(hint.c_str());
             } else {
                 ss << "init: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1616,10 +1651,11 @@ Java_com_micklab_llama_LlamaNative_init(
 
             std::ostringstream ss;
             if (!g_ctx) {
-                ss << "init: failed to create context (returned null) after "
+                const std::string hint = build_context_load_failure_message("init");
+                ss << hint << " after "
                    << ms << " ms";
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("failed to create context");
+                return env->NewStringUTF(hint.c_str());
             } else {
                 ss << "init: context created successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1778,6 +1814,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         }
 
         llama_backend_init();
+        log_requested_load_params("initWithMmproj");
 
         const size_t backend_count = ggml_backend_reg_count();
         log_to_file(std::string("initWithMmproj: backend init complete, ") + summarize_registered_backends(),
@@ -1788,6 +1825,8 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
 
         llama_model_params mparams = llama_model_default_params();
         mparams.n_gpu_layers = g_n_gpu_layers;
+        mparams.use_mmap = true;
+        mparams.use_mlock = false;
 
         {
             using namespace std::chrono;
@@ -1798,10 +1837,11 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
 
             std::ostringstream ss;
             if (!g_model) {
-                ss << "initWithMmproj: failed to load model (returned null) after "
+                const std::string hint = build_model_load_failure_message("initWithMmproj");
+                ss << hint << " after "
                    << ms << " ms. path_len=" << model_path.size();
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("failed to load model");
+                return env->NewStringUTF(hint.c_str());
             } else {
                 ss << "initWithMmproj: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1823,10 +1863,11 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
 
             std::ostringstream ss;
             if (!g_ctx) {
-                ss << "initWithMmproj: failed to create context (returned null) after "
+                const std::string hint = build_context_load_failure_message("initWithMmproj");
+                ss << hint << " after "
                    << ms << " ms";
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("failed to create context");
+                return env->NewStringUTF(hint.c_str());
             } else {
                 ss << "initWithMmproj: context created successfully in " << ms << " ms";
                 log_to_file(ss.str());

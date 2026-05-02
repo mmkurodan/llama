@@ -2,6 +2,7 @@ package com.micklab.llama;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Debug;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -35,7 +36,6 @@ public class ModelManager {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
-    private static final int PRELOAD_N_CTX = 64;
     private static final int DEFAULT_N_CTX = 2048;
     private static final int DEFAULT_N_THREADS = 2;
     private static final int DEFAULT_N_BATCH = 16;
@@ -303,22 +303,13 @@ public class ModelManager {
 
             if (requiresModelInit) {
                 if (currentModelPath != null || modelLoaded) {
+                    clearTransientLoadReferences();
                     unloadCurrentModelLocked();
                 } else {
                     clearLoadedModelState();
                 }
 
-                applyLoadParameters(config, PRELOAD_N_CTX);
-                String preloadResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
-                if (!"ok".equals(preloadResult)) {
-                    Log.e(TAG, "Model preload failed: " + preloadResult);
-                    if (listener != null) {
-                        listener.onError("Model preload failed: " + preloadResult);
-                    }
-                    return false;
-                }
-
-                llama.free();
+                prepareForLargeModelLoad(modelPath);
                 applyLoadParameters(config, config.nCtx);
                 String initResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
                 if (!"ok".equals(initResult)) {
@@ -469,7 +460,55 @@ public class ModelManager {
         
         return result;
     }
-    
+
+    private void clearTransientLoadReferences() {
+        try {
+            llama.setTokenListener(null);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to clear token listener before model load", t);
+        }
+    }
+
+    private void prepareForLargeModelLoad(String modelPath) {
+        clearTransientLoadReferences();
+        logRuntimeMemory("Before model load", modelPath);
+
+        Runtime runtime = Runtime.getRuntime();
+        runtime.runFinalization();
+        runtime.gc();
+        System.gc();
+        System.runFinalization();
+        runtime.gc();
+
+        logRuntimeMemory("After model load cleanup", modelPath);
+    }
+
+    private void logRuntimeMemory(String phase, String modelPath) {
+        Runtime runtime = Runtime.getRuntime();
+        long javaUsed = runtime.totalMemory() - runtime.freeMemory();
+        long javaTotal = runtime.totalMemory();
+        long javaMax = runtime.maxMemory();
+        long nativeHeap = Debug.getNativeHeapAllocatedSize();
+
+        Log.i(TAG, phase
+                + " for " + new File(modelPath).getName()
+                + " | javaUsed=" + formatBytes(javaUsed)
+                + " javaTotal=" + formatBytes(javaTotal)
+                + " javaMax=" + formatBytes(javaMax)
+                + " nativeHeap=" + formatBytes(nativeHeap));
+    }
+
+    private String formatBytes(long bytes) {
+        final String[] units = {"B", "KB", "MB", "GB", "TB"};
+        double value = bytes;
+        int unitIndex = 0;
+        while (value >= 1024.0 && unitIndex < units.length - 1) {
+            value /= 1024.0;
+            unitIndex++;
+        }
+        return String.format(Locale.US, "%.1f%s", value, units[unitIndex]);
+    }
+
     /**
      * Free the model resources.
      */
