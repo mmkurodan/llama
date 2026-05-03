@@ -69,6 +69,7 @@ static volatile sig_atomic_t g_signal_log_fd = -1;
 static volatile sig_atomic_t g_signal_crash_fd = -1;
 static std::atomic<bool> g_fatal_signal_handlers_installed(false);
 static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
+static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
 
 // 設定
 static int   g_n_ctx      = 2048;
@@ -431,7 +432,7 @@ static int32_t detokenize_with_resize(
     return n_chars;
 }
 
-static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO) {
+static void log_to_file(const std::string& msg, ggml_log_level level) {
     if (!should_log(level)) return;
     std::lock_guard<std::mutex> lock(g_log_mutex);
     if (g_log_path.empty()) return;
