@@ -22,6 +22,7 @@ import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -76,8 +77,13 @@ public class ModelManager {
         void onGenerationComplete(String configName, String result);
         void onError(String error);
     }
+
+    public interface BusyStateListener {
+        void onBusyStateChanged(boolean busy);
+    }
     
     private ModelListener listener;
+    private final CopyOnWriteArrayList<BusyStateListener> busyStateListeners = new CopyOnWriteArrayList<>();
     
     private ModelManager(Context context) {
         this.context = context.getApplicationContext();
@@ -112,6 +118,21 @@ public class ModelManager {
     
     public void setListener(ModelListener listener) {
         this.listener = listener;
+    }
+
+    public void addBusyStateListener(BusyStateListener listener) {
+        if (listener == null) {
+            return;
+        }
+        busyStateListeners.addIfAbsent(listener);
+        listener.onBusyStateChanged(isBusy());
+    }
+
+    public void removeBusyStateListener(BusyStateListener listener) {
+        if (listener == null) {
+            return;
+        }
+        busyStateListeners.remove(listener);
     }
     
     public LlamaNative getLlama() {
@@ -155,23 +176,33 @@ public class ModelManager {
      * @return true if lock acquired, false if already busy
      */
     public boolean tryAcquire() {
+        boolean previousBusy;
+        boolean currentBusy;
         synchronized (stateLock) {
             if (busy.get() || resetPending || reinitializing) {
                 return false;
             }
+            previousBusy = currentBusyStateLocked();
             busy.set(true);
-            return true;
+            currentBusy = currentBusyStateLocked();
         }
+        notifyBusyStateIfChanged(previousBusy, currentBusy);
+        return true;
     }
     
     /**
      * Release the busy lock.
      */
     public void release() {
+        boolean previousBusy;
+        boolean currentBusy;
         synchronized (stateLock) {
+            previousBusy = currentBusyStateLocked();
             busy.set(false);
             stateLock.notifyAll();
+            currentBusy = currentBusyStateLocked();
         }
+        notifyBusyStateIfChanged(previousBusy, currentBusy);
     }
     
     /**
@@ -179,25 +210,35 @@ public class ModelManager {
      * This is used during model reinitialization to clear any stuck busy state.
      */
     public void resetBusy() {
+        boolean previousBusy;
+        boolean currentBusy;
         synchronized (stateLock) {
+            previousBusy = currentBusyStateLocked();
             busy.set(false);
             stateLock.notifyAll();
+            currentBusy = currentBusyStateLocked();
         }
+        notifyBusyStateIfChanged(previousBusy, currentBusy);
         Log.i(TAG, "Busy state forcefully reset");
     }
 
     public ForceReinitializeResult forceReinitializeConfiguration(String configName) {
         String resolvedConfigName = normalizeConfigName(configName);
         boolean shouldInterruptCurrentWork;
+        boolean previousBusy;
+        boolean currentBusy;
 
         synchronized (stateLock) {
             if (resetPending || reinitializing) {
                 Log.i(TAG, "Force reinitialize already pending/in progress: " + resolvedConfigName);
                 return ForceReinitializeResult.ALREADY_PENDING;
             }
+            previousBusy = currentBusyStateLocked();
             resetPending = true;
             shouldInterruptCurrentWork = busy.get();
+            currentBusy = currentBusyStateLocked();
         }
+        notifyBusyStateIfChanged(previousBusy, currentBusy);
 
         if (shouldInterruptCurrentWork) {
             Log.i(TAG, "Interrupting current model work before force reinitialize: " + resolvedConfigName);
@@ -215,18 +256,28 @@ public class ModelManager {
                         return ForceReinitializeResult.FAILED;
                     }
                 }
+                previousBusy = currentBusyStateLocked();
                 resetPending = false;
                 reinitializing = true;
+                currentBusy = currentBusyStateLocked();
             }
+            notifyBusyStateIfChanged(previousBusy, currentBusy);
 
             llama.setTokenListener(null);
             boolean success = reinitializeConfiguration(resolvedConfigName);
             return success ? ForceReinitializeResult.SUCCESS : ForceReinitializeResult.FAILED;
         } finally {
+            boolean busyChanged;
             synchronized (stateLock) {
+                previousBusy = currentBusyStateLocked();
                 resetPending = false;
                 reinitializing = false;
                 stateLock.notifyAll();
+                currentBusy = currentBusyStateLocked();
+                busyChanged = previousBusy != currentBusy;
+            }
+            if (busyChanged) {
+                notifyBusyStateListeners(currentBusy);
             }
         }
     }
@@ -509,16 +560,37 @@ public class ModelManager {
         return String.format(Locale.US, "%.1f%s", value, units[unitIndex]);
     }
 
+    private boolean currentBusyStateLocked() {
+        return busy.get() || resetPending || reinitializing;
+    }
+
+    private void notifyBusyStateIfChanged(boolean previousBusy, boolean currentBusy) {
+        if (previousBusy != currentBusy) {
+            notifyBusyStateListeners(currentBusy);
+        }
+    }
+
+    private void notifyBusyStateListeners(boolean busyState) {
+        for (BusyStateListener listener : busyStateListeners) {
+            listener.onBusyStateChanged(busyState);
+        }
+    }
+
     /**
      * Free the model resources.
      */
     public void free() {
+        boolean previousBusy;
+        boolean currentBusy;
         synchronized (stateLock) {
             if (busy.get() || resetPending || reinitializing) {
                 return;
             }
+            previousBusy = currentBusyStateLocked();
             busy.set(true);
+            currentBusy = currentBusyStateLocked();
         }
+        notifyBusyStateIfChanged(previousBusy, currentBusy);
         try {
             if (currentModelPath != null || modelLoaded) {
                 unloadCurrentModelLocked();

@@ -3,16 +3,24 @@ package com.micklab.llama;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Typeface;
+import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -36,6 +44,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,6 +126,10 @@ public class SettingsActivity extends Activity {
     
     // API Server settings
     private EditText apiPortInput;
+    private TextView apiLoopbackUrlView;
+    private LinearLayout apiWifiUrlContainer;
+    private TextView apiWifiUrlView;
+    private TextView apiWifiUrlHintView;
     private EditText mcpConfigJsonInput;
     private EditText functionDefinitionsJsonInput;
     private Switch sharedMcpEnabledSwitch;
@@ -138,16 +152,32 @@ public class SettingsActivity extends Activity {
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
     private final List<CollapsibleSectionController> collapsibleSections = new ArrayList<>();
-    
-    private volatile int lastDownloadProgress = 0;
-    private final Handler busyStateHandler = new Handler(Looper.getMainLooper());
-    private final Runnable busyStateUpdater = new Runnable() {
+    private final ModelManager.BusyStateListener busyStateListener =
+            busy -> runOnUiThread(this::updateActionButtonStateForBusy);
+    private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override
-        public void run() {
-            updateActionButtonStateForBusy();
-            busyStateHandler.postDelayed(this, 200);
+        public void onAvailable(Network network) {
+            runOnUiThread(SettingsActivity.this::updateApiServerUrlViews);
+        }
+
+        @Override
+        public void onLost(Network network) {
+            runOnUiThread(SettingsActivity.this::updateApiServerUrlViews);
+        }
+
+        @Override
+        public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+            runOnUiThread(SettingsActivity.this::updateApiServerUrlViews);
+        }
+
+        @Override
+        public void onLinkPropertiesChanged(Network network, LinkProperties linkProperties) {
+            runOnUiThread(SettingsActivity.this::updateApiServerUrlViews);
         }
     };
+    private volatile int lastDownloadProgress = 0;
+    private ConnectivityManager connectivityManager;
+    private boolean networkCallbackRegistered = false;
 
     private static final class ImportedModelCandidate {
         private final String displayName;
@@ -186,6 +216,7 @@ public class SettingsActivity extends Activity {
         modelManager = ModelManager.getInstance(this);
         
         initViews();
+        modelManager.addBusyStateListener(busyStateListener);
 
         // Register download progress listener after views are initialized to avoid NPE if native
         // code emits progress immediately.
@@ -274,6 +305,10 @@ public class SettingsActivity extends Activity {
         
         // API Server settings
         apiPortInput = findViewById(R.id.apiPortInput);
+        apiLoopbackUrlView = findViewById(R.id.apiLoopbackUrlView);
+        apiWifiUrlContainer = findViewById(R.id.apiWifiUrlContainer);
+        apiWifiUrlView = findViewById(R.id.apiWifiUrlView);
+        apiWifiUrlHintView = findViewById(R.id.apiWifiUrlHintView);
         mcpConfigJsonInput = findViewById(R.id.mcpConfigJsonInput);
         functionDefinitionsJsonInput = findViewById(R.id.functionDefinitionsJsonInput);
         sharedMcpEnabledSwitch = findViewById(R.id.sharedMcpEnabledSwitch);
@@ -284,11 +319,27 @@ public class SettingsActivity extends Activity {
         settingsContentContainer = findViewById(R.id.settingsContentContainer);
         licenseButton = findViewById(R.id.licenseButton);
         documentsButton = findViewById(R.id.documentsButton);
+        connectivityManager = getSystemService(ConnectivityManager.class);
         
         // Load saved API port
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         int savedPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         apiPortInput.setText(String.valueOf(savedPort));
+        apiPortInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                apiPortInput.setError(null);
+                updateApiServerUrlViews();
+            }
+        });
         mcpConfigJsonInput.setText(McpSettingsHelper.getSharedMcpServersJson(this));
         mcpConfigJsonInput.setHint(McpSettingsHelper.getSharedMcpServersHint());
         functionDefinitionsJsonInput.setText(McpSettingsHelper.getSharedFunctionDefinitionsJson(this));
@@ -349,8 +400,11 @@ public class SettingsActivity extends Activity {
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
+        setupApiUrlCopyTarget(apiLoopbackUrlView, localizedText("ローカルURL", "Local URL"));
+        setupApiUrlCopyTarget(apiWifiUrlView, localizedText("Wi-Fi URL", "Wi-Fi URL"));
         setupCollapsibleSections();
         applyLocalizedUiText();
+        updateApiServerUrlViews();
         updateActionButtonStateForBusy();
     }
 
@@ -493,6 +547,9 @@ public class SettingsActivity extends Activity {
                 case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
                 case "Llama API Server": return "Llama APIサーバー";
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
+                case "Local URL (tap to copy):": return "ローカルURL（タップでコピー）:";
+                case "Wi-Fi URL (tap to copy):": return "Wi-Fi URL（タップでコピー）:";
+                case "Connect to Wi-Fi to show the URL.": return "Wi-Fi接続時にURLを表示します。";
                 case "MCP Settings": return "MCP設定";
                 case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
                 case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
@@ -583,6 +640,7 @@ public class SettingsActivity extends Activity {
             headerRow.setClickable(true);
             headerRow.setFocusable(true);
             headerRow.setPadding(0, dpToPx(4), 0, dpToPx(4));
+            headerRow.setMinimumHeight(dpToPx(40));
 
             headerView.setLayoutParams(new LinearLayout.LayoutParams(
                     0,
@@ -591,11 +649,17 @@ public class SettingsActivity extends Activity {
             ));
 
             TextView indicatorView = new TextView(this);
-            indicatorView.setTextSize(18f);
-            indicatorView.setPadding(dpToPx(8), 0, 0, 0);
+            indicatorView.setLayoutParams(new LinearLayout.LayoutParams(
+                    dpToPx(28),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            ));
+            indicatorView.setGravity(Gravity.CENTER);
+            indicatorView.setTextSize(20f);
+            indicatorView.setTypeface(Typeface.DEFAULT_BOLD);
+            indicatorView.setPadding(0, 0, dpToPx(8), 0);
 
-            headerRow.addView(headerView);
             headerRow.addView(indicatorView);
+            headerRow.addView(headerView);
 
             LinearLayout contentLayout = new LinearLayout(this);
             contentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -610,7 +674,7 @@ public class SettingsActivity extends Activity {
 
             CollapsibleSectionController controller = new CollapsibleSectionController(indicatorView, contentLayout);
             headerRow.setOnClickListener(v -> setSectionExpanded(controller, !controller.expanded));
-            setSectionExpanded(controller, true);
+            setSectionExpanded(controller, !shouldDefaultCollapse(headerIds[i]));
 
             sectionLayout.addView(headerRow);
             sectionLayout.addView(contentLayout);
@@ -626,7 +690,15 @@ public class SettingsActivity extends Activity {
     private void setSectionExpanded(CollapsibleSectionController controller, boolean expanded) {
         controller.expanded = expanded;
         controller.contentView.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        controller.indicatorView.setText(expanded ? "v" : ">");
+        controller.indicatorView.setText(expanded ? "▼" : "▶");
+    }
+
+    private boolean shouldDefaultCollapse(int headerId) {
+        return headerId == R.id.modelParametersHeader
+                || headerId == R.id.penaltyParametersHeader
+                || headerId == R.id.mirostatParametersHeader
+                || headerId == R.id.additionalSamplingParametersHeader
+                || headerId == R.id.dryParametersHeader;
     }
 
     private int findChildIndexById(List<View> children, int id) {
@@ -1015,16 +1087,47 @@ public class SettingsActivity extends Activity {
     }
 
     private int resolveApiPortFromUi() {
-        int apiPort = OllamaApiServer.DEFAULT_PORT;
-        try {
-            apiPort = Integer.parseInt(apiPortInput.getText().toString());
-        } catch (NumberFormatException e) {
-            // Use default
+        Integer apiPort = parseApiPortFromUi();
+        return apiPort != null ? apiPort : OllamaApiServer.DEFAULT_PORT;
+    }
+
+    private Integer parseApiPortFromUi() {
+        if (apiPortInput == null) {
+            return null;
         }
-        return apiPort;
+        String rawPort = apiPortInput.getText().toString().trim();
+        if (rawPort.isEmpty()) {
+            return null;
+        }
+        int apiPort;
+        try {
+            apiPort = Integer.parseInt(rawPort);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        return (apiPort >= 1 && apiPort <= 65535) ? apiPort : null;
+    }
+
+    private boolean validateApiPortInput() {
+        Integer apiPort = parseApiPortFromUi();
+        if (apiPort != null) {
+            apiPortInput.setError(null);
+            return true;
+        }
+
+        String message = localizedText(
+                "1〜65535 のポート番号を入力してください",
+                "Enter a port number between 1 and 65535");
+        apiPortInput.setError(message);
+        apiPortInput.requestFocus();
+        showToast(message);
+        return false;
     }
 
     private boolean saveSharedSettings() {
+        if (!validateApiPortInput()) {
+            return false;
+        }
         String rawMcpConfigJson = mcpConfigJsonInput != null
                 ? mcpConfigJsonInput.getText().toString()
                 : "";
@@ -1055,6 +1158,136 @@ public class SettingsActivity extends Activity {
                 this,
                 sharedFunctionCallingEnabledSwitch != null && sharedFunctionCallingEnabledSwitch.isChecked());
         return true;
+    }
+
+    private void setupApiUrlCopyTarget(TextView targetView, String label) {
+        if (targetView == null) {
+            return;
+        }
+        targetView.setOnClickListener(v -> copyUrlToClipboard(targetView, label));
+    }
+
+    private void copyUrlToClipboard(TextView sourceView, String label) {
+        if (sourceView == null) {
+            return;
+        }
+        Object tag = sourceView.getTag();
+        if (!(tag instanceof String)) {
+            return;
+        }
+        String url = (String) tag;
+        if (url.isEmpty()) {
+            return;
+        }
+        ClipboardManager clipboardManager = getSystemService(ClipboardManager.class);
+        if (clipboardManager == null) {
+            showToast(localizedText("クリップボードを利用できません", "Clipboard is unavailable"));
+            return;
+        }
+        clipboardManager.setPrimaryClip(ClipData.newPlainText(label, url));
+        showToast(localizedText("コピーしました: ", "Copied: ") + url);
+    }
+
+    private void updateApiServerUrlViews() {
+        if (apiLoopbackUrlView == null || apiWifiUrlContainer == null || apiWifiUrlHintView == null) {
+            return;
+        }
+
+        Integer apiPort = parseApiPortFromUi();
+        if (apiPort == null) {
+            setCopyableUrl(apiLoopbackUrlView, localizedText(
+                    "有効なポート番号を入力するとURLを表示します",
+                    "Enter a valid port to show the server URL"), false);
+            apiWifiUrlContainer.setVisibility(View.GONE);
+            apiWifiUrlHintView.setVisibility(View.VISIBLE);
+            apiWifiUrlHintView.setText(localizedText(
+                    "有効なポート番号を入力するとWi-Fi URLを表示します",
+                    "Enter a valid port to show the Wi-Fi URL"));
+            return;
+        }
+
+        setCopyableUrl(apiLoopbackUrlView, buildServerUrl("127.0.0.1", apiPort), true);
+        String wifiIpv4Address = getActiveWifiIpv4Address();
+        if (wifiIpv4Address == null || wifiIpv4Address.isEmpty()) {
+            apiWifiUrlContainer.setVisibility(View.GONE);
+            apiWifiUrlHintView.setVisibility(View.VISIBLE);
+            apiWifiUrlHintView.setText(localizedText(
+                    "Wi-Fi接続時にURLを表示します",
+                    "Connect to Wi-Fi to show the URL."));
+            return;
+        }
+
+        apiWifiUrlContainer.setVisibility(View.VISIBLE);
+        apiWifiUrlHintView.setVisibility(View.GONE);
+        setCopyableUrl(apiWifiUrlView, buildServerUrl(wifiIpv4Address, apiPort), true);
+    }
+
+    private void setCopyableUrl(TextView targetView, String text, boolean copyEnabled) {
+        if (targetView == null) {
+            return;
+        }
+        targetView.setText(text);
+        targetView.setTag(copyEnabled ? text : null);
+        targetView.setEnabled(copyEnabled);
+        targetView.setAlpha(copyEnabled ? 1f : 0.7f);
+    }
+
+    private String buildServerUrl(String host, int port) {
+        return "http://" + host + ":" + port;
+    }
+
+    private String getActiveWifiIpv4Address() {
+        if (connectivityManager == null) {
+            return null;
+        }
+        try {
+            Network activeNetwork = connectivityManager.getActiveNetwork();
+            if (activeNetwork == null) {
+                return null;
+            }
+            NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
+            if (capabilities == null || !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                return null;
+            }
+            LinkProperties linkProperties = connectivityManager.getLinkProperties(activeNetwork);
+            if (linkProperties == null) {
+                return null;
+            }
+            for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                InetAddress address = linkAddress.getAddress();
+                if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                    return address.getHostAddress();
+                }
+            }
+        } catch (SecurityException e) {
+            Log.w(TAG, "Unable to inspect Wi-Fi network state", e);
+        }
+        return null;
+    }
+
+    private void registerNetworkCallback() {
+        if (connectivityManager == null || networkCallbackRegistered) {
+            return;
+        }
+        try {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback);
+            networkCallbackRegistered = true;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failed to register network callback", e);
+        }
+    }
+
+    private void unregisterNetworkCallback() {
+        if (connectivityManager == null || !networkCallbackRegistered) {
+            return;
+        }
+        try {
+            connectivityManager.unregisterNetworkCallback(networkCallback);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Failed to unregister network callback", e);
+        } finally {
+            networkCallbackRegistered = false;
+        }
     }
     
     private void saveCurrentConfiguration() {
@@ -1558,14 +1791,23 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        registerNetworkCallback();
         updateActionButtonStateForBusy();
-        busyStateHandler.post(busyStateUpdater);
+        updateApiServerUrlViews();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        busyStateHandler.removeCallbacks(busyStateUpdater);
+        unregisterNetworkCallback();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (modelManager != null) {
+            modelManager.removeBusyStateListener(busyStateListener);
+        }
+        super.onDestroy();
     }
 
     @Override
