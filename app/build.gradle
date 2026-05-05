@@ -5,6 +5,8 @@ plugins {
 android {
     namespace "com.micklab.llama"
     compileSdk 35
+    def prebuiltRuntimeBackendDir = file("src/main/jniLibs/arm64-v8a")
+    def hasPrebuiltRuntimeBackends = new File(prebuiltRuntimeBackendDir, "libggml-base.so").exists()
 
     buildFeatures {
         buildConfig true
@@ -28,7 +30,8 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++17"
-                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                        "-DLLAMA_ANDROID_BUILD_RUNTIME_BACKENDS=${hasPrebuiltRuntimeBackends ? "OFF" : "ON"}"
             }
         }
     }

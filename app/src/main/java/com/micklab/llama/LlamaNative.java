@@ -5,6 +5,14 @@ import android.util.Log;
 public class LlamaNative {
 
     private static final String TAG = "LlamaNative";
+    private static final String[] HEXAGON_HTP_LIBRARIES = new String[] {
+            "ggml-htp-v68",
+            "ggml-htp-v69",
+            "ggml-htp-v73",
+            "ggml-htp-v75",
+            "ggml-htp-v79",
+            "ggml-htp-v81"
+    };
     
     public interface DownloadProgressListener {
         void onProgress(int percent);
@@ -20,18 +28,52 @@ public class LlamaNative {
     }
 
     static {
-        loadOptionalLibrary("ggml-base");
-        loadOptionalLibrary("ggml-cpu");
-        loadOptionalLibrary("ggml-hexagon");
-        System.loadLibrary("llama_jni");
+        loadOptionalLibrary("ggml-base", "ggml base runtime");
+        loadOptionalLibrary("ggml-cpu", "ggml cpu runtime");
+
+        boolean hexagonLoaded = loadOptionalLibrary("ggml-hexagon", "Hexagon backend");
+        int loadedHtpLibraries = 0;
+        for (String htpLibrary : HEXAGON_HTP_LIBRARIES) {
+            if (loadOptionalLibrary(htpLibrary, "Hexagon HTP runtime")) {
+                loadedHtpLibraries++;
+            }
+        }
+
+        if (!hexagonLoaded) {
+            Log.w(TAG, "Hexagon backend library was not loaded. NPU requests will fall back to CPU until libggml-hexagon.so is bundled in the APK.");
+        } else if (loadedHtpLibraries == 0) {
+            Log.w(TAG, "Hexagon backend loaded without any libggml-htp-vXX.so runtime libraries. NPU requests will fall back to CPU.");
+        } else {
+            Log.i(TAG, "Loaded " + loadedHtpLibraries + " Hexagon HTP runtime libraries");
+        }
+
+        loadJniLibrary();
     }
 
-    private static void loadOptionalLibrary(String libraryName) {
+    private static boolean loadOptionalLibrary(String libraryName, String label) {
         try {
             System.loadLibrary(libraryName);
-            Log.i(TAG, "Loaded optional native library: " + libraryName);
+            Log.i(TAG, "Loaded " + label + ": " + libraryName);
+            return true;
         } catch (UnsatisfiedLinkError e) {
-            Log.d(TAG, "Optional native library unavailable: " + libraryName);
+            Log.d(TAG, "Optional native library unavailable: " + libraryName, e);
+            return false;
+        }
+    }
+
+    private static void loadJniLibrary() {
+        try {
+            System.loadLibrary("llama");
+            Log.i(TAG, "Loaded JNI library: llama");
+        } catch (UnsatisfiedLinkError primaryError) {
+            Log.w(TAG, "Primary JNI library name libllama.so was unavailable, trying legacy name", primaryError);
+            try {
+                System.loadLibrary("llama_jni");
+                Log.w(TAG, "Loaded legacy JNI library name: llama_jni");
+            } catch (UnsatisfiedLinkError legacyError) {
+                Log.e(TAG, "Failed to load JNI library. Expected libllama.so in the APK.", legacyError);
+                throw primaryError;
+            }
         }
     }
 
@@ -50,7 +92,12 @@ public class LlamaNative {
             int backend,
             boolean useHexagon
     );
-    public native String configureBackend(int backend, int npuDeviceCount, String nativeLibraryDir);
+    public native String configureBackend(
+            int backend,
+            int npuDeviceCount,
+            String nativeLibraryDir,
+            boolean useHexagon
+    );
     public native String generate(String prompt);
     public native String generateWithMedia(String prompt, byte[][] mediaFiles);
     public native String generateOpenAiChatCompletion(

@@ -118,9 +118,61 @@ jobs:
           name: libcurl-arm64
           path: curl/build/arm64
 
+  build-snapdragon-runtime-libs:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/snapdragon-toolchain/arm64-android:v0.3
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Snapdragon runtime libraries
+        run: |
+          set -euo pipefail
+          cd app/src/main/cpp/llama
+          cp docs/backend/snapdragon/CMakeUserPresets.json .
+          cmake --preset arm64-android-snapdragon-release -B build-snapdragon \
+            -DGGML_HEXAGON=ON \
+            -DGGML_OPENCL=ON
+          cmake --build build-snapdragon -j"$(nproc)"
+          cmake --install build-snapdragon --prefix "$GITHUB_WORKSPACE/pkg-snapdragon/llama.cpp"
+
+      - name: Stage Snapdragon runtime libraries
+        run: |
+          set -euo pipefail
+          SRC="$GITHUB_WORKSPACE/pkg-snapdragon/llama.cpp/lib"
+          DEST="$GITHUB_WORKSPACE/snapdragon-jni-libs/arm64-v8a"
+          mkdir -p "$DEST"
+
+          cp "$SRC/libggml-base.so" "$DEST/"
+          cp "$SRC/libggml-cpu.so" "$DEST/"
+          cp "$SRC/libggml-hexagon.so" "$DEST/"
+          if [ -f "$SRC/libggml-opencl.so" ]; then
+            cp "$SRC/libggml-opencl.so" "$DEST/"
+          fi
+
+          mapfile -t HTP_LIBS < <(find "$SRC" -maxdepth 1 -type f -name 'libggml-htp-v*.so' | sort)
+          if [ "${#HTP_LIBS[@]}" -eq 0 ]; then
+            echo "Hexagon HTP runtime libraries were not produced" >&2
+            exit 1
+          fi
+          cp "${HTP_LIBS[@]}" "$DEST/"
+          ls -1 "$DEST"
+
+      - name: Upload Snapdragon runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapdragon-jni-libs-arm64
+          path: snapdragon-jni-libs/arm64-v8a
+          if-no-files-found: error
+
   build-apk:
     runs-on: ubuntu-latest
-    needs: build-libcurl
+    needs:
+      - build-libcurl
+      - build-snapdragon-runtime-libs
     steps:
       - uses: actions/checkout@v4
 
@@ -143,6 +195,21 @@ jobs:
         with:
           name: libcurl-arm64
           path: app/src/main/cpp/third_party/libcurl
+
+      - name: Download Snapdragon runtime artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: snapdragon-jni-libs-arm64
+          path: snapdragon-jni-libs/arm64-v8a
+
+      - name: Bundle Snapdragon runtime libraries into jniLibs
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          rm -rf "$DEST"
+          mkdir -p "$DEST"
+          cp snapdragon-jni-libs/arm64-v8a/*.so "$DEST/"
+          ls -1 "$DEST"
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -208,11 +275,41 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
+      - name: Stage libllama.so into jniLibs
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          mapfile -t JNI_CANDIDATES < <(find app/build -type f -name 'libllama.so' | grep 'arm64-v8a' | sort || true)
+          if [ "${#JNI_CANDIDATES[@]}" -eq 0 ]; then
+            echo "libllama.so was not found in the Gradle build outputs" >&2
+            exit 1
+          fi
+
+          SELECTED_JNI_LIB=""
+          for candidate in "${JNI_CANDIDATES[@]}"; do
+            if [[ "$candidate" == *release* || "$candidate" == *Release* ]]; then
+              SELECTED_JNI_LIB="$candidate"
+            fi
+          done
+          if [ -z "$SELECTED_JNI_LIB" ]; then
+            SELECTED_JNI_LIB="${JNI_CANDIDATES[0]}"
+          fi
+
+          cp "$SELECTED_JNI_LIB" "$DEST/libllama.so"
+          ls -1 "$DEST"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libs-arm64-v8a
+          path: app/src/main/jniLibs/arm64-v8a
+          if-no-files-found: error
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4

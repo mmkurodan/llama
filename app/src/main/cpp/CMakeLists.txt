@@ -212,6 +212,7 @@ add_library(
 )
 
 license_generate(llama_jni)
+set_target_properties(llama_jni PROPERTIES OUTPUT_NAME llama)
 
 # ---------------------------------------------------------
 # compile definitions

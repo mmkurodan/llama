@@ -578,7 +578,8 @@ public class ModelManager {
         String backendStatus = llama.configureBackend(
                 backendSelection.effectiveBackend.getNativeValue(),
                 backendSelection.npuDeviceCount,
-                nativeLibraryDir
+                nativeLibraryDir,
+                backendSelection.effectiveBackend.usesHexagon()
         );
         if ("ok".equals(backendStatus)) {
             return backendSelection;
@@ -605,7 +606,8 @@ public class ModelManager {
         String cpuStatus = llama.configureBackend(
                 fallbackSelection.effectiveBackend.getNativeValue(),
                 fallbackSelection.npuDeviceCount,
-                nativeLibraryDir
+                nativeLibraryDir,
+                fallbackSelection.effectiveBackend.usesHexagon()
         );
         if (!"ok".equals(cpuStatus)) {
             throw new IllegalStateException("CPU backend configure failed: " + cpuStatus);

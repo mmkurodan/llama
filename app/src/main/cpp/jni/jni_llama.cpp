@@ -73,21 +73,36 @@ static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
 
 // 設定
-static int   g_n_ctx      = 2048;
-static int   g_n_threads  = 2;
-static int   g_n_batch    = 16;
-static float g_temp       = 0.7f;
-static float g_top_p      = 0.9f;
-static int   g_top_k      = 40;
-static int   g_n_gpu_layers = 0;
 enum inference_backend_kind {
     INFERENCE_BACKEND_CPU = 0,
     INFERENCE_BACKEND_GPU = 1,
     INFERENCE_BACKEND_NPU = 2,
 };
-static int   g_backend_kind = INFERENCE_BACKEND_CPU;
-static bool  g_use_hexagon = false;
-static int   g_npu_device_count = 4;
+
+struct inference_load_settings {
+    int   n_ctx = 2048;
+    int   n_threads = 2;
+    int   n_batch = 16;
+    float temp = 0.7f;
+    float top_p = 0.9f;
+    int   top_k = 40;
+    int   n_gpu_layers = 0;
+    int   backend_kind = INFERENCE_BACKEND_CPU;
+    bool  use_hexagon = false;
+    int   npu_device_count = 4;
+};
+
+static inference_load_settings g_inference_settings;
+static int   & g_n_ctx = g_inference_settings.n_ctx;
+static int   & g_n_threads = g_inference_settings.n_threads;
+static int   & g_n_batch = g_inference_settings.n_batch;
+static float & g_temp = g_inference_settings.temp;
+static float & g_top_p = g_inference_settings.top_p;
+static int   & g_top_k = g_inference_settings.top_k;
+static int   & g_n_gpu_layers = g_inference_settings.n_gpu_layers;
+static int   & g_backend_kind = g_inference_settings.backend_kind;
+static bool  & g_use_hexagon = g_inference_settings.use_hexagon;
+static int   & g_npu_device_count = g_inference_settings.npu_device_count;
 static std::string g_native_library_dir;
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
@@ -394,6 +409,53 @@ static std::string join_library_path(const std::string & dir, const char * file_
     return dir + "/" + file_name;
 }
 
+static std::vector<std::string> list_shared_libraries_in_dir(const std::string & dir, const char * prefix) {
+    std::vector<std::string> libraries;
+    if (dir.empty()) {
+        return libraries;
+    }
+
+    DIR * handle = opendir(dir.c_str());
+    if (handle == nullptr) {
+        return libraries;
+    }
+
+    const size_t prefix_len = prefix != nullptr ? std::strlen(prefix) : 0;
+    while (dirent * entry = readdir(handle)) {
+        const char * name = entry->d_name;
+        if (name == nullptr || name[0] == '.') {
+            continue;
+        }
+        const std::string file_name(name);
+        if (file_name.size() < 4 || file_name.compare(file_name.size() - 3, 3, ".so") != 0) {
+            continue;
+        }
+        if (prefix_len > 0 && file_name.compare(0, prefix_len, prefix) != 0) {
+            continue;
+        }
+        libraries.push_back(file_name);
+    }
+
+    closedir(handle);
+    std::sort(libraries.begin(), libraries.end());
+    return libraries;
+}
+
+static std::string join_library_names(const std::vector<std::string> & libraries) {
+    if (libraries.empty()) {
+        return "<none>";
+    }
+
+    std::ostringstream ss;
+    for (size_t i = 0; i < libraries.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+        ss << libraries[i];
+    }
+    return ss.str();
+}
+
 static void set_search_path_env(const char * name, const std::string & dir) {
     if (name == nullptr || *name == '\0' || dir.empty()) {
         return;
@@ -426,14 +488,32 @@ static std::string ensure_hexagon_backend_loaded_locked() {
     setenv("GGML_HEXAGON_NDEV", std::to_string(effective_ndev).c_str(), 1);
     set_search_path_env("ADSP_LIBRARY_PATH", g_native_library_dir);
 
+    const std::vector<std::string> ggml_libraries =
+            list_shared_libraries_in_dir(g_native_library_dir, "libggml");
+    const std::vector<std::string> htp_libraries =
+            list_shared_libraries_in_dir(g_native_library_dir, "libggml-htp-v");
+
     const std::string hexagon_backend_path = join_library_path(g_native_library_dir, "libggml-hexagon.so");
     if (!is_readable_file(hexagon_backend_path)) {
-        return std::string("missing Hexagon backend library: ") + hexagon_backend_path;
+        std::ostringstream ss;
+        ss << "missing Hexagon backend library: " << hexagon_backend_path
+           << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]";
+        return ss.str();
+    }
+    if (htp_libraries.empty()) {
+        std::ostringstream ss;
+        ss << "missing Hexagon HTP runtime libraries in " << g_native_library_dir
+           << " expected libggml-htp-vXX.so"
+           << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]";
+        return ss.str();
     }
 
     ggml_backend_reg_t reg = ggml_backend_load(hexagon_backend_path.c_str());
     if (reg == nullptr) {
-        return std::string("ggml_backend_load failed for ") + hexagon_backend_path;
+        std::ostringstream ss;
+        ss << "ggml_backend_load failed for " << hexagon_backend_path
+           << " htp_libs=[" << join_library_names(htp_libraries) << "]";
+        return ss.str();
     }
     if (ggml_backend_reg_by_name("HTP") == nullptr) {
         return "Hexagon backend loaded but HTP registry was not registered";
@@ -500,7 +580,13 @@ static std::string prepare_requested_backend_locked(const char * log_prefix) {
         return "";
     }
 
-    g_use_hexagon = true;
+    if (!g_use_hexagon) {
+        std::ostringstream ss;
+        ss << log_prefix << ": NPU backend requested without useHexagon=true";
+        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+        return "NPU backend requested without useHexagon=true";
+    }
+
     std::string err = ensure_hexagon_backend_loaded_locked();
     if (!err.empty()) {
         std::ostringstream ss;
@@ -519,10 +605,10 @@ static std::string configure_model_backend_params_locked(
         llama_model_params & mparams,
         std::vector<ggml_backend_dev_t> & selected_devices) {
     mparams.n_gpu_layers = g_n_gpu_layers;
-    mparams.use_mmap = g_backend_kind != INFERENCE_BACKEND_NPU;
+    mparams.use_mmap = !(g_backend_kind == INFERENCE_BACKEND_NPU && g_use_hexagon);
     mparams.use_mlock = false;
 
-    if (g_backend_kind != INFERENCE_BACKEND_NPU) {
+    if (g_backend_kind != INFERENCE_BACKEND_NPU || !g_use_hexagon) {
         return "";
     }
 
@@ -539,7 +625,10 @@ static std::string configure_model_backend_params_locked(
 }
 
 static void configure_context_backend_params_locked(llama_context_params & cparams) {
-    const bool accelerator_enabled = g_backend_kind != INFERENCE_BACKEND_CPU && g_n_gpu_layers != 0;
+    const bool accelerator_enabled =
+            ((g_backend_kind == INFERENCE_BACKEND_GPU) ||
+             (g_backend_kind == INFERENCE_BACKEND_NPU && g_use_hexagon))
+            && g_n_gpu_layers != 0;
     cparams.offload_kqv = accelerator_enabled;
     cparams.op_offload = accelerator_enabled;
 }
@@ -2124,17 +2213,18 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_micklab_llama_LlamaNative_configureBackend(
         JNIEnv * env, jobject,
-        jint backend, jint npuDeviceCount, jstring jNativeLibraryDir
+        jint backend, jint npuDeviceCount, jstring jNativeLibraryDir, jboolean useHexagon
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
 
     g_backend_kind = backend;
-    g_use_hexagon = backend == INFERENCE_BACKEND_NPU;
+    g_use_hexagon = useHexagon == JNI_TRUE;
     g_npu_device_count = npuDeviceCount > 0 ? npuDeviceCount : 1;
     g_native_library_dir = jNativeLibraryDir ? jstring_to_std(env, jNativeLibraryDir) : "";
 
     std::ostringstream ss;
     ss << "configureBackend: backend=" << backend_kind_name(g_backend_kind)
+       << " use_hexagon=" << (g_use_hexagon ? "true" : "false")
        << " npu_device_count=" << g_npu_device_count
        << " native_library_dir=" << (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir);
     log_to_file(ss.str());
