@@ -401,7 +401,7 @@ public class SettingsActivity extends Activity {
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
         setupApiUrlCopyTarget(apiLoopbackUrlView, localizedText("ローカルURL", "Local URL"));
-        setupApiUrlCopyTarget(apiWifiUrlView, localizedText("Wi-Fi URL", "Wi-Fi URL"));
+        setupApiUrlCopyTarget(apiWifiUrlView, localizedText("LAN URL", "LAN URL"));
         setupCollapsibleSections();
         applyLocalizedUiText();
         updateApiServerUrlViews();
@@ -548,8 +548,8 @@ public class SettingsActivity extends Activity {
                 case "Llama API Server": return "Llama APIサーバー";
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
                 case "Local URL (tap to copy):": return "ローカルURL（タップでコピー）:";
-                case "Wi-Fi URL (tap to copy):": return "Wi-Fi URL（タップでコピー）:";
-                case "Connect to Wi-Fi to show the URL.": return "Wi-Fi接続時にURLを表示します。";
+                case "LAN URL (tap to copy):": return "LAN URL（タップでコピー）:";
+                case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
                 case "MCP Settings": return "MCP設定";
                 case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
                 case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
@@ -698,7 +698,8 @@ public class SettingsActivity extends Activity {
                 || headerId == R.id.penaltyParametersHeader
                 || headerId == R.id.mirostatParametersHeader
                 || headerId == R.id.additionalSamplingParametersHeader
-                || headerId == R.id.dryParametersHeader;
+                || headerId == R.id.dryParametersHeader
+                || headerId == R.id.mcpSettingsHeader;
     }
 
     private int findChildIndexById(List<View> children, int id) {
@@ -1201,19 +1202,19 @@ public class SettingsActivity extends Activity {
             apiWifiUrlContainer.setVisibility(View.GONE);
             apiWifiUrlHintView.setVisibility(View.VISIBLE);
             apiWifiUrlHintView.setText(localizedText(
-                    "有効なポート番号を入力するとWi-Fi URLを表示します",
-                    "Enter a valid port to show the Wi-Fi URL"));
+                    "有効なポート番号を入力するとLAN URLを表示します",
+                    "Enter a valid port to show the LAN URL"));
             return;
         }
 
-        setCopyableUrl(apiLoopbackUrlView, buildServerUrl("127.0.0.1", apiPort), true);
+        setCopyableUrl(apiLoopbackUrlView, buildServerUrl("localhost", apiPort), true);
         String wifiIpv4Address = getActiveWifiIpv4Address();
         if (wifiIpv4Address == null || wifiIpv4Address.isEmpty()) {
             apiWifiUrlContainer.setVisibility(View.GONE);
             apiWifiUrlHintView.setVisibility(View.VISIBLE);
             apiWifiUrlHintView.setText(localizedText(
-                    "Wi-Fi接続時にURLを表示します",
-                    "Connect to Wi-Fi to show the URL."));
+                    "Wi-Fi接続時にLAN URLを表示します",
+                    "Connect to Wi-Fi to show the LAN URL."));
             return;
         }
 

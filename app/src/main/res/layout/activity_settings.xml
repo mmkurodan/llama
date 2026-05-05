@@ -815,7 +815,7 @@
             android:layout_height="wrap_content"
             android:background="#F5F5F5"
             android:padding="12dp"
-            android:text="http://127.0.0.1:11434"
+            android:text="http://localhost:11434"
             android:textColor="#0B57D0" />
 
         <LinearLayout
@@ -828,7 +828,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Wi-Fi URL (tap to copy):"
+                android:text="LAN URL (tap to copy):"
                 android:paddingTop="12dp"
                 android:paddingBottom="4dp" />
 
@@ -845,7 +845,7 @@
             android:id="@+id/apiWifiUrlHintView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Connect to Wi-Fi to show the URL."
+            android:text="Connect to Wi-Fi to show the LAN URL."
             android:textColor="#666666"
             android:textSize="12sp"
             android:paddingTop="8dp" />
