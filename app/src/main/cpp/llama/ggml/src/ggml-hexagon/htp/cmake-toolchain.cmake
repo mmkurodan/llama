@@ -104,6 +104,10 @@ set(PIC_SHARED_LD_FLAGS
     -G0
     -fpic
     -Wl,-Bsymbolic
+    # Match Android's 16KB page-size requirement so packaged HTP skels pass
+    # PT_LOAD alignment checks on Android 15+ devices and in CI.
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384
     -Wl,-L${TARGET_DIR_NOOS}/G0/pic
     -Wl,-L${HEXAGON_TOOLCHAIN}/Tools/target/hexagon/lib/
     -Wl,--no-threads ${WRAP_MALLOC} ${WRAP_CALLOC} ${WRAP_FREE} ${WRAP_REALLOC} ${WRAP_MEMALIGN}
