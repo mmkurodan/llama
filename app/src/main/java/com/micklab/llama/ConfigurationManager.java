@@ -72,6 +72,7 @@ public class ConfigurationManager {
         public boolean streaming;
 
         // Runtime behavior switches
+        public String backend;
         public int gpuOffloadLayers;
         public boolean enableThinking;
         
@@ -118,6 +119,7 @@ public class ConfigurationManager {
             streaming = true;
 
             // Runtime behavior defaults
+            backend = InferenceBackend.CPU.name();
             gpuOffloadLayers = 0;
             enableThinking = true;
             
@@ -175,6 +177,7 @@ public class ConfigurationManager {
             json.put("streaming", streaming);
 
             // Runtime behavior switches
+            json.put("backend", backend);
             json.put("gpuOffloadLayers", gpuOffloadLayers);
             json.put("gpuOffloadEnabled", gpuOffloadLayers != 0);
             json.put("enableThinking", enableThinking);
@@ -236,6 +239,10 @@ public class ConfigurationManager {
                 boolean enabled = json.optBoolean("gpuOffloadEnabled", false);
                 config.gpuOffloadLayers = enabled ? -1 : 0;
             }
+            config.backend = InferenceBackend.fromConfig(
+                    json.optString("backend", null),
+                    config.gpuOffloadLayers
+            ).name();
             config.enableThinking = json.optBoolean("enableThinking", true);
             
             // New prompt settings (with defaults for backward compatibility)

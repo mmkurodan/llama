@@ -211,7 +211,21 @@
             android:inputType="number"
             android:text="16" />
 
+        <TextView
+            android:id="@+id/backendLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Inference Backend:"
+            android:paddingTop="8dp" />
+
+        <Spinner
+            android:id="@+id/backendSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+
         <LinearLayout
+            android:id="@+id/gpuOffloadContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -219,10 +233,11 @@
             android:paddingTop="8dp">
 
             <TextView
+                android:id="@+id/gpuOffloadLabel"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="GPU Offload Layers:" />
+                android:text="Offload Layers (GPU/NPU):" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -246,6 +261,14 @@
                     android:gravity="center" />
             </LinearLayout>
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/backendWarningView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#B00020"
+            android:paddingTop="4dp"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="match_parent"

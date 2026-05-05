@@ -20,14 +20,37 @@ public class LlamaNative {
     }
 
     static {
+        loadOptionalLibrary("ggml-base");
+        loadOptionalLibrary("ggml-cpu");
+        loadOptionalLibrary("ggml-hexagon");
         System.loadLibrary("llama_jni");
+    }
+
+    private static void loadOptionalLibrary(String libraryName) {
+        try {
+            System.loadLibrary(libraryName);
+            Log.i(TAG, "Loaded optional native library: " + libraryName);
+        } catch (UnsatisfiedLinkError e) {
+            Log.d(TAG, "Optional native library unavailable: " + libraryName);
+        }
     }
 
     public native String download(String url, String path);
     public native void setDownloadCaBundlePath(String path);
     public native String init(String modelPath);
     public native String initWithMmproj(String modelPath, String mmprojPath);
-    public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
+    public native void setLoadParameters(
+            int nCtx,
+            int nThreads,
+            int nBatch,
+            float temp,
+            float topP,
+            int topK,
+            int nGpuLayers,
+            int backend,
+            boolean useHexagon
+    );
+    public native String configureBackend(int backend, int npuDeviceCount, String nativeLibraryDir);
     public native String generate(String prompt);
     public native String generateWithMedia(String prompt, byte[][] mediaFiles);
     public native String generateOpenAiChatCompletion(
