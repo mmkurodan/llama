@@ -162,6 +162,7 @@ public class DocumentsActivity extends Activity {
         sb.append("   ※推論中（Busy）は設定ボタンが無効化されます。処理完了後に自動で再有効化されます。\n");
         sb.append("3) モデルURLを入力するか、ローカル端末から .gguf ファイルを取り込み、「モデルを読み込む」を押してモデルを読み込みます。\n");
         sb.append("   ※ローカル取り込みのファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動して選択できます。HTTP/HTTPS URLを利用でき、HTTPSでは通常のSSL/TLS証明書検証を行います。ローカル取り込み時は設定欄にファイル名のみが保存されます。\n");
+        sb.append("   ※保存済みモデルを整理したい場合は、設定画面の「MAINTAIN MODEL」から不要なファイルを削除できます。\n");
         sb.append("4) パラメータを調整する場合は各項目を編集し「設定を保存」で保存します。\n");
         sb.append("5) 「保存して閉じる」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
         sb.append("3. メイン画面\n");
@@ -173,6 +174,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 更新: ログ表示中の内容を最新100行で再読み込みします。\n");
         sb.append("- ログ消去: ログファイルを空にします。\n");
         sb.append("- API/WebUI開始 / API/WebUI停止: APIサーバーとWebUIを同時に起動または停止します。\n");
+        sb.append("- API状態: API/WebUI の稼働状態とポート番号を表示します。\n");
         sb.append("- モデル出力: モデル応答を表示します。ログ表示中はログ本文を表示します。\n");
         sb.append("- コピー（モデル出力）: モデル出力欄の内容をクリップボードへコピーします。\n");
         sb.append("- 保存: 通常時は表示中の応答を保存し、ログ表示中はログ全文を保存します。応答が空の場合はログ全文を保存します。\n");
@@ -182,9 +184,10 @@ public class DocumentsActivity extends Activity {
         sb.append("- 設定画面: 各項目は種別ごとのセクションに分かれており、見出しをタップすると開閉できます。MCP設定セクションは初期状態で閉じています。\n");
         sb.append("- 設定管理: 設定の保存/削除/読み込みを行います。\n");
         sb.append("- モデル選択: モデルURLでの読み込みに加え、ローカル端末から .gguf ファイルを取り込めます。ファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動できます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。\n");
+        sb.append("- MAINTAIN MODEL: アプリ保存領域にあるダウンロード済み/取り込み済みモデルを一覧表示し、不要なファイルを削除できます。\n");
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
         sb.append("- 出力設定: ストリーミング出力の有効/無効を切り替えます。\n");
-        sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
+        sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。自動選択結果は下部のプレビュー欄で確認できます。\n");
         sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURLは http://localhost:ポート番号 で表示され、Wi-Fi接続中はLAN URLも表示してタップでコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
         sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。各スイッチをオフにした場合は WebUI でのみ利用され、メイン画面のプロンプト入力や /api/chat、/api/generate、/v1/chat/completions では未設定として扱われます。オンにした場合のみ、それぞれ共有MCP設定と共有 function calling 定義として利用されます。\n");
         sb.append("- 表示言語: 日本語/English の表示言語を切り替えます。初回は端末設定から自動選択され、次回以降は選択が保存されます。\n");
@@ -241,6 +244,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- アプリ起動時にローカルAPI/WebUIサーバーを有効化するかどうか確認するポップアップが表示されます。\n");
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots と WebUI の静的ファイルを提供します。\n");
         sb.append("- WebUIは同じポートの http://<端末IP>:<ポート>/ で利用できます。\n");
+        sb.append("- 設定画面の Llama API サーバー欄では Local URL と LAN URL を確認でき、どちらもタップでコピーできます。\n");
         sb.append("- アプリ設定で保存したMCPコンフィグJSONは共通設定として /props 経由でWebUIにも渡され、WebUIのローカルMCP設定と合わせて利用されます。\n");
         sb.append("- MCP の外部利用スイッチをオンにすると、共有MCP設定は WebUI に加えて、メイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions の内部ツール実行にも利用されます。オフでは WebUI のみで利用されます。\n");
         sb.append("- Function Calling の外部利用スイッチをオンにすると、Function Definitions JSON は共通の function calling 定義としてメイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions に自動で追加されます。オフでは WebUI のみで利用されます。\n");
@@ -289,6 +293,7 @@ public class DocumentsActivity extends Activity {
         sb.append("   * During inference (Busy), the Settings button is disabled and is re-enabled automatically when processing completes.\n");
         sb.append("3) Enter the model URL or import a .gguf file from the local device, then tap \"Load Model\".\n");
         sb.append("   * The local import picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Reachable HTTP/HTTPS URLs can be used. HTTPS uses normal SSL/TLS certificate verification. Imported local files are saved as filenames only in Settings.\n");
+        sb.append("   * If you want to clean up stored models later, use \"MAINTAIN MODEL\" in Settings to delete unneeded files.\n");
         sb.append("4) Edit parameters if needed and tap \"Save Config\".\n");
         sb.append("5) Tap \"SAVE & CLOSE\" to save settings and apply them to the model immediately.\n\n");
         sb.append("3. Main Screen\n");
@@ -300,6 +305,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Update: Reload the latest 100 log lines while View Log is active.\n");
         sb.append("- Clear Log: Clear the log file.\n");
         sb.append("- Start/Stop API/WebUI: Toggle the API server and WebUI together.\n");
+        sb.append("- API Status: Shows whether the API/WebUI server is running and which port it uses.\n");
         sb.append("- Model Output: Shows model responses. When View Log is active, this area shows the log body instead.\n");
         sb.append("- Copy (Model Output): Copy the content shown in the Model Output area to the clipboard.\n");
         sb.append("- Download: Save the current response in normal view, or save the full log while View Log is active. If the response area is empty, the full log is used instead.\n");
@@ -309,9 +315,10 @@ public class DocumentsActivity extends Activity {
         sb.append("- Settings screen: Controls are grouped into collapsible sections. Tap a section title to expand or collapse it. The MCP Settings section is collapsed by default.\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
         sb.append("- Model Selection: Load models from a URL or import .gguf files from the local device. The picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification.\n");
+        sb.append("- MAINTAIN MODEL: Lists downloaded/imported model files stored by the app and lets you delete files you no longer need.\n");
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
-        sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
+        sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included, and the resulting template is shown in the preview field below.\n");
         sb.append("- Llama API Server: Set the server port. The Local URL is shown as http://localhost:<port>, and while connected to Wi-Fi the LAN URL is also shown and can be tapped to copy. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
         sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. When the new switches are off, they are available only in the WebUI and are treated as absent everywhere else. When enabled, they are also used as shared MCP and function-calling settings for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Display Language: Switch UI language between Japanese and English. On first launch it follows your device locale, and your choice is saved for later launches.\n");
@@ -368,6 +375,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- On app launch, a popup asks whether to enable the local API/WebUI server, and you can check \"Don't show next time\" to skip it on future launches.\n");
         sb.append("- Provides /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots, and the bundled WebUI on device.\n");
         sb.append("- The WebUI is available at http://<device-ip>:<port>/ on the same port.\n");
+        sb.append("- The Llama API Server section in Settings shows Local URL and LAN URL, and both can be tapped to copy.\n");
         sb.append("- MCP config JSON saved in the app settings is exposed to the WebUI through /props as a shared setting and is used together with the WebUI's local MCP settings.\n");
         sb.append("- When MCP outside WebUI is enabled, shared MCP settings are also used by the main prompt input, /api/chat, /api/generate, and /v1/chat/completions for internal tool execution. When disabled, they remain WebUI-only.\n");
         sb.append("- When Function Calling outside WebUI is enabled, Function Definitions JSON is automatically added as shared function-calling definitions for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions. When disabled, it remains WebUI-only.\n");

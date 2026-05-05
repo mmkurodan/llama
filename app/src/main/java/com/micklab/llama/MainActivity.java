@@ -952,18 +952,20 @@ public class MainActivity extends Activity {
                 "[日本語]\n" +
                 "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
                 "0) 起動時にAPI/WebUI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
-                "1) SettingsでモデルをLoad Modelしてください。\n" +
-                "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
-                "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
+                "1) SettingsでモデルURLを入力するか、ローカル .gguf を取り込んで Load Model を実行してください。\n" +
+                "2) 保存済みモデルを整理したい場合は、Settings の MAINTAIN MODEL を使って不要なファイルを削除できます。\n" +
+                "3) SAVE & CLOSEでメイン画面へ戻ります。Documents から操作マニュアルとプライバシーポリシーも確認できます。\n" +
+                "4) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
                 "[English]\n" +
                 "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
                 "0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
-                "1) In Settings, load a model with Load Model.\n" +
-                "2) Tap SAVE & CLOSE to return to the main screen.\n" +
-                "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
+                "1) In Settings, enter a model URL or import a local .gguf file, then run Load Model.\n" +
+                "2) If you want to clean up stored models, use MAINTAIN MODEL in Settings to delete unneeded files.\n" +
+                "3) Tap SAVE & CLOSE to return to the main screen. You can also open Documents there to review the manual and privacy policy.\n" +
+                "4) Enter your instruction in the input field and tap Send to display the response.\n\n" +
                 "[TIPS]\n" +
-                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。\n\n" +
-                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings.");
+                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。API/WebUI を有効にした場合は、Settings の Llama API Server 欄で Local URL / LAN URL を確認してコピーできます。\n\n" +
+                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings. When API/WebUI is enabled, the Llama API Server section in Settings shows copyable Local URL and LAN URL values.");
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
