@@ -267,15 +267,40 @@ jobs:
             exit 1
           fi
 
-          DEBUG_JNI_LIB="$(find app/build/intermediates/cxx/Debug -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort | head -n 1 || true)"
+          resolve_jni_lib() {
+            local variant="$1"
+            shift
+
+            local cmake_obj="app/build/intermediates/cmake/$variant/obj/arm64-v8a/libllama.so"
+            if [ -f "$cmake_obj" ]; then
+              printf '%s\n' "$cmake_obj"
+              return 0
+            fi
+
+            local build_type
+            local candidate
+            for build_type in "$@"; do
+              candidate="$(find "app/build/intermediates/cxx/$build_type" -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort | head -n 1 || true)"
+              if [ -n "$candidate" ]; then
+                printf '%s\n' "$candidate"
+                return 0
+              fi
+            done
+
+            return 1
+          }
+
+          DEBUG_JNI_LIB="$(resolve_jni_lib debug Debug || true)"
           if [ -z "$DEBUG_JNI_LIB" ]; then
             echo "Debug libllama.so was not found in the Gradle native build outputs" >&2
+            find app/build/intermediates -maxdepth 6 -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort >&2 || true
             exit 1
           fi
 
-          RELEASE_JNI_LIB="$(find app/build/intermediates/cxx/Release -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort | head -n 1 || true)"
+          RELEASE_JNI_LIB="$(resolve_jni_lib release Release RelWithDebInfo MinSizeRel || true)"
           if [ -z "$RELEASE_JNI_LIB" ]; then
             echo "Release libllama.so was not found in the Gradle native build outputs" >&2
+            find app/build/intermediates -maxdepth 6 -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort >&2 || true
             exit 1
           fi
 
