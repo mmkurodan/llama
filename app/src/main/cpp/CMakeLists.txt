@@ -16,30 +16,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
 
 set(LLAMA_ROOT_DIR ${CMAKE_SOURCE_DIR}/llama)
 set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
-set(LLAMA_RUNTIME_GGML_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/ggml-runtime)
-
-set(LLAMA_ANDROID_HEXAGON_BACKEND_DEFAULT OFF)
-if (DEFINED ENV{HEXAGON_SDK_ROOT} AND NOT "$ENV{HEXAGON_SDK_ROOT}" STREQUAL "")
-    set(LLAMA_ANDROID_HEXAGON_BACKEND_DEFAULT ON)
-endif()
-
-option(LLAMA_ANDROID_BUILD_RUNTIME_BACKENDS
-       "Build/package ggml runtime backend libraries alongside llama_jni"
-       ON)
-option(LLAMA_ANDROID_BUILD_HEXAGON_BACKEND
-       "Build/package ggml Hexagon backend artifacts when the Hexagon SDK is available"
-       ${LLAMA_ANDROID_HEXAGON_BACKEND_DEFAULT})
-
-set(LLAMA_ANDROID_HEXAGON_RUNTIME_ENABLED OFF)
-if (LLAMA_ANDROID_BUILD_RUNTIME_BACKENDS)
-    if (LLAMA_ANDROID_BUILD_HEXAGON_BACKEND AND
-            DEFINED ENV{HEXAGON_SDK_ROOT} AND
-            NOT "$ENV{HEXAGON_SDK_ROOT}" STREQUAL "")
-        set(LLAMA_ANDROID_HEXAGON_RUNTIME_ENABLED ON)
-    elseif (LLAMA_ANDROID_BUILD_HEXAGON_BACKEND)
-        message(WARNING "Hexagon SDK not detected; building only CPU runtime backends for Android packaging")
-    endif()
-endif()
 
 # ---------------------------------------------------------
 # build-info 用の値を CMake 側で定義（テンプレートに合わせる）
@@ -182,23 +158,6 @@ set(GGML_SOURCES
 )
 
 # ---------------------------------------------------------
-# Optional ggml runtime backend libraries for Java/JNI load order
-# - Always package ggml-base / ggml-cpu when enabled
-# - Package ggml-hexagon + HTP skels only when Hexagon SDK is available
-# ---------------------------------------------------------
-if (LLAMA_ANDROID_BUILD_RUNTIME_BACKENDS)
-    set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libraries for Android runtime backends" FORCE)
-    set(GGML_BACKEND_DL ON CACHE BOOL "Enable dynamic ggml backends for Android runtime packaging" FORCE)
-    set(GGML_BUILD_TESTS OFF CACHE BOOL "Disable ggml tests in Android app build" FORCE)
-    set(GGML_BUILD_EXAMPLES OFF CACHE BOOL "Disable ggml examples in Android app build" FORCE)
-    set(GGML_OPENMP OFF CACHE BOOL "Disable OpenMP in Android app build" FORCE)
-    set(GGML_NATIVE OFF CACHE BOOL "Disable host-native tuning while cross-compiling Android backends" FORCE)
-    set(GGML_CPU ON CACHE BOOL "Build ggml CPU backend for Android runtime packaging" FORCE)
-    set(GGML_HEXAGON ${LLAMA_ANDROID_HEXAGON_RUNTIME_ENABLED} CACHE BOOL "Build ggml Hexagon backend for Android runtime packaging" FORCE)
-    add_subdirectory(${GGML_ROOT_DIR} ${LLAMA_RUNTIME_GGML_BINARY_DIR})
-endif()
-
-# ---------------------------------------------------------
 # JNI shared library
 # ---------------------------------------------------------
 add_library(
@@ -212,7 +171,6 @@ add_library(
 )
 
 license_generate(llama_jni)
-set_target_properties(llama_jni PROPERTIES OUTPUT_NAME llama)
 
 # ---------------------------------------------------------
 # compile definitions
@@ -305,46 +263,6 @@ target_link_libraries(
     dl
     atomic
 )
-
-if (LLAMA_ANDROID_BUILD_RUNTIME_BACKENDS AND TARGET ggml-base AND TARGET ggml-cpu)
-    set(LLAMA_RUNTIME_BACKEND_DEPENDENCIES
-        llama_jni
-        ggml-base
-        ggml-cpu
-    )
-    set(LLAMA_RUNTIME_BACKEND_COPY_COMMANDS
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:ggml-base>
-            $<TARGET_FILE_DIR:llama_jni>/$<TARGET_FILE_NAME:ggml-base>
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:ggml-cpu>
-            $<TARGET_FILE_DIR:llama_jni>/$<TARGET_FILE_NAME:ggml-cpu>
-    )
-
-    if (LLAMA_ANDROID_HEXAGON_RUNTIME_ENABLED AND TARGET ggml-hexagon)
-        list(APPEND LLAMA_RUNTIME_BACKEND_DEPENDENCIES ggml-hexagon)
-        list(APPEND LLAMA_RUNTIME_BACKEND_COPY_COMMANDS
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:ggml-hexagon>
-                $<TARGET_FILE_DIR:llama_jni>/$<TARGET_FILE_NAME:ggml-hexagon>
-        )
-
-        foreach(HTP_VERSION v68 v69 v73 v75 v79 v81)
-            list(APPEND LLAMA_RUNTIME_BACKEND_COPY_COMMANDS
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${LLAMA_RUNTIME_GGML_BINARY_DIR}/src/ggml-hexagon/libggml-htp-${HTP_VERSION}.so
-                    $<TARGET_FILE_DIR:llama_jni>/libggml-htp-${HTP_VERSION}.so
-            )
-        endforeach()
-    endif()
-
-    add_custom_target(
-        llama_runtime_backends ALL
-        DEPENDS ${LLAMA_RUNTIME_BACKEND_DEPENDENCIES}
-        ${LLAMA_RUNTIME_BACKEND_COPY_COMMANDS}
-        VERBATIM
-    )
-endif()
 
 if (NOT MSVC)
     target_compile_options(llama_jni PRIVATE -Wno-cast-qual)

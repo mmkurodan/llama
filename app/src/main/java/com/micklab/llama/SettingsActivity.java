@@ -63,7 +63,6 @@ public class SettingsActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
-    private static final String PREF_INFERENCE_BACKEND = "inference_backend";
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
@@ -117,12 +116,8 @@ public class SettingsActivity extends Activity {
     
     // Runtime switches
     private Switch streamingSwitch;
-    private Spinner backendSpinner;
-    private LinearLayout gpuOffloadContainer;
-    private TextView gpuOffloadLabel;
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
-    private TextView backendWarningView;
     private Switch enableThinkingSwitch;
     
     // New prompt settings
@@ -292,12 +287,8 @@ public class SettingsActivity extends Activity {
         
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
-        backendSpinner = findViewById(R.id.backendSpinner);
-        gpuOffloadContainer = findViewById(R.id.gpuOffloadContainer);
-        gpuOffloadLabel = findViewById(R.id.gpuOffloadLabel);
         gpuLayersSeekBar = findViewById(R.id.gpuLayersSeekBar);
         gpuLayersValue = findViewById(R.id.gpuLayersValue);
-        backendWarningView = findViewById(R.id.backendWarningView);
         gpuLayersSeekBar.setMax(40);
         gpuLayersSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -334,8 +325,6 @@ public class SettingsActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         int savedPort = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
         apiPortInput.setText(String.valueOf(savedPort));
-        setupBackendSpinner(InferenceBackend.fromStorage(
-                prefs.getString(PREF_INFERENCE_BACKEND, InferenceBackend.CPU.name())));
         apiPortInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -458,118 +447,6 @@ public class SettingsActivity extends Activity {
         return AppLanguageManager.isJapanese(this) ? ja : en;
     }
 
-    private void setupBackendSpinner(InferenceBackend initialBackend) {
-        if (backendSpinner == null) {
-            return;
-        }
-
-        String[] backendLabels = new String[] {
-                localizedText("CPU", "CPU"),
-                localizedText("GPU", "GPU"),
-                localizedText("NPU (Hexagon)", "NPU (Hexagon)")
-        };
-        ArrayAdapter<String> backendAdapter = new ArrayAdapter<>(
-                this,
-                android.R.layout.simple_spinner_item,
-                backendLabels
-        );
-        backendAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        backendSpinner.setAdapter(backendAdapter);
-        backendSpinner.setSelection(indexForBackend(initialBackend), false);
-        backendSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                InferenceBackend backend = backendForIndex(position);
-                if (backend.usesAccelerator() && gpuLayersSeekBar != null && gpuLayersSeekBar.getProgress() == 0) {
-                    gpuLayersSeekBar.setProgress(40);
-                }
-                persistBackendPreference(backend);
-                updateBackendUiState();
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                // No-op
-            }
-        });
-        updateBackendUiState();
-    }
-
-    private int indexForBackend(InferenceBackend backend) {
-        if (backend == InferenceBackend.GPU) {
-            return 1;
-        }
-        if (backend == InferenceBackend.NPU) {
-            return 2;
-        }
-        return 0;
-    }
-
-    private InferenceBackend backendForIndex(int index) {
-        if (index == 1) {
-            return InferenceBackend.GPU;
-        }
-        if (index == 2) {
-            return InferenceBackend.NPU;
-        }
-        return InferenceBackend.CPU;
-    }
-
-    private InferenceBackend getSelectedBackend() {
-        if (backendSpinner == null) {
-            return InferenceBackend.CPU;
-        }
-        return backendForIndex(backendSpinner.getSelectedItemPosition());
-    }
-
-    private void setSelectedBackend(InferenceBackend backend) {
-        if (backendSpinner == null) {
-            return;
-        }
-        backendSpinner.setSelection(indexForBackend(backend), false);
-        persistBackendPreference(backend);
-        updateBackendUiState();
-    }
-
-    private void persistBackendPreference(InferenceBackend backend) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putString(PREF_INFERENCE_BACKEND, backend.name()).apply();
-    }
-
-    private void updateBackendUiState() {
-        InferenceBackend backend = getSelectedBackend();
-        boolean acceleratorEnabled = backend.usesAccelerator();
-
-        if (gpuOffloadContainer != null) {
-            gpuOffloadContainer.setAlpha(acceleratorEnabled ? 1f : 0.5f);
-        }
-        if (gpuOffloadLabel != null) {
-            gpuOffloadLabel.setEnabled(acceleratorEnabled);
-        }
-        if (gpuLayersSeekBar != null) {
-            gpuLayersSeekBar.setEnabled(acceleratorEnabled);
-        }
-        if (gpuLayersValue != null) {
-            gpuLayersValue.setEnabled(acceleratorEnabled);
-        }
-        if (backend != InferenceBackend.NPU) {
-            updateBackendWarning(null);
-        }
-    }
-
-    private void updateBackendWarning(String warning) {
-        if (backendWarningView == null) {
-            return;
-        }
-        if (warning == null || warning.trim().isEmpty()) {
-            backendWarningView.setVisibility(View.GONE);
-            backendWarningView.setText("");
-            return;
-        }
-        backendWarningView.setText(warning);
-        backendWarningView.setVisibility(View.VISIBLE);
-    }
-
     private void applyLocalizedUiText() {
         setTitle(localizedText("設定", "Settings"));
         View root = findViewById(android.R.id.content);
@@ -642,8 +519,7 @@ public class SettingsActivity extends Activity {
                 case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
                 case "Threads (n_threads):": return "スレッド数 (n_threads):";
                 case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
-                case "Inference Backend:": return "推論バックエンド:";
-                case "Offload Layers (GPU/NPU):": return "オフロード層 (GPU/NPU):";
+                case "GPU Offload Layers:": return "GPUオフロード層:";
                 case "Temperature (temp):": return "温度 (temp):";
                 case "Penalty Parameters": return "ペナルティ設定";
                 case "Penalty Last N:": return "ペナルティ対象直近N:";
@@ -997,17 +873,11 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         streamingSwitch.setChecked(config.streaming);
-        setSelectedBackend(InferenceBackend.fromConfig(config.backend, config.gpuOffloadLayers));
         int layers = config.gpuOffloadLayers;
         int displayLayers = (layers < 0) ? 40 : layers;
         gpuLayersSeekBar.setProgress(displayLayers);
         gpuLayersValue.setText(String.valueOf(displayLayers > 39 ? -1 : displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
-        updateBackendWarning(
-                getSelectedBackend() == InferenceBackend.NPU && modelManager != null
-                        ? modelManager.getLastLoadWarning()
-                        : null
-        );
         
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
@@ -1206,7 +1076,6 @@ public class SettingsActivity extends Activity {
         
         // Streaming
         config.streaming = streamingSwitch.isChecked();
-        config.backend = getSelectedBackend().name();
         int progress = gpuLayersSeekBar.getProgress();
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
@@ -1280,10 +1149,7 @@ public class SettingsActivity extends Activity {
         }
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit()
-                .putInt(PREF_API_PORT, resolveApiPortFromUi())
-                .putString(PREF_INFERENCE_BACKEND, getSelectedBackend().name())
-                .apply();
+        prefs.edit().putInt(PREF_API_PORT, resolveApiPortFromUi()).apply();
         McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
         McpSettingsHelper.saveSharedFunctionDefinitionsJson(this, rawFunctionDefinitionsJson);
         McpSettingsHelper.saveSharedMcpEnabledOutsideWebUi(
@@ -1821,11 +1687,6 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> {
                     loadedModelPath = modelManager.getCurrentModelPath();
                     modelLoadedSuccessfully = success;
-                    updateBackendWarning(
-                            getSelectedBackend() == InferenceBackend.NPU
-                                    ? modelManager.getLastLoadWarning()
-                                    : null
-                    );
                     modelFileInfo.setText(success
                         ? "Model loaded: " + (loadedModelPath == null ? config.name : new File(loadedModelPath).getName())
                         : "Model load failed");
@@ -1838,11 +1699,6 @@ public class SettingsActivity extends Activity {
             } catch (Throwable t) {
                 Log.e(TAG, "Model load error", t);
                 runOnUiThread(() -> {
-                    updateBackendWarning(
-                            getSelectedBackend() == InferenceBackend.NPU
-                                    ? modelManager.getLastLoadWarning()
-                                    : null
-                    );
                     showToast("Model load error: " + t.getMessage());
                     modelFileInfo.setText("Model init failed");
                     modelProgressBar.setProgress(0);

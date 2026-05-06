@@ -22,7 +22,6 @@ public class LlamaApplication extends Application {
     public void onCreate() {
         super.onCreate();
         configureNativeLogging();
-        NativeLibraryDiagnostics.logNativeLibraryState(this, TAG);
 
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();

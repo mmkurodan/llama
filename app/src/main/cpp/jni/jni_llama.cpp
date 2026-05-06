@@ -12,7 +12,6 @@
 #include <cerrno>
 #include <cstring>
 #include <cctype>
-#include <cstdlib>
 #include <exception>
 #include <dirent.h>
 #include <signal.h>
@@ -73,39 +72,13 @@ static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
 
 // 設定
-enum inference_backend_kind {
-    INFERENCE_BACKEND_CPU = 0,
-    INFERENCE_BACKEND_GPU = 1,
-    INFERENCE_BACKEND_NPU = 2,
-};
-
-struct inference_load_settings {
-    int   n_ctx = 2048;
-    int   n_threads = 2;
-    int   n_batch = 16;
-    float temp = 0.7f;
-    float top_p = 0.9f;
-    int   top_k = 40;
-    int   n_gpu_layers = 0;
-    int   backend_kind = INFERENCE_BACKEND_CPU;
-    bool  use_hexagon = false;
-    int   npu_device_count = 4;
-};
-
-static inference_load_settings g_inference_settings;
-static int   & g_n_ctx = g_inference_settings.n_ctx;
-static int   & g_n_threads = g_inference_settings.n_threads;
-static int   & g_n_batch = g_inference_settings.n_batch;
-static float & g_temp = g_inference_settings.temp;
-static float & g_top_p = g_inference_settings.top_p;
-static int   & g_top_k = g_inference_settings.top_k;
-static int   & g_n_gpu_layers = g_inference_settings.n_gpu_layers;
-static int   & g_backend_kind = g_inference_settings.backend_kind;
-static bool  & g_use_hexagon = g_inference_settings.use_hexagon;
-static int   & g_npu_device_count = g_inference_settings.npu_device_count;
-static std::string g_native_library_dir;
-static std::string g_source_apk_path;
-static constexpr const char * PACKAGED_NATIVE_LIBRARY_ABI = "arm64-v8a";
+static int   g_n_ctx      = 2048;
+static int   g_n_threads  = 2;
+static int   g_n_batch    = 16;
+static float g_temp       = 0.7f;
+static float g_top_p      = 0.9f;
+static int   g_top_k      = 40;
+static int   g_n_gpu_layers = 0;
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
@@ -374,233 +347,23 @@ static void log_requested_load_params(const char * log_prefix) {
        << " n_threads=" << g_n_threads
        << " n_batch=" << g_n_batch
        << " n_gpu_layers=" << g_n_gpu_layers
-       << " backend=" << (g_backend_kind == INFERENCE_BACKEND_GPU ? "GPU"
-                             : g_backend_kind == INFERENCE_BACKEND_NPU ? "NPU" : "CPU")
-       << " use_hexagon=" << (g_use_hexagon ? "true" : "false")
-       << " npu_device_count=" << g_npu_device_count
        << " temp=" << g_temp
        << " top_p=" << g_top_p
        << " top_k=" << g_top_k;
     log_to_file(ss.str());
 }
 
-static const char * backend_kind_name(int backend_kind) {
-    switch (backend_kind) {
-        case INFERENCE_BACKEND_GPU:
-            return "GPU";
-        case INFERENCE_BACKEND_NPU:
-            return "NPU";
-        case INFERENCE_BACKEND_CPU:
-        default:
-            return "CPU";
-    }
-}
-
-static bool is_readable_file(const std::string & path) {
-    struct stat st = {};
-    return !path.empty() && stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
-}
-
-static std::string join_library_path(const std::string & dir, const char * file_name) {
-    if (dir.empty() || file_name == nullptr || *file_name == '\0') {
-        return "";
-    }
-    if (dir.back() == '/') {
-        return dir + file_name;
-    }
-    return dir + "/" + file_name;
-}
-
-static std::string join_apk_library_path(
-        const std::string & apk_path,
-        const char * abi_dir,
-        const char * file_name) {
-    if (apk_path.empty() || abi_dir == nullptr || *abi_dir == '\0' || file_name == nullptr || *file_name == '\0') {
-        return "";
-    }
-    return apk_path + "!/lib/" + abi_dir + "/" + file_name;
-}
-
-static void append_unique_string(std::vector<std::string> & values, const std::string & value) {
-    if (value.empty()) {
-        return;
-    }
-    if (std::find(values.begin(), values.end(), value) == values.end()) {
-        values.push_back(value);
-    }
-}
-
-static std::string join_string_values(const std::vector<std::string> & values) {
-    if (values.empty()) {
-        return "<none>";
-    }
-
-    std::ostringstream ss;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
-        ss << values[i];
-    }
-    return ss.str();
-}
-
-static std::vector<std::string> build_library_load_candidates(const char * file_name) {
-    std::vector<std::string> candidates;
-    append_unique_string(candidates, join_library_path(g_native_library_dir, file_name));
-    append_unique_string(candidates, join_apk_library_path(g_source_apk_path, PACKAGED_NATIVE_LIBRARY_ABI, file_name));
-    return candidates;
-}
-
-static std::vector<std::string> list_shared_libraries_in_dir(const std::string & dir, const char * prefix) {
-    std::vector<std::string> libraries;
-    if (dir.empty()) {
-        return libraries;
-    }
-
-    DIR * handle = opendir(dir.c_str());
-    if (handle == nullptr) {
-        return libraries;
-    }
-
-    const size_t prefix_len = prefix != nullptr ? std::strlen(prefix) : 0;
-    while (dirent * entry = readdir(handle)) {
-        const char * name = entry->d_name;
-        if (name == nullptr || name[0] == '.') {
-            continue;
-        }
-        const std::string file_name(name);
-        if (file_name.size() < 4 || file_name.compare(file_name.size() - 3, 3, ".so") != 0) {
-            continue;
-        }
-        if (prefix_len > 0 && file_name.compare(0, prefix_len, prefix) != 0) {
-            continue;
-        }
-        libraries.push_back(file_name);
-    }
-
-    closedir(handle);
-    std::sort(libraries.begin(), libraries.end());
-    return libraries;
-}
-
-static std::string join_library_names(const std::vector<std::string> & libraries) {
-    return join_string_values(libraries);
-}
-
-static void set_search_path_env(const char * name, const std::string & dir) {
-    if (name == nullptr || *name == '\0' || dir.empty()) {
-        return;
-    }
-    const char * existing = getenv(name);
-    std::string value;
-    if (existing == nullptr || *existing == '\0') {
-        value = dir;
-    } else {
-        std::string existing_str(existing);
-        if (existing_str.find(dir) != std::string::npos) {
-            value = existing_str;
-        } else {
-            value = dir + ":" + existing_str;
-        }
-    }
-    setenv(name, value.c_str(), 1);
-    log_to_file(std::string("backend-env: ") + name + "=" + value);
-}
-
-static std::string ensure_hexagon_backend_loaded_locked() {
-    if (ggml_backend_reg_by_name("HTP") != nullptr) {
-        return "";
-    }
-    if (g_native_library_dir.empty() && g_source_apk_path.empty()) {
-        return "nativeLibraryDir and sourceApkPath are empty";
-    }
-
-    const int effective_ndev = g_npu_device_count > 0 ? g_npu_device_count : 1;
-    setenv("GGML_HEXAGON_NDEV", std::to_string(effective_ndev).c_str(), 1);
-    set_search_path_env("ADSP_LIBRARY_PATH", g_native_library_dir);
-
-    const std::vector<std::string> ggml_libraries =
-            list_shared_libraries_in_dir(g_native_library_dir, "libggml");
-    const std::vector<std::string> htp_libraries =
-            list_shared_libraries_in_dir(g_native_library_dir, "libggml-htp-v");
-    const std::vector<std::string> backend_candidates =
-            build_library_load_candidates("libggml-hexagon.so");
-
-    const std::string hexagon_backend_path = join_library_path(g_native_library_dir, "libggml-hexagon.so");
-    if (!is_readable_file(hexagon_backend_path) && backend_candidates.empty()) {
-        std::ostringstream ss;
-        ss << "missing Hexagon backend library: " << hexagon_backend_path
-           << " source_apk_path=" << (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path)
-           << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]";
-        return ss.str();
-    }
-
-    if (!is_readable_file(hexagon_backend_path)) {
-        log_to_file(
-                std::string("Hexagon backend library not visible in nativeLibraryDir; load_candidates=[")
-                + join_string_values(backend_candidates)
-                + "]",
-                GGML_LOG_LEVEL_WARN);
-    }
-    if (htp_libraries.empty()) {
-        log_to_file(
-                std::string("Hexagon HTP runtime libraries are not visible in nativeLibraryDir=")
-                + (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir)
-                + " source_apk_path=" + (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path),
-                GGML_LOG_LEVEL_WARN);
-    }
-
-    std::vector<std::string> load_failures;
-    for (const std::string & candidate : backend_candidates) {
-        ggml_backend_reg_t reg = ggml_backend_load(candidate.c_str());
-        if (reg == nullptr) {
-            load_failures.push_back(candidate + " -> load failed");
-            continue;
-        }
-        if (ggml_backend_reg_by_name("HTP") != nullptr) {
-            return "";
-        }
-        load_failures.push_back(candidate + " -> loaded without HTP registry");
-    }
-
-    std::ostringstream ss;
-    ss << "ggml_backend_load failed for candidates=[" << join_string_values(backend_candidates) << "]"
-       << " failures=[" << join_string_values(load_failures) << "]"
-       << " native_library_dir=" << (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir)
-       << " source_apk_path=" << (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path)
-       << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]"
-       << " htp_libs=[" << join_library_names(htp_libraries) << "]";
-    return ss.str();
-}
-
-static std::vector<ggml_backend_dev_t> collect_hexagon_devices_locked() {
-    std::vector<ggml_backend_dev_t> devices;
-    const int requested_devices = g_npu_device_count > 0 ? g_npu_device_count : 1;
-    for (int i = 0; i < requested_devices; ++i) {
-        std::string device_name = std::string("HTP") + std::to_string(i);
-        ggml_backend_dev_t dev = ggml_backend_dev_by_name(device_name.c_str());
-        if (dev == nullptr) {
-            break;
-        }
-        devices.push_back(dev);
-    }
-    return devices;
-}
-
 static std::string build_model_load_failure_message(const char * log_prefix) {
     std::ostringstream ss;
     ss << log_prefix
-       << ": failed to load model on " << backend_kind_name(g_backend_kind)
-       << " (possible mmap/address-space exhaustion or low_4GB fragmentation)";
+       << ": failed to load model (possible mmap/address-space exhaustion or low_4GB fragmentation)";
     return ss.str();
 }
 
 static std::string build_context_load_failure_message(const char * log_prefix) {
     std::ostringstream ss;
     ss << log_prefix
-       << ": failed to create context on " << backend_kind_name(g_backend_kind)
-       << " (n_ctx=" << g_n_ctx
+       << ": failed to create context (n_ctx=" << g_n_ctx
        << ", possible commit/address-space exhaustion)";
     return ss.str();
 }
@@ -621,69 +384,6 @@ static std::string summarize_registered_backends() {
         ss << "]";
     }
     return ss.str();
-}
-
-static std::string prepare_requested_backend_locked(const char * log_prefix) {
-    if (g_backend_kind != INFERENCE_BACKEND_NPU) {
-        g_use_hexagon = false;
-        unsetenv("GGML_HEXAGON_NDEV");
-        std::ostringstream ss;
-        ss << log_prefix << ": using " << backend_kind_name(g_backend_kind) << " backend";
-        log_to_file(ss.str());
-        return "";
-    }
-
-    if (!g_use_hexagon) {
-        std::ostringstream ss;
-        ss << log_prefix << ": NPU backend requested without useHexagon=true";
-        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-        return "NPU backend requested without useHexagon=true";
-    }
-
-    std::string err = ensure_hexagon_backend_loaded_locked();
-    if (!err.empty()) {
-        std::ostringstream ss;
-        ss << log_prefix << ": failed to prepare Hexagon backend: " << err;
-        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-        return err;
-    }
-
-    std::ostringstream ss;
-    ss << log_prefix << ": Hexagon backend prepared, " << summarize_registered_backends();
-    log_to_file(ss.str());
-    return "";
-}
-
-static std::string configure_model_backend_params_locked(
-        llama_model_params & mparams,
-        std::vector<ggml_backend_dev_t> & selected_devices) {
-    mparams.n_gpu_layers = g_n_gpu_layers;
-    mparams.use_mmap = !(g_backend_kind == INFERENCE_BACKEND_NPU && g_use_hexagon);
-    mparams.use_mlock = false;
-
-    if (g_backend_kind != INFERENCE_BACKEND_NPU || !g_use_hexagon) {
-        return "";
-    }
-
-    selected_devices = collect_hexagon_devices_locked();
-    if (selected_devices.empty()) {
-        return "no HTP devices registered";
-    }
-
-    selected_devices.push_back(nullptr);
-    mparams.devices = selected_devices.data();
-    mparams.split_mode = selected_devices.size() > 2 ? LLAMA_SPLIT_MODE_LAYER : LLAMA_SPLIT_MODE_NONE;
-    mparams.main_gpu = 0;
-    return "";
-}
-
-static void configure_context_backend_params_locked(llama_context_params & cparams) {
-    const bool accelerator_enabled =
-            ((g_backend_kind == INFERENCE_BACKEND_GPU) ||
-             (g_backend_kind == INFERENCE_BACKEND_NPU && g_use_hexagon))
-            && g_n_gpu_layers != 0;
-    cparams.offload_kqv = accelerator_enabled;
-    cparams.op_offload = accelerator_enabled;
 }
 
 static int32_t detokenize_with_resize(
@@ -1014,7 +714,7 @@ static std::string initialize_optional_multimodal_support_locked(
         log_to_file(start_ss.str());
 
         mtmd_context_params mparams_mtmd = mtmd_context_params_default();
-        mparams_mtmd.use_gpu = g_backend_kind == INFERENCE_BACKEND_GPU && g_n_gpu_layers != 0;
+        mparams_mtmd.use_gpu = g_n_gpu_layers != 0;
         mparams_mtmd.print_timings = false;
         mparams_mtmd.n_threads = g_n_threads;
         mparams_mtmd.warmup = true;
@@ -1902,14 +1602,6 @@ Java_com_micklab_llama_LlamaNative_init(
             log_to_file("init: JavaVM stored");
         }
 
-        {
-            const std::string backend_prepare_error = prepare_requested_backend_locked("init");
-            if (!backend_prepare_error.empty()) {
-                clear_partial_init();
-                return env->NewStringUTF(backend_prepare_error.c_str());
-            }
-        }
-
         llama_backend_init();
         log_requested_load_params("init");
 
@@ -1921,14 +1613,9 @@ Java_com_micklab_llama_LlamaNative_init(
         }
 
         llama_model_params mparams = llama_model_default_params();
-        std::vector<ggml_backend_dev_t> selected_devices;
-        {
-            const std::string model_backend_error = configure_model_backend_params_locked(mparams, selected_devices);
-            if (!model_backend_error.empty()) {
-                clear_partial_init();
-                return env->NewStringUTF(model_backend_error.c_str());
-            }
-        }
+        mparams.n_gpu_layers = g_n_gpu_layers;
+        mparams.use_mmap = true;
+        mparams.use_mlock = false;
 
         {
             using namespace std::chrono;
@@ -1955,7 +1642,6 @@ Java_com_micklab_llama_LlamaNative_init(
         cparams.n_threads       = g_n_threads;
         cparams.n_batch         = g_n_batch;
         cparams.n_threads_batch = g_n_threads;
-        configure_context_backend_params_locked(cparams);
 
         {
             using namespace std::chrono;
@@ -2128,14 +1814,6 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             log_to_file("initWithMmproj: JavaVM stored");
         }
 
-        {
-            const std::string backend_prepare_error = prepare_requested_backend_locked("initWithMmproj");
-            if (!backend_prepare_error.empty()) {
-                clear_partial_init();
-                return env->NewStringUTF(backend_prepare_error.c_str());
-            }
-        }
-
         llama_backend_init();
         log_requested_load_params("initWithMmproj");
 
@@ -2147,14 +1825,9 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         }
 
         llama_model_params mparams = llama_model_default_params();
-        std::vector<ggml_backend_dev_t> selected_devices;
-        {
-            const std::string model_backend_error = configure_model_backend_params_locked(mparams, selected_devices);
-            if (!model_backend_error.empty()) {
-                clear_partial_init();
-                return env->NewStringUTF(model_backend_error.c_str());
-            }
-        }
+        mparams.n_gpu_layers = g_n_gpu_layers;
+        mparams.use_mmap = true;
+        mparams.use_mlock = false;
 
         {
             using namespace std::chrono;
@@ -2181,7 +1854,6 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         cparams.n_threads       = g_n_threads;
         cparams.n_batch         = g_n_batch;
         cparams.n_threads_batch = g_n_threads;
-        configure_context_backend_params_locked(cparams);
 
         {
             using namespace std::chrono;
@@ -2232,8 +1904,7 @@ JNIEXPORT void JNICALL
 Java_com_micklab_llama_LlamaNative_setLoadParameters(
         JNIEnv *, jobject,
         jint nCtx, jint nThreads, jint nBatch,
-        jfloat temp, jfloat topP, jint topK, jint nGpuLayers,
-        jint backend, jboolean useHexagon
+        jfloat temp, jfloat topP, jint topK, jint nGpuLayers
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
 
@@ -2244,8 +1915,6 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
     g_top_p = topP;
     g_top_k = topK;
     g_n_gpu_layers = nGpuLayers;
-    g_backend_kind = backend;
-    g_use_hexagon = useHexagon == JNI_TRUE;
 
     {
         std::ostringstream ss;
@@ -2255,40 +1924,9 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
            << " temp=" << g_temp
            << " top_p=" << g_top_p
            << " top_k=" << g_top_k
-           << " n_gpu_layers=" << g_n_gpu_layers
-           << " backend=" << backend_kind_name(g_backend_kind)
-           << " use_hexagon=" << (g_use_hexagon ? "true" : "false");
+           << " n_gpu_layers=" << g_n_gpu_layers;
         log_to_file(ss.str());
     }
-}
-
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_micklab_llama_LlamaNative_configureBackend(
-        JNIEnv * env, jobject,
-        jint backend, jint npuDeviceCount, jstring jNativeLibraryDir, jstring jSourceApkPath, jboolean useHexagon
-) {
-    std::lock_guard<std::mutex> lock(g_mutex);
-
-    g_backend_kind = backend;
-    g_use_hexagon = useHexagon == JNI_TRUE;
-    g_npu_device_count = npuDeviceCount > 0 ? npuDeviceCount : 1;
-    g_native_library_dir = jNativeLibraryDir ? jstring_to_std(env, jNativeLibraryDir) : "";
-    g_source_apk_path = jSourceApkPath ? jstring_to_std(env, jSourceApkPath) : "";
-
-    std::ostringstream ss;
-    ss << "configureBackend: backend=" << backend_kind_name(g_backend_kind)
-       << " use_hexagon=" << (g_use_hexagon ? "true" : "false")
-       << " npu_device_count=" << g_npu_device_count
-       << " native_library_dir=" << (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir)
-       << " source_apk_path=" << (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path);
-    log_to_file(ss.str());
-
-    const std::string err = prepare_requested_backend_locked("configureBackend");
-    if (!err.empty()) {
-        return env->NewStringUTF(err.c_str());
-    }
-    return env->NewStringUTF("ok");
 }
 
 // ---------------- JNI: setParameters ----------------

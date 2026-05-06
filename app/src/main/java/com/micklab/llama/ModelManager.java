@@ -1,7 +1,6 @@
 package com.micklab.llama;
 
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
 import android.content.SharedPreferences;
 import android.os.Debug;
 import android.util.Log;
@@ -37,7 +36,6 @@ public class ModelManager {
     private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
-    private static final String PREF_INFERENCE_BACKEND = "inference_backend";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
     private static final int DEFAULT_N_CTX = 2048;
     private static final int DEFAULT_N_THREADS = 2;
@@ -47,8 +45,6 @@ public class ModelManager {
     private static final int DEFAULT_TOP_K = 40;
     private static final int GPU_LAYERS_DISABLED = 0;
     private static final int GPU_LAYERS_ENABLED_ALL = -1;
-    private static final int DEFAULT_NPU_DEVICE_COUNT = 4;
-    private static final long NPU_DEVICE_MEMORY_BYTES = 2L * 1024L * 1024L * 1024L;
     private static final Pattern SPLIT_GGUF_PATTERN = Pattern.compile("^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$");
     private static final String DOWNLOAD_CA_BUNDLE_FILENAME = "download-ca-bundle.pem";
     
@@ -67,50 +63,10 @@ public class ModelManager {
     private volatile String currentModelPath = null;
     private volatile String currentMmprojPath = null;
     private volatile boolean modelLoaded = false;
-    private volatile InferenceBackend currentLoadBackend = InferenceBackend.CPU;
-    private volatile int currentLoadNCtx = DEFAULT_N_CTX;
-    private volatile int currentLoadNThreads = DEFAULT_N_THREADS;
-    private volatile int currentLoadNBatch = DEFAULT_N_BATCH;
-    private volatile int currentLoadGpuLayers = GPU_LAYERS_DISABLED;
-    private volatile String lastLoadWarning = null;
     public enum ForceReinitializeResult {
         SUCCESS,
         FAILED,
         ALREADY_PENDING
-    }
-
-    private static final class ResolvedBackendSelection {
-        private final InferenceBackend requestedBackend;
-        private final InferenceBackend effectiveBackend;
-        private final int offloadLayers;
-        private final int npuDeviceCount;
-        private final String warning;
-
-        private ResolvedBackendSelection(
-                InferenceBackend requestedBackend,
-                InferenceBackend effectiveBackend,
-                int offloadLayers,
-                int npuDeviceCount,
-                String warning) {
-            this.requestedBackend = requestedBackend;
-            this.effectiveBackend = effectiveBackend;
-            this.offloadLayers = offloadLayers;
-            this.npuDeviceCount = npuDeviceCount;
-            this.warning = warning;
-        }
-
-        private ResolvedBackendSelection withFallback(
-                InferenceBackend fallbackBackend,
-                int fallbackOffloadLayers,
-                String fallbackWarning) {
-            return new ResolvedBackendSelection(
-                    requestedBackend,
-                    fallbackBackend,
-                    fallbackOffloadLayers,
-                    npuDeviceCount,
-                    fallbackWarning
-            );
-        }
     }
     
     // Listener interface
@@ -205,14 +161,6 @@ public class ModelManager {
     
     public String getCurrentModelPath() {
         return currentModelPath;
-    }
-
-    public InferenceBackend getCurrentLoadBackend() {
-        return currentLoadBackend;
-    }
-
-    public String getLastLoadWarning() {
-        return lastLoadWarning;
     }
 
     public boolean supportsVision() {
@@ -349,7 +297,6 @@ public class ModelManager {
         boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
-            lastLoadWarning = null;
             
             // Extract filename from URL or imported local model reference
             String filename = extractFilenameFromUrl(config.modelUrl);
@@ -365,26 +312,23 @@ public class ModelManager {
                     preferVisionProjector,
                     preferAudioProjector);
             String mmprojPath = ensureMultimodalProjectorAvailable(config, resolvedMmprojPath);
-
-            if (listener != null) {
-                listener.onModelLoading(configName);
+            
+            // If same model is already loaded, just re-apply parameters
+            if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentMmprojPath) && modelLoaded) {
+                Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
+                applyConfiguration(config);
+                currentConfigName = configName;
+                return true;
             }
 
-            String fileAvailabilityError = ensureModelFilesAvailable(config, destFile);
-            if (fileAvailabilityError != null) {
-                Log.e(TAG, fileAvailabilityError);
-                if (listener != null) {
-                    listener.onError(fileAvailabilityError);
-                }
-                return false;
-            }
-
-            ResolvedBackendSelection backendSelection = resolveBackendSelection(config, destFile);
             final boolean requiresModelInit =
                     !modelPath.equals(currentModelPath)
                             || !Objects.equals(mmprojPath, currentMmprojPath)
-                            || !matchesCurrentLoadSignature(config, backendSelection)
                             || !modelLoaded;
+            
+            if (listener != null) {
+                listener.onModelLoading(configName);
+            }
 
             if (requiresModelInit) {
                 shouldClearPendingLoad = true;
@@ -399,13 +343,13 @@ public class ModelManager {
                 }
             }
 
-            // If same model with same load signature is already loaded, just re-apply sampling parameters.
-            if (!requiresModelInit) {
-                Log.i(TAG, "Same model/backend already loaded, re-applying runtime parameters: " + configName);
-                applyConfiguration(config);
-                currentConfigName = configName;
-                lastLoadWarning = backendSelection.warning;
-                return true;
+            String fileAvailabilityError = ensureModelFilesAvailable(config, destFile);
+            if (fileAvailabilityError != null) {
+                Log.e(TAG, fileAvailabilityError);
+                if (listener != null) {
+                    listener.onError(fileAvailabilityError);
+                }
+                return false;
             }
 
             if (requiresModelInit) {
@@ -417,8 +361,7 @@ public class ModelManager {
                 }
 
                 prepareForLargeModelLoad(modelPath);
-                backendSelection = prepareBackendSelection(backendSelection);
-                applyLoadParameters(config, config.nCtx, backendSelection);
+                applyLoadParameters(config, config.nCtx);
                 String initResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
                 if (!"ok".equals(initResult)) {
                     Log.e(TAG, "Model init failed: " + initResult);
@@ -430,7 +373,6 @@ public class ModelManager {
 
                 currentModelPath = modelPath;
                 currentMmprojPath = mmprojPath;
-                updateCurrentLoadSignature(config, backendSelection);
             }
 
             // Set parameters from configuration
@@ -438,8 +380,6 @@ public class ModelManager {
 
             currentConfigName = configName;
             modelLoaded = true;
-            currentLoadBackend = backendSelection.effectiveBackend;
-            lastLoadWarning = backendSelection.warning;
 
             if (listener != null) {
                 listener.onModelLoaded(configName);
@@ -447,7 +387,7 @@ public class ModelManager {
 
             Log.i(TAG, "Configuration loaded: " + configName);
             return true;
-        } catch (IOException | JSONException | IllegalStateException e) {
+        } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load configuration: " + configName, e);
             if (listener != null) {
                 listener.onError("Failed to load configuration: " + e.getMessage());
@@ -511,171 +451,15 @@ public class ModelManager {
         );
     }
 
-    private void applyLoadParameters(
-            ConfigurationManager.Configuration config,
-            int nCtxOverride,
-            ResolvedBackendSelection backendSelection) {
+    private void applyLoadParameters(ConfigurationManager.Configuration config, int nCtxOverride) {
         int nCtx = safePositive(nCtxOverride > 0 ? nCtxOverride : config.nCtx, DEFAULT_N_CTX);
         int nThreads = safePositive(config.nThreads, DEFAULT_N_THREADS);
         int nBatch = safePositive(config.nBatch, DEFAULT_N_BATCH);
         float temp = safeFinite((float) config.temp, DEFAULT_TEMP);
         float topP = safeFinite((float) config.topP, DEFAULT_TOP_P);
         int topK = safePositive(config.topK, DEFAULT_TOP_K);
-        llama.setLoadParameters(
-                nCtx,
-                nThreads,
-                nBatch,
-                temp,
-                topP,
-                topK,
-                backendSelection.offloadLayers,
-                backendSelection.effectiveBackend.getNativeValue(),
-                backendSelection.effectiveBackend.usesHexagon()
-        );
-    }
-
-    private ResolvedBackendSelection resolveBackendSelection(
-            ConfigurationManager.Configuration config,
-            File modelFile) {
-        InferenceBackend requestedBackend = resolveRequestedBackend(config);
-        int offloadLayers = normalizeOffloadLayers(config.gpuOffloadLayers, requestedBackend);
-        int npuDeviceCount = DEFAULT_NPU_DEVICE_COUNT;
-        String warning = null;
-
-        if (requestedBackend == InferenceBackend.NPU && modelFile != null) {
-            long modelBytes = modelFile.length();
-            long npuLimitBytes = NPU_DEVICE_MEMORY_BYTES * npuDeviceCount;
-            if (modelBytes > npuLimitBytes) {
-                warning = localizedText(
-                        "モデルサイズがNPU上限を超えたため CPU に切り替えました: "
-                                + formatBytes(modelBytes) + " > " + formatBytes(npuLimitBytes),
-                        "Model size exceeds the NPU limit, so CPU fallback was used: "
-                                + formatBytes(modelBytes) + " > " + formatBytes(npuLimitBytes));
-                return new ResolvedBackendSelection(
-                        requestedBackend,
-                        InferenceBackend.CPU,
-                        GPU_LAYERS_DISABLED,
-                        npuDeviceCount,
-                        warning
-                );
-            }
-        }
-
-        return new ResolvedBackendSelection(
-                requestedBackend,
-                requestedBackend,
-                offloadLayers,
-                npuDeviceCount,
-                warning
-        );
-    }
-
-    private ResolvedBackendSelection prepareBackendSelection(
-            ResolvedBackendSelection backendSelection) {
-        ApplicationInfo applicationInfo = context.getApplicationInfo();
-        String nativeLibraryDir = applicationInfo != null ? applicationInfo.nativeLibraryDir : null;
-        String sourceApkPath = applicationInfo != null ? applicationInfo.sourceDir : null;
-
-        if (backendSelection.effectiveBackend == InferenceBackend.NPU) {
-            NativeLibraryDiagnostics.logNativeLibraryState(context, TAG);
-        }
-
-        String backendStatus = llama.configureBackend(
-                backendSelection.effectiveBackend.getNativeValue(),
-                backendSelection.npuDeviceCount,
-                nativeLibraryDir,
-                sourceApkPath,
-                backendSelection.effectiveBackend.usesHexagon()
-        );
-        if ("ok".equals(backendStatus)) {
-            return backendSelection;
-        }
-
-        if (backendSelection.effectiveBackend != InferenceBackend.NPU) {
-            throw new IllegalStateException("Backend configure failed: " + backendStatus);
-        }
-
-        String fallbackWarning = combineWarnings(
-                backendSelection.warning,
-                localizedText(
-                        "Hexagon backend を初期化できなかったため CPU に切り替えました: " + backendStatus,
-                        "Hexagon backend could not be initialized, so CPU fallback was used: " + backendStatus
-                )
-        );
-        ResolvedBackendSelection fallbackSelection = new ResolvedBackendSelection(
-                backendSelection.requestedBackend,
-                InferenceBackend.CPU,
-                GPU_LAYERS_DISABLED,
-                backendSelection.npuDeviceCount,
-                fallbackWarning
-        );
-        String cpuStatus = llama.configureBackend(
-                fallbackSelection.effectiveBackend.getNativeValue(),
-                fallbackSelection.npuDeviceCount,
-                nativeLibraryDir,
-                sourceApkPath,
-                fallbackSelection.effectiveBackend.usesHexagon()
-        );
-        if (!"ok".equals(cpuStatus)) {
-            throw new IllegalStateException("CPU backend configure failed: " + cpuStatus);
-        }
-        return fallbackSelection;
-    }
-
-    private InferenceBackend resolveRequestedBackend(ConfigurationManager.Configuration config) {
-        InferenceBackend configBackend = InferenceBackend.fromConfig(config.backend, config.gpuOffloadLayers);
-        if (config.backend != null && !config.backend.trim().isEmpty()) {
-            return configBackend;
-        }
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String savedBackend = prefs.getString(PREF_INFERENCE_BACKEND, configBackend.name());
-        return InferenceBackend.fromStorage(savedBackend);
-    }
-
-    private int normalizeOffloadLayers(int configuredLayers, InferenceBackend backend) {
-        if (!backend.usesAccelerator()) {
-            return GPU_LAYERS_DISABLED;
-        }
-        if (configuredLayers == 0) {
-            return GPU_LAYERS_ENABLED_ALL;
-        }
-        return (configuredLayers < 0 || configuredLayers > 39)
-                ? GPU_LAYERS_ENABLED_ALL
-                : Math.max(1, configuredLayers);
-    }
-
-    private boolean matchesCurrentLoadSignature(
-            ConfigurationManager.Configuration config,
-            ResolvedBackendSelection backendSelection) {
-        return currentLoadBackend == backendSelection.effectiveBackend
-                && currentLoadNCtx == safePositive(config.nCtx, DEFAULT_N_CTX)
-                && currentLoadNThreads == safePositive(config.nThreads, DEFAULT_N_THREADS)
-                && currentLoadNBatch == safePositive(config.nBatch, DEFAULT_N_BATCH)
-                && currentLoadGpuLayers == backendSelection.offloadLayers;
-    }
-
-    private void updateCurrentLoadSignature(
-            ConfigurationManager.Configuration config,
-            ResolvedBackendSelection backendSelection) {
-        currentLoadBackend = backendSelection.effectiveBackend;
-        currentLoadNCtx = safePositive(config.nCtx, DEFAULT_N_CTX);
-        currentLoadNThreads = safePositive(config.nThreads, DEFAULT_N_THREADS);
-        currentLoadNBatch = safePositive(config.nBatch, DEFAULT_N_BATCH);
-        currentLoadGpuLayers = backendSelection.offloadLayers;
-    }
-
-    private String combineWarnings(String first, String second) {
-        if (first == null || first.isEmpty()) {
-            return second;
-        }
-        if (second == null || second.isEmpty()) {
-            return first;
-        }
-        return first + "\n" + second;
-    }
-
-    private String localizedText(String ja, String en) {
-        return AppLanguageManager.isJapanese(context) ? ja : en;
+        int nGpuLayers = (config.gpuOffloadLayers < 0 || config.gpuOffloadLayers > 39) ? GPU_LAYERS_ENABLED_ALL : Math.max(0, config.gpuOffloadLayers);
+        llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK, nGpuLayers);
     }
 
     private int safePositive(int value, int fallback) {
@@ -831,11 +615,6 @@ public class ModelManager {
         currentMmprojPath = null;
         currentConfigName = null;
         modelLoaded = false;
-        currentLoadBackend = InferenceBackend.CPU;
-        currentLoadNCtx = DEFAULT_N_CTX;
-        currentLoadNThreads = DEFAULT_N_THREADS;
-        currentLoadNBatch = DEFAULT_N_BATCH;
-        currentLoadGpuLayers = GPU_LAYERS_DISABLED;
     }
 
     private String normalizeConfigName(String configName) {
