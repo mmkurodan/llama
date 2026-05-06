@@ -104,6 +104,8 @@ static int   & g_backend_kind = g_inference_settings.backend_kind;
 static bool  & g_use_hexagon = g_inference_settings.use_hexagon;
 static int   & g_npu_device_count = g_inference_settings.npu_device_count;
 static std::string g_native_library_dir;
+static std::string g_source_apk_path;
+static constexpr const char * PACKAGED_NATIVE_LIBRARY_ABI = "arm64-v8a";
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
@@ -409,6 +411,47 @@ static std::string join_library_path(const std::string & dir, const char * file_
     return dir + "/" + file_name;
 }
 
+static std::string join_apk_library_path(
+        const std::string & apk_path,
+        const char * abi_dir,
+        const char * file_name) {
+    if (apk_path.empty() || abi_dir == nullptr || *abi_dir == '\0' || file_name == nullptr || *file_name == '\0') {
+        return "";
+    }
+    return apk_path + "!/lib/" + abi_dir + "/" + file_name;
+}
+
+static void append_unique_string(std::vector<std::string> & values, const std::string & value) {
+    if (value.empty()) {
+        return;
+    }
+    if (std::find(values.begin(), values.end(), value) == values.end()) {
+        values.push_back(value);
+    }
+}
+
+static std::string join_string_values(const std::vector<std::string> & values) {
+    if (values.empty()) {
+        return "<none>";
+    }
+
+    std::ostringstream ss;
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+        ss << values[i];
+    }
+    return ss.str();
+}
+
+static std::vector<std::string> build_library_load_candidates(const char * file_name) {
+    std::vector<std::string> candidates;
+    append_unique_string(candidates, join_library_path(g_native_library_dir, file_name));
+    append_unique_string(candidates, join_apk_library_path(g_source_apk_path, PACKAGED_NATIVE_LIBRARY_ABI, file_name));
+    return candidates;
+}
+
 static std::vector<std::string> list_shared_libraries_in_dir(const std::string & dir, const char * prefix) {
     std::vector<std::string> libraries;
     if (dir.empty()) {
@@ -442,18 +485,7 @@ static std::vector<std::string> list_shared_libraries_in_dir(const std::string &
 }
 
 static std::string join_library_names(const std::vector<std::string> & libraries) {
-    if (libraries.empty()) {
-        return "<none>";
-    }
-
-    std::ostringstream ss;
-    for (size_t i = 0; i < libraries.size(); ++i) {
-        if (i > 0) {
-            ss << ", ";
-        }
-        ss << libraries[i];
-    }
-    return ss.str();
+    return join_string_values(libraries);
 }
 
 static void set_search_path_env(const char * name, const std::string & dir) {
@@ -480,8 +512,8 @@ static std::string ensure_hexagon_backend_loaded_locked() {
     if (ggml_backend_reg_by_name("HTP") != nullptr) {
         return "";
     }
-    if (g_native_library_dir.empty()) {
-        return "nativeLibraryDir is empty";
+    if (g_native_library_dir.empty() && g_source_apk_path.empty()) {
+        return "nativeLibraryDir and sourceApkPath are empty";
     }
 
     const int effective_ndev = g_npu_device_count > 0 ? g_npu_device_count : 1;
@@ -492,33 +524,54 @@ static std::string ensure_hexagon_backend_loaded_locked() {
             list_shared_libraries_in_dir(g_native_library_dir, "libggml");
     const std::vector<std::string> htp_libraries =
             list_shared_libraries_in_dir(g_native_library_dir, "libggml-htp-v");
+    const std::vector<std::string> backend_candidates =
+            build_library_load_candidates("libggml-hexagon.so");
 
     const std::string hexagon_backend_path = join_library_path(g_native_library_dir, "libggml-hexagon.so");
-    if (!is_readable_file(hexagon_backend_path)) {
+    if (!is_readable_file(hexagon_backend_path) && backend_candidates.empty()) {
         std::ostringstream ss;
         ss << "missing Hexagon backend library: " << hexagon_backend_path
-           << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]";
-        return ss.str();
-    }
-    if (htp_libraries.empty()) {
-        std::ostringstream ss;
-        ss << "missing Hexagon HTP runtime libraries in " << g_native_library_dir
-           << " expected libggml-htp-vXX.so"
+           << " source_apk_path=" << (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path)
            << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]";
         return ss.str();
     }
 
-    ggml_backend_reg_t reg = ggml_backend_load(hexagon_backend_path.c_str());
-    if (reg == nullptr) {
-        std::ostringstream ss;
-        ss << "ggml_backend_load failed for " << hexagon_backend_path
-           << " htp_libs=[" << join_library_names(htp_libraries) << "]";
-        return ss.str();
+    if (!is_readable_file(hexagon_backend_path)) {
+        log_to_file(
+                std::string("Hexagon backend library not visible in nativeLibraryDir; load_candidates=[")
+                + join_string_values(backend_candidates)
+                + "]",
+                GGML_LOG_LEVEL_WARN);
     }
-    if (ggml_backend_reg_by_name("HTP") == nullptr) {
-        return "Hexagon backend loaded but HTP registry was not registered";
+    if (htp_libraries.empty()) {
+        log_to_file(
+                std::string("Hexagon HTP runtime libraries are not visible in nativeLibraryDir=")
+                + (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir)
+                + " source_apk_path=" + (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path),
+                GGML_LOG_LEVEL_WARN);
     }
-    return "";
+
+    std::vector<std::string> load_failures;
+    for (const std::string & candidate : backend_candidates) {
+        ggml_backend_reg_t reg = ggml_backend_load(candidate.c_str());
+        if (reg == nullptr) {
+            load_failures.push_back(candidate + " -> load failed");
+            continue;
+        }
+        if (ggml_backend_reg_by_name("HTP") != nullptr) {
+            return "";
+        }
+        load_failures.push_back(candidate + " -> loaded without HTP registry");
+    }
+
+    std::ostringstream ss;
+    ss << "ggml_backend_load failed for candidates=[" << join_string_values(backend_candidates) << "]"
+       << " failures=[" << join_string_values(load_failures) << "]"
+       << " native_library_dir=" << (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir)
+       << " source_apk_path=" << (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path)
+       << " available_ggml_libs=[" << join_library_names(ggml_libraries) << "]"
+       << " htp_libs=[" << join_library_names(htp_libraries) << "]";
+    return ss.str();
 }
 
 static std::vector<ggml_backend_dev_t> collect_hexagon_devices_locked() {
@@ -2213,7 +2266,7 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_micklab_llama_LlamaNative_configureBackend(
         JNIEnv * env, jobject,
-        jint backend, jint npuDeviceCount, jstring jNativeLibraryDir, jboolean useHexagon
+        jint backend, jint npuDeviceCount, jstring jNativeLibraryDir, jstring jSourceApkPath, jboolean useHexagon
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
 
@@ -2221,12 +2274,14 @@ Java_com_micklab_llama_LlamaNative_configureBackend(
     g_use_hexagon = useHexagon == JNI_TRUE;
     g_npu_device_count = npuDeviceCount > 0 ? npuDeviceCount : 1;
     g_native_library_dir = jNativeLibraryDir ? jstring_to_std(env, jNativeLibraryDir) : "";
+    g_source_apk_path = jSourceApkPath ? jstring_to_std(env, jSourceApkPath) : "";
 
     std::ostringstream ss;
     ss << "configureBackend: backend=" << backend_kind_name(g_backend_kind)
        << " use_hexagon=" << (g_use_hexagon ? "true" : "false")
        << " npu_device_count=" << g_npu_device_count
-       << " native_library_dir=" << (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir);
+       << " native_library_dir=" << (g_native_library_dir.empty() ? "<empty>" : g_native_library_dir)
+       << " source_apk_path=" << (g_source_apk_path.empty() ? "<empty>" : g_source_apk_path);
     log_to_file(ss.str());
 
     const std::string err = prepare_requested_backend_locked("configureBackend");

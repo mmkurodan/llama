@@ -1,6 +1,7 @@
 package com.micklab.llama;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.SharedPreferences;
 import android.os.Debug;
 import android.util.Log;
@@ -416,10 +417,7 @@ public class ModelManager {
                 }
 
                 prepareForLargeModelLoad(modelPath);
-                String nativeLibraryDir = context.getApplicationInfo() != null
-                        ? context.getApplicationInfo().nativeLibraryDir
-                        : null;
-                backendSelection = prepareBackendSelection(backendSelection, nativeLibraryDir);
+                backendSelection = prepareBackendSelection(backendSelection);
                 applyLoadParameters(config, config.nCtx, backendSelection);
                 String initResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
                 if (!"ok".equals(initResult)) {
@@ -573,12 +571,20 @@ public class ModelManager {
     }
 
     private ResolvedBackendSelection prepareBackendSelection(
-            ResolvedBackendSelection backendSelection,
-            String nativeLibraryDir) {
+            ResolvedBackendSelection backendSelection) {
+        ApplicationInfo applicationInfo = context.getApplicationInfo();
+        String nativeLibraryDir = applicationInfo != null ? applicationInfo.nativeLibraryDir : null;
+        String sourceApkPath = applicationInfo != null ? applicationInfo.sourceDir : null;
+
+        if (backendSelection.effectiveBackend == InferenceBackend.NPU) {
+            NativeLibraryDiagnostics.logNativeLibraryState(context, TAG);
+        }
+
         String backendStatus = llama.configureBackend(
                 backendSelection.effectiveBackend.getNativeValue(),
                 backendSelection.npuDeviceCount,
                 nativeLibraryDir,
+                sourceApkPath,
                 backendSelection.effectiveBackend.usesHexagon()
         );
         if ("ok".equals(backendStatus)) {
@@ -607,6 +613,7 @@ public class ModelManager {
                 fallbackSelection.effectiveBackend.getNativeValue(),
                 fallbackSelection.npuDeviceCount,
                 nativeLibraryDir,
+                sourceApkPath,
                 fallbackSelection.effectiveBackend.usesHexagon()
         );
         if (!"ok".equals(cpuStatus)) {

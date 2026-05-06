@@ -52,6 +52,20 @@ android {
         }
     }
 
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ["src/main/jniLibs"]
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // The JNI bridge resolves ggml backends via absolute paths in nativeLibraryDir.
+            // Keep packaged .so files extracted on-device instead of relying on in-APK loading only.
+            useLegacyPackaging = true
+        }
+    }
+
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"

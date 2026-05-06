@@ -31,18 +31,22 @@ public class LlamaNative {
         loadOptionalLibrary("ggml-base", "ggml base runtime");
         loadOptionalLibrary("ggml-cpu", "ggml cpu runtime");
 
-        boolean hexagonLoaded = loadOptionalLibrary("ggml-hexagon", "Hexagon backend");
         int loadedHtpLibraries = 0;
         for (String htpLibrary : HEXAGON_HTP_LIBRARIES) {
             if (loadOptionalLibrary(htpLibrary, "Hexagon HTP runtime")) {
                 loadedHtpLibraries++;
             }
         }
+        boolean hexagonLoaded = loadOptionalLibrary("ggml-hexagon", "Hexagon backend");
 
         if (!hexagonLoaded) {
-            Log.w(TAG, "Hexagon backend library was not loaded. NPU requests will fall back to CPU until libggml-hexagon.so is bundled in the APK.");
+            Log.w(TAG,
+                    "Hexagon backend library was not loaded. NPU requests will fall back to CPU until "
+                            + "libggml-hexagon.so is installed into nativeLibraryDir.");
         } else if (loadedHtpLibraries == 0) {
-            Log.w(TAG, "Hexagon backend loaded without any libggml-htp-vXX.so runtime libraries. NPU requests will fall back to CPU.");
+            Log.w(TAG,
+                    "Hexagon backend loaded without any libggml-htp-vXX.so runtime libraries. "
+                            + "NPU requests will fall back to CPU.");
         } else {
             Log.i(TAG, "Loaded " + loadedHtpLibraries + " Hexagon HTP runtime libraries");
         }
@@ -96,6 +100,7 @@ public class LlamaNative {
             int backend,
             int npuDeviceCount,
             String nativeLibraryDir,
+            String sourceApkPath,
             boolean useHexagon
     );
     public native String generate(String prompt);
