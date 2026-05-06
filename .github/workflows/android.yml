@@ -244,28 +244,9 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:externalNativeBuildDebug :app:externalNativeBuildRelease --stacktrace --info
 
-      - name: Verify native libraries before assemble
+      - name: Locate variant libllama.so outputs
         run: |
           set -euo pipefail
-          DEST=app/src/main/jniLibs/arm64-v8a
-
-          REQUIRED_LIBS=(
-            "$DEST/libggml-base.so"
-            "$DEST/libggml-cpu.so"
-            "$DEST/libggml-hexagon.so"
-          )
-
-          for lib in "${REQUIRED_LIBS[@]}"; do
-            if [ ! -f "$lib" ]; then
-              echo "Required native library is missing from jniLibs: $lib" >&2
-              exit 1
-            fi
-          done
-
-          if ! find "$DEST" -maxdepth 1 -type f -name 'libggml-htp-v*.so' | grep -q .; then
-            echo "No libggml-htp-vXX.so library was staged into jniLibs" >&2
-            exit 1
-          fi
 
           resolve_jni_lib() {
             local variant="$1"
@@ -306,12 +287,79 @@ jobs:
 
           echo "Debug JNI lib: $DEBUG_JNI_LIB"
           echo "Release JNI lib: $RELEASE_JNI_LIB"
+          {
+            echo "DEBUG_JNI_LIB=$DEBUG_JNI_LIB"
+            echo "RELEASE_JNI_LIB=$RELEASE_JNI_LIB"
+          } >> "$GITHUB_ENV"
+
+      - name: Stage debug libllama.so into jniLibs
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          cp "$DEBUG_JNI_LIB" "$DEST/libllama.so"
+          ls -1 "$DEST"
+
+      - name: Verify native libraries before debug assemble
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+
+          REQUIRED_LIBS=(
+            "$DEST/libggml-base.so"
+            "$DEST/libggml-cpu.so"
+            "$DEST/libggml-hexagon.so"
+            "$DEST/libllama.so"
+          )
+
+          for lib in "${REQUIRED_LIBS[@]}"; do
+            if [ ! -f "$lib" ]; then
+              echo "Required native library is missing from jniLibs: $lib" >&2
+              exit 1
+            fi
+          done
+
+          if ! find "$DEST" -maxdepth 1 -type f -name 'libggml-htp-v*.so' | grep -q .; then
+            echo "No libggml-htp-vXX.so library was staged into jniLibs" >&2
+            exit 1
+          fi
           ls -1 "$DEST"
 
       - name: Build debug APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug -x externalNativeBuildDebug -x externalNativeBuildRelease --stacktrace --info
+
+      - name: Stage release libllama.so into jniLibs
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          cp "$RELEASE_JNI_LIB" "$DEST/libllama.so"
+          ls -1 "$DEST"
+
+      - name: Verify native libraries before release assemble
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+
+          REQUIRED_LIBS=(
+            "$DEST/libggml-base.so"
+            "$DEST/libggml-cpu.so"
+            "$DEST/libggml-hexagon.so"
+            "$DEST/libllama.so"
+          )
+
+          for lib in "${REQUIRED_LIBS[@]}"; do
+            if [ ! -f "$lib" ]; then
+              echo "Required native library is missing from jniLibs: $lib" >&2
+              exit 1
+            fi
+          done
+
+          if ! find "$DEST" -maxdepth 1 -type f -name 'libggml-htp-v*.so' | grep -q .; then
+            echo "No libggml-htp-vXX.so library was staged into jniLibs" >&2
+            exit 1
+          fi
+          ls -1 "$DEST"
 
       - name: Build release APK
         run: |
