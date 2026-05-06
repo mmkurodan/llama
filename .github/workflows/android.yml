@@ -239,35 +239,20 @@ jobs:
           cp "${HTP_LIBS[@]}" "$DEST/"
           ls -1 "$DEST"
 
-      - name: Build libllama.so before assemble
+      - name: Build variant JNI libraries before assemble
         run: |
           chmod +x gradlew
-          ./gradlew :app:externalNativeBuildRelease --stacktrace --info
+          ./gradlew :app:externalNativeBuildDebug :app:externalNativeBuildRelease --stacktrace --info
 
-      - name: Stage libllama.so into jniLibs
+      - name: Verify native libraries before assemble
         run: |
           set -euo pipefail
           DEST=app/src/main/jniLibs/arm64-v8a
-          mapfile -t JNI_CANDIDATES < <(find app/build -type f -name 'libllama.so' | grep 'arm64-v8a' | sort || true)
-          if [ "${#JNI_CANDIDATES[@]}" -eq 0 ]; then
-            echo "libllama.so was not found in the Gradle native build outputs" >&2
-            exit 1
-          fi
-
-          SELECTED_JNI_LIB="${JNI_CANDIDATES[0]}"
-          for candidate in "${JNI_CANDIDATES[@]}"; do
-            if [[ "$candidate" == *release* || "$candidate" == *Release* ]]; then
-              SELECTED_JNI_LIB="$candidate"
-            fi
-          done
-
-          cp "$SELECTED_JNI_LIB" "$DEST/libllama.so"
 
           REQUIRED_LIBS=(
             "$DEST/libggml-base.so"
             "$DEST/libggml-cpu.so"
             "$DEST/libggml-hexagon.so"
-            "$DEST/libllama.so"
           )
 
           for lib in "${REQUIRED_LIBS[@]}"; do
@@ -282,6 +267,20 @@ jobs:
             exit 1
           fi
 
+          DEBUG_JNI_LIB="$(find app/build/intermediates/cxx/Debug -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort | head -n 1 || true)"
+          if [ -z "$DEBUG_JNI_LIB" ]; then
+            echo "Debug libllama.so was not found in the Gradle native build outputs" >&2
+            exit 1
+          fi
+
+          RELEASE_JNI_LIB="$(find app/build/intermediates/cxx/Release -type f -path '*/arm64-v8a/libllama.so' 2>/dev/null | sort | head -n 1 || true)"
+          if [ -z "$RELEASE_JNI_LIB" ]; then
+            echo "Release libllama.so was not found in the Gradle native build outputs" >&2
+            exit 1
+          fi
+
+          echo "Debug JNI lib: $DEBUG_JNI_LIB"
+          echo "Release JNI lib: $RELEASE_JNI_LIB"
           ls -1 "$DEST"
 
       - name: Build debug APK
