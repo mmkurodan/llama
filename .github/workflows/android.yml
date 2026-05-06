@@ -202,15 +202,6 @@ jobs:
           name: snapdragon-jni-libs-arm64
           path: snapdragon-jni-libs/arm64-v8a
 
-      - name: Bundle Snapdragon runtime libraries into jniLibs
-        run: |
-          set -euo pipefail
-          DEST=app/src/main/jniLibs/arm64-v8a
-          rm -rf "$DEST"
-          mkdir -p "$DEST"
-          cp snapdragon-jni-libs/arm64-v8a/*.so "$DEST/"
-          ls -1 "$DEST"
-
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
@@ -225,19 +216,107 @@ jobs:
       - name: Generate Gradle Wrapper (8.7)
         run: gradle wrapper --gradle-version 8.7
 
+      - name: Bundle Snapdragon runtime libraries into jniLibs
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          rm -rf "$DEST"
+          mkdir -p "$DEST"
+
+          SRC=snapdragon-jni-libs/arm64-v8a
+          cp "$SRC/libggml-base.so" "$DEST/"
+          cp "$SRC/libggml-cpu.so" "$DEST/"
+          cp "$SRC/libggml-hexagon.so" "$DEST/"
+          if [ -f "$SRC/libggml-opencl.so" ]; then
+            cp "$SRC/libggml-opencl.so" "$DEST/"
+          fi
+
+          mapfile -t HTP_LIBS < <(find "$SRC" -maxdepth 1 -type f -name 'libggml-htp-v*.so' | sort)
+          if [ "${#HTP_LIBS[@]}" -eq 0 ]; then
+            echo "Hexagon HTP runtime libraries were not found in the downloaded artifact" >&2
+            exit 1
+          fi
+          cp "${HTP_LIBS[@]}" "$DEST/"
+          ls -1 "$DEST"
+
+      - name: Build libllama.so before assemble
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:externalNativeBuildRelease --stacktrace --info
+
+      - name: Stage libllama.so into jniLibs
+        run: |
+          set -euo pipefail
+          DEST=app/src/main/jniLibs/arm64-v8a
+          mapfile -t JNI_CANDIDATES < <(find app/build -type f -name 'libllama.so' | grep 'arm64-v8a' | sort || true)
+          if [ "${#JNI_CANDIDATES[@]}" -eq 0 ]; then
+            echo "libllama.so was not found in the Gradle native build outputs" >&2
+            exit 1
+          fi
+
+          SELECTED_JNI_LIB="${JNI_CANDIDATES[0]}"
+          for candidate in "${JNI_CANDIDATES[@]}"; do
+            if [[ "$candidate" == *release* || "$candidate" == *Release* ]]; then
+              SELECTED_JNI_LIB="$candidate"
+            fi
+          done
+
+          cp "$SELECTED_JNI_LIB" "$DEST/libllama.so"
+
+          REQUIRED_LIBS=(
+            "$DEST/libggml-base.so"
+            "$DEST/libggml-cpu.so"
+            "$DEST/libggml-hexagon.so"
+            "$DEST/libllama.so"
+          )
+
+          for lib in "${REQUIRED_LIBS[@]}"; do
+            if [ ! -f "$lib" ]; then
+              echo "Required native library is missing from jniLibs: $lib" >&2
+              exit 1
+            fi
+          done
+
+          if ! find "$DEST" -maxdepth 1 -type f -name 'libggml-htp-v*.so' | grep -q .; then
+            echo "No libggml-htp-vXX.so library was staged into jniLibs" >&2
+            exit 1
+          fi
+
+          ls -1 "$DEST"
+
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace --info
+          ./gradlew assembleDebug -x externalNativeBuildDebug -x externalNativeBuildRelease --stacktrace --info
 
       - name: Build release APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace --info
+          ./gradlew assembleRelease -x externalNativeBuildDebug -x externalNativeBuildRelease --stacktrace --info
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Verify required Snapdragon/JNI libraries inside APKs
+        run: |
+          set -euo pipefail
+
+          for APK in \
+            app/build/outputs/apk/debug/app-debug.apk \
+            app/build/outputs/apk/release/app-release.apk; do
+            echo "Checking packaged native libraries in $APK"
+            LISTING="$(mktemp)"
+            unzip -l "$APK" | tee "$LISTING"
+
+            grep -F 'lib/arm64-v8a/libggml-base.so' "$LISTING"
+            grep -F 'lib/arm64-v8a/libggml-cpu.so' "$LISTING"
+            grep -F 'lib/arm64-v8a/libggml-hexagon.so' "$LISTING"
+            grep -F 'lib/arm64-v8a/libllama.so' "$LISTING"
+            grep -E 'lib/arm64-v8a/libggml-htp-v[0-9]+\.so' "$LISTING"
+
+            rm -f "$LISTING"
+          done
 
       - name: Verify .so 16KB compatibility with ApkAnalyzer
         run: |
@@ -269,34 +348,11 @@ jobs:
       - name: Build AAB (bundleRelease)
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease --stacktrace --info
+          ./gradlew bundleRelease -x externalNativeBuildDebug -x externalNativeBuildRelease --stacktrace --info
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Stage libllama.so into jniLibs
-        run: |
-          set -euo pipefail
-          DEST=app/src/main/jniLibs/arm64-v8a
-          mapfile -t JNI_CANDIDATES < <(find app/build -type f -name 'libllama.so' | grep 'arm64-v8a' | sort || true)
-          if [ "${#JNI_CANDIDATES[@]}" -eq 0 ]; then
-            echo "libllama.so was not found in the Gradle build outputs" >&2
-            exit 1
-          fi
-
-          SELECTED_JNI_LIB=""
-          for candidate in "${JNI_CANDIDATES[@]}"; do
-            if [[ "$candidate" == *release* || "$candidate" == *Release* ]]; then
-              SELECTED_JNI_LIB="$candidate"
-            fi
-          done
-          if [ -z "$SELECTED_JNI_LIB" ]; then
-            SELECTED_JNI_LIB="${JNI_CANDIDATES[0]}"
-          fi
-
-          cp "$SELECTED_JNI_LIB" "$DEST/libllama.so"
-          ls -1 "$DEST"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
