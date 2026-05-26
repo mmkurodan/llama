@@ -1,0 +1,361 @@
+﻿2026-05-26T19:56:15.3246435Z ##[group]Run set -e
+2026-05-26T19:56:15.3246729Z [36;1mset -e[0m
+2026-05-26T19:56:15.3246957Z [36;1mexport API=24[0m
+2026-05-26T19:56:15.3247220Z [36;1mexport HOST_TAG=linux-x86_64[0m
+2026-05-26T19:56:15.3247644Z [36;1mexport TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG[0m
+2026-05-26T19:56:15.3248041Z [36;1m[0m
+2026-05-26T19:56:15.3248335Z [36;1mgit clone https://github.com/Mbed-TLS/mbedtls.git[0m
+2026-05-26T19:56:15.3248687Z [36;1mcd mbedtls[0m
+2026-05-26T19:56:15.3248919Z [36;1mgit checkout v3.5.1[0m
+2026-05-26T19:56:15.3249185Z [36;1m[0m
+2026-05-26T19:56:15.3249388Z [36;1mmkdir build[0m
+2026-05-26T19:56:15.3249609Z [36;1mcd build[0m
+2026-05-26T19:56:15.3249812Z [36;1m[0m
+2026-05-26T19:56:15.3250002Z [36;1mcmake .. \[0m
+2026-05-26T19:56:15.3250269Z [36;1m  -DCMAKE_SYSTEM_NAME=Android \[0m
+2026-05-26T19:56:15.3250568Z [36;1m  -DCMAKE_SYSTEM_VERSION=$API \[0m
+2026-05-26T19:56:15.3250877Z [36;1m  -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \[0m
+2026-05-26T19:56:15.3251508Z [36;1m  -DCMAKE_ANDROID_NDK=$ANDROID_NDK \[0m
+2026-05-26T19:56:15.3251868Z [36;1m  -DCMAKE_ANDROID_STL_TYPE=c++_static \[0m
+2026-05-26T19:56:15.3252290Z [36;1m  -DCMAKE_C_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang \[0m
+2026-05-26T19:56:15.3252804Z [36;1m  -DCMAKE_CXX_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang++ \[0m
+2026-05-26T19:56:15.3253223Z [36;1m  -DENABLE_TESTING=OFF \[0m
+2026-05-26T19:56:15.3253504Z [36;1m  -DENABLE_PROGRAMS=OFF \[0m
+2026-05-26T19:56:15.3253815Z [36;1m  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \[0m
+2026-05-26T19:56:15.3254368Z [36;1m  -DCMAKE_C_FLAGS="-fPIC" \[0m
+2026-05-26T19:56:15.3254649Z [36;1m  -DCMAKE_CXX_FLAGS="-fPIC" \[0m
+2026-05-26T19:56:15.3254963Z [36;1m  -DCMAKE_INSTALL_PREFIX=$PWD/install[0m
+2026-05-26T19:56:15.3255245Z [36;1m[0m
+2026-05-26T19:56:15.3255454Z [36;1mmake -j"$(nproc)"[0m
+2026-05-26T19:56:15.3255705Z [36;1mmake install[0m
+2026-05-26T19:56:15.3294873Z shell: /usr/bin/bash -e {0}
+2026-05-26T19:56:15.3295173Z ##[endgroup]
+2026-05-26T19:56:15.3369539Z Cloning into 'mbedtls'...
+2026-05-26T19:56:30.6427802Z Note: switching to 'v3.5.1'.
+2026-05-26T19:56:30.6428235Z 
+2026-05-26T19:56:30.6428579Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-05-26T19:56:30.6429184Z changes and commit them, and you can discard any commits you make in this
+2026-05-26T19:56:30.6429674Z state without impacting any branches by switching back to a branch.
+2026-05-26T19:56:30.6429958Z 
+2026-05-26T19:56:30.6430142Z If you want to create a new branch to retain commits you create, you may
+2026-05-26T19:56:30.6430638Z do so (now or later) by using -c with the switch command. Example:
+2026-05-26T19:56:30.6431159Z 
+2026-05-26T19:56:30.6431345Z   git switch -c <new-branch-name>
+2026-05-26T19:56:30.6431528Z 
+2026-05-26T19:56:30.6431643Z Or undo this operation with:
+2026-05-26T19:56:30.6431804Z 
+2026-05-26T19:56:30.6431904Z   git switch -
+2026-05-26T19:56:30.6432032Z 
+2026-05-26T19:56:30.6432252Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-05-26T19:56:30.6432574Z 
+2026-05-26T19:56:30.6432722Z HEAD is now at edb8fec988 Add docs re Everest license
+2026-05-26T19:56:30.6709797Z CMake Deprecation Warning at CMakeLists.txt:21 (cmake_minimum_required):
+2026-05-26T19:56:30.6710489Z   Compatibility with CMake < 3.10 will be removed from a future version of
+2026-05-26T19:56:30.6711257Z   CMake.
+2026-05-26T19:56:30.6711381Z 
+2026-05-26T19:56:30.6711588Z   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+2026-05-26T19:56:30.6712251Z   to tell CMake that the project requires at least <min> but has been updated
+2026-05-26T19:56:30.6712920Z   to work with policies introduced by <max> or earlier.
+2026-05-26T19:56:30.6713145Z 
+2026-05-26T19:56:30.6713150Z 
+2026-05-26T19:56:30.7413685Z -- Android: Targeting API '24' with architecture 'arm64', ABI 'arm64-v8a', and processor 'aarch64'
+2026-05-26T19:56:30.7665172Z -- Android: Selected unified Clang toolchain
+2026-05-26T19:56:36.6608292Z -- The C compiler identification is Clang 18.0.4
+2026-05-26T19:56:36.7091803Z CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+2026-05-26T19:56:36.7092553Z   Compatibility with CMake < 3.10 will be removed from a future version of
+2026-05-26T19:56:36.7092951Z   CMake.
+2026-05-26T19:56:36.7093076Z 
+2026-05-26T19:56:36.7093301Z   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+2026-05-26T19:56:36.7093814Z   to tell CMake that the project requires at least <min> but has been updated
+2026-05-26T19:56:36.7094279Z   to work with policies introduced by <max> or earlier.
+2026-05-26T19:56:36.7094615Z Call Stack (most recent call first):
+2026-05-26T19:56:36.7095021Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+2026-05-26T19:56:36.7095537Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+2026-05-26T19:56:36.7096049Z   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+2026-05-26T19:56:36.7096449Z   CMakeLists.txt:39 (project)
+2026-05-26T19:56:36.7096621Z 
+2026-05-26T19:56:36.7096625Z 
+2026-05-26T19:56:36.7151288Z -- Detecting C compiler ABI info
+2026-05-26T19:56:36.7205522Z CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+2026-05-26T19:56:36.7206526Z   Compatibility with CMake < 3.10 will be removed from a future version of
+2026-05-26T19:56:36.7206915Z   CMake.
+2026-05-26T19:56:36.7207307Z 
+2026-05-26T19:56:36.7207528Z   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+2026-05-26T19:56:36.7208022Z   to tell CMake that the project requires at least <min> but has been updated
+2026-05-26T19:56:36.7208453Z   to work with policies introduced by <max> or earlier.
+2026-05-26T19:56:36.7208790Z Call Stack (most recent call first):
+2026-05-26T19:56:36.7209201Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+2026-05-26T19:56:36.7209734Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+2026-05-26T19:56:36.7210231Z   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+2026-05-26T19:56:36.7210876Z   /home/runner/work/llama/llama/mbedtls/build/CMakeFiles/CMakeScratch/TryCompile-zkyvnL/CMakeLists.txt:4 (project)
+2026-05-26T19:56:36.7211538Z 
+2026-05-26T19:56:36.7211544Z 
+2026-05-26T19:56:37.3983485Z -- Detecting C compiler ABI info - done
+2026-05-26T19:56:37.4140858Z -- Check for working C compiler: /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/clang - skipped
+2026-05-26T19:56:37.4145781Z -- Detecting C compile features
+2026-05-26T19:56:37.4152416Z -- Detecting C compile features - done
+2026-05-26T19:56:37.5484330Z -- Found Python3: /usr/bin/python3.12 (found version "3.12.3") found components: Interpreter
+2026-05-26T19:56:37.6134500Z -- Configuring done (6.9s)
+2026-05-26T19:56:37.6447389Z CMake Warning:
+2026-05-26T19:56:37.6447838Z -- Generating done (0.0s)
+2026-05-26T19:56:37.6448221Z   Manually-specified variables were not used by the project:
+2026-05-26T19:56:37.6448521Z 
+2026-05-26T19:56:37.6448621Z     CMAKE_CXX_COMPILER
+2026-05-26T19:56:37.6448869Z     CMAKE_CXX_FLAGS
+2026-05-26T19:56:37.6448999Z 
+2026-05-26T19:56:37.6449003Z 
+2026-05-26T19:56:37.6451610Z -- Build files have been written to: /home/runner/work/llama/llama/mbedtls/build
+2026-05-26T19:56:37.6662417Z [  1%] Building C object 3rdparty/everest/CMakeFiles/everest.dir/library/everest.c.o
+2026-05-26T19:56:37.6663600Z [  1%] Building C object 3rdparty/p256-m/CMakeFiles/p256m.dir/p256-m_driver_entrypoints.c.o
+2026-05-26T19:56:37.6664854Z [  2%] Building C object 3rdparty/p256-m/CMakeFiles/p256m.dir/p256-m/p256-m.c.o
+2026-05-26T19:56:37.6665920Z [  3%] Building C object 3rdparty/everest/CMakeFiles/everest.dir/library/x25519.c.o
+2026-05-26T19:56:38.4035202Z [  4%] Building C object 3rdparty/everest/CMakeFiles/everest.dir/library/Hacl_Curve25519_joined.c.o
+2026-05-26T19:56:38.4043566Z [  5%] Linking C static library libp256m.a
+2026-05-26T19:56:38.9798073Z [  6%] Linking C static library libeverest.a
+2026-05-26T19:56:41.2182800Z [  6%] Built target p256m
+2026-05-26T19:56:41.2183342Z [  6%] Built target everest
+2026-05-26T19:56:41.2297753Z [  7%] Building C object library/CMakeFiles/mbedcrypto.dir/aes.c.o
+2026-05-26T19:56:41.2298769Z [  8%] Building C object library/CMakeFiles/mbedcrypto.dir/aesni.c.o
+2026-05-26T19:56:41.2299884Z [  9%] Building C object library/CMakeFiles/mbedcrypto.dir/aesce.c.o
+2026-05-26T19:56:41.2309425Z [  9%] Building C object library/CMakeFiles/mbedcrypto.dir/aria.c.o
+2026-05-26T19:56:41.4677161Z [ 10%] Building C object library/CMakeFiles/mbedcrypto.dir/asn1parse.c.o
+2026-05-26T19:56:41.6661119Z [ 11%] Building C object library/CMakeFiles/mbedcrypto.dir/asn1write.c.o
+2026-05-26T19:56:41.6902428Z [ 12%] Building C object library/CMakeFiles/mbedcrypto.dir/base64.c.o
+2026-05-26T19:56:41.8197454Z [ 13%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum.c.o
+2026-05-26T19:56:41.8606376Z [ 14%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum_core.c.o
+2026-05-26T19:56:41.8732719Z [ 15%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum_mod.c.o
+2026-05-26T19:56:41.8909373Z [ 15%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum_mod_raw.c.o
+2026-05-26T19:56:42.0021435Z [ 16%] Building C object library/CMakeFiles/mbedcrypto.dir/camellia.c.o
+2026-05-26T19:56:42.0262163Z [ 17%] Building C object library/CMakeFiles/mbedcrypto.dir/ccm.c.o
+2026-05-26T19:56:42.2664187Z [ 18%] Building C object library/CMakeFiles/mbedcrypto.dir/chacha20.c.o
+2026-05-26T19:56:42.2818356Z [ 19%] Building C object library/CMakeFiles/mbedcrypto.dir/chachapoly.c.o
+2026-05-26T19:56:42.3882344Z [ 20%] Building C object library/CMakeFiles/mbedcrypto.dir/cipher.c.o
+2026-05-26T19:56:42.4592212Z [ 21%] Building C object library/CMakeFiles/mbedcrypto.dir/cipher_wrap.c.o
+2026-05-26T19:56:42.4973577Z [ 21%] Building C object library/CMakeFiles/mbedcrypto.dir/constant_time.c.o
+2026-05-26T19:56:42.5562277Z [ 22%] Building C object library/CMakeFiles/mbedcrypto.dir/cmac.c.o
+2026-05-26T19:56:42.6592767Z [ 23%] Building C object library/CMakeFiles/mbedcrypto.dir/ctr_drbg.c.o
+2026-05-26T19:56:42.6632062Z [ 24%] Building C object library/CMakeFiles/mbedcrypto.dir/des.c.o
+2026-05-26T19:56:42.7032206Z [ 25%] Building C object library/CMakeFiles/mbedcrypto.dir/dhm.c.o
+2026-05-26T19:56:42.8108627Z [ 26%] Building C object library/CMakeFiles/mbedcrypto.dir/ecdh.c.o
+2026-05-26T19:56:42.8866163Z [ 27%] Building C object library/CMakeFiles/mbedcrypto.dir/ecdsa.c.o
+2026-05-26T19:56:42.9072348Z [ 28%] Building C object library/CMakeFiles/mbedcrypto.dir/ecjpake.c.o
+2026-05-26T19:56:42.9816125Z [ 28%] Building C object library/CMakeFiles/mbedcrypto.dir/ecp.c.o
+2026-05-26T19:56:43.0065973Z [ 29%] Building C object library/CMakeFiles/mbedcrypto.dir/ecp_curves.c.o
+2026-05-26T19:56:43.0892293Z [ 30%] Building C object library/CMakeFiles/mbedcrypto.dir/ecp_curves_new.c.o
+2026-05-26T19:56:43.1502093Z [ 31%] Building C object library/CMakeFiles/mbedcrypto.dir/entropy.c.o
+2026-05-26T19:56:43.2122189Z [ 32%] Building C object library/CMakeFiles/mbedcrypto.dir/entropy_poll.c.o
+2026-05-26T19:56:43.3502229Z [ 33%] Building C object library/CMakeFiles/mbedcrypto.dir/error.c.o
+2026-05-26T19:56:43.3504811Z [ 34%] Building C object library/CMakeFiles/mbedcrypto.dir/gcm.c.o
+2026-05-26T19:56:43.4824247Z [ 34%] Building C object library/CMakeFiles/mbedcrypto.dir/hkdf.c.o
+2026-05-26T19:56:43.5106110Z [ 35%] Building C object library/CMakeFiles/mbedcrypto.dir/hmac_drbg.c.o
+2026-05-26T19:56:43.5812366Z [ 36%] Building C object library/CMakeFiles/mbedcrypto.dir/lmots.c.o
+2026-05-26T19:56:43.6328403Z [ 37%] Building C object library/CMakeFiles/mbedcrypto.dir/lms.c.o
+2026-05-26T19:56:43.7195321Z [ 39%] Building C object library/CMakeFiles/mbedcrypto.dir/md5.c.o
+2026-05-26T19:56:43.7198547Z [ 39%] Building C object library/CMakeFiles/mbedcrypto.dir/md.c.o
+2026-05-26T19:56:43.8142417Z [ 40%] Building C object library/CMakeFiles/mbedcrypto.dir/memory_buffer_alloc.c.o
+2026-05-26T19:56:43.8222154Z [ 40%] Building C object library/CMakeFiles/mbedcrypto.dir/nist_kw.c.o
+2026-05-26T19:56:43.9252180Z [ 41%] Building C object library/CMakeFiles/mbedcrypto.dir/oid.c.o
+2026-05-26T19:56:43.9432043Z [ 42%] Building C object library/CMakeFiles/mbedcrypto.dir/padlock.c.o
+2026-05-26T19:56:43.9538598Z [ 43%] Building C object library/CMakeFiles/mbedcrypto.dir/pem.c.o
+2026-05-26T19:56:44.0242980Z [ 44%] Building C object library/CMakeFiles/mbedcrypto.dir/pk.c.o
+2026-05-26T19:56:44.0856032Z [ 45%] Building C object library/CMakeFiles/mbedcrypto.dir/pk_wrap.c.o
+2026-05-26T19:56:44.1562426Z [ 46%] Building C object library/CMakeFiles/mbedcrypto.dir/pkcs12.c.o
+2026-05-26T19:56:44.2202191Z [ 46%] Building C object library/CMakeFiles/mbedcrypto.dir/pkcs5.c.o
+2026-05-26T19:56:44.2342212Z [ 47%] Building C object library/CMakeFiles/mbedcrypto.dir/pkparse.c.o
+2026-05-26T19:56:44.2944462Z [ 48%] Building C object library/CMakeFiles/mbedcrypto.dir/pkwrite.c.o
+2026-05-26T19:56:44.3728360Z [ 49%] Building C object library/CMakeFiles/mbedcrypto.dir/platform.c.o
+2026-05-26T19:56:44.4502162Z [ 50%] Building C object library/CMakeFiles/mbedcrypto.dir/platform_util.c.o
+2026-05-26T19:56:44.5072662Z [ 51%] Building C object library/CMakeFiles/mbedcrypto.dir/poly1305.c.o
+2026-05-26T19:56:44.5200410Z [ 52%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto.c.o
+2026-05-26T19:56:44.5422229Z [ 53%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_aead.c.o
+2026-05-26T19:56:44.6732028Z [ 53%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_cipher.c.o
+2026-05-26T19:56:44.6934047Z [ 54%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_client.c.o
+2026-05-26T19:56:44.7412707Z [ 55%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_driver_wrappers_no_static.c.o
+2026-05-26T19:56:44.8652825Z [ 56%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_ecp.c.o
+2026-05-26T19:56:44.8859281Z [ 57%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_ffdh.c.o
+2026-05-26T19:56:44.9028268Z [ 58%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_hash.c.o
+2026-05-26T19:56:45.0718253Z [ 59%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_mac.c.o
+2026-05-26T19:56:45.0802220Z [ 59%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_pake.c.o
+2026-05-26T19:56:45.0832067Z [ 60%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_rsa.c.o
+2026-05-26T19:56:45.2895764Z [ 61%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_se.c.o
+2026-05-26T19:56:45.2942056Z [ 62%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_slot_management.c.o
+2026-05-26T19:56:45.2962631Z [ 63%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_storage.c.o
+2026-05-26T19:56:45.4302476Z [ 64%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_its_file.c.o
+2026-05-26T19:56:45.4872413Z [ 65%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_util.c.o
+2026-05-26T19:56:45.4922129Z [ 65%] Building C object library/CMakeFiles/mbedcrypto.dir/ripemd160.c.o
+2026-05-26T19:56:45.5822342Z [ 66%] Building C object library/CMakeFiles/mbedcrypto.dir/rsa.c.o
+2026-05-26T19:56:45.5876185Z [ 67%] Building C object library/CMakeFiles/mbedcrypto.dir/rsa_alt_helpers.c.o
+2026-05-26T19:56:45.6440646Z [ 68%] Building C object library/CMakeFiles/mbedcrypto.dir/sha1.c.o
+2026-05-26T19:56:45.7632326Z [ 69%] Building C object library/CMakeFiles/mbedcrypto.dir/sha256.c.o
+2026-05-26T19:56:45.8332293Z [ 70%] Building C object library/CMakeFiles/mbedcrypto.dir/sha512.c.o
+2026-05-26T19:56:45.9532215Z [ 71%] Building C object library/CMakeFiles/mbedcrypto.dir/sha3.c.o
+2026-05-26T19:56:45.9811933Z [ 71%] Building C object library/CMakeFiles/mbedcrypto.dir/threading.c.o
+2026-05-26T19:56:46.0564262Z [ 72%] Building C object library/CMakeFiles/mbedcrypto.dir/timing.c.o
+2026-05-26T19:56:46.0772217Z [ 73%] Building C object library/CMakeFiles/mbedcrypto.dir/version.c.o
+2026-05-26T19:56:46.1042112Z [ 74%] Building C object library/CMakeFiles/mbedcrypto.dir/version_features.c.o
+2026-05-26T19:56:46.2347825Z [ 75%] Linking C static library libmbedcrypto.a
+2026-05-26T19:56:46.2546655Z [ 75%] Built target mbedcrypto
+2026-05-26T19:56:46.2635207Z [ 76%] Building C object library/CMakeFiles/mbedx509.dir/pkcs7.c.o
+2026-05-26T19:56:46.2636254Z [ 77%] Building C object library/CMakeFiles/mbedx509.dir/x509.c.o
+2026-05-26T19:56:46.2636923Z [ 78%] Building C object library/CMakeFiles/mbedx509.dir/x509_create.c.o
+2026-05-26T19:56:46.2640300Z [ 79%] Building C object library/CMakeFiles/mbedx509.dir/x509_crl.c.o
+2026-05-26T19:56:46.5082407Z [ 80%] Building C object library/CMakeFiles/mbedx509.dir/x509_crt.c.o
+2026-05-26T19:56:46.5132081Z [ 80%] Building C object library/CMakeFiles/mbedx509.dir/x509_csr.c.o
+2026-05-26T19:56:46.5292151Z [ 81%] Building C object library/CMakeFiles/mbedx509.dir/x509write.c.o
+2026-05-26T19:56:46.6672432Z [ 82%] Building C object library/CMakeFiles/mbedx509.dir/x509write_crt.c.o
+2026-05-26T19:56:46.6914155Z [ 83%] Building C object library/CMakeFiles/mbedx509.dir/x509write_csr.c.o
+2026-05-26T19:56:47.0530319Z [ 84%] Linking C static library libmbedx509.a
+2026-05-26T19:56:47.0662194Z [ 84%] Built target mbedx509
+2026-05-26T19:56:47.0755109Z [ 85%] Building C object library/CMakeFiles/mbedtls.dir/debug.c.o
+2026-05-26T19:56:47.0756209Z [ 86%] Building C object library/CMakeFiles/mbedtls.dir/mps_reader.c.o
+2026-05-26T19:56:47.0756937Z [ 87%] Building C object library/CMakeFiles/mbedtls.dir/mps_trace.c.o
+2026-05-26T19:56:47.0761601Z [ 87%] Building C object library/CMakeFiles/mbedtls.dir/net_sockets.c.o
+2026-05-26T19:56:47.2212261Z [ 88%] Building C object library/CMakeFiles/mbedtls.dir/ssl_cache.c.o
+2026-05-26T19:56:47.2242137Z [ 89%] Building C object library/CMakeFiles/mbedtls.dir/ssl_ciphersuites.c.o
+2026-05-26T19:56:47.3242386Z [ 90%] Building C object library/CMakeFiles/mbedtls.dir/ssl_client.c.o
+2026-05-26T19:56:47.3522632Z [ 91%] Building C object library/CMakeFiles/mbedtls.dir/ssl_cookie.c.o
+2026-05-26T19:56:47.3882100Z [ 92%] Building C object library/CMakeFiles/mbedtls.dir/ssl_debug_helpers_generated.c.o
+2026-05-26T19:56:47.4242098Z [ 93%] Building C object library/CMakeFiles/mbedtls.dir/ssl_msg.c.o
+2026-05-26T19:56:47.5442180Z [ 93%] Building C object library/CMakeFiles/mbedtls.dir/ssl_ticket.c.o
+2026-05-26T19:56:47.5722398Z [ 94%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls.c.o
+2026-05-26T19:56:47.5762227Z [ 95%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls12_client.c.o
+2026-05-26T19:56:47.7632634Z [ 96%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls12_server.c.o
+2026-05-26T19:56:47.9962265Z [ 97%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_keys.c.o
+2026-05-26T19:56:48.1262177Z [ 98%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_server.c.o
+2026-05-26T19:56:48.1449234Z [ 99%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_client.c.o
+2026-05-26T19:56:48.2472272Z [ 99%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_generic.c.o
+2026-05-26T19:56:48.3601936Z [100%] Linking C static library libmbedtls.a
+2026-05-26T19:56:48.3748425Z [100%] Built target mbedtls
+2026-05-26T19:56:48.3979958Z [  3%] Built target everest
+2026-05-26T19:56:48.4084951Z [  6%] Built target p256m
+2026-05-26T19:56:48.4737920Z [ 75%] Built target mbedcrypto
+2026-05-26T19:56:48.4909936Z [ 84%] Built target mbedx509
+2026-05-26T19:56:48.5144421Z [100%] Built target mbedtls
+2026-05-26T19:56:48.5219809Z Install the project...
+2026-05-26T19:56:48.5241052Z -- Install configuration: "RelWithDebInfo"
+2026-05-26T19:56:48.5331249Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSConfig.cmake
+2026-05-26T19:56:48.5333032Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSConfigVersion.cmake
+2026-05-26T19:56:48.5335199Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSTargets.cmake
+2026-05-26T19:56:48.5337359Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSTargets-relwithdebinfo.cmake
+2026-05-26T19:56:48.5342988Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/aes.h
+2026-05-26T19:56:48.5344931Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/aria.h
+2026-05-26T19:56:48.5346628Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/asn1.h
+2026-05-26T19:56:48.5348489Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/asn1write.h
+2026-05-26T19:56:48.5350175Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/base64.h
+2026-05-26T19:56:48.5351712Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/bignum.h
+2026-05-26T19:56:48.5353825Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/build_info.h
+2026-05-26T19:56:48.5355417Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/camellia.h
+2026-05-26T19:56:48.5357042Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ccm.h
+2026-05-26T19:56:48.5358914Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/chacha20.h
+2026-05-26T19:56:48.5360522Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/chachapoly.h
+2026-05-26T19:56:48.5362359Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/check_config.h
+2026-05-26T19:56:48.5364601Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/cipher.h
+2026-05-26T19:56:48.5367081Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/cmac.h
+2026-05-26T19:56:48.5368436Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/compat-2.x.h
+2026-05-26T19:56:48.5370004Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_legacy_crypto.h
+2026-05-26T19:56:48.5372045Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_legacy_from_psa.h
+2026-05-26T19:56:48.5373717Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_psa_from_legacy.h
+2026-05-26T19:56:48.5375264Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_psa_superset_legacy.h
+2026-05-26T19:56:48.5376621Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_ssl.h
+2026-05-26T19:56:48.5378010Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_x509.h
+2026-05-26T19:56:48.5379378Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_psa.h
+2026-05-26T19:56:48.5380800Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/constant_time.h
+2026-05-26T19:56:48.5382379Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ctr_drbg.h
+2026-05-26T19:56:48.5384098Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/debug.h
+2026-05-26T19:56:48.5385612Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/des.h
+2026-05-26T19:56:48.5387120Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/dhm.h
+2026-05-26T19:56:48.5389232Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecdh.h
+2026-05-26T19:56:48.5390795Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecdsa.h
+2026-05-26T19:56:48.5392889Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecjpake.h
+2026-05-26T19:56:48.5394354Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecp.h
+2026-05-26T19:56:48.5396588Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/entropy.h
+2026-05-26T19:56:48.5398156Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/error.h
+2026-05-26T19:56:48.5399626Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/gcm.h
+2026-05-26T19:56:48.5401637Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/hkdf.h
+2026-05-26T19:56:48.5403089Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/hmac_drbg.h
+2026-05-26T19:56:48.5404663Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/lms.h
+2026-05-26T19:56:48.5406520Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/mbedtls_config.h
+2026-05-26T19:56:48.5409571Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/md.h
+2026-05-26T19:56:48.5411330Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/md5.h
+2026-05-26T19:56:48.5412972Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/memory_buffer_alloc.h
+2026-05-26T19:56:48.5414424Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/net_sockets.h
+2026-05-26T19:56:48.5415986Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/nist_kw.h
+2026-05-26T19:56:48.5417432Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/oid.h
+2026-05-26T19:56:48.5419426Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pem.h
+2026-05-26T19:56:48.5420854Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pk.h
+2026-05-26T19:56:48.5423181Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pkcs12.h
+2026-05-26T19:56:48.5424637Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pkcs5.h
+2026-05-26T19:56:48.5426215Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pkcs7.h
+2026-05-26T19:56:48.5427778Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/platform.h
+2026-05-26T19:56:48.5429447Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/platform_time.h
+2026-05-26T19:56:48.5431113Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/platform_util.h
+2026-05-26T19:56:48.5432709Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/poly1305.h
+2026-05-26T19:56:48.5434262Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/private_access.h
+2026-05-26T19:56:48.5435658Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/psa_util.h
+2026-05-26T19:56:48.5437123Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ripemd160.h
+2026-05-26T19:56:48.5438551Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/rsa.h
+2026-05-26T19:56:48.5440801Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha1.h
+2026-05-26T19:56:48.5442455Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha256.h
+2026-05-26T19:56:48.5443961Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha3.h
+2026-05-26T19:56:48.5445488Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha512.h
+2026-05-26T19:56:48.5446997Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl.h
+2026-05-26T19:56:48.5451715Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_cache.h
+2026-05-26T19:56:48.5453337Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_ciphersuites.h
+2026-05-26T19:56:48.5455246Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_cookie.h
+2026-05-26T19:56:48.5456651Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_ticket.h
+2026-05-26T19:56:48.5458155Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/threading.h
+2026-05-26T19:56:48.5459622Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/timing.h
+2026-05-26T19:56:48.5461268Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/version.h
+2026-05-26T19:56:48.5462778Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509.h
+2026-05-26T19:56:48.5464623Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509_crl.h
+2026-05-26T19:56:48.5466095Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509_crt.h
+2026-05-26T19:56:48.5468280Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509_csr.h
+2026-05-26T19:56:48.5471292Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/build_info.h
+2026-05-26T19:56:48.5472913Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto.h
+2026-05-26T19:56:48.5477115Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_adjust_auto_enabled.h
+2026-05-26T19:56:48.5478441Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_adjust_config_key_pair_types.h
+2026-05-26T19:56:48.5479837Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_adjust_config_synonyms.h
+2026-05-26T19:56:48.5481346Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_builtin_composites.h
+2026-05-26T19:56:48.5482935Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_builtin_key_derivation.h
+2026-05-26T19:56:48.5484333Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_builtin_primitives.h
+2026-05-26T19:56:48.5485648Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_compat.h
+2026-05-26T19:56:48.5487082Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_config.h
+2026-05-26T19:56:48.5488651Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_common.h
+2026-05-26T19:56:48.5490118Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_contexts_composites.h
+2026-05-26T19:56:48.5491698Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_contexts_key_derivation.h
+2026-05-26T19:56:48.5493099Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_contexts_primitives.h
+2026-05-26T19:56:48.5494326Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_extra.h
+2026-05-26T19:56:48.5496844Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_legacy.h
+2026-05-26T19:56:48.5498191Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_platform.h
+2026-05-26T19:56:48.5499592Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_se_driver.h
+2026-05-26T19:56:48.5501978Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_sizes.h
+2026-05-26T19:56:48.5504111Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_struct.h
+2026-05-26T19:56:48.5505629Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_types.h
+2026-05-26T19:56:48.5507273Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_values.h
+2026-05-26T19:56:48.5513474Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest
+2026-05-26T19:56:48.5514598Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib.h
+2026-05-26T19:56:48.5516173Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/Hacl_Curve25519.h
+2026-05-26T19:56:48.5517478Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013
+2026-05-26T19:56:48.5518599Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013/inttypes.h
+2026-05-26T19:56:48.5520174Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013/Hacl_Curve25519.h
+2026-05-26T19:56:48.5521650Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013/stdbool.h
+2026-05-26T19:56:48.5523187Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/everest.h
+2026-05-26T19:56:48.5524642Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin
+2026-05-26T19:56:48.5525649Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal
+2026-05-26T19:56:48.5526864Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/builtin.h
+2026-05-26T19:56:48.5528358Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/debug.h
+2026-05-26T19:56:48.5529856Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/wasmsupport.h
+2026-05-26T19:56:48.5531487Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/target.h
+2026-05-26T19:56:48.5532980Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/compat.h
+2026-05-26T19:56:48.5534494Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/types.h
+2026-05-26T19:56:48.5535977Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/callconv.h
+2026-05-26T19:56:48.5537390Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/c_endianness.h
+2026-05-26T19:56:48.5538793Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib
+2026-05-26T19:56:48.5540164Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib/FStar_UInt64_FStar_UInt32_FStar_UInt16_FStar_UInt8.h
+2026-05-26T19:56:48.5541618Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib/FStar_UInt128.h
+2026-05-26T19:56:48.5543086Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/x25519.h
+2026-05-26T19:56:48.5545139Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libeverest.a
+2026-05-26T19:56:48.5549115Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libp256m.a
+2026-05-26T19:56:48.5553073Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libmbedcrypto.a
+2026-05-26T19:56:48.5596325Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libmbedx509.a
+2026-05-26T19:56:48.5603142Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libmbedtls.a

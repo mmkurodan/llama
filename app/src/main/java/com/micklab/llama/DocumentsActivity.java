@@ -180,6 +180,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- コピー（処理状況/ログ）: 処理状況/ログ欄の内容をクリップボードへコピーします。\n\n");
         sb.append("4. 設定画面の操作\n");
         sb.append("- 設定画面: 各項目は種別ごとのセクションに分かれており、見出しをタップすると開閉できます。MCP設定セクションは初期状態で閉じています。\n");
+        sb.append("- モデル管理: ダウンロード済みモデルの削除に加え、現在編集中のプロファイルを別のダウンロード済みモデルへ切り替えられます。\n");
         sb.append("- 設定管理: 設定の保存/削除/読み込みを行います。\n");
         sb.append("- モデル選択: モデルURLでの読み込みに加え、ローカル端末から .gguf ファイルを取り込めます。ファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動できます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。\n");
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
@@ -248,7 +249,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("9. 🧭 GGUFファイルの探し方\n\n");
         sb.append("【9-1. GGUF対応モデルを探す】\n");
-        sb.append("- 設定画面の「Hugging FaceでGGUFを検索」ボタンから検索・選択・自動ダウンロードを開始できる\n");
+        sb.append("- 設定画面の「Hugging FaceでGGUFを検索」ボタンから Gemma や Qwen などの主要モデルを選ぶか、その他で任意キーワードを入力し、ファイル選択後に自動ダウンロードを開始できる\n");
         sb.append("- Hugging Face のモデル検索で GGUF タグを使う\n");
         sb.append("  → https://huggingface.co/models?library=gguf\n");
         sb.append("- GGUFモデルはリポジトリ名に -GGUF が付いていることが多い\n");
@@ -308,6 +309,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Copy (Processing Status/Logs): Copy the Processing Status/Logs area to the clipboard.\n\n");
         sb.append("4. Settings Screen\n");
         sb.append("- Settings screen: Controls are grouped into collapsible sections. Tap a section title to expand or collapse it. The MCP Settings section is collapsed by default.\n");
+        sb.append("- Model Maintenance: In addition to deleting downloaded models, you can switch the profile currently being edited to another downloaded model.\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
         sb.append("- Model Selection: Load models from a URL or import .gguf files from the local device. The picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification.\n");
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
@@ -376,7 +378,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13+ may require notification permission.\n\n");
         sb.append("9. 🧭 Finding GGUF Files\n\n");
         sb.append("[9-1. Locating GGUF-compatible models]\n");
-        sb.append("- Use the Settings screen's \"Search GGUF on Hugging Face\" button to search, select, and start the download automatically\n");
+        sb.append("- Use the Settings screen's \"Search GGUF on Hugging Face\" button to pick a major family such as Gemma or Qwen, or choose Other to enter any keyword, then select a file and start the download automatically\n");
         sb.append("- Use the GGUF tag on Hugging Face model search\n");
         sb.append("  → https://huggingface.co/models?library=gguf\n");
         sb.append("- GGUF models often have -GGUF in the repository name\n");

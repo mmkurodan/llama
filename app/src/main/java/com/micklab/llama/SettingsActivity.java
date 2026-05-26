@@ -67,6 +67,15 @@ public class SettingsActivity extends Activity {
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
+    private static final HuggingFaceSearchPreset[] HUGGING_FACE_SEARCH_PRESETS = new HuggingFaceSearchPreset[]{
+            new HuggingFaceSearchPreset("Gemma", "Gemma", "gemma"),
+            new HuggingFaceSearchPreset("Qwen", "Qwen", "qwen"),
+            new HuggingFaceSearchPreset("Llama", "Llama", "llama"),
+            new HuggingFaceSearchPreset("Mistral", "Mistral", "mistral"),
+            new HuggingFaceSearchPreset("DeepSeek", "DeepSeek", "deepseek"),
+            new HuggingFaceSearchPreset("Phi", "Phi", "phi"),
+            new HuggingFaceSearchPreset("その他", "Other", null),
+    };
     
     private ConfigurationManager configManager;
     private ModelManager modelManager;
@@ -189,6 +198,26 @@ public class SettingsActivity extends Activity {
         private ImportedModelCandidate(String displayName, long sizeBytes) {
             this.displayName = displayName;
             this.sizeBytes = sizeBytes;
+        }
+    }
+
+    private static final class HuggingFaceSearchPreset {
+        private final String jaLabel;
+        private final String enLabel;
+        private final String query;
+
+        private HuggingFaceSearchPreset(String jaLabel, String enLabel, String query) {
+            this.jaLabel = jaLabel;
+            this.enLabel = enLabel;
+            this.query = query;
+        }
+
+        private String getLabel(boolean japanese) {
+            return japanese ? jaLabel : enLabel;
+        }
+
+        private boolean isCustomQuery() {
+            return query == null || query.trim().isEmpty();
         }
     }
 
@@ -1411,10 +1440,15 @@ public class SettingsActivity extends Activity {
 
         final int[] selectedIndex = {0};
         new AlertDialog.Builder(this)
-            .setTitle("Model Maintenance")
+            .setTitle(localizedText("モデル管理", "Model Maintenance"))
             .setSingleChoiceItems(fileItems, 0, (dialog, which) -> selectedIndex[0] = which)
-            .setPositiveButton("Delete Selected", (dialog, which) -> confirmDeleteModelFile(modelFiles[selectedIndex[0]]))
-            .setNegativeButton("Close", null)
+            .setPositiveButton(
+                    localizedText("選択モデルを使用", "Use Selected Model"),
+                    (dialog, which) -> switchCurrentProfileToDownloadedModel(modelFiles[selectedIndex[0]]))
+            .setNeutralButton(
+                    localizedText("選択モデルを削除", "Delete Selected"),
+                    (dialog, which) -> confirmDeleteModelFile(modelFiles[selectedIndex[0]]))
+            .setNegativeButton(localizedText("閉じる", "Close"), null)
             .show();
     }
 
@@ -1466,6 +1500,49 @@ public class SettingsActivity extends Activity {
             .show();
     }
 
+    private void switchCurrentProfileToDownloadedModel(File modelFile) {
+        if (modelFile == null || !modelFile.isFile() || modelFile.length() <= 0) {
+            showToast(localizedText("選択したモデルファイルを利用できません", "The selected model file is unavailable"));
+            return;
+        }
+        if (importInProgress || modelManager.isBusy()) {
+            showToast(localizedText(
+                    "モデル処理中はプロファイルを変更できません",
+                    "Cannot change the profile while a model operation is running"));
+            return;
+        }
+
+        modelUrlInput.setText(modelFile.getName());
+        ConfigurationManager.Configuration config = getConfigFromUI();
+        try {
+            configManager.saveConfiguration(config);
+            currentConfig = config;
+            loadConfigList();
+
+            int position = configAdapter != null ? configAdapter.getPosition(config.name) : -1;
+            if (position >= 0) {
+                configSpinner.setSelection(position);
+            }
+
+            loadedModelPath = null;
+            modelLoadedSuccessfully = false;
+            modelFileInfo.setText(localizedText(
+                    "現在のプロファイルを変更しました: " + modelFile.getName(),
+                    "Current profile now uses: " + modelFile.getName()));
+            modelProgressBar.setProgress(0);
+            lastDownloadProgress = 0;
+            updateAutoTemplatePreview(config);
+            showToast(localizedText(
+                    "現在のプロファイルを更新しました: " + config.name,
+                    "Updated current profile: " + config.name));
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to switch current profile to downloaded model", e);
+            showToast(localizedText(
+                    "プロファイルの更新に失敗しました: ",
+                    "Failed to update profile: ") + e.getMessage());
+        }
+    }
+
     private void deleteModelFile(File modelFile) {
         if (importInProgress || modelManager.isBusy()) {
             showToast("Model is busy processing another request");
@@ -1498,9 +1575,30 @@ public class SettingsActivity extends Activity {
     }
 
     private void showHuggingFaceSearchDialog() {
+        final boolean japanese = AppLanguageManager.isJapanese(this);
+        String[] labels = new String[HUGGING_FACE_SEARCH_PRESETS.length];
+        for (int i = 0; i < HUGGING_FACE_SEARCH_PRESETS.length; i++) {
+            labels[i] = HUGGING_FACE_SEARCH_PRESETS[i].getLabel(japanese);
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("主要なモデルを選択", "Choose a model family"))
+                .setItems(labels, (dialog, which) -> {
+                    HuggingFaceSearchPreset preset = HUGGING_FACE_SEARCH_PRESETS[which];
+                    if (preset.isCustomQuery()) {
+                        showHuggingFaceKeywordDialog();
+                        return;
+                    }
+                    searchHuggingFaceRepositories(preset.query, preset.getLabel(japanese));
+                })
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private void showHuggingFaceKeywordDialog() {
         EditText queryInput = new EditText(this);
         queryInput.setSingleLine(true);
-        queryInput.setHint(localizedText("モデル名またはリポジトリ名", "Model or repository name"));
+        queryInput.setHint(localizedText("モデル名またはキーワード", "Model name or keyword"));
         String suggestedQuery = buildHuggingFaceQuerySeed();
         if (!suggestedQuery.isEmpty()) {
             queryInput.setText(suggestedQuery);
@@ -1508,22 +1606,34 @@ public class SettingsActivity extends Activity {
         }
 
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("Hugging Face で GGUF を検索", "Search GGUF on Hugging Face"))
+                .setTitle(localizedText("その他のGGUFを検索", "Search other GGUF models"))
                 .setView(queryInput)
                 .setPositiveButton(localizedText("検索", "Search"),
-                        (dialog, which) -> searchHuggingFaceRepositories(queryInput.getText().toString()))
+                        (dialog, which) -> {
+                            String query = queryInput.getText().toString().trim();
+                            if (query.isEmpty()) {
+                                showToast(localizedText("キーワードを入力してください", "Enter a keyword"));
+                                return;
+                            }
+                            searchHuggingFaceRepositories(query, query);
+                        })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
                 .show();
     }
 
-    private void searchHuggingFaceRepositories(String rawQuery) {
+    private void searchHuggingFaceRepositories(String rawQuery, String displayLabel) {
         final String query = rawQuery != null ? rawQuery.trim() : "";
-        setHuggingFaceSearchBusy(true, localizedText("Hugging Face を検索中...", "Searching Hugging Face..."));
+        final String label = displayLabel != null && !displayLabel.trim().isEmpty()
+                ? displayLabel.trim()
+                : query;
+        setHuggingFaceSearchBusy(true, localizedText(
+                "Hugging Face を検索中... " + label,
+                "Searching Hugging Face... " + label));
 
         new Thread(() -> {
             try {
                 List<HuggingFaceApiClient.ModelSearchResult> results =
-                        HuggingFaceApiClient.searchGgufModels(query, 24);
+                        HuggingFaceApiClient.searchGgufModels(query);
                 runOnUiThread(() -> {
                     setHuggingFaceSearchBusy(false, null);
                     if (results.isEmpty()) {
