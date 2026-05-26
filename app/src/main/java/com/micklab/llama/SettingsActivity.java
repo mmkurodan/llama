@@ -67,15 +67,6 @@ public class SettingsActivity extends Activity {
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
-    private static final HuggingFaceSearchPreset[] HUGGING_FACE_SEARCH_PRESETS = new HuggingFaceSearchPreset[]{
-            new HuggingFaceSearchPreset("Gemma", "Gemma", "gemma"),
-            new HuggingFaceSearchPreset("Qwen", "Qwen", "qwen"),
-            new HuggingFaceSearchPreset("Llama", "Llama", "llama"),
-            new HuggingFaceSearchPreset("Mistral", "Mistral", "mistral"),
-            new HuggingFaceSearchPreset("DeepSeek", "DeepSeek", "deepseek"),
-            new HuggingFaceSearchPreset("Phi", "Phi", "phi"),
-            new HuggingFaceSearchPreset("その他", "Other", null),
-    };
     
     private ConfigurationManager configManager;
     private ModelManager modelManager;
@@ -198,26 +189,6 @@ public class SettingsActivity extends Activity {
         private ImportedModelCandidate(String displayName, long sizeBytes) {
             this.displayName = displayName;
             this.sizeBytes = sizeBytes;
-        }
-    }
-
-    private static final class HuggingFaceSearchPreset {
-        private final String jaLabel;
-        private final String enLabel;
-        private final String query;
-
-        private HuggingFaceSearchPreset(String jaLabel, String enLabel, String query) {
-            this.jaLabel = jaLabel;
-            this.enLabel = enLabel;
-            this.query = query;
-        }
-
-        private String getLabel(boolean japanese) {
-            return japanese ? jaLabel : enLabel;
-        }
-
-        private boolean isCustomQuery() {
-            return query == null || query.trim().isEmpty();
         }
     }
 
@@ -1575,38 +1546,12 @@ public class SettingsActivity extends Activity {
     }
 
     private void showHuggingFaceSearchDialog() {
-        final boolean japanese = AppLanguageManager.isJapanese(this);
-        String[] labels = new String[HUGGING_FACE_SEARCH_PRESETS.length];
-        for (int i = 0; i < HUGGING_FACE_SEARCH_PRESETS.length; i++) {
-            labels[i] = HUGGING_FACE_SEARCH_PRESETS[i].getLabel(japanese);
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle(localizedText("主要なモデルを選択", "Choose a model family"))
-                .setItems(labels, (dialog, which) -> {
-                    HuggingFaceSearchPreset preset = HUGGING_FACE_SEARCH_PRESETS[which];
-                    if (preset.isCustomQuery()) {
-                        showHuggingFaceKeywordDialog();
-                        return;
-                    }
-                    searchHuggingFaceRepositories(preset.query, preset.getLabel(japanese));
-                })
-                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
-                .show();
-    }
-
-    private void showHuggingFaceKeywordDialog() {
         EditText queryInput = new EditText(this);
         queryInput.setSingleLine(true);
-        queryInput.setHint(localizedText("モデル名またはキーワード", "Model name or keyword"));
-        String suggestedQuery = buildHuggingFaceQuerySeed();
-        if (!suggestedQuery.isEmpty()) {
-            queryInput.setText(suggestedQuery);
-            queryInput.setSelection(suggestedQuery.length());
-        }
+        queryInput.setHint(localizedText("モデル名またはキーワード（部分一致）", "Model name or keyword (partial match)"));
 
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("その他のGGUFを検索", "Search other GGUF models"))
+                .setTitle(localizedText("Hugging Face で GGUF を検索", "Search GGUF on Hugging Face"))
                 .setView(queryInput)
                 .setPositiveButton(localizedText("検索", "Search"),
                         (dialog, which) -> {
@@ -1615,20 +1560,17 @@ public class SettingsActivity extends Activity {
                                 showToast(localizedText("キーワードを入力してください", "Enter a keyword"));
                                 return;
                             }
-                            searchHuggingFaceRepositories(query, query);
+                            searchHuggingFaceRepositories(query);
                         })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
                 .show();
     }
 
-    private void searchHuggingFaceRepositories(String rawQuery, String displayLabel) {
+    private void searchHuggingFaceRepositories(String rawQuery) {
         final String query = rawQuery != null ? rawQuery.trim() : "";
-        final String label = displayLabel != null && !displayLabel.trim().isEmpty()
-                ? displayLabel.trim()
-                : query;
         setHuggingFaceSearchBusy(true, localizedText(
-                "Hugging Face を検索中... " + label,
-                "Searching Hugging Face... " + label));
+                "Hugging Face を検索中... " + query,
+                "Searching Hugging Face... " + query));
 
         new Thread(() -> {
             try {
@@ -1753,19 +1695,6 @@ public class SettingsActivity extends Activity {
             }
         }
         updateActionButtonStateForBusy();
-    }
-
-    private String buildHuggingFaceQuerySeed() {
-        String currentReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
-        String filename = extractFilenameFromUrl(currentReference);
-        if (filename != null && !filename.isEmpty()) {
-            String seed = filename.toLowerCase(Locale.US).endsWith(".gguf")
-                    ? filename.substring(0, filename.length() - 5)
-                    : filename;
-            return seed.replace('_', ' ').trim();
-        }
-        String configName = configNameInput != null ? configNameInput.getText().toString().trim() : "";
-        return configName;
     }
 
     private String buildHuggingFaceRepositoryMeta(HuggingFaceApiClient.ModelSearchResult result) {

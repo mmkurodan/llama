@@ -16,54 +16,40 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public final class HuggingFaceApiClient {
     private static final String API_BASE_URL = "https://huggingface.co/api";
     private static final String WEB_BASE_URL = "https://huggingface.co";
     private static final int CONNECT_TIMEOUT_MS = 10000;
     private static final int READ_TIMEOUT_MS = 20000;
-    private static final int SEARCH_PAGE_SIZE = 100;
+    private static final int SEARCH_RESULT_LIMIT = 30;
 
     private HuggingFaceApiClient() {
     }
 
     public static List<ModelSearchResult> searchGgufModels(String query) throws IOException, JSONException {
         String trimmedQuery = query != null ? query.trim() : "";
-        Map<String, ModelSearchResult> uniqueResults = new LinkedHashMap<>();
-        String cursor = null;
-
-        while (true) {
-            JsonArrayPage page = readModelSearchPage(trimmedQuery, cursor);
-            for (int i = 0; i < page.items.length(); i++) {
-                JSONObject item = page.items.optJSONObject(i);
-                if (item == null) {
-                    continue;
-                }
-
-                String repoId = item.optString("id", "").trim();
-                if (repoId.isEmpty() || !hasGgufTag(item.optJSONArray("tags"))) {
-                    continue;
-                }
-
-                if (!uniqueResults.containsKey(repoId)) {
-                    uniqueResults.put(repoId, new ModelSearchResult(
-                            repoId,
-                            item.optLong("downloads", 0L),
-                            item.optLong("likes", 0L),
-                            item.optString("pipeline_tag", "")));
-                }
+        JSONArray items = readModelSearchPage(trimmedQuery);
+        List<ModelSearchResult> results = new ArrayList<>();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) {
+                continue;
             }
 
-            if (page.nextCursor == null || page.nextCursor.isEmpty() || page.items.length() == 0) {
-                break;
+            String repoId = item.optString("id", "").trim();
+            if (repoId.isEmpty() || !hasGgufTag(item.optJSONArray("tags"))) {
+                continue;
             }
-            cursor = page.nextCursor;
+
+            results.add(new ModelSearchResult(
+                    repoId,
+                    item.optLong("downloads", 0L),
+                    item.optLong("likes", 0L),
+                    item.optString("pipeline_tag", "")));
         }
-
-        return new ArrayList<>(uniqueResults.values());
+        return results;
     }
 
     public static RepositoryFiles getRepositoryGgufFiles(String repoId) throws IOException, JSONException {
@@ -138,35 +124,14 @@ public final class HuggingFaceApiClient {
         }
     }
 
-    private static JsonArrayPage readModelSearchPage(String query, String cursor) throws IOException, JSONException {
+    private static JSONArray readModelSearchPage(String query) throws IOException, JSONException {
         Uri.Builder builder = Uri.parse(API_BASE_URL + "/models").buildUpon()
                 .appendQueryParameter("filter", "gguf")
-                .appendQueryParameter("limit", String.valueOf(SEARCH_PAGE_SIZE));
+                .appendQueryParameter("limit", String.valueOf(SEARCH_RESULT_LIMIT));
         if (!query.isEmpty()) {
             builder.appendQueryParameter("search", query);
         }
-        if (cursor != null && !cursor.isEmpty()) {
-            builder.appendQueryParameter("cursor", cursor);
-        }
-        HttpURLConnection connection = openConnection(builder.build().toString());
-        try {
-            int responseCode = connection.getResponseCode();
-            String responseBody = readResponseBody(connection, responseCode);
-            if (responseCode < 200 || responseCode >= 300) {
-                throw new IOException("HTTP " + responseCode + (responseBody.isEmpty() ? "" : ": " + responseBody));
-            }
-            Object parsed = new JSONTokener(responseBody).nextValue();
-            if (!(parsed instanceof JSONArray)) {
-                throw new IOException("Unexpected Hugging Face search response");
-            }
-            return new JsonArrayPage((JSONArray) parsed, parseNextCursor(connection.getHeaderField("Link")));
-        } finally {
-            connection.disconnect();
-        }
-    }
-
-    private static JSONArray readJsonArray(String url) throws IOException, JSONException {
-        Object parsed = readJsonValue(url);
+        Object parsed = readJsonValue(builder.build().toString());
         if (parsed instanceof JSONArray) {
             return (JSONArray) parsed;
         }
@@ -221,40 +186,6 @@ public final class HuggingFaceApiClient {
                 buffer.write(chunk, 0, read);
             }
             return buffer.toString(StandardCharsets.UTF_8.name()).trim();
-        }
-    }
-
-    private static String parseNextCursor(String linkHeader) {
-        if (linkHeader == null || linkHeader.isEmpty()) {
-            return null;
-        }
-
-        String[] links = linkHeader.split(",");
-        for (String rawLink : links) {
-            String link = rawLink.trim();
-            if (!link.contains("rel=\"next\"")) {
-                continue;
-            }
-
-            int urlStart = link.indexOf('<');
-            int urlEnd = link.indexOf('>');
-            if (urlStart < 0 || urlEnd <= urlStart) {
-                continue;
-            }
-
-            String nextUrl = link.substring(urlStart + 1, urlEnd);
-            return Uri.parse(nextUrl).getQueryParameter("cursor");
-        }
-        return null;
-    }
-
-    private static final class JsonArrayPage {
-        private final JSONArray items;
-        private final String nextCursor;
-
-        private JsonArrayPage(JSONArray items, String nextCursor) {
-            this.items = items != null ? items : new JSONArray();
-            this.nextCursor = nextCursor;
         }
     }
 
