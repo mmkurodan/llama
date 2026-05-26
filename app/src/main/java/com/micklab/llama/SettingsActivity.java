@@ -48,6 +48,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
 
@@ -74,6 +75,7 @@ public class SettingsActivity extends Activity {
     private EditText configNameInput;
     private Spinner configSpinner;
     private EditText modelUrlInput;
+    private Button searchGgufButton;
     private EditText nCtxInput;
     private EditText nThreadsInput;
     private EditText nBatchInput;
@@ -151,6 +153,7 @@ public class SettingsActivity extends Activity {
     private String loadedModelPath = null;
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
+    private volatile boolean huggingFaceSearchInProgress = false;
     private final List<CollapsibleSectionController> collapsibleSections = new ArrayList<>();
     private final ModelManager.BusyStateListener busyStateListener =
             busy -> runOnUiThread(this::updateActionButtonStateForBusy);
@@ -245,6 +248,7 @@ public class SettingsActivity extends Activity {
         configNameInput = findViewById(R.id.configNameInput);
         configSpinner = findViewById(R.id.configSpinner);
         modelUrlInput = findViewById(R.id.modelUrlInput);
+        searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
         nThreadsInput = findViewById(R.id.nThreadsInput);
         nBatchInput = findViewById(R.id.nBatchInput);
@@ -390,6 +394,12 @@ public class SettingsActivity extends Activity {
             }
             launchLocalGgufPicker();
         });
+        searchGgufButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showHuggingFaceSearchDialog();
+        });
         maintainModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
                 return;
@@ -419,6 +429,11 @@ public class SettingsActivity extends Activity {
             showToast(localizedText("モデル取込を実行中です", "Model import is already running"));
             return true;
         }
+        if (huggingFaceSearchInProgress) {
+            updateActionButtonStateForBusy();
+            showToast(localizedText("Hugging Face の検索を実行中です", "Hugging Face search is already running"));
+            return true;
+        }
         if (modelManager != null && modelManager.isBusy()) {
             updateActionButtonStateForBusy();
             showToast("Model is busy processing another request");
@@ -428,12 +443,15 @@ public class SettingsActivity extends Activity {
     }
 
     private void updateActionButtonStateForBusy() {
-        boolean isBusy = importInProgress || (modelManager != null && modelManager.isBusy());
+        boolean isBusy = importInProgress
+                || huggingFaceSearchInProgress
+                || (modelManager != null && modelManager.isBusy());
 
         if (saveConfigButton != null) saveConfigButton.setEnabled(!isBusy);
         if (loadConfigButton != null) loadConfigButton.setEnabled(!isBusy);
         if (deleteConfigButton != null) deleteConfigButton.setEnabled(!isBusy);
         if (importModelButton != null) importModelButton.setEnabled(!isBusy);
+        if (searchGgufButton != null) searchGgufButton.setEnabled(!isBusy);
         if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
         if (maintainModelButton != null) maintainModelButton.setEnabled(!isBusy);
 
@@ -511,6 +529,7 @@ public class SettingsActivity extends Activity {
                 case "Load Selected Config": return "選択した設定を読み込む";
                 case "Model Selection": return "モデル選択";
                 case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
+                case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
                 case "gguf import from local device": return "ローカル端末からggufを取り込む";
                 case "Load Model": return "モデルを読み込む";
                 case "MAINTAIN MODEL": return "モデル管理";
@@ -956,6 +975,9 @@ public class SettingsActivity extends Activity {
         if (currentConfig != null && currentConfig.promptTemplate != null && !currentConfig.promptTemplate.isEmpty()) {
             config.promptTemplate = currentConfig.promptTemplate;
         }
+        if (shouldPreserveMultimodalProjectorReference(config.modelUrl)) {
+            config.multimodalProjectorUrl = currentConfig.multimodalProjectorUrl;
+        }
         
         // Penalty parameters
         try {
@@ -1085,6 +1107,33 @@ public class SettingsActivity extends Activity {
         config.customChatTemplate = customChatTemplateInput.getText().toString();
         
         return config;
+    }
+
+    private boolean shouldPreserveMultimodalProjectorReference(String nextModelReference) {
+        if (currentConfig == null) {
+            return false;
+        }
+        String currentProjectorReference = currentConfig.multimodalProjectorUrl;
+        if (currentProjectorReference == null || currentProjectorReference.trim().isEmpty()) {
+            return false;
+        }
+
+        String previousModelReference = currentConfig.modelUrl;
+        if (previousModelReference == null || previousModelReference.trim().isEmpty()) {
+            return false;
+        }
+        if (nextModelReference == null || nextModelReference.trim().isEmpty()) {
+            return false;
+        }
+
+        String previousFilename = ModelFileHelper.extractFilename(previousModelReference);
+        String nextFilename = ModelFileHelper.extractFilename(nextModelReference);
+        if (previousFilename != null && !previousFilename.isEmpty()
+                && nextFilename != null && !nextFilename.isEmpty()) {
+            return previousFilename.equalsIgnoreCase(nextFilename);
+        }
+
+        return previousModelReference.trim().equalsIgnoreCase(nextModelReference.trim());
     }
 
     private int resolveApiPortFromUi() {
@@ -1446,6 +1495,201 @@ public class SettingsActivity extends Activity {
         } else {
             showToast("Failed to delete model file: " + modelFile.getName());
         }
+    }
+
+    private void showHuggingFaceSearchDialog() {
+        EditText queryInput = new EditText(this);
+        queryInput.setSingleLine(true);
+        queryInput.setHint(localizedText("モデル名またはリポジトリ名", "Model or repository name"));
+        String suggestedQuery = buildHuggingFaceQuerySeed();
+        if (!suggestedQuery.isEmpty()) {
+            queryInput.setText(suggestedQuery);
+            queryInput.setSelection(suggestedQuery.length());
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("Hugging Face で GGUF を検索", "Search GGUF on Hugging Face"))
+                .setView(queryInput)
+                .setPositiveButton(localizedText("検索", "Search"),
+                        (dialog, which) -> searchHuggingFaceRepositories(queryInput.getText().toString()))
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private void searchHuggingFaceRepositories(String rawQuery) {
+        final String query = rawQuery != null ? rawQuery.trim() : "";
+        setHuggingFaceSearchBusy(true, localizedText("Hugging Face を検索中...", "Searching Hugging Face..."));
+
+        new Thread(() -> {
+            try {
+                List<HuggingFaceApiClient.ModelSearchResult> results =
+                        HuggingFaceApiClient.searchGgufModels(query, 24);
+                runOnUiThread(() -> {
+                    setHuggingFaceSearchBusy(false, null);
+                    if (results.isEmpty()) {
+                        showToast(localizedText(
+                                "該当するGGUFリポジトリが見つかりませんでした",
+                                "No matching GGUF repositories were found"));
+                        return;
+                    }
+                    showHuggingFaceRepositoryDialog(results);
+                });
+            } catch (IOException | JSONException e) {
+                Log.e(TAG, "Failed to search Hugging Face GGUF repositories", e);
+                runOnUiThread(() -> {
+                    setHuggingFaceSearchBusy(false, null);
+                    showToast(localizedText(
+                            "Hugging Face の検索に失敗しました: ",
+                            "Hugging Face search failed: ") + e.getMessage());
+                });
+            }
+        }, "hf-gguf-search").start();
+    }
+
+    private void showHuggingFaceRepositoryDialog(List<HuggingFaceApiClient.ModelSearchResult> results) {
+        String[] labels = new String[results.size()];
+        for (int i = 0; i < results.size(); i++) {
+            HuggingFaceApiClient.ModelSearchResult result = results.get(i);
+            StringBuilder label = new StringBuilder(result.getRepoId());
+            String meta = buildHuggingFaceRepositoryMeta(result);
+            if (!meta.isEmpty()) {
+                label.append("  (").append(meta).append(')');
+            }
+            labels[i] = label.toString();
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("ダウンロード元を選択", "Select a repository"))
+                .setItems(labels, (dialog, which) -> fetchHuggingFaceRepositoryFiles(results.get(which)))
+                .setNegativeButton(localizedText("閉じる", "Close"), null)
+                .show();
+    }
+
+    private void fetchHuggingFaceRepositoryFiles(HuggingFaceApiClient.ModelSearchResult result) {
+        setHuggingFaceSearchBusy(true, localizedText(
+                "GGUF 一覧を取得中... " + result.getRepoId(),
+                "Loading GGUF files... " + result.getRepoId()));
+
+        new Thread(() -> {
+            try {
+                HuggingFaceApiClient.RepositoryFiles repositoryFiles =
+                        HuggingFaceApiClient.getRepositoryGgufFiles(result.getRepoId());
+                runOnUiThread(() -> {
+                    setHuggingFaceSearchBusy(false, null);
+                    if (repositoryFiles.getFiles().isEmpty()) {
+                        showToast(localizedText(
+                                "ダウンロード可能なGGUFファイルが見つかりませんでした",
+                                "No downloadable GGUF files were found"));
+                        return;
+                    }
+                    showHuggingFaceFileDialog(repositoryFiles);
+                });
+            } catch (IOException | JSONException e) {
+                Log.e(TAG, "Failed to load Hugging Face GGUF file list", e);
+                runOnUiThread(() -> {
+                    setHuggingFaceSearchBusy(false, null);
+                    showToast(localizedText(
+                            "GGUF 一覧の取得に失敗しました: ",
+                            "Failed to load GGUF files: ") + e.getMessage());
+                });
+            }
+        }, "hf-gguf-files").start();
+    }
+
+    private void showHuggingFaceFileDialog(HuggingFaceApiClient.RepositoryFiles repositoryFiles) {
+        List<HuggingFaceApiClient.GgufFileInfo> files = repositoryFiles.getFiles();
+        String[] labels = new String[files.size()];
+        for (int i = 0; i < files.size(); i++) {
+            HuggingFaceApiClient.GgufFileInfo file = files.get(i);
+            labels[i] = file.isProjector()
+                    ? file.getFilename() + " " + localizedText("(プロジェクタ)", "(projector)")
+                    : file.getFilename();
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("ダウンロード対象を選択", "Select a GGUF file"))
+                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(files.get(which)))
+                .setNegativeButton(localizedText("閉じる", "Close"), null)
+                .show();
+    }
+
+    private void applyHuggingFaceFileSelection(HuggingFaceApiClient.GgufFileInfo selectedFile) {
+        String downloadUrl = selectedFile.getDownloadUrl();
+        modelUrlInput.setText(downloadUrl);
+        currentConfig = getConfigFromUI();
+        updateAutoTemplatePreview(currentConfig);
+        modelFileInfo.setText(localizedText(
+                "選択したモデル: " + selectedFile.getFilename(),
+                "Selected model: " + selectedFile.getFilename()));
+        showToast(localizedText(
+                "ダウンロードを開始します: " + selectedFile.getFilename(),
+                "Starting download: " + selectedFile.getFilename()));
+        loadModel();
+    }
+
+    private void setHuggingFaceSearchBusy(boolean busy, String statusMessage) {
+        huggingFaceSearchInProgress = busy;
+        if (busy) {
+            modelProgressBar.setIndeterminate(true);
+            modelProgressBar.setProgress(0);
+            lastDownloadProgress = 0;
+            if (statusMessage != null && !statusMessage.isEmpty()) {
+                modelFileInfo.setText(statusMessage);
+            }
+        } else {
+            modelProgressBar.setIndeterminate(false);
+            if (modelProgressBar.getProgress() == 0) {
+                lastDownloadProgress = 0;
+            }
+        }
+        updateActionButtonStateForBusy();
+    }
+
+    private String buildHuggingFaceQuerySeed() {
+        String currentReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
+        String filename = extractFilenameFromUrl(currentReference);
+        if (filename != null && !filename.isEmpty()) {
+            String seed = filename.toLowerCase(Locale.US).endsWith(".gguf")
+                    ? filename.substring(0, filename.length() - 5)
+                    : filename;
+            return seed.replace('_', ' ').trim();
+        }
+        String configName = configNameInput != null ? configNameInput.getText().toString().trim() : "";
+        return configName;
+    }
+
+    private String buildHuggingFaceRepositoryMeta(HuggingFaceApiClient.ModelSearchResult result) {
+        List<String> items = new ArrayList<>();
+        if (result.getDownloads() > 0) {
+            items.add("DL " + formatCompactCount(result.getDownloads()));
+        }
+        if (result.getLikes() > 0) {
+            items.add(localizedText("いいね ", "Likes ") + formatCompactCount(result.getLikes()));
+        }
+        if (result.getPipelineTag() != null && !result.getPipelineTag().isEmpty()) {
+            items.add(result.getPipelineTag());
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) {
+                builder.append(" / ");
+            }
+            builder.append(items.get(i));
+        }
+        return builder.toString();
+    }
+
+    private String formatCompactCount(long value) {
+        if (value >= 1_000_000_000L) {
+            return String.format(Locale.US, "%.1fB", value / 1_000_000_000.0d);
+        }
+        if (value >= 1_000_000L) {
+            return String.format(Locale.US, "%.1fM", value / 1_000_000.0d);
+        }
+        if (value >= 1_000L) {
+            return String.format(Locale.US, "%.1fK", value / 1_000.0d);
+        }
+        return String.valueOf(value);
     }
 
     private void launchLocalGgufPicker() {

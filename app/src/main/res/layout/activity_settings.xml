@@ -120,6 +120,12 @@
             android:minLines="2" />
 
         <Button
+            android:id="@+id/searchGgufButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Search GGUF on Hugging Face" />
+
+        <Button
             android:id="@+id/loadModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

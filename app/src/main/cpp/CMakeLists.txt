@@ -25,14 +25,14 @@ set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 #   @BUILD_COMPILER@
 #   @BUILD_TARGET@
 # ---------------------------------------------------------
-set(LLAMA_BUILD_NUMBER 8653 CACHE STRING "")
-set(LLAMA_BUILD_COMMIT "1f34806c441f335f7d66e56fdb8ab3f5d09684e9" CACHE STRING "")
+set(LLAMA_BUILD_NUMBER 9351 CACHE STRING "")
+set(LLAMA_BUILD_COMMIT "0d18aaa9d1a8af3df9abccd828e22eeaac7f840b" CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
 # ggml.c expects these string macros to be defined at compile time.
-set(GGML_VERSION      "0.9.11" CACHE STRING "")
-set(GGML_BUILD_COMMIT "1f34806c441f335f7d66e56fdb8ab3f5d09684e9" CACHE STRING "")
+set(GGML_VERSION      "0.13.0" CACHE STRING "")
+set(GGML_BUILD_COMMIT "0d18aaa9d1a8af3df9abccd828e22eeaac7f840b" CACHE STRING "")
 
 # ---------------------------------------------------------
 # embedded license text for --license in common/arg.cpp
@@ -62,15 +62,15 @@ configure_file(
 # ---------------------------------------------------------
 # llama core sources
 # ---------------------------------------------------------
-file(GLOB LLAMA_ROOT_FILES
+file(GLOB LLAMA_ROOT_FILES CONFIGURE_DEPENDS
     ${LLAMA_ROOT_DIR}/*.cpp
 )
 
-file(GLOB LLAMA_COMMON_FILES
+file(GLOB LLAMA_COMMON_FILES CONFIGURE_DEPENDS
     ${LLAMA_ROOT_DIR}/common/*.cpp
 )
 
-file(GLOB LLAMA_COMMON_JINJA_FILES
+file(GLOB LLAMA_COMMON_JINJA_FILES CONFIGURE_DEPENDS
     ${LLAMA_ROOT_DIR}/common/jinja/*.cpp
 )
 
@@ -78,12 +78,16 @@ set(LLAMA_VENDOR_FILES
     ${LLAMA_ROOT_DIR}/vendor/cpp-httplib/httplib.cpp
 )
 
-file(GLOB LLAMA_SRC_FILES
+file(GLOB LLAMA_SRC_FILES CONFIGURE_DEPENDS
     ${LLAMA_ROOT_DIR}/src/*.cpp
 )
 
-file(GLOB LLAMA_MODEL_FILES
+file(GLOB LLAMA_MODEL_FILES CONFIGURE_DEPENDS
     ${LLAMA_ROOT_DIR}/src/models/*.cpp
+)
+
+file(GLOB MTMD_MODEL_SOURCES CONFIGURE_DEPENDS
+    ${LLAMA_ROOT_DIR}/tools/mtmd/models/*.cpp
 )
 
 set(MTMD_SOURCES
@@ -92,26 +96,7 @@ set(MTMD_SOURCES
     ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-image.cpp
     ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-helper.cpp
     ${LLAMA_ROOT_DIR}/tools/mtmd/clip.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/cogvlm.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/conformer.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/gemma4v.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/glm4v.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/internvl.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/kimivl.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/kimik25.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/nemotron-v2-vl.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/llama4.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/llava.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/minicpmv.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/paddleocr.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/pixtral.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/qwen2vl.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/qwen3vl.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/siglip.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/whisper-enc.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/deepseekocr.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/mobilenetv5.cpp
-    ${LLAMA_ROOT_DIR}/tools/mtmd/models/youtuvl.cpp
+    ${MTMD_MODEL_SOURCES}
 )
 
 set(LLAMA_SOURCES
@@ -126,35 +111,23 @@ set(LLAMA_SOURCES
 )
 
 # ---------------------------------------------------------
-# GGML sources (updated for llama.cpp b8653)
+# GGML sources (updated for llama.cpp b9351)
 # ---------------------------------------------------------
+file(GLOB GGML_CORE_SOURCES CONFIGURE_DEPENDS
+    ${GGML_ROOT_DIR}/src/*.c
+    ${GGML_ROOT_DIR}/src/*.cpp
+)
+
+file(GLOB GGML_CPU_SOURCES CONFIGURE_DEPENDS
+    ${GGML_ROOT_DIR}/src/ggml-cpu/*.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/*.cpp
+    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/*.c
+    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/*.cpp
+)
+
 set(GGML_SOURCES
-    ${GGML_ROOT_DIR}/src/ggml.c
-    ${GGML_ROOT_DIR}/src/ggml.cpp
-    ${GGML_ROOT_DIR}/src/ggml-alloc.c
-    ${GGML_ROOT_DIR}/src/ggml-quants.c
-    ${GGML_ROOT_DIR}/src/ggml-opt.cpp
-    ${GGML_ROOT_DIR}/src/ggml-threading.cpp
-    ${GGML_ROOT_DIR}/src/gguf.cpp
-    ${GGML_ROOT_DIR}/src/ggml-backend-dl.cpp
-    ${GGML_ROOT_DIR}/src/ggml-backend.cpp
-    ${GGML_ROOT_DIR}/src/ggml-backend-reg.cpp
-
-    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu.c
-    ${GGML_ROOT_DIR}/src/ggml-cpu/ggml-cpu.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/ops.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/quants.c
-    ${GGML_ROOT_DIR}/src/ggml-cpu/repack.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/traits.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/unary-ops.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/vec.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/binary-ops.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/hbm.cpp
-
-    # ARM architecture support
-    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/quants.c
-    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/repack.cpp
-    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/cpu-feats.cpp
+    ${GGML_CORE_SOURCES}
+    ${GGML_CPU_SOURCES}
 )
 
 # ---------------------------------------------------------

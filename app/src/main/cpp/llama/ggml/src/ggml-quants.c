@@ -13,6 +13,10 @@
 #include <stdlib.h> // for qsort
 #include <stdio.h>  // for GGML_ASSERT
 
+#ifdef GGML_USE_OPENMP
+#include <omp.h>
+#endif
+
 #define GROUP_MAX_EPS 1e-15f
 #define GROUP_MAX_EPS_IQ3_XXS 1e-8f
 #define GROUP_MAX_EPS_IQ2_S 1e-8f
@@ -49,10 +53,12 @@ void quantize_row_q1_0_ref(const float * GGML_RESTRICT x, block_q1_0 * GGML_REST
 
         y[i].d = GGML_FP32_TO_FP16(d);
 
+        // Clear all bits first
         for (int j = 0; j < qk / 8; ++j) {
             y[i].qs[j] = 0;
         }
 
+        // Just store sign of each weight directly (no normalization)
         for (int j = 0; j < qk; ++j) {
             const int bit_index = j;
             const int byte_index = bit_index / 8;
@@ -2039,12 +2045,13 @@ size_t quantize_q1_0(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst, 
     size_t row_size = ggml_row_size(GGML_TYPE_Q1_0, n_per_row);
     char * qrow = (char *)dst;
     for (int64_t row = 0; row < nrow; ++row) {
-        quantize_row_q1_0_ref(src, (block_q1_0 *) qrow, n_per_row);
+        quantize_row_q1_0_ref(src, (block_q1_0*)qrow, n_per_row);
         src += n_per_row;
         qrow += row_size;
     }
     return nrow * row_size;
 }
+
 
 size_t quantize_q4_0(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
     if (!quant_weights) {
@@ -3061,70 +3068,121 @@ void iq2xs_init_impl(enum ggml_type type) {
         }
         kmap_q2xs[index] = i;
     }
-    int8_t pos[8];
-    int * dist2 = (int *)malloc(2*grid_size*sizeof(int));
+    // The neighbour search runs in three passes:
+    //   1. Parallel: for each i, qsort and count its neighbours into n_per_i,
+    //      and reduce the totals (num_neighbors, num_not_in_map).
+    //   2. Serial: prefix-sum n_per_i into offsets[], so each i has a
+    //      pre-assigned slice of kneighbors_q2xs to write into.
+    //   3. Parallel: redo the qsort and write each i's neighbour list at
+    //      offsets[i].
+    int * n_per_i = (int *)malloc(kmap_size*sizeof(int));
+    GGML_ASSERT(n_per_i);
     int num_neighbors = 0, num_not_in_map = 0;
-    for (int i = 0; i < kmap_size; ++i) {
-        if (kmap_q2xs[i] >= 0) continue;
-        ++num_not_in_map;
-        for (int k = 0; k < 8; ++k) {
-            int l = (i >> 2*k) & 0x3;
-            pos[k] = 2*l + 1;
-        }
-        for (int j = 0; j < grid_size; ++j) {
-            const int8_t * pg = (const int8_t *)(kgrid_q2xs + j);
-            int d2 = 0;
-            for (int k = 0; k < 8; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
-            dist2[2*j+0] = d2;
-            dist2[2*j+1] = j;
-        }
-        qsort(dist2, grid_size, 2*sizeof(int), iq2_compare_func);
-        int n = 0; int d2 = dist2[0];
-        int nhave = 1;
-        for (int j = 0; j < grid_size; ++j) {
-            if (dist2[2*j] > d2) {
-                if (nhave == nwant) break;
-                d2 = dist2[2*j];
-                ++nhave;
+#ifdef GGML_USE_OPENMP
+    #pragma omp parallel reduction(+:num_neighbors,num_not_in_map)
+#endif
+    {
+        int * dist2 = (int *)malloc(2*grid_size*sizeof(int));
+        GGML_ASSERT(dist2);
+        int8_t pos[8];
+        int i;
+#ifdef GGML_USE_OPENMP
+        #pragma omp for schedule(dynamic, 64)
+#endif
+        for (i = 0; i < kmap_size; ++i) {
+            if (kmap_q2xs[i] >= 0) {
+                n_per_i[i] = 0;
+                continue;
             }
-            ++n;
+            ++num_not_in_map;
+            for (int k = 0; k < 8; ++k) {
+                int l = (i >> 2*k) & 0x3;
+                pos[k] = 2*l + 1;
+            }
+            for (int j = 0; j < grid_size; ++j) {
+                const int8_t * pg = (const int8_t *)(kgrid_q2xs + j);
+                int d2 = 0;
+                for (int k = 0; k < 8; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
+                dist2[2*j+0] = d2;
+                dist2[2*j+1] = j;
+            }
+            qsort(dist2, grid_size, 2*sizeof(int), iq2_compare_func);
+            int n = 0; int d2 = dist2[0];
+            int nhave = 1;
+            for (int j = 0; j < grid_size; ++j) {
+                if (dist2[2*j] > d2) {
+                    if (nhave == nwant) break;
+                    d2 = dist2[2*j];
+                    ++nhave;
+                }
+                ++n;
+            }
+            n_per_i[i] = n;
+            num_neighbors += n;
         }
-        num_neighbors += n;
+        free(dist2);
     }
     //printf("%s: %d neighbours in total\n", __func__, num_neighbors);
     kneighbors_q2xs = (uint16_t *)malloc((num_neighbors + num_not_in_map)*sizeof(uint16_t));
     iq2_data[gindex].neighbours = kneighbors_q2xs;
+
+    int * offsets = (int *)malloc(kmap_size*sizeof(int));
+    GGML_ASSERT(offsets);
     int counter = 0;
     for (int i = 0; i < kmap_size; ++i) {
-        if (kmap_q2xs[i] >= 0) continue;
-        for (int k = 0; k < 8; ++k) {
-            int l = (i >> 2*k) & 0x3;
-            pos[k] = 2*l + 1;
+        if (kmap_q2xs[i] >= 0) {
+            offsets[i] = -1;
+            continue;
         }
-        for (int j = 0; j < grid_size; ++j) {
-            const int8_t * pg = (const int8_t *)(kgrid_q2xs + j);
-            int d2 = 0;
-            for (int k = 0; k < 8; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
-            dist2[2*j+0] = d2;
-            dist2[2*j+1] = j;
-        }
-        qsort(dist2, grid_size, 2*sizeof(int), iq2_compare_func);
-        kmap_q2xs[i] = -(counter + 1);
-        int d2 = dist2[0];
-        uint16_t * start = &kneighbors_q2xs[counter++];
-        int n = 0, nhave = 1;
-        for (int j = 0; j < grid_size; ++j) {
-            if (dist2[2*j] > d2) {
-                if (nhave == nwant) break;
-                d2 = dist2[2*j];
-                ++nhave;
-            }
-            kneighbors_q2xs[counter++] = dist2[2*j+1];
-            ++n;
-        }
-        *start = n;
+        offsets[i] = counter;
+        counter += 1 + n_per_i[i];
     }
-    free(dist2);
+
+#ifdef GGML_USE_OPENMP
+    #pragma omp parallel
+#endif
+    {
+        int * dist2 = (int *)malloc(2*grid_size*sizeof(int));
+        GGML_ASSERT(dist2);
+        int8_t pos[8];
+        int i;
+#ifdef GGML_USE_OPENMP
+        #pragma omp for schedule(dynamic, 64)
+#endif
+        for (i = 0; i < kmap_size; ++i) {
+            if (kmap_q2xs[i] >= 0) continue;
+            for (int k = 0; k < 8; ++k) {
+                int l = (i >> 2*k) & 0x3;
+                pos[k] = 2*l + 1;
+            }
+            for (int j = 0; j < grid_size; ++j) {
+                const int8_t * pg = (const int8_t *)(kgrid_q2xs + j);
+                int d2 = 0;
+                for (int k = 0; k < 8; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
+                dist2[2*j+0] = d2;
+                dist2[2*j+1] = j;
+            }
+            qsort(dist2, grid_size, 2*sizeof(int), iq2_compare_func);
+            int local_counter = offsets[i];
+            kmap_q2xs[i] = -(local_counter + 1);
+            int d2 = dist2[0];
+            uint16_t * start = &kneighbors_q2xs[local_counter++];
+            int n = 0, nhave = 1;
+            for (int j = 0; j < grid_size; ++j) {
+                if (dist2[2*j] > d2) {
+                    if (nhave == nwant) break;
+                    d2 = dist2[2*j];
+                    ++nhave;
+                }
+                kneighbors_q2xs[local_counter++] = dist2[2*j+1];
+                ++n;
+            }
+            *start = n;
+        }
+        free(dist2);
+    }
+    free(offsets);
+    free(n_per_i);
 }
 
 void iq2xs_free_impl(enum ggml_type type) {
@@ -3660,70 +3718,115 @@ void iq3xs_init_impl(int grid_size) {
         }
         kmap_q3xs[index] = i;
     }
-    int8_t pos[4];
-    int * dist2 = (int *)malloc(2*grid_size*sizeof(int));
+    // See explanation of parallelism in iq2xs_init_impl
+    int * n_per_i = (int *)malloc(kmap_size*sizeof(int));
+    GGML_ASSERT(n_per_i);
     int num_neighbors = 0, num_not_in_map = 0;
-    for (int i = 0; i < kmap_size; ++i) {
-        if (kmap_q3xs[i] >= 0) continue;
-        ++num_not_in_map;
-        for (int k = 0; k < 4; ++k) {
-            int l = (i >> 3*k) & 0x7;
-            pos[k] = 2*l + 1;
-        }
-        for (int j = 0; j < grid_size; ++j) {
-            const int8_t * pg = (const int8_t *)(kgrid_q3xs + j);
-            int d2 = 0;
-            for (int k = 0; k < 4; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
-            dist2[2*j+0] = d2;
-            dist2[2*j+1] = j;
-        }
-        qsort(dist2, grid_size, 2*sizeof(int), iq3_compare_func);
-        int n = 0; int d2 = dist2[0];
-        int nhave = 1;
-        for (int j = 0; j < grid_size; ++j) {
-            if (dist2[2*j] > d2) {
-                if (nhave == nwant) break;
-                d2 = dist2[2*j];
-                ++nhave;
+#ifdef GGML_USE_OPENMP
+    #pragma omp parallel reduction(+:num_neighbors,num_not_in_map)
+#endif
+    {
+        int * dist2 = (int *)malloc(2*grid_size*sizeof(int));
+        GGML_ASSERT(dist2);
+        int8_t pos[4];
+        int i;
+#ifdef GGML_USE_OPENMP
+        #pragma omp for schedule(dynamic, 64)
+#endif
+        for (i = 0; i < kmap_size; ++i) {
+            if (kmap_q3xs[i] >= 0) {
+                n_per_i[i] = 0;
+                continue;
             }
-            ++n;
+            ++num_not_in_map;
+            for (int k = 0; k < 4; ++k) {
+                int l = (i >> 3*k) & 0x7;
+                pos[k] = 2*l + 1;
+            }
+            for (int j = 0; j < grid_size; ++j) {
+                const int8_t * pg = (const int8_t *)(kgrid_q3xs + j);
+                int d2 = 0;
+                for (int k = 0; k < 4; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
+                dist2[2*j+0] = d2;
+                dist2[2*j+1] = j;
+            }
+            qsort(dist2, grid_size, 2*sizeof(int), iq3_compare_func);
+            int n = 0; int d2 = dist2[0];
+            int nhave = 1;
+            for (int j = 0; j < grid_size; ++j) {
+                if (dist2[2*j] > d2) {
+                    if (nhave == nwant) break;
+                    d2 = dist2[2*j];
+                    ++nhave;
+                }
+                ++n;
+            }
+            n_per_i[i] = n;
+            num_neighbors += n;
         }
-        num_neighbors += n;
+        free(dist2);
     }
     //printf("%s: %d neighbours in total\n", __func__, num_neighbors);
     kneighbors_q3xs = (uint16_t *)malloc((num_neighbors + num_not_in_map)*sizeof(uint16_t));
     iq3_data[gindex].neighbours = kneighbors_q3xs;
+
+    int * offsets = (int *)malloc(kmap_size*sizeof(int));
+    GGML_ASSERT(offsets);
     int counter = 0;
     for (int i = 0; i < kmap_size; ++i) {
-        if (kmap_q3xs[i] >= 0) continue;
-        for (int k = 0; k < 4; ++k) {
-            int l = (i >> 3*k) & 0x7;
-            pos[k] = 2*l + 1;
+        if (kmap_q3xs[i] >= 0) {
+            offsets[i] = -1;
+            continue;
         }
-        for (int j = 0; j < grid_size; ++j) {
-            const int8_t * pg = (const int8_t *)(kgrid_q3xs + j);
-            int d2 = 0;
-            for (int k = 0; k < 4; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
-            dist2[2*j+0] = d2;
-            dist2[2*j+1] = j;
-        }
-        qsort(dist2, grid_size, 2*sizeof(int), iq3_compare_func);
-        kmap_q3xs[i] = -(counter + 1);
-        int d2 = dist2[0];
-        uint16_t * start = &kneighbors_q3xs[counter++];
-        int n = 0, nhave = 1;
-        for (int j = 0; j < grid_size; ++j) {
-            if (dist2[2*j] > d2) {
-                if (nhave == nwant) break;
-                d2 = dist2[2*j];
-                ++nhave;
-            }
-            kneighbors_q3xs[counter++] = dist2[2*j+1];
-            ++n;
-        }
-        *start = n;
+        offsets[i] = counter;
+        counter += 1 + n_per_i[i];
     }
-    free(dist2);
+
+#ifdef GGML_USE_OPENMP
+    #pragma omp parallel
+#endif
+    {
+        int * dist2 = (int *)malloc(2*grid_size*sizeof(int));
+        GGML_ASSERT(dist2);
+        int8_t pos[4];
+        int i;
+#ifdef GGML_USE_OPENMP
+        #pragma omp for schedule(dynamic, 64)
+#endif
+        for (i = 0; i < kmap_size; ++i) {
+            if (kmap_q3xs[i] >= 0) continue;
+            for (int k = 0; k < 4; ++k) {
+                int l = (i >> 3*k) & 0x7;
+                pos[k] = 2*l + 1;
+            }
+            for (int j = 0; j < grid_size; ++j) {
+                const int8_t * pg = (const int8_t *)(kgrid_q3xs + j);
+                int d2 = 0;
+                for (int k = 0; k < 4; ++k) d2 += (pg[k] - pos[k])*(pg[k] - pos[k]);
+                dist2[2*j+0] = d2;
+                dist2[2*j+1] = j;
+            }
+            qsort(dist2, grid_size, 2*sizeof(int), iq3_compare_func);
+            int local_counter = offsets[i];
+            kmap_q3xs[i] = -(local_counter + 1);
+            int d2 = dist2[0];
+            uint16_t * start = &kneighbors_q3xs[local_counter++];
+            int n = 0, nhave = 1;
+            for (int j = 0; j < grid_size; ++j) {
+                if (dist2[2*j] > d2) {
+                    if (nhave == nwant) break;
+                    d2 = dist2[2*j];
+                    ++nhave;
+                }
+                kneighbors_q3xs[local_counter++] = dist2[2*j+1];
+                ++n;
+            }
+            *start = n;
+        }
+        free(dist2);
+    }
+    free(offsets);
+    free(n_per_i);
 }
 
 void iq3xs_free_impl(int grid_size) {
@@ -5354,6 +5457,10 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
                     }
                 }
             } break;
+        case GGML_TYPE_Q1_0:
+            {
+                VALIDATE_ROW_DATA_D_F16_IMPL(block_q1_0, data, nb);
+            } break;
         case GGML_TYPE_Q4_0:
             {
                 VALIDATE_ROW_DATA_D_F16_IMPL(block_q4_0, data, nb);
@@ -5412,10 +5519,6 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
                         return false;
                     }
                 }
-            } break;
-        case GGML_TYPE_Q1_0:
-            {
-                VALIDATE_ROW_DATA_D_F16_IMPL(block_q1_0, data, nb);
             } break;
         case GGML_TYPE_TQ1_0:
             {

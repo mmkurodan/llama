@@ -248,6 +248,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("9. 🧭 GGUFファイルの探し方\n\n");
         sb.append("【9-1. GGUF対応モデルを探す】\n");
+        sb.append("- 設定画面の「Hugging FaceでGGUFを検索」ボタンから検索・選択・自動ダウンロードを開始できる\n");
         sb.append("- Hugging Face のモデル検索で GGUF タグを使う\n");
         sb.append("  → https://huggingface.co/models?library=gguf\n");
         sb.append("- GGUFモデルはリポジトリ名に -GGUF が付いていることが多い\n");
@@ -375,6 +376,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13+ may require notification permission.\n\n");
         sb.append("9. 🧭 Finding GGUF Files\n\n");
         sb.append("[9-1. Locating GGUF-compatible models]\n");
+        sb.append("- Use the Settings screen's \"Search GGUF on Hugging Face\" button to search, select, and start the download automatically\n");
         sb.append("- Use the GGUF tag on Hugging Face model search\n");
         sb.append("  → https://huggingface.co/models?library=gguf\n");
         sb.append("- GGUF models often have -GGUF in the repository name\n");

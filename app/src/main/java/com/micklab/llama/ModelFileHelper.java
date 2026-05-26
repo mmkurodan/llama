@@ -222,7 +222,11 @@ public final class ModelFileHelper {
         return tokens;
     }
 
-    private static boolean isLikelyProjectorFilename(String lowerName) {
+    public static boolean isLikelyProjectorFilename(String filename) {
+        if (filename == null) {
+            return false;
+        }
+        String lowerName = filename.toLowerCase(Locale.US);
         return isGgufFilename(lowerName)
                 && (lowerName.contains("mmproj")
                 || lowerName.contains("projector")

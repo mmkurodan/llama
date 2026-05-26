@@ -93,6 +93,10 @@ typedef sycl::half2 ggml_half2;
 // QR = QK / number of values before dequantization
 // QI = number of 32 bit integers before dequantization
 
+#define QI1_0 (QK1_0 / 32)
+#define QR1_0 1
+
+
 #define QI4_0 (QK4_0 / (4 * QR4_0))
 #define QR4_0 2
 
