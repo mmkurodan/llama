@@ -165,8 +165,8 @@ target_include_directories(
     llama_jni
     PRIVATE
     ${LLAMA_ROOT_DIR}/include
-    ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/common
+    ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/vendor
     ${LLAMA_ROOT_DIR}/tools/mtmd
 
