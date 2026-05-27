@@ -68,6 +68,8 @@ public class MainActivity extends Activity {
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final int LOG_LEVEL_INFO = 2;
     private static final int LOG_DISPLAY_MAX_LINES = 100;
+    private static final int PROCESSING_LOG_MAX_CHARS = 64 * 1024;
+    private static final int PROCESSING_LOG_TRIM_TARGET_CHARS = 48 * 1024;
     private static String stripResponseMarkers(String text) {
         return ResponseMarkerSanitizer.stripResponseMarkers(text);
     }
@@ -844,13 +846,36 @@ public class MainActivity extends Activity {
 
     private void appendMessage(final String msg) {
         runOnUiThread(() -> {
+            if (logView == null) {
+                return;
+            }
             String timestamp = timestampFormat.format(new Date());
-            logView.append("[" + timestamp + "] " + msg + "\n");
+            String nextLine = "[" + timestamp + "] " + msg + "\n";
+            String currentText = logView.getText() != null ? logView.getText().toString() : "";
+            logView.setText(appendAndTrimProcessingLog(currentText, nextLine));
             scrollTextViewToBottom(logView);
             if (mainScrollView != null) {
                 mainScrollView.post(() -> mainScrollView.fullScroll(ScrollView.FOCUS_DOWN));
             }
         });
+    }
+
+    private String appendAndTrimProcessingLog(String currentText, String appendedLine) {
+        String base = currentText != null ? currentText : "";
+        String next = appendedLine != null ? appendedLine : "";
+        StringBuilder builder = new StringBuilder(base.length() + next.length());
+        builder.append(base);
+        builder.append(next);
+        if (builder.length() <= PROCESSING_LOG_MAX_CHARS) {
+            return builder.toString();
+        }
+
+        int trimStart = Math.max(0, builder.length() - PROCESSING_LOG_TRIM_TARGET_CHARS);
+        int nextLineStart = builder.indexOf("\n", trimStart);
+        if (nextLineStart >= 0 && nextLineStart + 1 < builder.length()) {
+            trimStart = nextLineStart + 1;
+        }
+        return builder.substring(trimStart);
     }
 
     private void appendException(final String prefix, final Throwable t) {

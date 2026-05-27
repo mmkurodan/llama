@@ -432,6 +432,47 @@ static int32_t detokenize_with_resize(
     return n_chars;
 }
 
+struct reusable_token_batch {
+    llama_batch batch;
+
+    explicit reusable_token_batch(int32_t capacity)
+            : batch(llama_batch_init(std::max<int32_t>(capacity, 1), 0, 1)) {
+    }
+
+    ~reusable_token_batch() {
+        llama_batch_free(batch);
+    }
+
+    bool valid() const {
+        return batch.token != nullptr
+                && batch.pos != nullptr
+                && batch.n_seq_id != nullptr
+                && batch.seq_id != nullptr
+                && batch.seq_id[0] != nullptr
+                && batch.logits != nullptr;
+    }
+
+    void set_token(int32_t index, llama_token token, llama_pos pos, bool logits) {
+        batch.token[index] = token;
+        batch.pos[index] = pos;
+        batch.n_seq_id[index] = 1;
+        batch.seq_id[index][0] = 0;
+        batch.logits[index] = logits ? 1 : 0;
+    }
+};
+
+static void reset_generation_state_locked() {
+    if (!g_ctx) {
+        return;
+    }
+    llama_memory_t mem = llama_get_memory(g_ctx);
+    if (mem != nullptr) {
+        llama_memory_clear(mem, true);
+    }
+    llama_synchronize(g_ctx);
+    llama_perf_context_reset(g_ctx);
+}
+
 static void log_to_file(const std::string& msg, ggml_log_level level) {
     if (!should_log(level)) return;
     std::lock_guard<std::mutex> lock(g_log_mutex);
@@ -2156,6 +2197,12 @@ static bool prefill_text_prompt_locked(
     n_prompt_tokens = static_cast<size_t>(n_tokens);
     n_past = n_tokens;
 
+    reusable_token_batch prompt_batch(std::min(g_n_batch, n_tokens));
+    if (!prompt_batch.valid()) {
+        error_message = "failed to allocate prompt batch";
+        return false;
+    }
+
     for (int i = 0; i < n_tokens; i += g_n_batch) {
         if (g_cancel_generation.load()) {
             error_message = "generation cancelled";
@@ -2163,19 +2210,13 @@ static bool prefill_text_prompt_locked(
         }
 
         const int batch_size = std::min(g_n_batch, n_tokens - i);
-        llama_batch batch = llama_batch_init(batch_size, 0, 1);
-        batch.n_tokens = batch_size;
+        prompt_batch.batch.n_tokens = batch_size;
 
         for (int j = 0; j < batch_size; ++j) {
-            batch.token[j] = tokens[i + j];
-            batch.pos[j] = i + j;
-            batch.n_seq_id[j] = 1;
-            batch.seq_id[j][0] = 0;
-            batch.logits[j] = (i + j == n_tokens - 1) ? 1 : 0;
+            prompt_batch.set_token(j, tokens[i + j], i + j, i + j == n_tokens - 1);
         }
 
-        const int rc = llama_decode(g_ctx, batch);
-        llama_batch_free(batch);
+        const int rc = llama_decode(g_ctx, prompt_batch.batch);
         if (rc != 0) {
             error_message = "decode failed (prompt)";
             return false;
@@ -2288,13 +2329,25 @@ static jstring generate_locked(
     }
 
     const int max_tokens = 1024;
-    llama_memory_t mem = llama_get_memory(g_ctx);
-    llama_memory_clear(mem, false);
+    reset_generation_state_locked();
 
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
     size_t n_prompt_tokens = 0;
     llama_pos n_past = 0;
     std::string prefill_error;
+    reusable_token_batch generation_batch(1);
+    if (!generation_batch.valid()) {
+        const char * errmsg = "failed to allocate generation batch";
+        log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
+        notify_token_error(errmsg);
+        return env->NewStringUTF(errmsg);
+    }
+
+    struct generation_reset_guard {
+        ~generation_reset_guard() {
+            reset_generation_state_locked();
+        }
+    } reset_guard;
 
     const bool has_media = media_files != nullptr && !media_files->empty();
     const bool prefill_ok = has_media
@@ -2446,16 +2499,10 @@ static jstring generate_locked(
             }
         }
 
-        llama_batch batch = llama_batch_init(1, 0, 1);
-        batch.n_tokens = 1;
-        batch.token[0] = id;
-        batch.pos[0] = generation_base_pos + i;
-        batch.n_seq_id[0] = 1;
-        batch.seq_id[0][0] = 0;
-        batch.logits[0] = 1;
+        generation_batch.batch.n_tokens = 1;
+        generation_batch.set_token(0, id, generation_base_pos + i, true);
 
-        const int rc_step = llama_decode(g_ctx, batch);
-        llama_batch_free(batch);
+        const int rc_step = llama_decode(g_ctx, generation_batch.batch);
         if (rc_step != 0) {
             const char * errmsg = "decode failed (generation)";
             log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
@@ -2571,13 +2618,21 @@ static jstring generate_openai_chat_completion_locked(
             log_to_file(std::string("generateOpenAiChatCompletion: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
         }
 
-        llama_memory_t mem = llama_get_memory(g_ctx);
-        llama_memory_clear(mem, false);
+        reset_generation_state_locked();
 
         const llama_vocab * vocab = llama_model_get_vocab(g_model);
         size_t n_prompt_tokens = 0;
         llama_pos n_past = 0;
         std::string prefill_error;
+        reusable_token_batch generation_batch(1);
+        if (!generation_batch.valid()) {
+            return build_error("failed to allocate generation batch");
+        }
+        struct generation_reset_guard {
+            ~generation_reset_guard() {
+                reset_generation_state_locked();
+            }
+        } reset_guard;
 
         const bool has_media = media_files != nullptr && !media_files->empty();
         const bool prefill_ok = has_media
@@ -2649,16 +2704,10 @@ static jstring generate_openai_chat_completion_locked(
                 prev_text = full;
             }
 
-            llama_batch batch = llama_batch_init(1, 0, 1);
-            batch.n_tokens = 1;
-            batch.token[0] = id;
-            batch.pos[0] = generation_base_pos + i;
-            batch.n_seq_id[0] = 1;
-            batch.seq_id[0][0] = 0;
-            batch.logits[0] = 1;
+            generation_batch.batch.n_tokens = 1;
+            generation_batch.set_token(0, id, generation_base_pos + i, true);
 
-            const int rc_step = llama_decode(g_ctx, batch);
-            llama_batch_free(batch);
+            const int rc_step = llama_decode(g_ctx, generation_batch.batch);
             if (rc_step != 0) {
                 return build_error("decode failed (generation)");
             }
