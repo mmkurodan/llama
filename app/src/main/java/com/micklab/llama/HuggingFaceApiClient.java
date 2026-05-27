@@ -66,6 +66,7 @@ public final class HuggingFaceApiClient {
 
         String revision = response.optString("sha", "main");
         List<GgufFileInfo> modelFiles = new ArrayList<>();
+        List<GgufFileInfo> projectorFiles = new ArrayList<>();
         for (int i = 0; i < siblings.length(); i++) {
             JSONObject sibling = siblings.optJSONObject(i);
             if (sibling == null) {
@@ -81,13 +82,16 @@ public final class HuggingFaceApiClient {
                     filename,
                     buildResolveUrl(normalizedRepoId, revision, filename),
                     ModelFileHelper.isLikelyProjectorFilename(filename));
-            if (!fileInfo.isProjector()) {
+            if (fileInfo.isProjector()) {
+                projectorFiles.add(fileInfo);
+            } else {
                 modelFiles.add(fileInfo);
             }
         }
 
         Collections.sort(modelFiles, Comparator.comparing(GgufFileInfo::getFilename, String.CASE_INSENSITIVE_ORDER));
-        return new RepositoryFiles(normalizedRepoId, revision, modelFiles);
+        Collections.sort(projectorFiles, Comparator.comparing(GgufFileInfo::getFilename, String.CASE_INSENSITIVE_ORDER));
+        return new RepositoryFiles(normalizedRepoId, revision, modelFiles, projectorFiles);
     }
 
     private static boolean hasGgufTag(JSONArray tags) {
@@ -223,11 +227,17 @@ public final class HuggingFaceApiClient {
         private final String repoId;
         private final String revision;
         private final List<GgufFileInfo> files;
+        private final List<GgufFileInfo> projectorFiles;
 
-        private RepositoryFiles(String repoId, String revision, List<GgufFileInfo> files) {
+        private RepositoryFiles(
+                String repoId,
+                String revision,
+                List<GgufFileInfo> files,
+                List<GgufFileInfo> projectorFiles) {
             this.repoId = repoId;
             this.revision = revision != null ? revision : "";
             this.files = files != null ? files : Collections.emptyList();
+            this.projectorFiles = projectorFiles != null ? projectorFiles : Collections.emptyList();
         }
 
         public String getRepoId() {
@@ -240,6 +250,38 @@ public final class HuggingFaceApiClient {
 
         public List<GgufFileInfo> getFiles() {
             return files;
+        }
+
+        public List<GgufFileInfo> getProjectorFiles() {
+            return projectorFiles;
+        }
+
+        public GgufFileInfo findMatchingProjector(
+                GgufFileInfo modelFile,
+                boolean preferVision,
+                boolean preferAudio) {
+            if (modelFile == null || projectorFiles.isEmpty()) {
+                return null;
+            }
+
+            List<String> projectorNames = new ArrayList<>();
+            for (GgufFileInfo projectorFile : projectorFiles) {
+                projectorNames.add(projectorFile.getFilename());
+            }
+            String matchedName = ModelFileHelper.findBestMatchingProjectorReference(
+                    modelFile.getFilename(),
+                    projectorNames,
+                    preferVision,
+                    preferAudio);
+            if (matchedName == null || matchedName.isEmpty()) {
+                return null;
+            }
+            for (GgufFileInfo projectorFile : projectorFiles) {
+                if (matchedName.equals(projectorFile.getFilename())) {
+                    return projectorFile;
+                }
+            }
+            return null;
         }
     }
 

@@ -175,6 +175,48 @@ public final class ModelFileHelper {
         return new InferredModalities(vision, audio);
     }
 
+    public static String findBestMatchingProjectorReference(
+            String modelReference,
+            List<String> projectorReferences,
+            boolean preferVision,
+            boolean preferAudio) {
+        if (projectorReferences == null || projectorReferences.isEmpty()) {
+            return null;
+        }
+
+        String modelFilename = extractFilename(modelReference);
+        if (modelFilename == null || modelFilename.isEmpty()) {
+            return projectorReferences.size() == 1 ? projectorReferences.get(0) : null;
+        }
+
+        String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
+        List<String> tokens = tokenizeModelStem(modelStem);
+
+        String bestReference = null;
+        int bestScore = Integer.MIN_VALUE;
+        int candidateCount = 0;
+        for (String reference : projectorReferences) {
+            String candidateFilename = extractFilename(reference);
+            if (!isLikelyProjectorFilename(candidateFilename)) {
+                continue;
+            }
+            candidateCount++;
+
+            String candidateStem = stripGgufSuffix(candidateFilename).toLowerCase(Locale.US);
+            int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio)
+                    + scoreProjectorPrecisionCompatibility(modelStem, candidateStem);
+            if (score > bestScore) {
+                bestReference = reference;
+                bestScore = score;
+            }
+        }
+
+        if (bestReference == null) {
+            return null;
+        }
+        return (bestScore >= 130 || candidateCount == 1) ? bestReference : null;
+    }
+
     private static File getProjectorSearchDir(Context context, String modelReference) {
         if (modelReference != null) {
             String trimmed = modelReference.trim();
@@ -294,6 +336,80 @@ public final class ModelFileHelper {
             score += 20;
         }
         return score;
+    }
+
+    private static int scoreProjectorPrecisionCompatibility(String modelStem, String candidateStem) {
+        String modelPrecision = inferPrecisionToken(modelStem);
+        String candidatePrecision = inferPrecisionToken(candidateStem);
+
+        if (candidatePrecision.isEmpty()) {
+            return 0;
+        }
+        if ("bf16".equals(modelPrecision)) {
+            if ("bf16".equals(candidatePrecision)) {
+                return 120;
+            }
+            if ("f16".equals(candidatePrecision)) {
+                return 30;
+            }
+            return 0;
+        }
+        if ("f16".equals(modelPrecision)) {
+            if ("f16".equals(candidatePrecision)) {
+                return 120;
+            }
+            if ("bf16".equals(candidatePrecision)) {
+                return 20;
+            }
+            return 0;
+        }
+        if (isQuantizedModelStem(modelStem)) {
+            if ("f16".equals(candidatePrecision)) {
+                return 120;
+            }
+            if ("bf16".equals(candidatePrecision)) {
+                return 80;
+            }
+            if ("f32".equals(candidatePrecision)) {
+                return 20;
+            }
+        }
+        return 0;
+    }
+
+    private static String inferPrecisionToken(String stem) {
+        if (stem == null || stem.isEmpty()) {
+            return "";
+        }
+        if (stem.contains("bf16")) {
+            return "bf16";
+        }
+        if (stem.contains("f16")) {
+            return "f16";
+        }
+        if (stem.contains("f32")) {
+            return "f32";
+        }
+        return "";
+    }
+
+    private static boolean isQuantizedModelStem(String stem) {
+        if (stem == null || stem.isEmpty()) {
+            return false;
+        }
+        return stem.contains("q2")
+                || stem.contains("q3")
+                || stem.contains("q4")
+                || stem.contains("q5")
+                || stem.contains("q6")
+                || stem.contains("q8")
+                || stem.contains("iq1")
+                || stem.contains("iq2")
+                || stem.contains("iq3")
+                || stem.contains("iq4")
+                || stem.contains("ud-")
+                || stem.contains("mxfp4")
+                || stem.contains("nvfp4");
     }
 
     private static boolean hasAudioProjectorHint(String candidateStem) {

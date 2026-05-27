@@ -1652,30 +1652,43 @@ public class SettingsActivity extends Activity {
         List<HuggingFaceApiClient.GgufFileInfo> files = repositoryFiles.getFiles();
         String[] labels = new String[files.size()];
         for (int i = 0; i < files.size(); i++) {
-            HuggingFaceApiClient.GgufFileInfo file = files.get(i);
-            labels[i] = file.isProjector()
-                    ? file.getFilename() + " " + localizedText("(プロジェクタ)", "(projector)")
-                    : file.getFilename();
+            labels[i] = files.get(i).getFilename();
         }
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("ダウンロード対象を選択", "Select a GGUF file"))
-                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(files.get(which)))
+                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(repositoryFiles, files.get(which)))
                 .setNegativeButton(localizedText("閉じる", "Close"), null)
                 .show();
     }
 
-    private void applyHuggingFaceFileSelection(HuggingFaceApiClient.GgufFileInfo selectedFile) {
+    private void applyHuggingFaceFileSelection(
+            HuggingFaceApiClient.RepositoryFiles repositoryFiles,
+            HuggingFaceApiClient.GgufFileInfo selectedFile) {
         String downloadUrl = selectedFile.getDownloadUrl();
+        HuggingFaceApiClient.GgufFileInfo matchedProjector =
+                repositoryFiles.findMatchingProjector(selectedFile, false, false);
         modelUrlInput.setText(downloadUrl);
         currentConfig = getConfigFromUI();
+        if (matchedProjector != null) {
+            currentConfig.multimodalProjectorUrl = matchedProjector.getDownloadUrl();
+        }
         updateAutoTemplatePreview(currentConfig);
-        modelFileInfo.setText(localizedText(
-                "選択したモデル: " + selectedFile.getFilename(),
-                "Selected model: " + selectedFile.getFilename()));
-        showToast(localizedText(
-                "ダウンロードを開始します: " + selectedFile.getFilename(),
-                "Starting download: " + selectedFile.getFilename()));
+        String selectionMessage = matchedProjector != null
+                ? localizedText(
+                        "選択したモデル: " + selectedFile.getFilename() + "\n対応 mmproj: " + matchedProjector.getFilename(),
+                        "Selected model: " + selectedFile.getFilename() + "\nMatched mmproj: " + matchedProjector.getFilename())
+                : localizedText(
+                        "選択したモデル: " + selectedFile.getFilename(),
+                        "Selected model: " + selectedFile.getFilename());
+        modelFileInfo.setText(selectionMessage);
+        showToast(matchedProjector != null
+                ? localizedText(
+                        "ダウンロードを開始します: " + selectedFile.getFilename() + " / mmproj も設定しました",
+                        "Starting download: " + selectedFile.getFilename() + " / matched mmproj configured")
+                : localizedText(
+                        "ダウンロードを開始します: " + selectedFile.getFilename(),
+                        "Starting download: " + selectedFile.getFilename()));
         loadModel();
     }
 
