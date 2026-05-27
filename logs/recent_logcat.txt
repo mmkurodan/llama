@@ -1,0 +1,2 @@
+2026-05-28 05:56:55.143 pid=26376 [logcat] reason=app-start
+exitCode=0

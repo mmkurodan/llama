@@ -513,13 +513,19 @@ public class ModelManager {
                         + " model=" + (currentModelPath != null ? new File(currentModelPath).getName() : "(none)")
                         + " promptLen=" + (prompt != null ? prompt.length() : 0)
                         + " mediaCount=" + (mediaFiles != null ? mediaFiles.length : 0));
+        DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-start");
         try {
             result = (mediaFiles == null || mediaFiles.length == 0)
                     ? llama.generate(prompt)
                     : llama.generateWithMedia(prompt, mediaFiles);
+            DiagnosticsLogger.logEvent(
+                    context,
+                    "generation-stage",
+                    "id=" + generationId + " stage=native-call-end resultLen=" + (result != null ? result.length() : 0));
         } catch (Throwable t) {
             // Log full stack trace and notify listener so the server can respond gracefully
             Log.e(TAG, "Exception during generate", t);
+            DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-throw error=" + t);
             DiagnosticsLogger.logMemorySnapshot(
                     context,
                     "generation-error",

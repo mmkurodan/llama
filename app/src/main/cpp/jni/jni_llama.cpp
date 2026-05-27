@@ -322,6 +322,137 @@ static size_t validate_utf8(const std::string& text) {
     return len;
 }
 
+static void append_replacement_char(std::u16string & out) {
+    out.push_back(static_cast<char16_t>(0xFFFD));
+}
+
+static void append_code_point_utf16(std::u16string & out, uint32_t code_point) {
+    if (code_point <= 0xFFFF) {
+        out.push_back(static_cast<char16_t>(code_point));
+        return;
+    }
+
+    code_point -= 0x10000;
+    out.push_back(static_cast<char16_t>(0xD800 + ((code_point >> 10) & 0x3FF)));
+    out.push_back(static_cast<char16_t>(0xDC00 + (code_point & 0x3FF)));
+}
+
+static std::u16string utf8_to_utf16_lossy(const std::string & text) {
+    std::u16string out;
+    out.reserve(text.size());
+
+    size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char c0 = static_cast<unsigned char>(text[i]);
+        uint32_t code_point = 0;
+        size_t width = 0;
+        bool valid = false;
+
+        if (c0 <= 0x7F) {
+            code_point = c0;
+            width = 1;
+            valid = true;
+        } else if (c0 >= 0xC2 && c0 <= 0xDF && i + 1 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            if ((c1 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x1F) << 6) | (c1 & 0x3F);
+                width = 2;
+                valid = true;
+            }
+        } else if (c0 == 0xE0 && i + 2 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            if (c1 >= 0xA0 && c1 <= 0xBF && (c2 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
+                width = 3;
+                valid = true;
+            }
+        } else if ((c0 >= 0xE1 && c0 <= 0xEC || c0 >= 0xEE && c0 <= 0xEF) && i + 2 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            if ((c1 & 0xC0) == 0x80 && (c2 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
+                width = 3;
+                valid = true;
+            }
+        } else if (c0 == 0xED && i + 2 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            if (c1 >= 0x80 && c1 <= 0x9F && (c2 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
+                width = 3;
+                valid = true;
+            }
+        } else if (c0 == 0xF0 && i + 3 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            const unsigned char c3 = static_cast<unsigned char>(text[i + 3]);
+            if (c1 >= 0x90 && c1 <= 0xBF
+                    && (c2 & 0xC0) == 0x80
+                    && (c3 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x07) << 18)
+                        | ((c1 & 0x3F) << 12)
+                        | ((c2 & 0x3F) << 6)
+                        | (c3 & 0x3F);
+                width = 4;
+                valid = true;
+            }
+        } else if ((c0 >= 0xF1 && c0 <= 0xF3) && i + 3 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            const unsigned char c3 = static_cast<unsigned char>(text[i + 3]);
+            if ((c1 & 0xC0) == 0x80
+                    && (c2 & 0xC0) == 0x80
+                    && (c3 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x07) << 18)
+                        | ((c1 & 0x3F) << 12)
+                        | ((c2 & 0x3F) << 6)
+                        | (c3 & 0x3F);
+                width = 4;
+                valid = true;
+            }
+        } else if (c0 == 0xF4 && i + 3 < text.size()) {
+            const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
+            const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
+            const unsigned char c3 = static_cast<unsigned char>(text[i + 3]);
+            if (c1 >= 0x80 && c1 <= 0x8F
+                    && (c2 & 0xC0) == 0x80
+                    && (c3 & 0xC0) == 0x80) {
+                code_point = ((c0 & 0x07) << 18)
+                        | ((c1 & 0x3F) << 12)
+                        | ((c2 & 0x3F) << 6)
+                        | (c3 & 0x3F);
+                width = 4;
+                valid = true;
+            }
+        }
+
+        if (!valid) {
+            append_replacement_char(out);
+            ++i;
+            continue;
+        }
+
+        append_code_point_utf16(out, code_point);
+        i += width;
+    }
+
+    return out;
+}
+
+static jstring new_java_string_utf8(JNIEnv * env, const std::string & text) {
+    static const jchar empty_chars[1] = {0};
+    const std::u16string utf16 = utf8_to_utf16_lossy(text);
+    const jchar * chars = utf16.empty()
+            ? empty_chars
+            : reinterpret_cast<const jchar *>(utf16.data());
+    return env->NewString(chars, static_cast<jsize>(utf16.size()));
+}
+
+static jstring new_java_string_utf8(JNIEnv * env, const char * text) {
+    return new_java_string_utf8(env, text != nullptr ? std::string(text) : std::string());
+}
+
 static bool find_stop_sequence(const std::string& text, size_t * stop_pos, std::string * stop_seq) {
     size_t earliest = std::string::npos;
     std::string found;
@@ -1469,7 +1600,7 @@ Java_com_micklab_llama_LlamaNative_download(
         if (url_chars)  env->ReleaseStringUTFChars(jurl, url_chars);
         if (path_chars) env->ReleaseStringUTFChars(jpath, path_chars);
         log_to_file("download: invalid args", GGML_LOG_LEVEL_ERROR);
-        return env->NewStringUTF("invalid args");
+        return new_java_string_utf8(env, "invalid args");
     }
 
     const std::string url(url_chars);
@@ -1500,11 +1631,11 @@ Java_com_micklab_llama_LlamaNative_download(
         if (error_message.empty()) {
             error_message = "download failed";
         }
-        return env->NewStringUTF(error_message.c_str());
+        return new_java_string_utf8(env, error_message);
     }
 
     log_to_file("download: ok");
-    return env->NewStringUTF("ok");
+    return new_java_string_utf8(env, "ok");
 }
 
 // ---------------- JNI: init ----------------
@@ -1556,7 +1687,7 @@ Java_com_micklab_llama_LlamaNative_init(
             std::ostringstream ss;
             ss << "init: model already initialized at path=" << model_path << "; skipping init";
             log_to_file(ss.str());
-            return env->NewStringUTF("ok");
+            return new_java_string_utf8(env, "ok");
         }
 
         // Defensively free existing resources before loading a new model
@@ -1590,7 +1721,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 ss << "init: model file cannot be opened: " << model_path
                    << " errno=" << errno << " strerror=" << std::strerror(errno);
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("model file open failed");
+                return new_java_string_utf8(env, "model file open failed");
             } else {
                 auto sz = ifs.tellg();
                 std::ostringstream ss;
@@ -1606,7 +1737,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 std::ostringstream ss;
                 ss << "init: missing split shard: " << missing_split_path;
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF(ss.str().c_str());
+                return new_java_string_utf8(env, ss.str());
             }
         }
 
@@ -1650,7 +1781,7 @@ Java_com_micklab_llama_LlamaNative_init(
         log_to_file(std::string("init: backend init complete, ") + summarize_registered_backends(),
                     backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
         if (backend_count == 0) {
-            return env->NewStringUTF("no ggml backends registered");
+            return new_java_string_utf8(env, "no ggml backends registered");
         }
 
         llama_model_params mparams = llama_model_default_params();
@@ -1671,7 +1802,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 ss << hint << " after "
                    << ms << " ms. path_len=" << model_path.size();
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF(hint.c_str());
+                return new_java_string_utf8(env, hint);
             } else {
                 ss << "init: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1697,7 +1828,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 ss << hint << " after "
                    << ms << " ms";
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF(hint.c_str());
+                return new_java_string_utf8(env, hint);
             } else {
                 ss << "init: context created successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1708,17 +1839,17 @@ Java_com_micklab_llama_LlamaNative_init(
         g_current_mmproj_path = initialize_optional_multimodal_support_locked(model_path, "", "init");
         log_to_file("init: initialization complete");
 
-        return env->NewStringUTF("ok");
+        return new_java_string_utf8(env, "ok");
     } catch (const std::exception & e) {
         std::ostringstream ss;
         ss << "init: exception: " << e.what();
         log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
         clear_partial_init();
-        return env->NewStringUTF("init exception");
+        return new_java_string_utf8(env, "init exception");
     } catch (...) {
         log_to_file("init: unknown native exception", GGML_LOG_LEVEL_ERROR);
         clear_partial_init();
-        return env->NewStringUTF("init unknown exception");
+        return new_java_string_utf8(env, "init unknown exception");
     }
 }
 
@@ -1778,7 +1909,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                << " mmproj=" << (g_current_mmproj_path.empty() ? "<none>" : g_current_mmproj_path)
                << "; skipping init";
             log_to_file(ss.str());
-            return env->NewStringUTF("ok");
+            return new_java_string_utf8(env, "ok");
         }
 
         if (g_mtmd) {
@@ -1811,7 +1942,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 ss << "initWithMmproj: model file cannot be opened: " << model_path
                    << " errno=" << errno << " strerror=" << std::strerror(errno);
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF("model file open failed");
+                return new_java_string_utf8(env, "model file open failed");
             } else {
                 auto sz = ifs.tellg();
                 std::ostringstream ss;
@@ -1844,7 +1975,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 std::ostringstream ss;
                 ss << "initWithMmproj: missing split shard: " << missing_split_path;
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF(ss.str().c_str());
+                return new_java_string_utf8(env, ss.str());
             }
         }
 
@@ -1862,7 +1993,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         log_to_file(std::string("initWithMmproj: backend init complete, ") + summarize_registered_backends(),
                     backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
         if (backend_count == 0) {
-            return env->NewStringUTF("no ggml backends registered");
+            return new_java_string_utf8(env, "no ggml backends registered");
         }
 
         llama_model_params mparams = llama_model_default_params();
@@ -1883,7 +2014,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 ss << hint << " after "
                    << ms << " ms. path_len=" << model_path.size();
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF(hint.c_str());
+                return new_java_string_utf8(env, hint);
             } else {
                 ss << "initWithMmproj: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1909,7 +2040,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 ss << hint << " after "
                    << ms << " ms";
                 log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
-                return env->NewStringUTF(hint.c_str());
+                return new_java_string_utf8(env, hint);
             } else {
                 ss << "initWithMmproj: context created successfully in " << ms << " ms";
                 log_to_file(ss.str());
@@ -1925,17 +2056,17 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         g_current_mmproj_path = selected_mmproj_path;
         log_to_file("initWithMmproj: initialization complete");
 
-        return env->NewStringUTF("ok");
+        return new_java_string_utf8(env, "ok");
     } catch (const std::exception & e) {
         std::ostringstream ss;
         ss << "initWithMmproj: exception: " << e.what();
         log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
         clear_partial_init();
-        return env->NewStringUTF("init exception");
+        return new_java_string_utf8(env, "init exception");
     } catch (...) {
         log_to_file("initWithMmproj: unknown native exception", GGML_LOG_LEVEL_ERROR);
         clear_partial_init();
-        return env->NewStringUTF("init unknown exception");
+        return new_java_string_utf8(env, "init unknown exception");
     }
 }
 
@@ -2101,10 +2232,10 @@ static void notify_token_error(const char * errmsg) {
         }
     }
     if (env) {
-        jstring jerr = env->NewStringUTF(errmsg);
+        jstring jerr = new_java_string_utf8(env, errmsg);
         if (!jerr) {
             if (env->ExceptionCheck()) env->ExceptionClear();
-            jerr = env->NewStringUTF("unknown error");
+            jerr = new_java_string_utf8(env, "unknown error");
         }
         if (jerr) {
             env->CallVoidMethod(g_token_listener, g_token_onError, jerr);
@@ -2131,7 +2262,7 @@ static void notify_token_delta(const std::string & delta) {
         }
     }
     if (env) {
-        jstring jdelta = env->NewStringUTF(delta.c_str());
+        jstring jdelta = new_java_string_utf8(env, delta);
         if (jdelta) {
             env->CallVoidMethod(g_token_listener, g_token_onToken, jdelta);
             if (env->ExceptionCheck()) env->ExceptionClear();
@@ -2313,7 +2444,7 @@ static jstring generate_locked(
     if (!g_ctx || !g_model) {
         log_to_file("generate: not initialized", GGML_LOG_LEVEL_ERROR);
         notify_token_error("not initialized");
-        return env->NewStringUTF("not initialized");
+        return new_java_string_utf8(env, "not initialized");
     }
 
     g_cancel_generation.store(false);
@@ -2340,7 +2471,7 @@ static jstring generate_locked(
         const char * errmsg = "failed to allocate generation batch";
         log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
         notify_token_error(errmsg);
-        return env->NewStringUTF(errmsg);
+        return new_java_string_utf8(env, errmsg);
     }
 
     struct generation_reset_guard {
@@ -2357,14 +2488,14 @@ static jstring generate_locked(
     if (!prefill_ok) {
         log_to_file(std::string("generate: prompt prefill failed: ") + prefill_error, GGML_LOG_LEVEL_ERROR);
         notify_token_error(prefill_error.c_str());
-        return env->NewStringUTF(prefill_error.c_str());
+        return new_java_string_utf8(env, prefill_error);
     }
 
     if (n_past >= g_n_ctx) {
         const char * errmsg = "prompt exceeds context";
         log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_WARN);
         notify_token_error(errmsg);
-        return env->NewStringUTF(errmsg);
+        return new_java_string_utf8(env, errmsg);
     }
 
     const llama_pos generation_base_pos = n_past;
@@ -2508,7 +2639,7 @@ static jstring generate_locked(
             log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
             notify_token_error(errmsg);
             llama_sampler_free(smpl);
-            return env->NewStringUTF(errmsg);
+            return new_java_string_utf8(env, errmsg);
         }
     }
 
@@ -2530,7 +2661,7 @@ static jstring generate_locked(
         log_to_file(std::string("generate: output=\n") + output, GGML_LOG_LEVEL_DEBUG);
     }
 
-    return env->NewStringUTF(output.c_str());
+    return new_java_string_utf8(env, output);
 }
 
 static jstring generate_openai_chat_completion_locked(
@@ -2547,7 +2678,7 @@ static jstring generate_openai_chat_completion_locked(
         json error_json = {
                 {"error", message},
         };
-        return env->NewStringUTF(error_json.dump().c_str());
+        return new_java_string_utf8(env, error_json.dump());
     };
 
     if (!g_ctx || !g_model) {
@@ -2745,7 +2876,7 @@ static jstring generate_openai_chat_completion_locked(
             log_to_file(std::string("generateOpenAiChatCompletion: result=\n") + result.dump(2), GGML_LOG_LEVEL_DEBUG);
         }
 
-        return env->NewStringUTF(result.dump().c_str());
+        return new_java_string_utf8(env, result.dump());
     } catch (const std::exception & e) {
         return build_error(e.what());
     }
@@ -2859,7 +2990,7 @@ Java_com_micklab_llama_LlamaNative_getChatTemplate(
     
     if (!g_model) {
         log_to_file("getChatTemplate: model not loaded", GGML_LOG_LEVEL_WARN);
-        return env->NewStringUTF("");
+        return new_java_string_utf8(env, "");
     }
     
     // Try to get chat template from GGUF metadata
@@ -2867,11 +2998,11 @@ Java_com_micklab_llama_LlamaNative_getChatTemplate(
     
     if (chat_template && strlen(chat_template) > 0) {
         log_to_file(std::string("getChatTemplate: found template, len=") + std::to_string(strlen(chat_template)));
-        return env->NewStringUTF(chat_template);
+        return new_java_string_utf8(env, chat_template);
     }
     
     log_to_file("getChatTemplate: no chat template in model metadata");
-    return env->NewStringUTF("");
+    return new_java_string_utf8(env, "");
 }
 
 extern "C"
