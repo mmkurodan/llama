@@ -420,7 +420,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 設定情報（モデルURL、各種パラメータ、APIポート、ログレベル、MCPコンフィグJSON、Function Definitions JSON）\n");
         sb.append("- 構成ファイル（configs/*.json）\n");
         sb.append("- ダウンロードまたは取り込んだモデルファイル\n");
-        sb.append("- ログファイル（ollama.log、Javaクラッシュ時は last_crash.txt、ネイティブクラッシュ時は native_crash.txt）\n\n");
+        sb.append("- ログファイル（ollama.log、Javaクラッシュ時は last_crash.txt、ネイティブクラッシュ時は native_crash.txt、診断情報は diagnostics/process_diagnostics.log・diagnostics/last_state.txt・best effort の diagnostics/recent_logcat.txt）\n\n");
         sb.append("また、アプリの生成機能、API連携、WebUIを利用する際、ユーザーが入力したテキスト（会話内容）は、端末内または同一ローカルネットワーク内で動作するローカル API に送信されます。MCPサーバーを設定して利用しない限り、このデータが外部サーバーへ送信されることはなく、保存も行いません。\n\n");
         sb.append("---\n\n");
         sb.append("2. 通信\n");
@@ -453,7 +453,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Configuration data (model URL, parameters, API port, log level, MCP config JSON, Function Definitions JSON)\n");
         sb.append("- Configuration files (configs/*.json)\n");
         sb.append("- Downloaded or imported model files\n");
-        sb.append("- Log files (ollama.log, last_crash.txt for Java crashes, and native_crash.txt for native crashes)\n\n");
+        sb.append("- Log files (ollama.log, last_crash.txt for Java crashes, native_crash.txt for native crashes, and diagnostics/process_diagnostics.log plus diagnostics/last_state.txt with a best-effort diagnostics/recent_logcat.txt)\n\n");
         sb.append("When using the generation features, API integrations, or the WebUI, the text entered by the user (conversation content) is sent to a local API running on the device or within the same local network. Unless you configure and use MCP servers, this data is not transmitted to external servers and is not stored.\n\n");
         sb.append("2. Communication\n");
         sb.append("- When downloading models, the application communicates with the URL entered by the user.\n");

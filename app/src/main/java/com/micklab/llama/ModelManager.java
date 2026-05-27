@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,6 +54,7 @@ public class ModelManager {
     private final Context context;
     private final LlamaNative llama;
     private final ConfigurationManager configManager;
+    private final AtomicInteger generationCounter = new AtomicInteger(0);
     
     // State tracking
     private final AtomicBoolean busy = new AtomicBoolean(false);
@@ -297,6 +299,7 @@ public class ModelManager {
         boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+            DiagnosticsLogger.logEvent(context, "model-load", "Loading configuration: " + configName);
             
             // Extract filename from URL or imported local model reference
             String filename = extractFilenameFromUrl(config.modelUrl);
@@ -318,6 +321,10 @@ public class ModelManager {
                 Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
                 applyConfiguration(config);
                 currentConfigName = configName;
+                DiagnosticsLogger.logMemorySnapshot(
+                        context,
+                        "model-load-skip",
+                        "config=" + configName + " model already loaded");
                 return true;
             }
 
@@ -386,6 +393,12 @@ public class ModelManager {
             }
 
             Log.i(TAG, "Configuration loaded: " + configName);
+            DiagnosticsLogger.logMemorySnapshot(
+                    context,
+                    "model-load-complete",
+                    "config=" + configName
+                            + " model=" + new File(modelPath).getName()
+                            + " mmproj=" + (mmprojPath != null ? new File(mmprojPath).getName() : "(none)"));
             return true;
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load configuration: " + configName, e);
@@ -491,6 +504,15 @@ public class ModelManager {
         }
         
         String result;
+        int generationId = generationCounter.incrementAndGet();
+        DiagnosticsLogger.logMemorySnapshot(
+                context,
+                "generation-start",
+                "id=" + generationId
+                        + " config=" + currentConfigName
+                        + " model=" + (currentModelPath != null ? new File(currentModelPath).getName() : "(none)")
+                        + " promptLen=" + (prompt != null ? prompt.length() : 0)
+                        + " mediaCount=" + (mediaFiles != null ? mediaFiles.length : 0));
         try {
             result = (mediaFiles == null || mediaFiles.length == 0)
                     ? llama.generate(prompt)
@@ -498,12 +520,20 @@ public class ModelManager {
         } catch (Throwable t) {
             // Log full stack trace and notify listener so the server can respond gracefully
             Log.e(TAG, "Exception during generate", t);
+            DiagnosticsLogger.logMemorySnapshot(
+                    context,
+                    "generation-error",
+                    "id=" + generationId + " error=" + t);
             if (listener != null) {
                 listener.onError("Generation exception: " + t.toString());
             }
             // Return a clear error string so API layer can send a proper error response
             return "generate failed: " + t.toString();
         }
+        DiagnosticsLogger.logMemorySnapshot(
+                context,
+                "generation-end",
+                "id=" + generationId + " resultLen=" + (result != null ? result.length() : 0));
         
         if (listener != null) {
             listener.onGenerationComplete(currentConfigName, result);
@@ -547,6 +577,10 @@ public class ModelManager {
                 + " javaTotal=" + formatBytes(javaTotal)
                 + " javaMax=" + formatBytes(javaMax)
                 + " nativeHeap=" + formatBytes(nativeHeap));
+        DiagnosticsLogger.logMemorySnapshot(
+                context,
+                "runtime-memory",
+                phase + " model=" + new File(modelPath).getName());
     }
 
     private String formatBytes(long bytes) {

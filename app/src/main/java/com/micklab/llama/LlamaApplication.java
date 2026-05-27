@@ -22,6 +22,9 @@ public class LlamaApplication extends Application {
     public void onCreate() {
         super.onCreate();
         configureNativeLogging();
+        DiagnosticsLogger.logEvent(this, "app", "Application created");
+        DiagnosticsLogger.logMemorySnapshot(this, "app-start", "Application onCreate");
+        new Thread(() -> DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, "app-start"), "diag-logcat").start();
 
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();
@@ -44,6 +47,8 @@ public class LlamaApplication extends Application {
                     fw.write(sw.toString());
                 }
                 Log.e(TAG, "Crash log written to " + crashFile.getAbsolutePath());
+                DiagnosticsLogger.logEvent(LlamaApplication.this, "java-crash", "Crash log written: " + crashFile.getAbsolutePath());
+                DiagnosticsLogger.logMemorySnapshot(LlamaApplication.this, "java-crash", e.toString());
             } catch (Throwable logError) {
                 Log.e(TAG, "Failed to persist Java crash log", logError);
             }
@@ -75,5 +80,17 @@ public class LlamaApplication extends Application {
     private File getAppFilesDir() {
         File externalDir = getExternalFilesDir(null);
         return externalDir != null ? externalDir : getFilesDir();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        DiagnosticsLogger.logMemorySnapshot(this, "memory-warning", "onLowMemory");
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        DiagnosticsLogger.logMemorySnapshot(this, "memory-trim", "onTrimMemory level=" + level);
     }
 }
