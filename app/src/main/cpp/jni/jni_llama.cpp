@@ -11,9 +11,7 @@
 #include <iomanip>
 #include <cerrno>
 #include <cstring>
-#include <cctype>
 #include <exception>
-#include <dirent.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -712,21 +710,6 @@ static std::string path_filename(const std::string & path) {
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
-static std::string path_parent_directory(const std::string & path) {
-    const size_t slash = path.find_last_of("/\\");
-    return slash == std::string::npos ? "" : path.substr(0, slash);
-}
-
-static std::string path_join(const std::string & dir, const std::string & name) {
-    if (dir.empty()) {
-        return name;
-    }
-    if (dir.back() == '/' || dir.back() == '\\') {
-        return dir + name;
-    }
-    return dir + "/" + name;
-}
-
 static bool is_regular_file_path(const std::string & path) {
     struct stat st = {};
     return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
@@ -740,25 +723,6 @@ static std::string strip_gguf_suffix(const std::string & filename) {
     return lower;
 }
 
-static std::vector<std::string> tokenize_stem(const std::string & stem) {
-    std::vector<std::string> tokens;
-    std::string token;
-    for (char ch : stem) {
-        if (std::isalnum(static_cast<unsigned char>(ch))) {
-            token.push_back(ch);
-            continue;
-        }
-        if (token.size() >= 2 && token != "mmproj" && token != "gguf") {
-            tokens.push_back(token);
-        }
-        token.clear();
-    }
-    if (token.size() >= 2 && token != "mmproj" && token != "gguf") {
-        tokens.push_back(token);
-    }
-    return tokens;
-}
-
 static bool contains_any_substring(const std::string & haystack, const std::vector<std::string> & needles) {
     for (const auto & needle : needles) {
         if (!needle.empty() && haystack.find(needle) != std::string::npos) {
@@ -768,113 +732,16 @@ static bool contains_any_substring(const std::string & haystack, const std::vect
     return false;
 }
 
-static bool has_audio_projector_hint(const std::string & candidate_stem) {
-    return contains_any_substring(candidate_stem, {
-            "audio", "gemma4a", "qwen2a", "qwen25o", "voxtral",
-            "ultravox", "glma", "lfm2a", "whisper"
-    });
-}
-
-static bool has_vision_projector_hint(const std::string & candidate_stem) {
-    return contains_any_substring(candidate_stem, {
-            "vision", "image", "gemma4v", "siglip", "llava", "glm4v", "minicpmv"
-    });
-}
-
-static bool is_likely_projector_filename(const std::string & lower_name) {
-    return lower_name.size() > 5
-            && lower_name.compare(lower_name.size() - 5, 5, ".gguf") == 0
-            && (lower_name.find("mmproj") != std::string::npos
-            || lower_name.find("projector") != std::string::npos
-            || lower_name.find("gemma4a") != std::string::npos
-            || lower_name.find("gemma4v") != std::string::npos);
-}
-
-static int score_projector_candidate(
-        const std::string & candidate_stem,
-        const std::string & model_stem,
-        const std::vector<std::string> & tokens) {
-    int score = 100;
-    for (const auto & token : tokens) {
-        if (candidate_stem.find(token) != std::string::npos) {
-            score += token.size() >= 4 ? 20 : 10;
-        }
-    }
-    if (!model_stem.empty() && candidate_stem.find(model_stem) != std::string::npos) {
-        score += 80;
-    }
-    if (candidate_stem.find("mmproj") != std::string::npos) {
-        score += 10;
-    }
-    if (candidate_stem.rfind("mmproj-", 0) == 0) {
-        score += 10;
-    }
-    if (has_audio_projector_hint(candidate_stem) || has_vision_projector_hint(candidate_stem)) {
-        score += 20;
-    }
-    return score;
-}
-
-static bool contains_path(const std::vector<std::string> & paths, const std::string & path) {
-    return std::find(paths.begin(), paths.end(), path) != paths.end();
-}
-
 static std::vector<std::string> collect_multimodal_projector_candidates(
         const std::string & model_path,
         const std::string & requested_mmproj_path) {
+    (void) model_path;
     std::vector<std::string> result;
+    // Only try the projector path that Java has already resolved.
+    // Native directory scanning made text-only model switches pick unrelated mmproj files
+    // that happened to live next to the model, which could crash during mtmd init.
     if (!requested_mmproj_path.empty() && is_regular_file_path(requested_mmproj_path)) {
         result.push_back(requested_mmproj_path);
-    }
-
-    const std::string parent_dir = path_parent_directory(model_path);
-    if (parent_dir.empty()) {
-        return result;
-    }
-
-    DIR * dir = opendir(parent_dir.c_str());
-    if (!dir) {
-        return result;
-    }
-
-    const std::string model_filename = to_lower_ascii(path_filename(model_path));
-    const std::string model_stem = strip_gguf_suffix(model_path);
-    const std::vector<std::string> model_tokens = tokenize_stem(model_stem);
-    std::vector<std::pair<int, std::string>> scored_candidates;
-
-    struct dirent * entry = nullptr;
-    while ((entry = readdir(dir)) != nullptr) {
-        const std::string name(entry->d_name);
-        if (name.empty()) {
-            continue;
-        }
-        const std::string lower_name = to_lower_ascii(name);
-        if (lower_name == model_filename || !is_likely_projector_filename(lower_name)) {
-            continue;
-        }
-
-        const std::string full_path = path_join(parent_dir, name);
-        if (!is_regular_file_path(full_path) || contains_path(result, full_path)) {
-            continue;
-        }
-
-        const std::string candidate_stem = strip_gguf_suffix(lower_name);
-        scored_candidates.emplace_back(
-                score_projector_candidate(candidate_stem, model_stem, model_tokens),
-                full_path);
-    }
-    closedir(dir);
-
-    std::stable_sort(scored_candidates.begin(), scored_candidates.end(),
-                     [](const std::pair<int, std::string> & lhs, const std::pair<int, std::string> & rhs) {
-                         if (lhs.first != rhs.first) {
-                             return lhs.first > rhs.first;
-                         }
-                         return lhs.second < rhs.second;
-                     });
-
-    for (const auto & entry : scored_candidates) {
-        result.push_back(entry.second);
     }
     return result;
 }
@@ -903,13 +770,6 @@ static std::string initialize_optional_multimodal_support_locked(
     const bool likely_multimodal_model = is_likely_multimodal_model_path(model_path);
     const auto candidates = collect_multimodal_projector_candidates(model_path, requested_mmproj_path);
 
-    if (requested_mmproj_path.empty() && !candidates.empty()) {
-        std::ostringstream ss;
-        ss << log_prefix << ": auto-detected " << candidates.size()
-           << " multimodal projector candidate(s) next to the model";
-        log_to_file(ss.str());
-    }
-
     if (candidates.empty()) {
         if (!requested_mmproj_path.empty()) {
             std::ostringstream ss;
@@ -918,8 +778,9 @@ static std::string initialize_optional_multimodal_support_locked(
             log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
         } else if (likely_multimodal_model) {
             std::ostringstream ss;
-            ss << log_prefix << ": likely multimodal model detected but no mmproj was found next to the model: "
-               << model_path << "; multimodal support disabled";
+            ss << log_prefix << ": likely multimodal model detected but no explicit mmproj was requested; "
+               << "skipping native projector auto-detection for model " << model_path
+               << "; multimodal support disabled";
             log_to_file(ss.str(), GGML_LOG_LEVEL_WARN);
         }
         return "";
