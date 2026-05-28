@@ -1,0 +1,19 @@
+﻿2026-05-28T11:09:33.6267013Z ##[group]Run actions/download-artifact@v4
+2026-05-28T11:09:33.6267292Z with:
+2026-05-28T11:09:33.6267467Z   name: mbedtls-arm64
+2026-05-28T11:09:33.6267670Z   path: mbedtls-arm64
+2026-05-28T11:09:33.6267868Z   merge-multiple: false
+2026-05-28T11:09:33.6268088Z   repository: mmkurodan/llama
+2026-05-28T11:09:33.6268304Z   run-id: 26570973095
+2026-05-28T11:09:33.6268494Z ##[endgroup]
+2026-05-28T11:09:33.8242000Z Downloading single artifact
+2026-05-28T11:09:34.1143696Z Preparing to download the following artifacts:
+2026-05-28T11:09:34.1144758Z - mbedtls-arm64 (ID: 7264289420, Size: 2047927, Expected Digest: sha256:d44964957583026a94ea1f0c72eb940d3c83cdfbd84ca0dd63dcf9063333df2f)
+2026-05-28T11:09:34.2884071Z Redirecting to blob download url: https://productionresultssa5.blob.core.windows.net/actions-results/3cc47029-7a9e-4ad4-9328-a24169a7f26c/workflow-job-run-695f128c-f2f5-56ac-94ca-b7a80c4fd252/artifacts/da54aa56e51a6bf59103ee1a51aa4ecbe420cbc6810aa574dbe4434c456d8e9b.zip
+2026-05-28T11:09:34.2885323Z Starting download of artifact to: /home/runner/work/llama/llama/mbedtls-arm64
+2026-05-28T11:09:34.5192051Z (node:2892) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-05-28T11:09:34.5193581Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-05-28T11:09:34.9785239Z SHA256 digest of downloaded artifact is d44964957583026a94ea1f0c72eb940d3c83cdfbd84ca0dd63dcf9063333df2f
+2026-05-28T11:09:34.9786187Z Artifact download completed successfully.
+2026-05-28T11:09:34.9786655Z Total of 1 artifact(s) downloaded
+2026-05-28T11:09:34.9792417Z Download artifact has finished successfully

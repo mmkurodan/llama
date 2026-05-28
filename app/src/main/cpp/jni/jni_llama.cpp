@@ -23,7 +23,7 @@
 #include <malloc.h>
 #endif
 
-#if defined(__BIONIC__)
+#if defined(__ANDROID__)
 #include <dlfcn.h>
 #include <malloc.h>
 #endif
@@ -631,7 +631,7 @@ static void trim_native_allocator(const char * reason) {
     std::ostringstream ss;
     ss << reason << ": malloc_trim result=" << trimmed;
     log_to_file(ss.str());
-#elif defined(__BIONIC__)
+#elif defined(__ANDROID__)
     using mallopt_fn = int (*)(int, int);
     mallopt_fn mallopt_ptr = reinterpret_cast<mallopt_fn>(dlsym(RTLD_DEFAULT, "mallopt"));
     if (mallopt_ptr == nullptr) {

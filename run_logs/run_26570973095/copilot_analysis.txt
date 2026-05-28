@@ -1,0 +1,43 @@
+Model: gpt-5-mini
+Timestamp: Thu May 28 12:06:43 PM UTC 2026
+---
+Warning: Ignoring invalid allowedUrls entry "https://http//127.0.0.1:11434$". Error: Invalid URL pattern: https://http//127.0.0.1:11434$
+1) 問題点の要約
+- 致命: C++ (JNI) コンパイルで malloc_trim が未定義 → ビルド(ninja/Gradle)停止・Exit code 1。
+- 警告/非推奨: Node の Buffer() 非推奨警告が複数回発生（依存またはアクション内）、GitHub Actions 上の Node.js 20 は非推奨。
+- 警告: Android Gradle Plugin が古く compileSdk=35 に対して警告。Java の deprecated API 警告あり。
+- ビルド環境警告: apt の CLI 警告、CMake の deprecation 警告、libcurl の configure 警告（zlib, LDAP, IDN, libpsl, libgsasl 等が見つからない/無効）。
+
+2) 根拠となるログ行
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3900:2026-05-28T11:12:12.8993160Z C/C++: /home/.../jni/jni_llama.cpp:622:25: error: use of undeclared identifier 'malloc_trim'
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3903:2026-05-28T11:12:12.9052089Z C/C++: 1 error generated.
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3907:2026-05-28T11:12:31.0920665Z FAILURE: Build failed with an exception.
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3913:2026-05-28T11:12:31.0925661Z > com.android.ide.common.process.ProcessException: ninja: Entering directory `/home/.../arm64-v8a'
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3929:2026-05-28T11:12:31.1006194Z   ninja: build stopped: subcommand failed.
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:4169:2026-05-28T11:12:31.1528291Z Caused by: org.gradle.process.internal.ExecException: Process 'command '/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja'' finished with non-zero exit value 1
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:127:2026-05-28T11:10:45.4545187Z (node:2279) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+- /root/llama/run_logs/run_26570973095/1_build-libcurl.txt:236:2026-05-28T11:09:34.5192098Z (node:2892) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3337:2026-05-28T11:11:56.0920927Z WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:3838:2026-05-28T11:12:04.0920492Z Note: Some input files use or override a deprecated API.
+- /root/llama/run_logs/run_26570973095/1_build-libcurl.txt:113:2026-05-28T11:08:59.0817519Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+- /root/llama/run_logs/run_26570973095/1_build-libcurl.txt:497:2026-05-28T11:10:05.4906336Z configure: WARNING: zlib disabled
+- /root/llama/run_logs/run_26570973095/1_build-libcurl.txt:501:2026-05-28T11:10:05.8718271Z configure: WARNING: Cannot find libraries for LDAP support: LDAP disabled
+- /root/llama/run_logs/run_26570973095/1_build-libcurl.txt:534:2026-05-28T11:10:06.3163142Z configure: WARNING: Cannot find libraries for IDN support: IDN disabled
+- /root/llama/run_logs/run_26570973095/2_build-mbedtls.txt:296:2026-05-28T11:08:22.2217276Z CMake Deprecation Warning at CMakeLists.txt:21 (cmake_minimum_required):
+- /root/llama/run_logs/run_26570973095/0_build-apk.txt:4193:2026-05-28T11:12:31.4735774Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/download-artifact@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026....
+
+3) 補足（対処案・優先度）
+- 最優先: malloc_trim 未定義 → jni_llama.cpp の該当呼び出しを条件付きコンパイルで囲むか（#ifdef で glibc のみ呼ぶ）、Android 互換の代替処理に置換する。Android/Bionic では malloc_trim が無いのが原因。
+- Node Buffer() 警告: --trace-deprecation で発生箇所特定し、当該ライブラリを最新版に更新／コードを Buffer.from()/Buffer.alloc() に差し替え。
+- Actions の Node.js 20 警告: 使用中のアクションを Node24 対応版へ更新、または一時的に FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true を設定。
+- Android Gradle Plugin 警告: AGP と Gradle wrapper を compileSdk=35 に対応する最新版へ更新（または compileSdk を下げる）。
+- libcurl の configure 警告: 必要機能（zlib, LDAP, IDN 等）が不要なら明示的に無効化、必要ならクロスツールチェインに該当ライブラリを追加して再ビルド。
+- apt/CMake 警告は重要度低〜中：スクリプトの安定化（apt->apt-get など）、CMakeLists の cmake_minimum_required 更新を検討。
+
+必要なら該当ソース（jni/jni_llama.cpp 周辺）や package/action の箇所を開いて具体的に差分案を作成します。
+
+
+
+Changes    +0 -0
+Requests   0 Premium (2m 6s)
+Tokens     ↑ 36.8k (4.5k cached) • ↓ 11.5k (9.8k reasoning)

@@ -1,0 +1,5 @@
+2026-05-28 21:54:44.129 pid=1930 [app-start] Application onCreate
+  javaUsed=32.6MB javaTotal=256.0MB javaMax=256.0MB nativeHeap=6.7MB nativeHeapFree=1.8MB nativeHeapSize=12.8MB
+  pssTotal=13.8MB privateDirty=6.6MB sharedDirty=52.9MB nativePss=2.1MB dalvikPss=825.0KB otherPss=9.6MB
+  systemAvail=13.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=400 fdCount=113
+  procStatus VmRSS=123100 kB VmHWM=123100 kB VmSize=16960896 kB VmSwap=7812 kB Threads=13 FDSize=128

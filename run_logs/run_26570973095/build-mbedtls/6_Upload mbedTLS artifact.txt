@@ -1,0 +1,20 @@
+﻿2026-05-28T11:08:44.4826593Z ##[group]Run actions/upload-artifact@v4
+2026-05-28T11:08:44.4826897Z with:
+2026-05-28T11:08:44.4827106Z   name: mbedtls-arm64
+2026-05-28T11:08:44.4827350Z   path: mbedtls/build/install
+2026-05-28T11:08:44.4827609Z   if-no-files-found: warn
+2026-05-28T11:08:44.4827850Z   compression-level: 6
+2026-05-28T11:08:44.4828075Z   overwrite: false
+2026-05-28T11:08:44.4828301Z   include-hidden-files: false
+2026-05-28T11:08:44.4828558Z ##[endgroup]
+2026-05-28T11:08:44.7204400Z With the provided path, there will be 121 files uploaded
+2026-05-28T11:08:44.7209925Z Artifact name is valid!
+2026-05-28T11:08:44.7210630Z Root directory input is valid!
+2026-05-28T11:08:44.8710633Z Beginning upload of artifact content to blob storage
+2026-05-28T11:08:45.3949384Z Uploaded bytes 2047927
+2026-05-28T11:08:45.4183115Z Finished uploading artifact content to blob storage!
+2026-05-28T11:08:45.4186419Z SHA256 digest of uploaded artifact zip is d44964957583026a94ea1f0c72eb940d3c83cdfbd84ca0dd63dcf9063333df2f
+2026-05-28T11:08:45.4188474Z Finalizing artifact upload
+2026-05-28T11:08:45.5664292Z Artifact mbedtls-arm64.zip successfully finalized. Artifact ID 7264289420
+2026-05-28T11:08:45.5665462Z Artifact mbedtls-arm64 has been successfully uploaded! Final size is 2047927 bytes. Artifact ID is 7264289420
+2026-05-28T11:08:45.5672326Z Artifact download URL: https://github.com/mmkurodan/llama/actions/runs/26570973095/artifacts/7264289420

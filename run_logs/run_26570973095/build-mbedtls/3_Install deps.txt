@@ -1,0 +1,125 @@
+﻿2026-05-28T11:07:30.1940685Z ##[group]Run sudo apt update
+2026-05-28T11:07:30.1941108Z [36;1msudo apt update[0m
+2026-05-28T11:07:30.1941455Z [36;1msudo apt install -y cmake git build-essential[0m
+2026-05-28T11:07:30.1973677Z shell: /usr/bin/bash -e {0}
+2026-05-28T11:07:30.1973994Z ##[endgroup]
+2026-05-28T11:07:30.2155402Z 
+2026-05-28T11:07:30.2156227Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-28T11:07:30.2157101Z 
+2026-05-28T11:07:30.2791219Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-28T11:07:30.3299577Z Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
+2026-05-28T11:07:30.3302234Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-05-28T11:07:30.3371409Z Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+2026-05-28T11:07:30.3909236Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-05-28T11:07:30.3919053Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-05-28T11:07:30.3954612Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-05-28T11:07:30.3968083Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-05-28T11:07:30.4438116Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [130 kB]
+2026-05-28T11:07:30.4539485Z Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [158 kB]
+2026-05-28T11:07:30.4577839Z Get:11 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.6 kB]
+2026-05-28T11:07:30.5014647Z Get:12 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1215 B]
+2026-05-28T11:07:30.5944716Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [2016 kB]
+2026-05-28T11:07:30.6080001Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [356 kB]
+2026-05-28T11:07:30.6165682Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [178 kB]
+2026-05-28T11:07:30.6230366Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1693 kB]
+2026-05-28T11:07:30.6361428Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [330 kB]
+2026-05-28T11:07:30.6407100Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [386 kB]
+2026-05-28T11:07:30.6464082Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [3210 kB]
+2026-05-28T11:07:30.6684561Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [742 kB]
+2026-05-28T11:07:30.6720667Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [11.1 kB]
+2026-05-28T11:07:30.6734254Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2026-05-28T11:07:30.7300361Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5764 B]
+2026-05-28T11:07:30.7318139Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+2026-05-28T11:07:30.7614510Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1704 kB]
+2026-05-28T11:07:30.7702827Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [268 kB]
+2026-05-28T11:07:30.7726194Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [42.4 kB]
+2026-05-28T11:07:30.7740925Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1192 kB]
+2026-05-28T11:07:30.7818511Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [230 kB]
+2026-05-28T11:07:30.7840052Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [74.3 kB]
+2026-05-28T11:07:30.7857159Z Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [3006 kB]
+2026-05-28T11:07:30.8042859Z Get:32 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [698 kB]
+2026-05-28T11:07:30.8087272Z Get:33 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [9000 B]
+2026-05-28T11:07:35.6291731Z Fetched 16.8 MB in 2s (8121 kB/s)
+2026-05-28T11:07:36.4267580Z Reading package lists...
+2026-05-28T11:07:36.6300888Z Building dependency tree...
+2026-05-28T11:07:36.6307627Z Reading state information...
+2026-05-28T11:07:36.6478633Z 6 packages can be upgraded. Run 'apt list --upgradable' to see them.
+2026-05-28T11:07:36.6597634Z 
+2026-05-28T11:07:36.6598725Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-28T11:07:36.6599288Z 
+2026-05-28T11:07:36.6717308Z Reading package lists...
+2026-05-28T11:07:36.8718156Z Building dependency tree...
+2026-05-28T11:07:36.8725580Z Reading state information...
+2026-05-28T11:07:37.0464457Z git is already the newest version (1:2.54.0-0ppa1~ubuntu24.04.1).
+2026-05-28T11:07:37.0465229Z git set to manually installed.
+2026-05-28T11:07:37.0465739Z The following additional packages will be installed:
+2026-05-28T11:07:37.0472249Z   cmake-data libjsoncpp25 librhash0
+2026-05-28T11:07:37.0477603Z Suggested packages:
+2026-05-28T11:07:37.0477997Z   cmake-doc cmake-format elpa-cmake-mode ninja-build
+2026-05-28T11:07:37.1077827Z The following NEW packages will be installed:
+2026-05-28T11:07:37.1084636Z   build-essential cmake cmake-data libjsoncpp25 librhash0
+2026-05-28T11:07:37.1558527Z 0 upgraded, 5 newly installed, 0 to remove and 6 not upgraded.
+2026-05-28T11:07:37.2090320Z Need to get 13.6 MB of archives.
+2026-05-28T11:07:37.2091007Z After this operation, 49.1 MB of additional disk space will be used.
+2026-05-28T11:07:37.2091461Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-28T11:07:37.2402219Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 build-essential amd64 12.10ubuntu1 [4928 B]
+2026-05-28T11:07:37.2474923Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libjsoncpp25 amd64 1.9.5-6build1 [82.8 kB]
+2026-05-28T11:07:37.2669789Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 librhash0 amd64 1.4.3-3build1 [129 kB]
+2026-05-28T11:07:37.2818051Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 cmake-data all 3.28.3-1build7 [2155 kB]
+2026-05-28T11:07:37.3404080Z Get:6 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 cmake amd64 3.28.3-1build7 [11.2 MB]
+2026-05-28T11:07:37.8441809Z Fetched 13.6 MB in 0s (35.2 MB/s)
+2026-05-28T11:07:37.8654106Z Selecting previously unselected package build-essential.
+2026-05-28T11:07:37.8885691Z (Reading database ... 
+2026-05-28T11:07:37.8886282Z (Reading database ... 5%
+2026-05-28T11:07:37.8886818Z (Reading database ... 10%
+2026-05-28T11:07:37.8887203Z (Reading database ... 15%
+2026-05-28T11:07:37.8887571Z (Reading database ... 20%
+2026-05-28T11:07:37.8887882Z (Reading database ... 25%
+2026-05-28T11:07:37.8888117Z (Reading database ... 30%
+2026-05-28T11:07:37.8888343Z (Reading database ... 35%
+2026-05-28T11:07:37.8888609Z (Reading database ... 40%
+2026-05-28T11:07:37.8888836Z (Reading database ... 45%
+2026-05-28T11:07:37.8889068Z (Reading database ... 50%
+2026-05-28T11:07:37.8919979Z (Reading database ... 55%
+2026-05-28T11:07:38.0067839Z (Reading database ... 60%
+2026-05-28T11:07:38.2114870Z (Reading database ... 65%
+2026-05-28T11:07:38.3152674Z (Reading database ... 70%
+2026-05-28T11:07:38.4664979Z (Reading database ... 75%
+2026-05-28T11:07:38.6269446Z (Reading database ... 80%
+2026-05-28T11:07:38.7628219Z (Reading database ... 85%
+2026-05-28T11:07:38.8211693Z (Reading database ... 90%
+2026-05-28T11:07:38.9547865Z (Reading database ... 95%
+2026-05-28T11:07:38.9548250Z (Reading database ... 100%
+2026-05-28T11:07:38.9548626Z (Reading database ... 202271 files and directories currently installed.)
+2026-05-28T11:07:38.9591879Z Preparing to unpack .../build-essential_12.10ubuntu1_amd64.deb ...
+2026-05-28T11:07:38.9616416Z Unpacking build-essential (12.10ubuntu1) ...
+2026-05-28T11:07:38.9834138Z Selecting previously unselected package libjsoncpp25:amd64.
+2026-05-28T11:07:38.9962561Z Preparing to unpack .../libjsoncpp25_1.9.5-6build1_amd64.deb ...
+2026-05-28T11:07:38.9982031Z Unpacking libjsoncpp25:amd64 (1.9.5-6build1) ...
+2026-05-28T11:07:39.0206446Z Selecting previously unselected package librhash0:amd64.
+2026-05-28T11:07:39.0341326Z Preparing to unpack .../librhash0_1.4.3-3build1_amd64.deb ...
+2026-05-28T11:07:39.0352018Z Unpacking librhash0:amd64 (1.4.3-3build1) ...
+2026-05-28T11:07:39.0640217Z Selecting previously unselected package cmake-data.
+2026-05-28T11:07:39.0769294Z Preparing to unpack .../cmake-data_3.28.3-1build7_all.deb ...
+2026-05-28T11:07:39.0840021Z Unpacking cmake-data (3.28.3-1build7) ...
+2026-05-28T11:07:39.6948726Z Selecting previously unselected package cmake.
+2026-05-28T11:07:39.7095777Z Preparing to unpack .../cmake_3.28.3-1build7_amd64.deb ...
+2026-05-28T11:07:39.7104620Z Unpacking cmake (3.28.3-1build7) ...
+2026-05-28T11:07:39.8982180Z Setting up libjsoncpp25:amd64 (1.9.5-6build1) ...
+2026-05-28T11:07:39.9007556Z Setting up librhash0:amd64 (1.4.3-3build1) ...
+2026-05-28T11:07:39.9028415Z Setting up build-essential (12.10ubuntu1) ...
+2026-05-28T11:07:39.9048300Z Setting up cmake-data (3.28.3-1build7) ...
+2026-05-28T11:07:39.9114506Z Setting up cmake (3.28.3-1build7) ...
+2026-05-28T11:07:39.9137852Z Processing triggers for man-db (2.12.0-4build2) ...
+2026-05-28T11:07:39.9159238Z Not building database; man-db/auto-update is not 'true'.
+2026-05-28T11:07:39.9172918Z Processing triggers for libc-bin (2.39-0ubuntu8.7) ...
+2026-05-28T11:07:40.5455578Z 
+2026-05-28T11:07:40.5456111Z Running kernel seems to be up-to-date.
+2026-05-28T11:07:40.5456468Z 
+2026-05-28T11:07:40.5456663Z No services need to be restarted.
+2026-05-28T11:07:40.5456872Z 
+2026-05-28T11:07:40.5456988Z No containers need to be restarted.
+2026-05-28T11:07:40.5457169Z 
+2026-05-28T11:07:40.5457305Z No user sessions are running outdated binaries.
+2026-05-28T11:07:40.5457605Z 
+2026-05-28T11:07:40.5457920Z No VM guests are running outdated hypervisor (qemu) binaries on this host.

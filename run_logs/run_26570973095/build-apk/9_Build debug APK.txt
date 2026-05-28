@@ -1,0 +1,1060 @@
+﻿2026-05-28T11:11:52.8820844Z ##[group]Run chmod +x gradlew
+2026-05-28T11:11:52.8822169Z [36;1mchmod +x gradlew[0m
+2026-05-28T11:11:52.8822675Z [36;1m./gradlew assembleDebug --stacktrace --info[0m
+2026-05-28T11:11:52.8850991Z shell: /usr/bin/bash -e {0}
+2026-05-28T11:11:52.8851669Z ##[endgroup]
+2026-05-28T11:11:52.9692494Z Downloading https://services.gradle.org/distributions/gradle-8.7-bin.zip
+2026-05-28T11:11:54.2644658Z ............10%.............20%.............30%.............40%............50%.............60%.............70%.............80%.............90%............100%
+2026-05-28T11:11:55.2791011Z Initialized native services in: /home/runner/.gradle/native
+2026-05-28T11:11:55.2815325Z Initialized jansi services in: /home/runner/.gradle/native
+2026-05-28T11:11:55.3937411Z Received JVM installation metadata from '/usr/lib/jvm/temurin-17-jdk-amd64': {JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64, JAVA_VERSION=17.0.19, JAVA_VENDOR=Eclipse Adoptium, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.19+10, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.19+10, VM_VENDOR=Eclipse Adoptium, OS_ARCH=amd64}
+2026-05-28T11:11:55.4933080Z The client will now receive all logging from the daemon (pid: 2358). The daemon log file: /home/runner/.gradle/daemon/8.7/daemon-2358.out.log
+2026-05-28T11:11:55.4942894Z Starting 2nd build in daemon [uptime: 41.35 secs, performance: 100%, GC rate: 0.00/s, heap usage: 0% of 512 MiB, non-heap usage: 22% of 384 MiB]
+2026-05-28T11:11:55.4944118Z Using 4 worker leases.
+2026-05-28T11:11:55.5930824Z Closing daemon's stdin at end of input.
+2026-05-28T11:11:55.5962192Z The daemon will no longer process any standard input.
+2026-05-28T11:11:55.6000805Z Now considering [/home/runner/work/llama/llama] as hierarchies to watch
+2026-05-28T11:11:55.6002257Z Watching the file system is configured to be enabled if available
+2026-05-28T11:11:55.6032053Z File system watching is active
+2026-05-28T11:11:55.6033076Z Starting Build
+2026-05-28T11:11:55.6041469Z Settings evaluated using settings file '/home/runner/work/llama/llama/settings.gradle'.
+2026-05-28T11:11:55.6062342Z Projects loaded. Root project using build file '/home/runner/work/llama/llama/build.gradle'.
+2026-05-28T11:11:55.6092145Z Included projects: [root project 'ollama', project ':app']
+2026-05-28T11:11:55.6981994Z 
+2026-05-28T11:11:55.6998741Z > Configure project :
+2026-05-28T11:11:55.7052733Z Evaluating root project 'ollama' using build file '/home/runner/work/llama/llama/build.gradle'.
+2026-05-28T11:11:55.7082839Z Transforming gradle-8.5.1.jar (com.android.tools.build:gradle:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7122728Z Transforming gradle-settings-api-8.5.1.jar (com.android.tools.build:gradle-settings-api:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7149616Z Transforming lint-model-31.5.1.jar (com.android.tools.lint:lint-model:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7182650Z Transforming builder-8.5.1.jar (com.android.tools.build:builder:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7233035Z Transforming manifest-merger-31.5.1.jar (com.android.tools.build:manifest-merger:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7235114Z Transforming sdk-common-31.5.1.jar (com.android.tools:sdk-common:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7262866Z Transforming sdklib-31.5.1.jar (com.android.tools:sdklib:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7302558Z Transforming repository-31.5.1.jar (com.android.tools:repository:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7312512Z Transforming gradle-api-8.5.1.jar (com.android.tools.build:gradle-api:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7314464Z Transforming builder-test-api-8.5.1.jar (com.android.tools.build:builder-test-api:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7316838Z Transforming ddmlib-31.5.1.jar (com.android.tools.ddms:ddmlib:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7318568Z Transforming aaptcompiler-8.5.1.jar (com.android.tools.build:aaptcompiler:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7320463Z Transforming bundletool-1.16.0.jar (com.android.tools.build:bundletool:1.16.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7322630Z Transforming aapt2-proto-8.5.1-11315950.jar (com.android.tools.build:aapt2-proto:8.5.1-11315950) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7324312Z Transforming crash-31.5.1.jar (com.android.tools.analytics-library:crash:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7326078Z Transforming tracker-31.5.1.jar (com.android.tools.analytics-library:tracker:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7342438Z Transforming shared-31.5.1.jar (com.android.tools.analytics-library:shared:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7344413Z Transforming lint-typedef-remover-31.5.1.jar (com.android.tools.lint:lint-typedef-remover:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7346806Z Transforming databinding-compiler-common-8.5.1.jar (androidx.databinding:databinding-compiler-common:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7348890Z Transforming databinding-common-8.5.1.jar (androidx.databinding:databinding-common:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7350777Z Transforming baseLibrary-8.5.1.jar (com.android.databinding:baseLibrary:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7352914Z Transforming layoutlib-api-31.5.1.jar (com.android.tools.layoutlib:layoutlib-api:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7357598Z Transforming android-device-provider-ddmlib-proto-31.5.1.jar (com.android.tools.utp:android-device-provider-ddmlib-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7360291Z Transforming android-device-provider-gradle-proto-31.5.1.jar (com.android.tools.utp:android-device-provider-gradle-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7370477Z Transforming android-test-plugin-host-additional-test-output-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-host-additional-test-output-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7378020Z Transforming android-test-plugin-host-coverage-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-host-coverage-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7380918Z Transforming android-test-plugin-host-emulator-control-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-host-emulator-control-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7383622Z Transforming android-test-plugin-host-logcat-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-host-logcat-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7386046Z Transforming android-test-plugin-host-apk-installer-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-host-apk-installer-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7388789Z Transforming android-test-plugin-host-retention-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-host-retention-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7408626Z Transforming android-test-plugin-result-listener-gradle-proto-31.5.1.jar (com.android.tools.utp:android-test-plugin-result-listener-gradle-proto:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7433079Z Transforming builder-model-8.5.1.jar (com.android.tools.build:builder-model:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7435707Z Transforming dvlib-31.5.1.jar (com.android.tools:dvlib:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7437599Z Transforming common-31.5.1.jar (com.android.tools:common:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7439922Z Transforming jetifier-processor-1.0.0-beta10.jar (com.android.tools.build.jetifier:jetifier-processor:1.0.0-beta10) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7442801Z Transforming jetifier-core-1.0.0-beta10.jar (com.android.tools.build.jetifier:jetifier-core:1.0.0-beta10) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7445012Z Transforming kotlin-reflect-1.9.20.jar (org.jetbrains.kotlin:kotlin-reflect:1.9.20) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7447141Z Transforming kotlin-stdlib-jdk7-1.9.20.jar (org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.20) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7449365Z Transforming kotlin-stdlib-1.9.20.jar (org.jetbrains.kotlin:kotlin-stdlib:1.9.20) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7452092Z Transforming kotlin-stdlib-jdk8-1.9.20.jar (org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.20) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7454842Z Transforming transform-api-2.0.0-deprecated-use-gradle-api.jar (com.android.tools.build:transform-api:2.0.0-deprecated-use-gradle-api) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7457170Z Transforming httpmime-4.5.6.jar (org.apache.httpcomponents:httpmime:4.5.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7459240Z Transforming commons-io-2.13.0.jar (commons-io:commons-io:2.13.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7461138Z Transforming asm-commons-9.6.jar (org.ow2.asm:asm-commons:9.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7463163Z Transforming asm-util-9.6.jar (org.ow2.asm:asm-util:9.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7465072Z Transforming asm-analysis-9.6.jar (org.ow2.asm:asm-analysis:9.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7466915Z Transforming asm-tree-9.6.jar (org.ow2.asm:asm-tree:9.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7468678Z Transforming asm-9.6.jar (org.ow2.asm:asm:9.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7470450Z Transforming apkzlib-8.5.1.jar (com.android.tools.build:apkzlib:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7472863Z Transforming bcpkix-jdk18on-1.77.jar (org.bouncycastle:bcpkix-jdk18on:1.77) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7475066Z Transforming jaxb-runtime-2.3.2.jar (org.glassfish.jaxb:jaxb-runtime:2.3.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7477120Z Transforming jopt-simple-4.9.jar (net.sf.jopt-simple:jopt-simple:4.9) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7479114Z Transforming javapoet-1.10.0.jar (com.squareup:javapoet:1.10.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7481182Z Transforming protobuf-java-util-3.22.3.jar (com.google.protobuf:protobuf-java-util:3.22.3) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7483530Z Transforming grpc-protobuf-1.57.0.jar (io.grpc:grpc-protobuf:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7485418Z Transforming tink-1.7.0.jar (com.google.crypto.tink:tink:1.7.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7487404Z Transforming protos-31.5.1.jar (com.android.tools.analytics-library:protos:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7489974Z Transforming proto-google-common-protos-2.17.0.jar (com.google.api.grpc:proto-google-common-protos:2.17.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7492406Z Transforming protobuf-java-3.22.3.jar (com.google.protobuf:protobuf-java:3.22.3) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7494383Z Transforming grpc-netty-1.57.0.jar (io.grpc:grpc-netty:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7496195Z Transforming grpc-core-1.57.0.jar (io.grpc:grpc-core:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7498004Z Transforming gson-2.10.1.jar (com.google.code.gson:gson:2.10.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7499839Z Transforming grpc-stub-1.57.0.jar (io.grpc:grpc-stub:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7502103Z Transforming core-proto-0.0.9-alpha02.jar (com.google.testing.platform:core-proto:0.0.9-alpha02) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7504316Z Transforming kxml2-2.3.0.jar (net.sf.kxml:kxml2:2.3.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7506713Z Transforming tensorflow-lite-metadata-0.1.0-rc2.jar (org.tensorflow:tensorflow-lite-metadata:0.1.0-rc2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7509063Z Transforming flatbuffers-java-1.12.0.jar (com.google.flatbuffers:flatbuffers-java:1.12.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7511073Z Transforming jimfs-1.1.jar (com.google.jimfs:jimfs:1.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7513140Z Transforming grpc-context-1.57.0.jar (io.grpc:grpc-context:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7515180Z Transforming grpc-protobuf-lite-1.57.0.jar (io.grpc:grpc-protobuf-lite:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7517159Z Transforming grpc-api-1.57.0.jar (io.grpc:grpc-api:1.57.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7519090Z Transforming guava-32.0.1-jre.jar (com.google.guava:guava:32.0.1-jre) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7521170Z Transforming dagger-2.28.3.jar (com.google.dagger:dagger:2.28.3) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7523348Z Transforming javax.inject-1.jar (javax.inject:javax.inject:1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7525420Z Transforming bcutil-jdk18on-1.77.jar (org.bouncycastle:bcutil-jdk18on:1.77) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7527511Z Transforming bcprov-jdk18on-1.77.jar (org.bouncycastle:bcprov-jdk18on:1.77) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7529678Z Transforming trove4j-1.0.20200330.jar (org.jetbrains.intellij.deps:trove4j:1.0.20200330) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7532107Z Transforming commons-compress-1.21.jar (org.apache.commons:commons-compress:1.21) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7534276Z Transforming httpclient-4.5.14.jar (org.apache.httpcomponents:httpclient:4.5.14) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7536349Z Transforming httpcore-4.4.16.jar (org.apache.httpcomponents:httpcore:4.4.16) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7538350Z Transforming javax.activation-1.2.0.jar (com.sun.activation:javax.activation:1.2.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7540399Z Transforming annotations-23.0.0.jar (org.jetbrains:annotations:23.0.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7542650Z Transforming signflinger-8.5.1.jar (com.android:signflinger:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7544919Z Transforming zipflinger-8.5.1.jar (com.android:zipflinger:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7546947Z Transforming annotations-31.5.1.jar (com.android.tools:annotations:31.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7548850Z Transforming jna-platform-5.6.0.jar (net.java.dev.jna:jna-platform:5.6.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7551073Z Transforming juniversalchardet-1.0.3.jar (com.googlecode.juniversalchardet:juniversalchardet:1.0.3) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7553642Z Transforming javax.annotation-api-1.3.2.jar (javax.annotation:javax.annotation-api:1.3.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7555756Z Transforming stax-ex-1.8.1.jar (org.jvnet.staxex:stax-ex:1.8.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7557885Z Transforming jakarta.xml.bind-api-2.3.2.jar (jakarta.xml.bind:jakarta.xml.bind-api:2.3.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7559933Z Transforming txw2-2.3.2.jar (org.glassfish.jaxb:txw2:2.3.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7562560Z Transforming istack-commons-runtime-3.0.8.jar (com.sun.istack:istack-commons-runtime:3.0.8) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7564790Z Transforming FastInfoset-1.2.16.jar (com.sun.xml.fastinfoset:FastInfoset:1.2.16) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7567009Z Transforming jakarta.activation-api-1.2.1.jar (jakarta.activation:jakarta.activation-api:1.2.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7569379Z Transforming auto-value-annotations-1.6.2.jar (com.google.auto.value:auto-value-annotations:1.6.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7571937Z Transforming error_prone_annotations-2.18.0.jar (com.google.errorprone:error_prone_annotations:2.18.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7574170Z Transforming jose4j-0.9.5.jar (org.bitbucket.b_c:jose4j:0.9.5) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7576024Z Transforming slf4j-api-1.7.30.jar (org.slf4j:slf4j-api:1.7.30) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7590702Z Transforming jdom2-2.0.6.jar (org.jdom:jdom2:2.0.6) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7594146Z Transforming jsr305-3.0.2.jar (com.google.code.findbugs:jsr305:3.0.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7596296Z Transforming j2objc-annotations-2.8.jar (com.google.j2objc:j2objc-annotations:2.8) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7598468Z Transforming annotations-4.1.1.4.jar (com.google.android:annotations:4.1.1.4) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7600792Z Transforming animal-sniffer-annotations-1.23.jar (org.codehaus.mojo:animal-sniffer-annotations:1.23) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7603322Z Transforming perfmark-api-0.26.0.jar (io.perfmark:perfmark-api:0.26.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7605847Z Transforming netty-codec-http2-4.1.93.Final.jar (io.netty:netty-codec-http2:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7608192Z Transforming netty-handler-proxy-4.1.93.Final.jar (io.netty:netty-handler-proxy:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7610506Z Transforming netty-codec-http-4.1.93.Final.jar (io.netty:netty-codec-http:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7612904Z Transforming netty-handler-4.1.93.Final.jar (io.netty:netty-handler:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7615618Z Transforming netty-transport-native-unix-common-4.1.93.Final.jar (io.netty:netty-transport-native-unix-common:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7618087Z Transforming checker-qual-3.33.0.jar (org.checkerframework:checker-qual:3.33.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7620148Z Transforming commons-codec-1.11.jar (commons-codec:commons-codec:1.11) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7622532Z Transforming apksig-8.5.1.jar (com.android.tools.build:apksig:8.5.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7624538Z Transforming javawriter-2.5.0.jar (com.squareup:javawriter:2.5.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7626531Z Transforming failureaccess-1.0.1.jar (com.google.guava:failureaccess:1.0.1) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7629211Z Transforming listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar (com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7632491Z Transforming commons-logging-1.2.jar (commons-logging:commons-logging:1.2) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7634473Z Transforming jna-5.6.0.jar (net.java.dev.jna:jna:5.6.0) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7636523Z Transforming netty-codec-socks-4.1.93.Final.jar (io.netty:netty-codec-socks:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7638659Z Transforming netty-codec-4.1.93.Final.jar (io.netty:netty-codec:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7640735Z Transforming netty-transport-4.1.93.Final.jar (io.netty:netty-transport:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7643150Z Transforming netty-buffer-4.1.93.Final.jar (io.netty:netty-buffer:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7645267Z Transforming netty-resolver-4.1.93.Final.jar (io.netty:netty-resolver:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7647405Z Transforming netty-common-4.1.93.Final.jar (io.netty:netty-common:4.1.93.Final) with ExternalDependencyInstrumentingArtifactTransform
+2026-05-28T11:11:55.7921519Z 
+2026-05-28T11:11:55.7929869Z > Configure project :app
+2026-05-28T11:11:55.7955043Z Evaluating project ':app' using build file '/home/runner/work/llama/llama/app/build.gradle'.
+2026-05-28T11:11:55.7956412Z Using default execution profile
+2026-05-28T11:11:55.7982582Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.7984185Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.7985146Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.7986394Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.7987608Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.7988640Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.7989816Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.7990743Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.7992142Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.7993367Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.7994425Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.7995547Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.7996536Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.7997633Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.7999264Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8000267Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8001588Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8002573Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8003673Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8004920Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8005926Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8006956Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8007873Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8009025Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8010234Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8011485Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8012577Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8013626Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8015168Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8041634Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8042850Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8044035Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8045063Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8046311Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8047583Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8048665Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8049849Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8050889Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8052364Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8053647Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8054728Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8055863Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8056884Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8058063Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8059351Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8060408Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8061764Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8062823Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8064014Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8065250Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8066326Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8067474Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8068512Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8069713Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8071001Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8072313Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8073326Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8074025Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8074842Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8075995Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8076719Z C/C++: android.ndkVersion from module build.gradle is [27.2.12479018]
+2026-05-28T11:11:55.8077512Z C/C++: android.ndkPath from module build.gradle is not set
+2026-05-28T11:11:55.8078201Z C/C++: ndk.dir in local.properties is not set
+2026-05-28T11:11:55.8078978Z C/C++: Not considering ANDROID_NDK_HOME because support was removed after deprecation period.
+2026-05-28T11:11:55.8079766Z C/C++: sdkFolder is /usr/local/lib/android/sdk
+2026-05-28T11:11:55.8080381Z All projects evaluated.
+2026-05-28T11:11:55.8080954Z Task name matched 'assembleDebug'
+2026-05-28T11:11:55.8082150Z Selected primary task 'assembleDebug' from project :
+2026-05-28T11:11:56.0920872Z WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+2026-05-28T11:11:56.0942094Z 
+2026-05-28T11:11:56.0952734Z This Android Gradle plugin (8.5.1) was tested up to compileSdk = 34.
+2026-05-28T11:11:56.0953640Z 
+2026-05-28T11:11:56.0954245Z You are strongly encouraged to update your project to use a newer
+2026-05-28T11:11:56.0955413Z Android Gradle plugin that has been tested with compileSdk = 35.
+2026-05-28T11:11:56.0956637Z 
+2026-05-28T11:11:56.0957226Z If you are already using the latest version of the Android Gradle plugin,
+2026-05-28T11:11:56.0958556Z you may need to wait until a newer version with support for compileSdk = 35 is available.
+2026-05-28T11:11:56.0959463Z 
+2026-05-28T11:11:56.0959973Z For more information refer to the compatibility table:
+2026-05-28T11:11:56.0961017Z https://d.android.com/r/tools/api-level-support
+2026-05-28T11:11:56.0961834Z 
+2026-05-28T11:11:56.0962271Z To suppress this warning, add/update
+2026-05-28T11:11:56.0963179Z     android.suppressUnsupportedCompileSdk=35
+2026-05-28T11:11:56.0965374Z to this project's gradle.properties.
+2026-05-28T11:11:56.2937493Z Tasks to be executed: [task ':app:preBuild', task ':app:preDebugBuild', task ':app:mergeDebugNativeDebugMetadata', task ':app:generateDebugBuildConfig', task ':app:javaPreCompileDebug', task ':app:checkDebugAarMetadata', task ':app:generateDebugResValues', task ':app:mapDebugSourceSetPaths', task ':app:generateDebugResources', task ':app:mergeDebugResources', task ':app:packageDebugResources', task ':app:parseDebugLocalResources', task ':app:createDebugCompatibleScreenManifests', task ':app:extractDeepLinksDebug', task ':app:processDebugMainManifest', task ':app:processDebugManifest', task ':app:processDebugManifestForPackage', task ':app:processDebugResources', task ':app:compileDebugJavaWithJavac', task ':app:mergeDebugShaders', task ':app:compileDebugShaders', task ':app:generateDebugAssets', task ':app:mergeDebugAssets', task ':app:compressDebugAssets', task ':app:processDebugJavaRes', task ':app:mergeDebugJavaResource', task ':app:checkDebugDuplicateClasses', task ':app:desugarDebugFileDependencies', task ':app:mergeDebugStartupProfile', task ':app:mergeExtDexDebug', task ':app:mergeLibDexDebug', task ':app:dexBuilderDebug', task ':app:mergeProjectDexDebug', task ':app:configureCMakeDebug[arm64-v8a]', task ':app:buildCMakeDebug[arm64-v8a]', task ':app:mergeDebugJniLibFolders', task ':app:mergeDebugNativeLibs', task ':app:stripDebugDebugSymbols', task ':app:validateSigningDebug', task ':app:writeDebugAppMetadata', task ':app:writeDebugSigningConfigVersions', task ':app:packageDebug', task ':app:createDebugApkListingFileRedirect', task ':app:assembleDebug']
+2026-05-28T11:11:56.2950636Z Tasks that were excluded: []
+2026-05-28T11:11:56.2951975Z Resolve mutations for :app:preBuild (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.2953192Z :app:preBuild (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.2953864Z 
+2026-05-28T11:11:56.2954315Z > Task :app:preBuild UP-TO-DATE
+2026-05-28T11:11:56.2955202Z Skipping task ':app:preBuild' as it has no actions.
+2026-05-28T11:11:56.2956358Z Resolve mutations for :app:preDebugBuild (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.2957959Z :app:preDebugBuild (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.2958660Z 
+2026-05-28T11:11:56.2959112Z > Task :app:preDebugBuild UP-TO-DATE
+2026-05-28T11:11:56.2960081Z Skipping task ':app:preDebugBuild' as it has no actions.
+2026-05-28T11:11:56.2961613Z Resolve mutations for :app:mergeDebugNativeDebugMetadata (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.2963082Z :app:mergeDebugNativeDebugMetadata (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.3920052Z 
+2026-05-28T11:11:56.3921449Z > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+2026-05-28T11:11:56.3923173Z Skipping task ':app:mergeDebugNativeDebugMetadata' as it has no source files and no previous output files.
+2026-05-28T11:11:56.3924865Z Resolve mutations for :app:generateDebugBuildConfig (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.3926362Z :app:generateDebugBuildConfig (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.3927382Z 
+2026-05-28T11:11:56.3927879Z > Task :app:generateDebugBuildConfig
+2026-05-28T11:11:56.3929004Z Caching disabled for task ':app:generateDebugBuildConfig' because:
+2026-05-28T11:11:56.3930187Z   Build cache is disabled
+2026-05-28T11:11:56.3931173Z Task ':app:generateDebugBuildConfig' is not up-to-date because:
+2026-05-28T11:11:56.3932792Z   No history is available.
+2026-05-28T11:11:56.3933952Z Resolve mutations for :app:javaPreCompileDebug (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.3935395Z :app:javaPreCompileDebug (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.3936821Z Resolve mutations for :app:checkDebugAarMetadata (Thread[included builds,5,main]) started.
+2026-05-28T11:11:56.3938267Z :app:checkDebugAarMetadata (Thread[included builds,5,main]) started.
+2026-05-28T11:11:56.4931944Z 
+2026-05-28T11:11:56.4962675Z > Task :app:javaPreCompileDebug
+2026-05-28T11:11:56.4992327Z Caching disabled for task ':app:javaPreCompileDebug' because:
+2026-05-28T11:11:56.5004342Z   Build cache is disabled
+2026-05-28T11:11:56.5032168Z Task ':app:javaPreCompileDebug' is not up-to-date because:
+2026-05-28T11:11:56.5061989Z   No history is available.
+2026-05-28T11:11:56.5092528Z Resolve mutations for :app:generateDebugResValues (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:56.5094682Z :app:generateDebugResValues (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:56.5109443Z 
+2026-05-28T11:11:56.5110091Z > Task :app:checkDebugAarMetadata
+2026-05-28T11:11:56.5111631Z Caching disabled for task ':app:checkDebugAarMetadata' because:
+2026-05-28T11:11:56.5112712Z   Build cache is disabled
+2026-05-28T11:11:56.5113555Z   Caching has been disabled for the task
+2026-05-28T11:11:56.5114590Z Task ':app:checkDebugAarMetadata' is not up-to-date because:
+2026-05-28T11:11:56.5115572Z   No history is available.
+2026-05-28T11:11:56.5116118Z 
+2026-05-28T11:11:56.5116544Z > Task :app:generateDebugResValues
+2026-05-28T11:11:56.5117518Z Caching disabled for task ':app:generateDebugResValues' because:
+2026-05-28T11:11:56.5118577Z   Build cache is disabled
+2026-05-28T11:11:56.5119492Z Task ':app:generateDebugResValues' is not up-to-date because:
+2026-05-28T11:11:56.5120497Z   No history is available.
+2026-05-28T11:11:56.5121724Z Resolve mutations for :app:mapDebugSourceSetPaths (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.5123184Z :app:mapDebugSourceSetPaths (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:56.5123994Z 
+2026-05-28T11:11:56.5124444Z > Task :app:mapDebugSourceSetPaths
+2026-05-28T11:11:56.5125412Z Caching disabled for task ':app:mapDebugSourceSetPaths' because:
+2026-05-28T11:11:56.5126454Z   Build cache is disabled
+2026-05-28T11:11:56.5127248Z   Caching has been disabled for the task
+2026-05-28T11:11:56.5128238Z Task ':app:mapDebugSourceSetPaths' is not up-to-date because:
+2026-05-28T11:11:56.5129190Z   No history is available.
+2026-05-28T11:11:56.5130286Z Resolve mutations for :app:generateDebugResources (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.5132548Z :app:generateDebugResources (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.5133522Z 
+2026-05-28T11:11:56.5134002Z > Task :app:generateDebugResources
+2026-05-28T11:11:56.5135072Z Caching disabled for task ':app:generateDebugResources' because:
+2026-05-28T11:11:56.5136181Z   Build cache is disabled
+2026-05-28T11:11:56.5137157Z Task ':app:generateDebugResources' is not up-to-date because:
+2026-05-28T11:11:56.5138335Z   No history is available.
+2026-05-28T11:11:56.5139386Z Resolve mutations for :app:mergeDebugResources (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.5140581Z :app:mergeDebugResources (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:56.6946141Z Resolve mutations for :app:packageDebugResources (Thread[included builds,5,main]) started.
+2026-05-28T11:11:56.7012870Z :app:packageDebugResources (Thread[included builds,5,main]) started.
+2026-05-28T11:11:56.7919215Z 
+2026-05-28T11:11:56.7922634Z > Task :app:packageDebugResources
+2026-05-28T11:11:56.7924055Z Caching disabled for task ':app:packageDebugResources' because:
+2026-05-28T11:11:56.7925281Z   Build cache is disabled
+2026-05-28T11:11:56.7926307Z Task ':app:packageDebugResources' is not up-to-date because:
+2026-05-28T11:11:56.7927879Z   No history is available.
+2026-05-28T11:11:56.7929056Z The input changes require a full rebuild for incremental task ':app:packageDebugResources'.
+2026-05-28T11:11:56.7930438Z [MergeResources] Inputs are non-incremental full task action.
+2026-05-28T11:11:56.7932107Z Resolve mutations for :app:parseDebugLocalResources (Thread[included builds,5,main]) started.
+2026-05-28T11:11:56.7933594Z :app:parseDebugLocalResources (Thread[included builds,5,main]) started.
+2026-05-28T11:11:56.7934454Z 
+2026-05-28T11:11:56.7934997Z > Task :app:mergeDebugResources
+2026-05-28T11:11:56.7936001Z Caching disabled for task ':app:mergeDebugResources' because:
+2026-05-28T11:11:56.7937091Z   Build cache is disabled
+2026-05-28T11:11:56.7938041Z Task ':app:mergeDebugResources' is not up-to-date because:
+2026-05-28T11:11:56.7939072Z   No history is available.
+2026-05-28T11:11:56.7940205Z The input changes require a full rebuild for incremental task ':app:mergeDebugResources'.
+2026-05-28T11:11:56.7941712Z [MergeResources] Inputs are non-incremental full task action.
+2026-05-28T11:11:56.7943124Z Compiling image file /home/runner/work/llama/llama/app/src/main/res/mipmap-hdpi/ic_launcher.png
+2026-05-28T11:11:56.7945505Z Compiling file /home/runner/work/llama/llama/app/src/main/res/mipmap-hdpi/ic_launcher.png to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/mipmap-hdpi_ic_launcher.png.flat
+2026-05-28T11:11:56.7947849Z Compiling image file /home/runner/work/llama/llama/app/src/main/res/mipmap-mdpi/ic_launcher.png
+2026-05-28T11:11:56.7950185Z Compiling file /home/runner/work/llama/llama/app/src/main/res/mipmap-mdpi/ic_launcher.png to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/mipmap-mdpi_ic_launcher.png.flat
+2026-05-28T11:11:56.7953460Z Compiling xml file /home/runner/work/llama/llama/app/src/main/res/layout/activity_settings.xml to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/layout_activity_settings.xml.flat
+2026-05-28T11:11:56.7956650Z Compiling xml file /home/runner/work/llama/llama/app/src/main/res/xml/network_security_config.xml to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/xml_network_security_config.xml.flat
+2026-05-28T11:11:56.7959074Z Compiling image file /home/runner/work/llama/llama/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+2026-05-28T11:11:56.7963398Z Compiling file /home/runner/work/llama/llama/app/src/main/res/mipmap-xhdpi/ic_launcher.png to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/mipmap-xhdpi_ic_launcher.png.flat
+2026-05-28T11:11:56.7966529Z Compiling xml file /home/runner/work/llama/llama/app/src/main/res/layout/activity_documents.xml to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/layout_activity_documents.xml.flat
+2026-05-28T11:11:56.7970000Z Compiling xml file /home/runner/work/llama/llama/app/src/main/res/layout/activity_main.xml to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/layout_activity_main.xml.flat
+2026-05-28T11:11:56.7972567Z Compiling image file /home/runner/work/llama/llama/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+2026-05-28T11:11:56.7975043Z Compiling file /home/runner/work/llama/llama/app/src/main/res/mipmap-xxhdpi/ic_launcher.png to /home/runner/work/llama/llama/app/build/intermediates/merged_res/debug/mergeDebugResources/mipmap-xxhdpi_ic_launcher.png.flat
+2026-05-28T11:11:57.7921396Z Resolve mutations for :app:createDebugCompatibleScreenManifests (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:57.7932400Z :app:createDebugCompatibleScreenManifests (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:57.7942545Z 
+2026-05-28T11:11:57.7943190Z > Task :app:createDebugCompatibleScreenManifests
+2026-05-28T11:11:57.7944472Z Caching disabled for task ':app:createDebugCompatibleScreenManifests' because:
+2026-05-28T11:11:57.7945642Z   Build cache is disabled
+2026-05-28T11:11:57.7946917Z   Caching has been disabled for the task
+2026-05-28T11:11:57.7947962Z Task ':app:createDebugCompatibleScreenManifests' is not up-to-date because:
+2026-05-28T11:11:57.7949078Z   No history is available.
+2026-05-28T11:11:57.7950185Z Resolve mutations for :app:extractDeepLinksDebug (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:57.7951891Z :app:extractDeepLinksDebug (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:57.7952719Z 
+2026-05-28T11:11:57.7953173Z > Task :app:extractDeepLinksDebug
+2026-05-28T11:11:57.7954144Z Caching disabled for task ':app:extractDeepLinksDebug' because:
+2026-05-28T11:11:57.7955148Z   Build cache is disabled
+2026-05-28T11:11:57.7956074Z Task ':app:extractDeepLinksDebug' is not up-to-date because:
+2026-05-28T11:11:57.7957108Z   No history is available.
+2026-05-28T11:11:57.7958137Z Resolve mutations for :app:processDebugMainManifest (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:57.7959519Z :app:processDebugMainManifest (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:57.8920282Z 
+2026-05-28T11:11:57.8952594Z > Task :app:parseDebugLocalResources
+2026-05-28T11:11:57.8972414Z Transforming android.jar with PlatformAttrTransform
+2026-05-28T11:11:57.8982583Z Caching disabled for PlatformAttrTransform: /usr/local/lib/android/sdk/platforms/android-35/android.jar because:
+2026-05-28T11:11:57.9012081Z   Build cache is disabled
+2026-05-28T11:11:57.9027136Z Transforming android.jar with PlatformAttrTransform
+2026-05-28T11:11:57.9028188Z Caching disabled for task ':app:parseDebugLocalResources' because:
+2026-05-28T11:11:57.9029110Z   Build cache is disabled
+2026-05-28T11:11:57.9029917Z Task ':app:parseDebugLocalResources' is not up-to-date because:
+2026-05-28T11:11:57.9030833Z   No history is available.
+2026-05-28T11:11:57.9032046Z The input changes require a full rebuild for incremental task ':app:parseDebugLocalResources'.
+2026-05-28T11:11:57.9033165Z Transforming android.jar with PlatformAttrTransform
+2026-05-28T11:11:57.9033713Z 
+2026-05-28T11:11:57.9034054Z > Task :app:processDebugMainManifest
+2026-05-28T11:11:57.9034967Z Caching disabled for task ':app:processDebugMainManifest' because:
+2026-05-28T11:11:57.9035881Z   Build cache is disabled
+2026-05-28T11:11:57.9036697Z Task ':app:processDebugMainManifest' is not up-to-date because:
+2026-05-28T11:11:57.9037609Z   No history is available.
+2026-05-28T11:11:57.9038567Z Merging main manifest /home/runner/work/llama/llama/app/src/main/AndroidManifest.xml
+2026-05-28T11:11:57.9039316Z 
+2026-05-28T11:11:57.9039607Z Merging result: SUCCESS
+2026-05-28T11:11:57.9040278Z 1<?xml version="1.0" encoding="utf-8"?>
+2026-05-28T11:11:57.9041371Z 2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+2026-05-28T11:11:57.9043593Z 3    package="com.***.llama"
+2026-05-28T11:11:57.9044336Z 4    android:versionCode="420"
+2026-05-28T11:11:57.9045023Z 5    android:versionName="1.420" >
+2026-05-28T11:11:57.9045695Z 6
+2026-05-28T11:11:57.9046248Z 7    <uses-sdk
+2026-05-28T11:11:57.9046865Z 8        android:minSdkVersion="24"
+2026-05-28T11:11:57.9047615Z 9        android:targetSdkVersion="35" />
+2026-05-28T11:11:57.9048306Z 10
+2026-05-28T11:11:57.9049049Z 11    <uses-permission android:name="android.permission.INTERNET" />
+2026-05-28T11:11:57.9050172Z 11-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:3:5-67
+2026-05-28T11:11:57.9051494Z 11-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:3:22-64
+2026-05-28T11:11:57.9052678Z 12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+2026-05-28T11:11:57.9053859Z 12-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:4:5-79
+2026-05-28T11:11:57.9054999Z 12-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:4:22-76
+2026-05-28T11:11:57.9082475Z 13    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+2026-05-28T11:11:57.9112371Z 13-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:5:5-77
+2026-05-28T11:11:57.9142101Z 13-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:5:22-74
+2026-05-28T11:11:57.9144241Z 14    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+2026-05-28T11:11:57.9172262Z 14-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:6:5-89
+2026-05-28T11:11:57.9202277Z 14-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:6:22-86
+2026-05-28T11:11:57.9204715Z 15    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+2026-05-28T11:11:57.9232480Z 15-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:7:5-77
+2026-05-28T11:11:57.9252829Z 15-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:7:22-74
+2026-05-28T11:11:57.9253970Z 16
+2026-05-28T11:11:57.9254766Z 17    <application
+2026-05-28T11:11:57.9255962Z 17-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:9:5-46:19
+2026-05-28T11:11:57.9257521Z 18        android:name="com.***.llama.LlamaApplication"
+2026-05-28T11:11:57.9258764Z 18-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:10:9-58
+2026-05-28T11:11:57.9259901Z 19        android:debuggable="true"
+2026-05-28T11:11:57.9260716Z 20        android:extractNativeLibs="false"
+2026-05-28T11:11:57.9261809Z 21        android:icon="@mipmap/ic_launcher"
+2026-05-28T11:11:57.9262928Z 21-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:13:9-43
+2026-05-28T11:11:57.9264194Z 22        android:label="LLM tester with llama.cpp"
+2026-05-28T11:11:57.9265313Z 22-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:11:9-50
+2026-05-28T11:11:57.9266583Z 23        android:networkSecurityConfig="@xml/network_security_config"
+2026-05-28T11:11:57.9267858Z 23-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:14:9-69
+2026-05-28T11:11:57.9269158Z 24        android:theme="@android:style/Theme.Material.Light.NoActionBar" >
+2026-05-28T11:11:57.9270427Z 24-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:12:9-72
+2026-05-28T11:11:57.9271710Z 25        <activity
+2026-05-28T11:11:57.9273121Z 25-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:16:9-25:20
+2026-05-28T11:11:57.9274704Z 26            android:name="com.***.llama.MainActivity"
+2026-05-28T11:11:57.9275953Z 26-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:17:13-58
+2026-05-28T11:11:57.9277098Z 27            android:exported="true" >
+2026-05-28T11:11:57.9278167Z 27-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:18:13-36
+2026-05-28T11:11:57.9279305Z 28            <intent-filter>
+2026-05-28T11:11:57.9280326Z 28-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:20:13-23:29
+2026-05-28T11:11:57.9281810Z 29                <action android:name="android.intent.action.MAIN" />
+2026-05-28T11:11:57.9283495Z 29-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:21:17-69
+2026-05-28T11:11:57.9284692Z 29-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:21:25-66
+2026-05-28T11:11:57.9285737Z 30
+2026-05-28T11:11:57.9286672Z 31                <category android:name="android.intent.category.LAUNCHER" />
+2026-05-28T11:11:57.9288070Z 31-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:22:17-77
+2026-05-28T11:11:57.9289367Z 31-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:22:27-74
+2026-05-28T11:11:57.9290483Z 32            </intent-filter>
+2026-05-28T11:11:57.9291541Z 33        </activity>
+2026-05-28T11:11:57.9292320Z 34        <activity
+2026-05-28T11:11:57.9293242Z 34-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:27:9-30:39
+2026-05-28T11:11:57.9306248Z 35            android:name="com.***.llama.SettingsActivity"
+2026-05-28T11:11:57.9307804Z 35-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:28:13-62
+2026-05-28T11:11:57.9308900Z 36            android:exported="true"
+2026-05-28T11:11:57.9310009Z 36-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:30:13-36
+2026-05-28T11:11:57.9311153Z 37            android:label="Settings" />
+2026-05-28T11:11:57.9312356Z 37-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:29:13-37
+2026-05-28T11:11:57.9313736Z 38        <activity
+2026-05-28T11:11:57.9314701Z 38-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:32:9-35:39
+2026-05-28T11:11:57.9315966Z 39            android:name="com.***.llama.DocumentsActivity"
+2026-05-28T11:11:57.9317196Z 39-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:33:13-63
+2026-05-28T11:11:57.9318349Z 40            android:exported="true"
+2026-05-28T11:11:57.9319561Z 40-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:35:13-36
+2026-05-28T11:11:57.9320581Z 41            android:label="Documents" />
+2026-05-28T11:11:57.9321708Z 41-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:34:13-38
+2026-05-28T11:11:57.9322672Z 42
+2026-05-28T11:11:57.9323233Z 43        <service
+2026-05-28T11:11:57.9324095Z 43-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:37:9-44:19
+2026-05-28T11:11:57.9325272Z 44            android:name="com.***.llama.OllamaForegroundService"
+2026-05-28T11:11:57.9326320Z 44-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:38:13-69
+2026-05-28T11:11:57.9327296Z 45            android:exported="true"
+2026-05-28T11:11:57.9328199Z 45-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:40:13-36
+2026-05-28T11:11:57.9329244Z 46            android:foregroundServiceType="specialUse" >
+2026-05-28T11:11:57.9330251Z 46-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:39:13-55
+2026-05-28T11:11:57.9331190Z 47            <property
+2026-05-28T11:11:57.9332210Z 47-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:41:13-43:49
+2026-05-28T11:11:57.9333347Z 48                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+2026-05-28T11:11:57.9334581Z 48-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:42:17-76
+2026-05-28T11:11:57.9335561Z 49                android:value="llm_inference" />
+2026-05-28T11:11:57.9336510Z 49-->/home/runner/work/llama/llama/app/src/main/AndroidManifest.xml:43:17-46
+2026-05-28T11:11:57.9337455Z 50        </service>
+2026-05-28T11:11:57.9338074Z 51    </application>
+2026-05-28T11:11:57.9338674Z 52
+2026-05-28T11:11:57.9339226Z 53</manifest>
+2026-05-28T11:11:57.9339550Z 
+2026-05-28T11:11:57.9340491Z Merged manifest saved to /home/runner/work/llama/llama/app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml
+2026-05-28T11:11:57.9372430Z Resolve mutations for :app:processDebugManifest (Thread[included builds,5,main]) started.
+2026-05-28T11:11:57.9373705Z :app:processDebugManifest (Thread[included builds,5,main]) started.
+2026-05-28T11:11:58.1918983Z 
+2026-05-28T11:11:58.1922985Z > Task :app:processDebugManifest
+2026-05-28T11:11:58.1923905Z Caching disabled for task ':app:processDebugManifest' because:
+2026-05-28T11:11:58.1925062Z   Build cache is disabled
+2026-05-28T11:11:58.1925827Z Task ':app:processDebugManifest' is not up-to-date because:
+2026-05-28T11:11:58.1926627Z   No history is available.
+2026-05-28T11:11:58.1927642Z Resolve mutations for :app:processDebugManifestForPackage (Thread[included builds,5,main]) started.
+2026-05-28T11:11:58.1928958Z :app:processDebugManifestForPackage (Thread[included builds,5,main]) started.
+2026-05-28T11:11:58.1930186Z Resolve mutations for :app:mergeDebugShaders (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:58.1931499Z :app:mergeDebugShaders (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:58.1932085Z 
+2026-05-28T11:11:58.1932369Z > Task :app:mergeDebugShaders
+2026-05-28T11:11:58.1933125Z Caching disabled for task ':app:mergeDebugShaders' because:
+2026-05-28T11:11:58.1933927Z   Build cache is disabled
+2026-05-28T11:11:58.1934531Z   Simple merging task
+2026-05-28T11:11:58.1935215Z Task ':app:mergeDebugShaders' is not up-to-date because:
+2026-05-28T11:11:58.1936011Z   No history is available.
+2026-05-28T11:11:58.1936882Z The input changes require a full rebuild for incremental task ':app:mergeDebugShaders'.
+2026-05-28T11:11:58.1938198Z Resolve mutations for :app:compileDebugShaders (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.1939685Z :app:compileDebugShaders (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.1940349Z 
+2026-05-28T11:11:58.1940657Z > Task :app:compileDebugShaders NO-SOURCE
+2026-05-28T11:11:58.1941819Z Skipping task ':app:compileDebugShaders' as it has no source files and no previous output files.
+2026-05-28T11:11:58.1943175Z Resolve mutations for :app:generateDebugAssets (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.1944426Z :app:generateDebugAssets (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.1945088Z 
+2026-05-28T11:11:58.1945387Z > Task :app:generateDebugAssets UP-TO-DATE
+2026-05-28T11:11:58.1946226Z Skipping task ':app:generateDebugAssets' as it has no actions.
+2026-05-28T11:11:58.1947347Z Resolve mutations for :app:mergeDebugAssets (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.1948551Z :app:mergeDebugAssets (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.2951919Z 
+2026-05-28T11:11:58.2970892Z > Task :app:mergeDebugAssets
+2026-05-28T11:11:58.2972381Z Caching disabled for task ':app:mergeDebugAssets' because:
+2026-05-28T11:11:58.2973429Z   Build cache is disabled
+2026-05-28T11:11:58.2974250Z   Simple merging task
+2026-05-28T11:11:58.2975123Z Task ':app:mergeDebugAssets' is not up-to-date because:
+2026-05-28T11:11:58.2976193Z   No history is available.
+2026-05-28T11:11:58.2977292Z The input changes require a full rebuild for incremental task ':app:mergeDebugAssets'.
+2026-05-28T11:11:58.2978839Z Resolve mutations for :app:compressDebugAssets (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.2980310Z :app:compressDebugAssets (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.2981969Z Resolve mutations for :app:processDebugJavaRes (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.2985177Z :app:processDebugJavaRes (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.3022003Z 
+2026-05-28T11:11:58.3022612Z > Task :app:processDebugJavaRes NO-SOURCE
+2026-05-28T11:11:58.3023868Z file or directory '/home/runner/work/llama/llama/app/src/main/resources', not found
+2026-05-28T11:11:58.3026374Z file or directory '/home/runner/work/llama/llama/app/src/debug/resources', not found
+2026-05-28T11:11:58.3041657Z Skipping task ':app:processDebugJavaRes' as it has no source files and no previous output files.
+2026-05-28T11:11:58.3043299Z Resolve mutations for :app:mergeDebugJavaResource (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.3047697Z :app:mergeDebugJavaResource (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.3048931Z 
+2026-05-28T11:11:58.3049368Z > Task :app:processDebugManifestForPackage
+2026-05-28T11:11:58.3050440Z Custom actions are attached to task ':app:processDebugManifestForPackage'.
+2026-05-28T11:11:58.3051926Z Caching disabled for task ':app:processDebugManifestForPackage' because:
+2026-05-28T11:11:58.3053000Z   Build cache is disabled
+2026-05-28T11:11:58.3053966Z Task ':app:processDebugManifestForPackage' is not up-to-date because:
+2026-05-28T11:11:58.3055011Z   No history is available.
+2026-05-28T11:11:58.3056062Z Resolve mutations for :app:processDebugResources (Thread[included builds,5,main]) started.
+2026-05-28T11:11:58.3057382Z :app:processDebugResources (Thread[included builds,5,main]) started.
+2026-05-28T11:11:58.3919831Z 
+2026-05-28T11:11:58.3920693Z > Task :app:compressDebugAssets
+2026-05-28T11:11:58.3921804Z Caching disabled for task ':app:compressDebugAssets' because:
+2026-05-28T11:11:58.3922696Z   Build cache is disabled
+2026-05-28T11:11:58.3923570Z Task ':app:compressDebugAssets' is not up-to-date because:
+2026-05-28T11:11:58.3924478Z   No history is available.
+2026-05-28T11:11:58.3925453Z The input changes require a full rebuild for incremental task ':app:compressDebugAssets'.
+2026-05-28T11:11:58.3926220Z 
+2026-05-28T11:11:58.3926543Z > Task :app:mergeDebugJavaResource
+2026-05-28T11:11:58.3927748Z Caching disabled for task ':app:mergeDebugJavaResource' because:
+2026-05-28T11:11:58.3928614Z   Build cache is disabled
+2026-05-28T11:11:58.3929305Z   Caching has been disabled for the task
+2026-05-28T11:11:58.3930188Z Task ':app:mergeDebugJavaResource' is not up-to-date because:
+2026-05-28T11:11:58.3934295Z   No history is available.
+2026-05-28T11:11:58.3934940Z The input changes require a full rebuild for incremental task ':app:mergeDebugJavaResource'.
+2026-05-28T11:11:58.6927789Z Resolve mutations for :app:checkDebugDuplicateClasses (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.6982362Z :app:checkDebugDuplicateClasses (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.6985051Z Resolve mutations for :app:desugarDebugFileDependencies (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:58.6996792Z :app:desugarDebugFileDependencies (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:58.7931887Z 
+2026-05-28T11:11:58.7932686Z > Task :app:checkDebugDuplicateClasses
+2026-05-28T11:11:58.7933650Z Caching disabled for task ':app:checkDebugDuplicateClasses' because:
+2026-05-28T11:11:58.7934512Z   Build cache is disabled
+2026-05-28T11:11:58.7935172Z   Caching has been disabled for the task
+2026-05-28T11:11:58.7935992Z Task ':app:checkDebugDuplicateClasses' is not up-to-date because:
+2026-05-28T11:11:58.7936820Z   No history is available.
+2026-05-28T11:11:58.7937207Z 
+2026-05-28T11:11:58.7937518Z > Task :app:desugarDebugFileDependencies
+2026-05-28T11:11:58.7938379Z Caching disabled for task ':app:desugarDebugFileDependencies' because:
+2026-05-28T11:11:58.7939241Z   Build cache is disabled
+2026-05-28T11:11:58.7939993Z Task ':app:desugarDebugFileDependencies' is not up-to-date because:
+2026-05-28T11:11:58.7940823Z   No history is available.
+2026-05-28T11:11:58.7941914Z Resolve mutations for :app:mergeDebugStartupProfile (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.7942771Z :app:mergeDebugStartupProfile (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.7943217Z 
+2026-05-28T11:11:58.7943433Z > Task :app:mergeDebugStartupProfile
+2026-05-28T11:11:58.7943978Z Caching disabled for task ':app:mergeDebugStartupProfile' because:
+2026-05-28T11:11:58.7944530Z   Build cache is disabled
+2026-05-28T11:11:58.7944951Z   Simple merging task
+2026-05-28T11:11:58.7945450Z Task ':app:mergeDebugStartupProfile' is not up-to-date because:
+2026-05-28T11:11:58.7945999Z   No history is available.
+2026-05-28T11:11:58.7947158Z Dex optimization based on startup profile is enabled, but there are no input baseline profiles found in the baselineProfiles sources. You should add /home/runner/work/llama/llama/app/src/main/baselineProfiles/startup-prof.txt, for instance.
+2026-05-28T11:11:58.7948802Z Resolve mutations for :app:mergeExtDexDebug (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:58.7949500Z :app:mergeExtDexDebug (Thread[Execution worker,5,main]) started.
+2026-05-28T11:11:58.7950232Z Resolve mutations for :app:mergeLibDexDebug (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.7950992Z :app:mergeLibDexDebug (Thread[Execution worker Thread 2,5,main]) started.
+2026-05-28T11:11:58.7952011Z Resolve mutations for :app:configureCMakeDebug[arm64-v8a] (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.7952867Z :app:configureCMakeDebug[arm64-v8a] (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:11:58.7953309Z 
+2026-05-28T11:11:58.7953503Z > Task :app:mergeExtDexDebug
+2026-05-28T11:11:58.7954003Z Caching disabled for task ':app:mergeExtDexDebug' because:
+2026-05-28T11:11:58.7954523Z   Build cache is disabled
+2026-05-28T11:11:58.7955014Z Task ':app:mergeExtDexDebug' is not up-to-date because:
+2026-05-28T11:11:58.7955557Z   No history is available.
+2026-05-28T11:11:58.7956153Z The input changes require a full rebuild for incremental task ':app:mergeExtDexDebug'.
+2026-05-28T11:11:58.7956587Z 
+2026-05-28T11:11:58.7956782Z > Task :app:mergeLibDexDebug
+2026-05-28T11:11:58.7957483Z Caching disabled for task ':app:mergeLibDexDebug' because:
+2026-05-28T11:11:58.7958013Z   Build cache is disabled
+2026-05-28T11:11:58.7958512Z Task ':app:mergeLibDexDebug' is not up-to-date because:
+2026-05-28T11:11:58.7959044Z   No history is available.
+2026-05-28T11:11:58.7959628Z The input changes require a full rebuild for incremental task ':app:mergeLibDexDebug'.
+2026-05-28T11:11:58.9919359Z 
+2026-05-28T11:11:58.9920298Z > Task :app:processDebugResources
+2026-05-28T11:11:58.9921510Z Caching disabled for task ':app:processDebugResources' because:
+2026-05-28T11:11:58.9922102Z   Build cache is disabled
+2026-05-28T11:11:58.9922615Z Task ':app:processDebugResources' is not up-to-date because:
+2026-05-28T11:11:58.9923155Z   No history is available.
+2026-05-28T11:11:58.9923822Z The input changes require a full rebuild for incremental task ':app:processDebugResources'.
+2026-05-28T11:11:58.9925017Z Downloading https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2/8.5.1-11315950/aapt2-8.5.1-11315950.pom to /home/runner/.gradle/.tmp/gradle_download749351418084997730bin
+2026-05-28T11:11:58.9926510Z Downloading https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2/8.5.1-11315950/aapt2-8.5.1-11315950-linux.jar to /home/runner/.gradle/.tmp/gradle_download5651679881973621250bin
+2026-05-28T11:11:58.9927720Z Transforming aapt2-8.5.1-11315950-linux.jar (com.android.tools.build:aapt2:8.5.1-11315950) with Aapt2Extractor
+2026-05-28T11:11:58.9929774Z Caching disabled for Aapt2Extractor: /home/runner/.gradle/caches/modules-2/files-2.1/com.android.tools.build/aapt2/8.5.1-11315950/53889c17ff54b4a02daad67db903458eca88b79a/aapt2-8.5.1-11315950-linux.jar because:
+2026-05-28T11:11:58.9930848Z   Build cache is disabled
+2026-05-28T11:11:58.9931415Z   Caching not enabled.
+2026-05-28T11:11:58.9931873Z AAPT2 aapt2-8.5.1-11315950-linux Daemon #0: starting
+2026-05-28T11:11:58.9932752Z Aapt output file /home/runner/work/llama/llama/app/build/intermediates/processed_res/debug/processDebugResources/out/resources-debug.ap_
+2026-05-28T11:12:00.7919365Z 
+2026-05-28T11:12:00.7920294Z > Task :app:configureCMakeDebug[arm64-v8a]
+2026-05-28T11:12:00.7921012Z Caching disabled for task ':app:configureCMakeDebug[arm64-v8a]' because:
+2026-05-28T11:12:00.7922202Z   Build cache is disabled
+2026-05-28T11:12:00.7922819Z   Caching has been disabled for the task
+2026-05-28T11:12:00.7923602Z Task ':app:configureCMakeDebug[arm64-v8a]' is not up-to-date because:
+2026-05-28T11:12:00.7924436Z   Task.upToDateWhen is false.
+2026-05-28T11:12:00.7925660Z Starting process 'command '/usr/local/bin/cmake''. Working directory: /home/runner/work/llama/llama Command: /usr/local/bin/cmake --version
+2026-05-28T11:12:00.7927045Z Successfully started process 'command '/usr/local/bin/cmake''
+2026-05-28T11:12:00.7928443Z Parsing /usr/local/lib/android/sdk/build-tools/34.0.0/package.xml
+2026-05-28T11:12:00.7929432Z Parsing /usr/local/lib/android/sdk/build-tools/35.0.0/package.xml
+2026-05-28T11:12:00.7930425Z Parsing /usr/local/lib/android/sdk/build-tools/35.0.1/package.xml
+2026-05-28T11:12:00.7932474Z Parsing /usr/local/lib/android/sdk/build-tools/36.0.0/package.xml
+2026-05-28T11:12:00.7933734Z Parsing /usr/local/lib/android/sdk/build-tools/36.1.0/package.xml
+2026-05-28T11:12:00.7934743Z Parsing /usr/local/lib/android/sdk/build-tools/37.0.0/package.xml
+2026-05-28T11:12:00.7935685Z Parsing /usr/local/lib/android/sdk/cmake/3.31.5/package.xml
+2026-05-28T11:12:00.7937085Z Parsing /usr/local/lib/android/sdk/cmake/4.1.2/package.xml
+2026-05-28T11:12:00.7938093Z Parsing legacy package: /usr/local/lib/android/sdk/cmdline-tools/latest
+2026-05-28T11:12:00.7939253Z Parsing /usr/local/lib/android/sdk/extras/android/m2repository/package.xml
+2026-05-28T11:12:00.7940417Z Parsing /usr/local/lib/android/sdk/extras/google/google_play_services/package.xml
+2026-05-28T11:12:00.7941795Z Parsing /usr/local/lib/android/sdk/extras/google/m2repository/package.xml
+2026-05-28T11:12:00.7942850Z Parsing /usr/local/lib/android/sdk/ndk/27.2.12479018/package.xml
+2026-05-28T11:12:00.7944136Z Parsing /usr/local/lib/android/sdk/ndk/27.3.13750724/package.xml
+2026-05-28T11:12:00.7945097Z Parsing /usr/local/lib/android/sdk/ndk/28.2.13676358/package.xml
+2026-05-28T11:12:00.7946025Z Parsing /usr/local/lib/android/sdk/ndk/29.0.14206865/package.xml
+2026-05-28T11:12:00.7947044Z Parsing /usr/local/lib/android/sdk/platform-tools/package.xml
+2026-05-28T11:12:00.7948038Z Parsing /usr/local/lib/android/sdk/platforms/android-34/package.xml
+2026-05-28T11:12:00.7949111Z Parsing /usr/local/lib/android/sdk/platforms/android-34-ext10/package.xml
+2026-05-28T11:12:00.7950240Z Parsing /usr/local/lib/android/sdk/platforms/android-34-ext11/package.xml
+2026-05-28T11:12:00.7951551Z Parsing /usr/local/lib/android/sdk/platforms/android-34-ext12/package.xml
+2026-05-28T11:12:00.7952695Z Parsing /usr/local/lib/android/sdk/platforms/android-34-ext8/package.xml
+2026-05-28T11:12:00.7953798Z Parsing /usr/local/lib/android/sdk/platforms/android-35/package.xml
+2026-05-28T11:12:00.7954853Z Parsing /usr/local/lib/android/sdk/platforms/android-35-ext14/package.xml
+2026-05-28T11:12:00.7955960Z Parsing /usr/local/lib/android/sdk/platforms/android-35-ext15/package.xml
+2026-05-28T11:12:00.7957041Z Parsing /usr/local/lib/android/sdk/platforms/android-36/package.xml
+2026-05-28T11:12:00.7958105Z Parsing /usr/local/lib/android/sdk/platforms/android-36-ext18/package.xml
+2026-05-28T11:12:00.7959206Z Parsing /usr/local/lib/android/sdk/platforms/android-36-ext19/package.xml
+2026-05-28T11:12:00.7960281Z Parsing /usr/local/lib/android/sdk/platforms/android-36.1/package.xml
+2026-05-28T11:12:00.7961558Z Parsing /usr/local/lib/android/sdk/platforms/android-37.0/package.xml
+2026-05-28T11:12:00.7962729Z Checking the license for package CMake 3.22.1 in /usr/local/lib/android/sdk/licenses
+2026-05-28T11:12:00.7963762Z License for package CMake 3.22.1 accepted.
+2026-05-28T11:12:00.7964506Z Preparing "Install CMake 3.22.1 v.3.22.1".
+2026-05-28T11:12:00.7965244Z "Install CMake 3.22.1 v.3.22.1" ready.
+2026-05-28T11:12:00.7966088Z Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
+2026-05-28T11:12:00.7966988Z "Install CMake 3.22.1 v.3.22.1" complete.
+2026-05-28T11:12:00.7967708Z "Install CMake 3.22.1 v.3.22.1" finished.
+2026-05-28T11:12:00.7969116Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : Start JSON generation. Platform version: 24 min SDK version: arm64-v8a
+2026-05-28T11:12:00.7971726Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : rebuilding JSON /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a/android_gradle_build.json due to:
+2026-05-28T11:12:00.7974070Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : - no fingerprint file, will remove stale configuration folder
+2026-05-28T11:12:00.7976475Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : removing stale contents from '/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a'
+2026-05-28T11:12:00.7978735Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : created folder '/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a'
+2026-05-28T11:12:00.7980807Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : executing cmake /usr/local/lib/android/sdk/cmake/3.22.1/bin/cmake \
+2026-05-28T11:12:00.7982596Z   -H/home/runner/work/llama/llama/app/src/main/cpp \
+2026-05-28T11:12:00.7983445Z   -DCMAKE_SYSTEM_NAME=Android \
+2026-05-28T11:12:00.7984167Z   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+2026-05-28T11:12:00.7984915Z   -DCMAKE_SYSTEM_VERSION=24 \
+2026-05-28T11:12:00.7985610Z   -DANDROID_PLATFORM=android-24 \
+2026-05-28T11:12:00.7986349Z   -DANDROID_ABI=arm64-v8a \
+2026-05-28T11:12:00.7987061Z   -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+2026-05-28T11:12:00.7987907Z   -DANDROID_NDK=/usr/local/lib/android/sdk/ndk/27.2.12479018 \
+2026-05-28T11:12:00.7988873Z   -DCMAKE_ANDROID_NDK=/usr/local/lib/android/sdk/ndk/27.2.12479018 \
+2026-05-28T11:12:00.7990422Z   -DCMAKE_TOOLCHAIN_FILE=/usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake \
+2026-05-28T11:12:00.7991920Z   -DCMAKE_MAKE_PROGRAM=/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja \
+2026-05-28T11:12:00.7992881Z   -DCMAKE_CXX_FLAGS=-std=c++17 \
+2026-05-28T11:12:00.7994100Z   -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a \
+2026-05-28T11:12:00.7995844Z   -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a \
+2026-05-28T11:12:00.7997091Z   -DCMAKE_BUILD_TYPE=Debug \
+2026-05-28T11:12:00.7997938Z   -B/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a \
+2026-05-28T11:12:00.7998847Z   -GNinja \
+2026-05-28T11:12:00.7999481Z   -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON
+2026-05-28T11:12:00.7999954Z 
+2026-05-28T11:12:00.8000805Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : /usr/local/lib/android/sdk/cmake/3.22.1/bin/cmake \
+2026-05-28T11:12:00.8002463Z   -H/home/runner/work/llama/llama/app/src/main/cpp \
+2026-05-28T11:12:00.8003305Z   -DCMAKE_SYSTEM_NAME=Android \
+2026-05-28T11:12:00.8004024Z   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+2026-05-28T11:12:00.8004751Z   -DCMAKE_SYSTEM_VERSION=24 \
+2026-05-28T11:12:00.8005461Z   -DANDROID_PLATFORM=android-24 \
+2026-05-28T11:12:00.8006174Z   -DANDROID_ABI=arm64-v8a \
+2026-05-28T11:12:00.8006858Z   -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+2026-05-28T11:12:00.8007714Z   -DANDROID_NDK=/usr/local/lib/android/sdk/ndk/27.2.12479018 \
+2026-05-28T11:12:00.8008703Z   -DCMAKE_ANDROID_NDK=/usr/local/lib/android/sdk/ndk/27.2.12479018 \
+2026-05-28T11:12:00.8009988Z   -DCMAKE_TOOLCHAIN_FILE=/usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake \
+2026-05-28T11:12:00.8011561Z   -DCMAKE_MAKE_PROGRAM=/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja \
+2026-05-28T11:12:00.8012522Z   -DCMAKE_CXX_FLAGS=-std=c++17 \
+2026-05-28T11:12:00.8013726Z   -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a \
+2026-05-28T11:12:00.8015492Z   -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a \
+2026-05-28T11:12:00.8016748Z   -DCMAKE_BUILD_TYPE=Debug \
+2026-05-28T11:12:00.8017588Z   -B/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a \
+2026-05-28T11:12:00.8018476Z   -GNinja \
+2026-05-28T11:12:00.8019108Z   -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON
+2026-05-28T11:12:00.8019582Z 
+2026-05-28T11:12:00.8026370Z Starting process 'command '/usr/local/lib/android/sdk/cmake/3.22.1/bin/cmake''. Working directory: /home/runner/work/llama/llama/app Command: /usr/local/lib/android/sdk/cmake/3.22.1/bin/cmake -H/home/runner/work/llama/llama/app/src/main/cpp -DCMAKE_SYSTEM_NAME=Android -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_SYSTEM_VERSION=24 -DANDROID_PLATFORM=android-24 -DANDROID_ABI=arm64-v8a -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a -DANDROID_NDK=/usr/local/lib/android/sdk/ndk/27.2.12479018 -DCMAKE_ANDROID_NDK=/usr/local/lib/android/sdk/ndk/27.2.12479018 -DCMAKE_TOOLCHAIN_FILE=/usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake -DCMAKE_MAKE_PROGRAM=/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja -DCMAKE_CXX_FLAGS=-std=c++17 -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a -DCMAKE_BUILD_TYPE=Debug -B/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a -GNinja -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON
+2026-05-28T11:12:00.8036127Z Successfully started process 'command '/usr/local/lib/android/sdk/cmake/3.22.1/bin/cmake''
+2026-05-28T11:12:01.1920326Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : Received process result: 0
+2026-05-28T11:12:01.2920354Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : Exiting generation of /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a/compile_commands.json.bin normally
+2026-05-28T11:12:01.2922325Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : done executing cmake
+2026-05-28T11:12:01.3936181Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : hard linked /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a/compile_commands.json to /home/runner/work/llama/llama/app/.cxx/tools/debug/arm64-v8a/compile_commands.json
+2026-05-28T11:12:01.3962708Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : JSON generation completed without problems
+2026-05-28T11:12:01.3993142Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/CMakeLists.txt debug|arm64-v8a : Writing build model to /home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/logs/arm64-v8a/build_model.json
+2026-05-28T11:12:01.4022310Z Resolve mutations for :app:compileDebugJavaWithJavac (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:12:01.4023785Z :app:compileDebugJavaWithJavac (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:12:03.3919419Z 
+2026-05-28T11:12:03.3935893Z > Task :app:compileDebugJavaWithJavac
+2026-05-28T11:12:03.3952437Z Custom actions are attached to task ':app:compileDebugJavaWithJavac'.
+2026-05-28T11:12:03.3953563Z Caching disabled for task ':app:compileDebugJavaWithJavac' because:
+2026-05-28T11:12:03.3954462Z   Build cache is disabled
+2026-05-28T11:12:03.3955284Z Task ':app:compileDebugJavaWithJavac' is not up-to-date because:
+2026-05-28T11:12:03.3956160Z   No history is available.
+2026-05-28T11:12:03.3957248Z The input changes require a full rebuild for incremental task ':app:compileDebugJavaWithJavac'.
+2026-05-28T11:12:03.3958908Z Full recompilation is required because no incremental change information is available. This is usually caused by clean builds or changing compiler arguments.
+2026-05-28T11:12:03.3960400Z Compiling with toolchain '/usr/lib/jvm/temurin-17-jdk-amd64'.
+2026-05-28T11:12:03.3961614Z file or directory '/home/runner/work/llama/llama/app/src/debug/java', not found
+2026-05-28T11:12:03.3962591Z Compiling with JDK Java compiler API.
+2026-05-28T11:12:04.0920441Z Note: Some input files use or override a deprecated API.
+2026-05-28T11:12:04.0921860Z Note: Recompile with -Xlint:deprecation for details.
+2026-05-28T11:12:04.1945540Z Class dependency analysis for incremental compilation took 0.075 secs.
+2026-05-28T11:12:04.1962695Z Created classpath snapshot for incremental compilation in 0.02 secs.
+2026-05-28T11:12:04.1964161Z Resolve mutations for :app:dexBuilderDebug (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:12:04.1968638Z :app:dexBuilderDebug (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:12:06.1941970Z 
+2026-05-28T11:12:06.2002467Z > Task :app:dexBuilderDebug
+2026-05-28T11:12:06.2041187Z Caching disabled for task ':app:dexBuilderDebug' because:
+2026-05-28T11:12:06.2042400Z   Build cache is disabled
+2026-05-28T11:12:06.2122329Z Task ':app:dexBuilderDebug' is not up-to-date because:
+2026-05-28T11:12:06.2152268Z   No history is available.
+2026-05-28T11:12:06.2162235Z The input changes require a full rebuild for incremental task ':app:dexBuilderDebug'.
+2026-05-28T11:12:06.2163371Z Dex builder is incremental : false 
+2026-05-28T11:12:06.2164624Z Processing input /home/runner/work/llama/llama/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes
+2026-05-28T11:12:06.2166245Z Dexing /home/runner/work/llama/llama/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes
+2026-05-28T11:12:06.2168305Z Processing input /home/runner/work/llama/llama/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/processDebugResources/R.jar
+2026-05-28T11:12:06.2170609Z Dexing /home/runner/work/llama/llama/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/processDebugResources/R.jar
+2026-05-28T11:12:06.2173994Z Dexing '/home/runner/work/llama/llama/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes' to '/home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out'
+2026-05-28T11:12:06.2177122Z Dexing '/home/runner/work/llama/llama/app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes' to '/home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out'
+2026-05-28T11:12:06.2180942Z Dexing '/home/runner/work/llama/llama/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/processDebugResources/R.jar' to '/home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out/617a77e9e3a8b209c90e753577c8a5f955b1f143dcbd74fb7ac6629d24728492_0.jar'
+2026-05-28T11:12:06.2185449Z Dexing '/home/runner/work/llama/llama/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/processDebugResources/R.jar' to '/home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out/617a77e9e3a8b209c90e753577c8a5f955b1f143dcbd74fb7ac6629d24728492_1.jar'
+2026-05-28T11:12:07.3920339Z Done with all dex archive conversions
+2026-05-28T11:12:07.3992915Z Resolve mutations for :app:mergeProjectDexDebug (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:12:07.4053284Z :app:mergeProjectDexDebug (Thread[Execution worker Thread 3,5,main]) started.
+2026-05-28T11:12:07.4927550Z Resolve mutations for :app:buildCMakeDebug[arm64-v8a] (Thread[included builds,5,main]) started.
+2026-05-28T11:12:07.4952439Z :app:buildCMakeDebug[arm64-v8a] (Thread[Execution worker,5,main]) started.
+2026-05-28T11:12:08.2942090Z 
+2026-05-28T11:12:08.2972708Z > Task :app:mergeProjectDexDebug
+2026-05-28T11:12:08.3022783Z Caching disabled for task ':app:mergeProjectDexDebug' because:
+2026-05-28T11:12:08.3067764Z   Build cache is disabled
+2026-05-28T11:12:08.3112575Z Task ':app:mergeProjectDexDebug' is not up-to-date because:
+2026-05-28T11:12:08.3162444Z   No history is available.
+2026-05-28T11:12:08.3202640Z The input changes require a full rebuild for incremental task ':app:mergeProjectDexDebug'.
+2026-05-28T11:12:08.3263988Z Merging to '/home/runner/work/llama/llama/app/build/intermediates/dex/debug/mergeProjectDexDebug/0' with D8 from all or a subset of dex files in /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out/617a77e9e3a8b209c90e753577c8a5f955b1f143dcbd74fb7ac6629d24728492_1.jar, and from all global synthetics files in 
+2026-05-28T11:12:08.3386337Z Merging to '/home/runner/work/llama/llama/app/build/intermediates/dex/debug/mergeProjectDexDebug/3' with D8 from all or a subset of dex files in /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, /home/runner/work/llama/llama/app/build/intermediates/project_dex_archive/debug/dexBuilderDebug/out, and from all global synthetics files in 
+2026-05-28T11:12:09.3972049Z 
+2026-05-28T11:12:09.3982750Z > Task :app:buildCMakeDebug[arm64-v8a]
+2026-05-28T11:12:09.4022852Z Deleting stale output file: /home/runner/work/llama/llama/app/build/intermediates/cxx/Debug/2s4u6l5z/obj/arm64-v8a
+2026-05-28T11:12:09.4032531Z Caching disabled for task ':app:buildCMakeDebug[arm64-v8a]' because:
+2026-05-28T11:12:09.4062418Z   Build cache is disabled
+2026-05-28T11:12:09.4092175Z   Caching has been disabled for the task
+2026-05-28T11:12:09.4122455Z Task ':app:buildCMakeDebug[arm64-v8a]' is not up-to-date because:
+2026-05-28T11:12:09.4152091Z   Task.upToDateWhen is false.
+2026-05-28T11:12:09.4152837Z C/C++: starting build
+2026-05-28T11:12:09.4184617Z C/C++: reading expected JSONs
+2026-05-28T11:12:09.4212149Z C/C++: done reading expected JSONs
+2026-05-28T11:12:09.4242364Z C/C++: executing build commands for targets that produce .so files or executables
+2026-05-28T11:12:09.4262193Z C/C++: evaluate miniconfig
+2026-05-28T11:12:09.4271996Z C/C++: evaluate library llama_jni (arm64-v8a)
+2026-05-28T11:12:09.4298814Z C/C++: building target library llama_jni because no targets are specified.
+2026-05-28T11:12:09.4352334Z C/C++: about to build targets llama_jni
+2026-05-28T11:12:09.4399500Z C/C++: Build llama_jni
+2026-05-28T11:12:09.4442084Z C/C++: /usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja \
+2026-05-28T11:12:09.4453148Z   -C \
+2026-05-28T11:12:09.4522188Z   /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a \
+2026-05-28T11:12:09.4551943Z   llama_jni
+2026-05-28T11:12:09.4581584Z 
+2026-05-28T11:12:09.4643358Z Starting process 'command '/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja''. Working directory: /home/runner/work/llama/llama/app Command: /usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja -C /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a llama_jni
+2026-05-28T11:12:09.4702442Z Successfully started process 'command '/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja''
+2026-05-28T11:12:12.8943057Z C/C++: ninja: Entering directory `/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a'
+2026-05-28T11:12:12.8981692Z C/C++: /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=aarch64-none-linux-android24 --sysroot=/usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DGGML_COMMIT=\"0d18aaa9d1a8af3df9abccd828e22eeaac7f840b\" -DGGML_USE_CPU -DGGML_USE_K_QUANTS -DGGML_VERSION=\"0.13.0\" -Dllama_jni_EXPORTS -I/home/runner/work/llama/llama/app/src/main/cpp/llama/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/common -I/home/runner/work/llama/llama/app/src/main/cpp/llama/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/vendor -I/home/runner/work/llama/llama/app/src/main/cpp/llama/tools/mtmd -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu/arch/arm -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/libcurl/include -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/mbedtls/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D__BIONIC_NO_PAGE_SIZE_MACRO -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fPIC -fno-limit-debug-info  -fPIC -Wno-cast-qual -pthread -std=c++17 -MD -MT CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -MF CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o.d -o CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -c /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp
+2026-05-28T11:12:12.8993124Z C/C++: /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp:622:25: error: use of undeclared identifier 'malloc_trim'
+2026-05-28T11:12:12.9012046Z C/C++:   622 |     const int trimmed = malloc_trim(0);
+2026-05-28T11:12:12.9022050Z C/C++:       |                         ^
+2026-05-28T11:12:12.9052070Z C/C++: 1 error generated.
+2026-05-28T11:12:31.0919291Z C/C++: Received process result: 1
+2026-05-28T11:12:31.0919871Z 
+2026-05-28T11:12:31.0919918Z 
+2026-05-28T11:12:31.0920661Z FAILURE: Build failed with an exception.
+2026-05-28T11:12:31.0921519Z > Task :app:buildCMakeDebug[arm64-v8a] FAILED
+2026-05-28T11:12:31.0922173Z 
+2026-05-28T11:12:31.0922485Z AAPT2 aapt2-8.5.1-11315950-linux Daemon #0: shutdown
+2026-05-28T11:12:31.0923399Z * What went wrong:
+2026-05-28T11:12:31.0924195Z Execution failed for task ':app:buildCMakeDebug[arm64-v8a]'.
+2026-05-28T11:12:31.0925656Z > com.android.ide.common.process.ProcessException: ninja: Entering directory `/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a'
+2026-05-28T11:12:31.0927029Z   [0/2] Re-checking globbed directories...
+2026-05-28T11:12:31.0928068Z   [1/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/reasoning-budget.cpp.o
+2026-05-28T11:12:31.0929672Z   [2/250] Building CXX object CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o
+2026-05-28T11:12:31.0930704Z   FAILED: CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o 
+2026-05-28T11:12:31.0940149Z   /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=aarch64-none-linux-android24 --sysroot=/usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DGGML_COMMIT=\"0d18aaa9d1a8af3df9abccd828e22eeaac7f840b\" -DGGML_USE_CPU -DGGML_USE_K_QUANTS -DGGML_VERSION=\"0.13.0\" -Dllama_jni_EXPORTS -I/home/runner/work/llama/llama/app/src/main/cpp/llama/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/common -I/home/runner/work/llama/llama/app/src/main/cpp/llama/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/vendor -I/home/runner/work/llama/llama/app/src/main/cpp/llama/tools/mtmd -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu/arch/arm -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/libcurl/include -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/mbedtls/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D__BIONIC_NO_PAGE_SIZE_MACRO -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fPIC -fno-limit-debug-info  -fPIC -Wno-cast-qual -pthread -std=c++17 -MD -MT CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -MF CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o.d -o CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -c /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp
+2026-05-28T11:12:31.0949921Z 29 actionable tasks: 29 executed
+2026-05-28T11:12:31.0951395Z   /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp:622:25: error: use of undeclared identifier 'malloc_trim'
+2026-05-28T11:12:31.0959104Z     622 |     const int trimmed = malloc_trim(0);
+2026-05-28T11:12:31.0960155Z         |                         ^
+2026-05-28T11:12:31.0960996Z   1 error generated.
+2026-05-28T11:12:31.0962427Z   [3/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-auto-parser-helpers.cpp.o
+2026-05-28T11:12:31.0963950Z   [4/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-auto-parser-generator.cpp.o
+2026-05-28T11:12:31.0968227Z   [5/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-peg-parser.cpp.o
+2026-05-28T11:12:31.1003995Z   [6/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-diff-analyzer.cpp.o
+2026-05-28T11:12:31.1005233Z   [7/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/arg.cpp.o
+2026-05-28T11:12:31.1006187Z   ninja: build stopped: subcommand failed.
+2026-05-28T11:12:31.1006877Z   
+2026-05-28T11:12:31.1007497Z   C++ build system [build] failed while executing:
+2026-05-28T11:12:31.1008349Z       /usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja \
+2026-05-28T11:12:31.1009088Z         -C \
+2026-05-28T11:12:31.1009829Z         /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a \
+2026-05-28T11:12:31.1010699Z         llama_jni
+2026-05-28T11:12:31.1011515Z     from /home/runner/work/llama/llama/app
+2026-05-28T11:12:31.1011973Z 
+2026-05-28T11:12:31.1012217Z * Try:
+2026-05-28T11:12:31.1012827Z > Run with --debug option to get more log output.
+2026-05-28T11:12:31.1013577Z > Run with --scan to get full insights.
+2026-05-28T11:12:31.1014337Z > Get more help at https://help.gradle.org.
+2026-05-28T11:12:31.1014791Z 
+2026-05-28T11:12:31.1015040Z * Exception is:
+2026-05-28T11:12:31.1016033Z org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:buildCMakeDebug[arm64-v8a]'.
+2026-05-28T11:12:31.1017247Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:130)
+2026-05-28T11:12:31.1018478Z 	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:282)
+2026-05-28T11:12:31.1019392Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:128)
+2026-05-28T11:12:31.1020502Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+2026-05-28T11:12:31.1022049Z 	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+2026-05-28T11:12:31.1024027Z 	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+2026-05-28T11:12:31.1026019Z 	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+2026-05-28T11:12:31.1027783Z 	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+2026-05-28T11:12:31.1029458Z 	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+2026-05-28T11:12:31.1031197Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+2026-05-28T11:12:31.1033495Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+2026-05-28T11:12:31.1035174Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+2026-05-28T11:12:31.1037113Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:200)
+2026-05-28T11:12:31.1039281Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:195)
+2026-05-28T11:12:31.1041184Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+2026-05-28T11:12:31.1043072Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1044699Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:157)
+2026-05-28T11:12:31.1046500Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1048138Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+2026-05-28T11:12:31.1049793Z 	at org.gradle.internal.operations.DefaultBuildOperationExecutor.call(DefaultBuildOperationExecutor.java:73)
+2026-05-28T11:12:31.1051715Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+2026-05-28T11:12:31.1053238Z 	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+2026-05-28T11:12:31.1054898Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+2026-05-28T11:12:31.1056847Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+2026-05-28T11:12:31.1058928Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+2026-05-28T11:12:31.1060883Z 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:80)
+2026-05-28T11:12:31.1062899Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+2026-05-28T11:12:31.1064394Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+2026-05-28T11:12:31.1065488Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:463)
+2026-05-28T11:12:31.1066391Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:380)
+2026-05-28T11:12:31.1067607Z 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+2026-05-28T11:12:31.1068536Z 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+2026-05-28T11:12:31.1070080Z Caused by: org.gradle.internal.UncheckedException: com.android.ide.common.process.ProcessException: ninja: Entering directory `/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a'
+2026-05-28T11:12:31.1071894Z [0/2] Re-checking globbed directories...
+2026-05-28T11:12:31.1072895Z [1/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/reasoning-budget.cpp.o
+2026-05-28T11:12:31.1074042Z [2/250] Building CXX object CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o
+2026-05-28T11:12:31.1075012Z FAILED: CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o 
+2026-05-28T11:12:31.1085245Z /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=aarch64-none-linux-android24 --sysroot=/usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DGGML_COMMIT=\"0d18aaa9d1a8af3df9abccd828e22eeaac7f840b\" -DGGML_USE_CPU -DGGML_USE_K_QUANTS -DGGML_VERSION=\"0.13.0\" -Dllama_jni_EXPORTS -I/home/runner/work/llama/llama/app/src/main/cpp/llama/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/common -I/home/runner/work/llama/llama/app/src/main/cpp/llama/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/vendor -I/home/runner/work/llama/llama/app/src/main/cpp/llama/tools/mtmd -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu/arch/arm -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/libcurl/include -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/mbedtls/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D__BIONIC_NO_PAGE_SIZE_MACRO -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fPIC -fno-limit-debug-info  -fPIC -Wno-cast-qual -pthread -std=c++17 -MD -MT CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -MF CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o.d -o CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -c /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp
+2026-05-28T11:12:31.1096815Z /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp:622:25: error: use of undeclared identifier 'malloc_trim'
+2026-05-28T11:12:31.1098072Z   622 |     const int trimmed = malloc_trim(0);
+2026-05-28T11:12:31.1098812Z       |                         ^
+2026-05-28T11:12:31.1099435Z 1 error generated.
+2026-05-28T11:12:31.1100347Z [3/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-auto-parser-helpers.cpp.o
+2026-05-28T11:12:31.1101948Z [4/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-auto-parser-generator.cpp.o
+2026-05-28T11:12:31.1103280Z [5/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-peg-parser.cpp.o
+2026-05-28T11:12:31.1104508Z [6/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-diff-analyzer.cpp.o
+2026-05-28T11:12:31.1105686Z [7/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/arg.cpp.o
+2026-05-28T11:12:31.1106626Z ninja: build stopped: subcommand failed.
+2026-05-28T11:12:31.1107070Z 
+2026-05-28T11:12:31.1107399Z C++ build system [build] failed while executing:
+2026-05-28T11:12:31.1108228Z     /usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja \
+2026-05-28T11:12:31.1108999Z       -C \
+2026-05-28T11:12:31.1109737Z       /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a \
+2026-05-28T11:12:31.1110643Z       llama_jni
+2026-05-28T11:12:31.1111465Z   from /home/runner/work/llama/llama/app
+2026-05-28T11:12:31.1112605Z 	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:68)
+2026-05-28T11:12:31.1114434Z 	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:41)
+2026-05-28T11:12:31.1115789Z 	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:128)
+2026-05-28T11:12:31.1117223Z 	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
+2026-05-28T11:12:31.1118882Z 	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
+2026-05-28T11:12:31.1120488Z 	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
+2026-05-28T11:12:31.1122137Z 	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:244)
+2026-05-28T11:12:31.1123500Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:29)
+2026-05-28T11:12:31.1124986Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:26)
+2026-05-28T11:12:31.1126654Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+2026-05-28T11:12:31.1128279Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1130196Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:157)
+2026-05-28T11:12:31.1132085Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1133716Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
+2026-05-28T11:12:31.1135379Z 	at org.gradle.internal.operations.DefaultBuildOperationExecutor.run(DefaultBuildOperationExecutor.java:68)
+2026-05-28T11:12:31.1136876Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
+2026-05-28T11:12:31.1138354Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
+2026-05-28T11:12:31.1139988Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
+2026-05-28T11:12:31.1141630Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:162)
+2026-05-28T11:12:31.1142994Z 	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:105)
+2026-05-28T11:12:31.1144337Z 	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:44)
+2026-05-28T11:12:31.1145602Z 	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:59)
+2026-05-28T11:12:31.1146856Z 	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:56)
+2026-05-28T11:12:31.1148505Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:200)
+2026-05-28T11:12:31.1150579Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:195)
+2026-05-28T11:12:31.1152715Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+2026-05-28T11:12:31.1154374Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1155902Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:157)
+2026-05-28T11:12:31.1157391Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1158790Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+2026-05-28T11:12:31.1160280Z 	at org.gradle.internal.operations.DefaultBuildOperationExecutor.call(DefaultBuildOperationExecutor.java:73)
+2026-05-28T11:12:31.1161957Z 	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:56)
+2026-05-28T11:12:31.1163337Z 	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:44)
+2026-05-28T11:12:31.1167509Z 	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:41)
+2026-05-28T11:12:31.1168961Z 	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:74)
+2026-05-28T11:12:31.1170262Z 	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+2026-05-28T11:12:31.1171891Z 	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
+2026-05-28T11:12:31.1173496Z 	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:28)
+2026-05-28T11:12:31.1175060Z 	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:67)
+2026-05-28T11:12:31.1176581Z 	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:37)
+2026-05-28T11:12:31.1178499Z 	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:61)
+2026-05-28T11:12:31.1180185Z 	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:26)
+2026-05-28T11:12:31.1182491Z 	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:67)
+2026-05-28T11:12:31.1184406Z 	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:45)
+2026-05-28T11:12:31.1186242Z 	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:40)
+2026-05-28T11:12:31.1187871Z 	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:29)
+2026-05-28T11:12:31.1189418Z 	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
+2026-05-28T11:12:31.1190938Z 	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$1(BuildCacheStep.java:75)
+2026-05-28T11:12:31.1192313Z 	at org.gradle.internal.Either$Right.fold(Either.java:175)
+2026-05-28T11:12:31.1193374Z 	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+2026-05-28T11:12:31.1194656Z 	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:73)
+2026-05-28T11:12:31.1195926Z 	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:48)
+2026-05-28T11:12:31.1197366Z 	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:46)
+2026-05-28T11:12:31.1198946Z 	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:35)
+2026-05-28T11:12:31.1200500Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:76)
+2026-05-28T11:12:31.1202388Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:54)
+2026-05-28T11:12:31.1203880Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:54)
+2026-05-28T11:12:31.1205293Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:36)
+2026-05-28T11:12:31.1207083Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+2026-05-28T11:12:31.1209141Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+2026-05-28T11:12:31.1211399Z 	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:49)
+2026-05-28T11:12:31.1213502Z 	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:27)
+2026-05-28T11:12:31.1215472Z 	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:71)
+2026-05-28T11:12:31.1217611Z 	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:39)
+2026-05-28T11:12:31.1219240Z 	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:65)
+2026-05-28T11:12:31.1220655Z 	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:36)
+2026-05-28T11:12:31.1222200Z 	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:106)
+2026-05-28T11:12:31.1223463Z 	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:55)
+2026-05-28T11:12:31.1225166Z 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
+2026-05-28T11:12:31.1227252Z 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
+2026-05-28T11:12:31.1229346Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
+2026-05-28T11:12:31.1233707Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
+2026-05-28T11:12:31.1235806Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
+2026-05-28T11:12:31.1237735Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+2026-05-28T11:12:31.1239688Z 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+2026-05-28T11:12:31.1241910Z 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+2026-05-28T11:12:31.1243719Z 	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:75)
+2026-05-28T11:12:31.1245350Z 	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:41)
+2026-05-28T11:12:31.1247139Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+2026-05-28T11:12:31.1248790Z 	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:289)
+2026-05-28T11:12:31.1250389Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+2026-05-28T11:12:31.1252686Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+2026-05-28T11:12:31.1254288Z 	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+2026-05-28T11:12:31.1255948Z 	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+2026-05-28T11:12:31.1257927Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+2026-05-28T11:12:31.1260060Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+2026-05-28T11:12:31.1262500Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+2026-05-28T11:12:31.1264247Z 	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+2026-05-28T11:12:31.1265652Z 	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+2026-05-28T11:12:31.1266990Z 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:48)
+2026-05-28T11:12:31.1270995Z 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:35)
+2026-05-28T11:12:31.1272731Z 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:61)
+2026-05-28T11:12:31.1277106Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:127)
+2026-05-28T11:12:31.1278980Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+2026-05-28T11:12:31.1280870Z 	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+2026-05-28T11:12:31.1283256Z 	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+2026-05-28T11:12:31.1285173Z 	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+2026-05-28T11:12:31.1286951Z 	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+2026-05-28T11:12:31.1288674Z 	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+2026-05-28T11:12:31.1290440Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+2026-05-28T11:12:31.1292813Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+2026-05-28T11:12:31.1294819Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+2026-05-28T11:12:31.1296714Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:200)
+2026-05-28T11:12:31.1298806Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:195)
+2026-05-28T11:12:31.1300678Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+2026-05-28T11:12:31.1302757Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1304682Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:157)
+2026-05-28T11:12:31.1306324Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+2026-05-28T11:12:31.1307945Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+2026-05-28T11:12:31.1309592Z 	at org.gradle.internal.operations.DefaultBuildOperationExecutor.call(DefaultBuildOperationExecutor.java:73)
+2026-05-28T11:12:31.1311387Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+2026-05-28T11:12:31.1313006Z 	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+2026-05-28T11:12:31.1314707Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+2026-05-28T11:12:31.1316702Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+2026-05-28T11:12:31.1319001Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+2026-05-28T11:12:31.1320952Z 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:80)
+2026-05-28T11:12:31.1323100Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+2026-05-28T11:12:31.1325281Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+2026-05-28T11:12:31.1327368Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:463)
+2026-05-28T11:12:31.1328901Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:380)
+2026-05-28T11:12:31.1330705Z 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+2026-05-28T11:12:31.1342429Z 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+2026-05-28T11:12:31.1344338Z Caused by: com.android.ide.common.process.ProcessException: ninja: Entering directory `/home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a'
+2026-05-28T11:12:31.1345780Z [0/2] Re-checking globbed directories...
+2026-05-28T11:12:31.1346856Z [1/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/reasoning-budget.cpp.o
+2026-05-28T11:12:31.1348010Z [2/250] Building CXX object CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o
+2026-05-28T11:12:31.1348975Z FAILED: CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o 
+2026-05-28T11:12:31.1379457Z /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=aarch64-none-linux-android24 --sysroot=/usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DGGML_COMMIT=\"0d18aaa9d1a8af3df9abccd828e22eeaac7f840b\" -DGGML_USE_CPU -DGGML_USE_K_QUANTS -DGGML_VERSION=\"0.13.0\" -Dllama_jni_EXPORTS -I/home/runner/work/llama/llama/app/src/main/cpp/llama/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/common -I/home/runner/work/llama/llama/app/src/main/cpp/llama/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/vendor -I/home/runner/work/llama/llama/app/src/main/cpp/llama/tools/mtmd -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/include -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu -I/home/runner/work/llama/llama/app/src/main/cpp/llama/ggml/src/ggml-cpu/arch/arm -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/libcurl/include -I/home/runner/work/llama/llama/app/src/main/cpp/third_party/mbedtls/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D__BIONIC_NO_PAGE_SIZE_MACRO -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -std=c++17 -O3 -fPIC -fno-limit-debug-info  -fPIC -Wno-cast-qual -pthread -std=c++17 -MD -MT CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -MF CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o.d -o CMakeFiles/llama_jni.dir/jni/jni_llama.cpp.o -c /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp
+2026-05-28T11:12:31.1391124Z /home/runner/work/llama/llama/app/src/main/cpp/jni/jni_llama.cpp:622:25: error: use of undeclared identifier 'malloc_trim'
+2026-05-28T11:12:31.1422852Z   622 |     const int trimmed = malloc_trim(0);
+2026-05-28T11:12:31.1423603Z       |                         ^
+2026-05-28T11:12:31.1424240Z 1 error generated.
+2026-05-28T11:12:31.1425168Z [3/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-auto-parser-helpers.cpp.o
+2026-05-28T11:12:31.1426515Z [4/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-auto-parser-generator.cpp.o
+2026-05-28T11:12:31.1427848Z [5/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-peg-parser.cpp.o
+2026-05-28T11:12:31.1429088Z [6/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/chat-diff-analyzer.cpp.o
+2026-05-28T11:12:31.1430241Z [7/250] Building CXX object CMakeFiles/llama_jni.dir/llama/common/arg.cpp.o
+2026-05-28T11:12:31.1431158Z ninja: build stopped: subcommand failed.
+2026-05-28T11:12:31.1431776Z 
+2026-05-28T11:12:31.1432098Z C++ build system [build] failed while executing:
+2026-05-28T11:12:31.1432890Z     /usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja \
+2026-05-28T11:12:31.1433640Z       -C \
+2026-05-28T11:12:31.1434369Z       /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a \
+2026-05-28T11:12:31.1435221Z       llama_jni
+2026-05-28T11:12:31.1435828Z   from /home/runner/work/llama/llama/app
+2026-05-28T11:12:31.1436932Z 	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.execute(ExecuteProcess.kt:288)
+2026-05-28T11:12:31.1438550Z 	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt$executeProcess$1.invoke(ExecuteProcess.kt:108)
+2026-05-28T11:12:31.1440594Z 	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt$executeProcess$1.invoke(ExecuteProcess.kt:106)
+2026-05-28T11:12:31.1442411Z 	at com.android.build.gradle.internal.cxx.timing.TimingEnvironmentKt.time(TimingEnvironment.kt:32)
+2026-05-28T11:12:31.1443922Z 	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.executeProcess(ExecuteProcess.kt:106)
+2026-05-28T11:12:31.1445614Z 	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.executeProcess$default(ExecuteProcess.kt:85)
+2026-05-28T11:12:31.1447427Z 	at com.android.build.gradle.internal.cxx.build.CxxRegularBuilder.executeProcessBatch(CxxRegularBuilder.kt:332)
+2026-05-28T11:12:31.1491105Z 	at com.android.build.gradle.internal.cxx.build.CxxRegularBuilder.build(CxxRegularBuilder.kt:129)
+2026-05-28T11:12:31.1492957Z 	at com.android.build.gradle.tasks.ExternalNativeBuildTask$doTaskAction$$inlined$recordTaskAction$1.invoke(BaseTask.kt:70)
+2026-05-28T11:12:31.1494419Z 	at com.android.build.gradle.internal.tasks.Blocks.recordSpan(Blocks.java:51)
+2026-05-28T11:12:31.1495802Z 	at com.android.build.gradle.tasks.ExternalNativeBuildTask.doTaskAction(ExternalNativeBuildTask.kt:145)
+2026-05-28T11:12:31.1497759Z 	at com.android.build.gradle.internal.tasks.UnsafeOutputsTask$taskAction$$inlined$recordTaskAction$1.invoke(BaseTask.kt:65)
+2026-05-28T11:12:31.1499210Z 	at com.android.build.gradle.internal.tasks.Blocks.recordSpan(Blocks.java:51)
+2026-05-28T11:12:31.1500527Z 	at com.android.build.gradle.internal.tasks.UnsafeOutputsTask.taskAction(UnsafeOutputsTask.kt:63)
+2026-05-28T11:12:31.1502078Z 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+2026-05-28T11:12:31.1503501Z 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+2026-05-28T11:12:31.1505073Z 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+2026-05-28T11:12:31.1506477Z 	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
+2026-05-28T11:12:31.1507389Z 	... 119 more
+2026-05-28T11:12:31.1509178Z Caused by: com.android.ide.common.process.ProcessException: Error while executing process /usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja with arguments {-C /home/runner/work/llama/llama/app/.cxx/Debug/2s4u6l5z/arm64-v8a llama_jni}
+2026-05-28T11:12:31.1522113Z 	at com.android.build.gradle.internal.process.GradleProcessResult.buildProcessException(GradleProcessResult.java:73)
+2026-05-28T11:12:31.1524112Z 	at com.android.build.gradle.internal.process.GradleProcessResult.assertNormalExitValue(GradleProcessResult.java:48)
+2026-05-28T11:12:31.1525836Z 	at com.android.build.gradle.internal.cxx.process.ExecuteProcessKt.execute(ExecuteProcess.kt:277)
+2026-05-28T11:12:31.1526965Z 	... 136 more
+2026-05-28T11:12:31.1528266Z Caused by: org.gradle.process.internal.ExecException: Process 'command '/usr/local/lib/android/sdk/cmake/3.22.1/bin/ninja'' finished with non-zero exit value 1
+2026-05-28T11:12:31.1530220Z 	at org.gradle.process.internal.DefaultExecHandle$ExecResultImpl.assertNormalExitValue(DefaultExecHandle.java:442)
+2026-05-28T11:12:31.1532169Z 	at com.android.build.gradle.internal.process.GradleProcessResult.assertNormalExitValue(GradleProcessResult.java:46)
+2026-05-28T11:12:31.1533422Z 	... 137 more
+2026-05-28T11:12:31.1533746Z 
+2026-05-28T11:12:31.1533754Z 
+2026-05-28T11:12:31.1534038Z BUILD FAILED in 38s
+2026-05-28T11:12:31.2083279Z ##[error]Process completed with exit code 1.

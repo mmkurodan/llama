@@ -1,0 +1,8 @@
+2026-05-28T11:08:48.0210000Z Evaluating build-libcurl.if
+2026-05-28T11:08:48.0210000Z Evaluating: success()
+2026-05-28T11:08:48.0210000Z Result: true
+2026-05-28T11:08:48.0380000Z Requested labels: ubuntu-latest
+2026-05-28T11:08:48.0380000Z Job defined at: mmkurodan/llama/.github/workflows/android.yml@refs/heads/main
+2026-05-28T11:08:48.0380000Z Waiting for a runner to pick up this job...
+2026-05-28T11:08:48.1900000Z Job is about to start running on the hosted runner: GitHub Actions 1000001911
+2026-05-28T11:08:48.1890000Z Job is waiting for a hosted runner to come online.
