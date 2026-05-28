@@ -13,12 +13,15 @@
 #include <cstring>
 #include <cctype>
 #include <exception>
-#include <malloc.h>
 #include <dirent.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 
 #include <android/log.h>
 #define LOG_TAG "LLAMA_JNI"
@@ -618,13 +621,15 @@ static void log_to_file(const std::string& msg, ggml_log_level level) {
 }
 
 static void trim_native_allocator(const char * reason) {
-#if defined(__GLIBC__) || defined(__BIONIC__)
+#if defined(__GLIBC__)
     const int trimmed = malloc_trim(0);
     std::ostringstream ss;
     ss << reason << ": malloc_trim result=" << trimmed;
     log_to_file(ss.str());
 #else
-    (void) reason;
+    if (reason != nullptr) {
+        log_to_file(std::string(reason) + ": malloc_trim unavailable on this platform");
+    }
 #endif
 }
 
