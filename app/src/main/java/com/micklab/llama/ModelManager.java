@@ -379,7 +379,11 @@ public class ModelManager {
                 }
 
                 currentModelPath = modelPath;
-                currentMmprojPath = mmprojPath;
+                boolean multimodalActive = llama.supportsVision() || llama.supportsAudio();
+                if (!multimodalActive && mmprojPath != null) {
+                    Log.i(TAG, "Projector request was not activated by native init; treating model as text-only");
+                }
+                currentMmprojPath = multimodalActive ? mmprojPath : null;
             }
 
             // Set parameters from configuration
@@ -398,7 +402,7 @@ public class ModelManager {
                     "model-load-complete",
                     "config=" + configName
                             + " model=" + new File(modelPath).getName()
-                            + " mmproj=" + (mmprojPath != null ? new File(mmprojPath).getName() : "(none)"));
+                            + " mmproj=" + (currentMmprojPath != null ? new File(currentMmprojPath).getName() : "(none)"));
             return true;
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load configuration: " + configName, e);
@@ -717,8 +721,11 @@ public class ModelManager {
             boolean preferVisionProjector,
             boolean preferAudioProjector) {
         if (config.multimodalProjectorUrl != null && !config.multimodalProjectorUrl.trim().isEmpty()) {
-            File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
-            return configuredFile != null ? configuredFile.getAbsolutePath() : null;
+            if (ModelFileHelper.canAutoApplyProjectorReference(config.modelUrl, config.multimodalProjectorUrl)) {
+                File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+                return configuredFile != null ? configuredFile.getAbsolutePath() : null;
+            }
+            Log.w(TAG, "Ignoring stale or incompatible multimodal projector for model: " + config.modelUrl);
         }
 
         File autoDetected = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(

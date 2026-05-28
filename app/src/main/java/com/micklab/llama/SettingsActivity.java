@@ -1125,6 +1125,9 @@ public class SettingsActivity extends Activity {
         if (nextModelReference == null || nextModelReference.trim().isEmpty()) {
             return false;
         }
+        if (!ModelFileHelper.canAutoApplyProjectorReference(nextModelReference, currentProjectorReference)) {
+            return false;
+        }
 
         String previousFilename = ModelFileHelper.extractFilename(previousModelReference);
         String nextFilename = ModelFileHelper.extractFilename(nextModelReference);

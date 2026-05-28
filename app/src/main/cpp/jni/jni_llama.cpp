@@ -13,6 +13,7 @@
 #include <cstring>
 #include <cctype>
 #include <exception>
+#include <malloc.h>
 #include <dirent.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -614,6 +615,17 @@ static void log_to_file(const std::string& msg, ggml_log_level level) {
     if (!g_log_ofs) return;
     g_log_ofs << current_time_str() << " [JNI] " << msg << std::endl;
     g_log_ofs.flush();
+}
+
+static void trim_native_allocator(const char * reason) {
+#if defined(__GLIBC__) || defined(__BIONIC__)
+    const int trimmed = malloc_trim(0);
+    std::ostringstream ss;
+    ss << reason << ": malloc_trim result=" << trimmed;
+    log_to_file(ss.str());
+#else
+    (void) reason;
+#endif
 }
 
 // ---------------- llama.cpp ログコールバック ----------------
@@ -1488,6 +1500,7 @@ static void llama_jni_free() {
 
     llama_backend_free();
     log_to_file("Backend freed (log kept open for re-init)");
+    trim_native_allocator("llama_jni_free");
 }
 
 // ---------------- JNI: setLogPath ----------------

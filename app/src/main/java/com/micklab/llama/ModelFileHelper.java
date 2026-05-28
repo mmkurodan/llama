@@ -74,6 +74,34 @@ public final class ModelFileHelper {
         return new File(getModelStorageDir(context), filename);
     }
 
+    public static boolean isLikelyMultimodalModelReference(String modelReference) {
+        String modelFilename = extractFilename(modelReference);
+        if (modelFilename == null || modelFilename.isEmpty()) {
+            return false;
+        }
+        return isLikelyMultimodalModelStem(stripGgufSuffix(modelFilename).toLowerCase(Locale.US));
+    }
+
+    public static boolean canAutoApplyProjectorReference(String modelReference, String projectorReference) {
+        String modelFilename = extractFilename(modelReference);
+        String projectorFilename = extractFilename(projectorReference);
+        if (modelFilename == null || modelFilename.isEmpty()
+                || projectorFilename == null || projectorFilename.isEmpty()
+                || !isLikelyProjectorFilename(projectorFilename)) {
+            return false;
+        }
+
+        String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
+        String projectorStem = stripGgufSuffix(projectorFilename).toLowerCase(Locale.US);
+        int score = scoreProjectorCandidate(
+                projectorStem,
+                modelStem,
+                tokenizeModelStem(modelStem),
+                false,
+                false) + scoreProjectorPrecisionCompatibility(modelStem, projectorStem);
+        return score >= 130 || isLikelyMultimodalModelStem(modelStem);
+    }
+
     public static File findAutoDetectedMultimodalProjectorFile(Context context, String modelReference) {
         return findAutoDetectedMultimodalProjectorFile(context, modelReference, false, false);
     }
@@ -106,6 +134,7 @@ public final class ModelFileHelper {
         String modelFilename = extractFilename(modelReference);
         String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
         List<String> tokens = tokenizeModelStem(modelStem);
+        boolean likelyMultimodalModel = isLikelyMultimodalModelStem(modelStem);
 
         File best = null;
         int bestScore = Integer.MIN_VALUE;
@@ -120,7 +149,7 @@ public final class ModelFileHelper {
         if (best == null) {
             return null;
         }
-        return (bestScore >= 130 || candidates.size() == 1) ? best : null;
+        return (bestScore >= 130 || (candidates.size() == 1 && likelyMultimodalModel)) ? best : null;
     }
 
     public static InferredModalities inferAutoDetectedModalities(Context context, String modelReference) {
@@ -133,6 +162,7 @@ public final class ModelFileHelper {
         String modelFilename = extractFilename(modelReference);
         String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
         List<String> tokens = tokenizeModelStem(modelStem);
+        boolean likelyMultimodalModel = isLikelyMultimodalModelStem(modelStem);
         boolean vision = false;
         boolean audio = false;
 
@@ -158,7 +188,7 @@ public final class ModelFileHelper {
 
             String candidateStem = stripGgufSuffix(lowerName);
             int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, false, false);
-            if (score < 130 && candidateCount > 1) {
+            if (score < 130 && (candidateCount > 1 || !likelyMultimodalModel)) {
                 continue;
             }
 
@@ -191,6 +221,7 @@ public final class ModelFileHelper {
 
         String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
         List<String> tokens = tokenizeModelStem(modelStem);
+        boolean likelyMultimodalModel = isLikelyMultimodalModelStem(modelStem);
 
         String bestReference = null;
         int bestScore = Integer.MIN_VALUE;
@@ -214,7 +245,7 @@ public final class ModelFileHelper {
         if (bestReference == null) {
             return null;
         }
-        return (bestScore >= 130 || candidateCount == 1) ? bestReference : null;
+        return (bestScore >= 130 || (candidateCount == 1 && likelyMultimodalModel)) ? bestReference : null;
     }
 
     private static File getProjectorSearchDir(Context context, String modelReference) {
@@ -410,6 +441,34 @@ public final class ModelFileHelper {
                 || stem.contains("ud-")
                 || stem.contains("mxfp4")
                 || stem.contains("nvfp4");
+    }
+
+    private static boolean isLikelyMultimodalModelStem(String stem) {
+        if (stem == null || stem.isEmpty()) {
+            return false;
+        }
+        return containsAny(stem,
+                "gemma-4",
+                "gemma4",
+                "gemma-3n",
+                "gemma3n",
+                "llava",
+                "vision",
+                "audio",
+                "qwen2-vl",
+                "qwen25vl",
+                "qwen2vl",
+                "qwen2.5-vl",
+                "qwen2-audio",
+                "qwen2audio",
+                "qwen2.5-omni",
+                "qwen25omni",
+                "glm-4v",
+                "glm4v",
+                "minicpm-v",
+                "minicpmv",
+                "voxtral",
+                "ultravox");
     }
 
     private static boolean hasAudioProjectorHint(String candidateStem) {
