@@ -93,13 +93,18 @@ public final class ModelFileHelper {
 
         String modelStem = stripGgufSuffix(modelFilename).toLowerCase(Locale.US);
         String projectorStem = stripGgufSuffix(projectorFilename).toLowerCase(Locale.US);
+        boolean likelyMultimodalModel = isLikelyMultimodalModelStem(modelStem);
+        List<String> tokens = tokenizeModelStem(modelStem);
+        if (!hasMeaningfulProjectorAffinity(projectorStem, modelStem, tokens, likelyMultimodalModel)) {
+            return false;
+        }
         int score = scoreProjectorCandidate(
                 projectorStem,
                 modelStem,
-                tokenizeModelStem(modelStem),
+                tokens,
                 false,
                 false) + scoreProjectorPrecisionCompatibility(modelStem, projectorStem);
-        return score >= 130 || isLikelyMultimodalModelStem(modelStem);
+        return score >= 130 || likelyMultimodalModel;
     }
 
     public static File findAutoDetectedMultimodalProjectorFile(Context context, String modelReference) {
@@ -140,6 +145,9 @@ public final class ModelFileHelper {
         int bestScore = Integer.MIN_VALUE;
         for (File candidate : candidates) {
             String candidateStem = stripGgufSuffix(candidate.getName()).toLowerCase(Locale.US);
+            if (!hasMeaningfulProjectorAffinity(candidateStem, modelStem, tokens, likelyMultimodalModel)) {
+                continue;
+            }
             int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio);
             if (score > bestScore) {
                 best = candidate;
@@ -187,6 +195,9 @@ public final class ModelFileHelper {
             }
 
             String candidateStem = stripGgufSuffix(lowerName);
+            if (!hasMeaningfulProjectorAffinity(candidateStem, modelStem, tokens, likelyMultimodalModel)) {
+                continue;
+            }
             int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, false, false);
             if (score < 130 && (candidateCount > 1 || !likelyMultimodalModel)) {
                 continue;
@@ -234,6 +245,9 @@ public final class ModelFileHelper {
             candidateCount++;
 
             String candidateStem = stripGgufSuffix(candidateFilename).toLowerCase(Locale.US);
+            if (!hasMeaningfulProjectorAffinity(candidateStem, modelStem, tokens, likelyMultimodalModel)) {
+                continue;
+            }
             int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio)
                     + scoreProjectorPrecisionCompatibility(modelStem, candidateStem);
             if (score > bestScore) {
@@ -406,6 +420,32 @@ public final class ModelFileHelper {
             }
         }
         return 0;
+    }
+
+    private static boolean hasMeaningfulProjectorAffinity(
+            String candidateStem,
+            String modelStem,
+            List<String> tokens,
+            boolean likelyMultimodalModel) {
+        if (candidateStem == null || candidateStem.isEmpty()) {
+            return false;
+        }
+        if (modelStem != null && !modelStem.isEmpty() && candidateStem.contains(modelStem)) {
+            return true;
+        }
+        if (tokens != null) {
+            for (String token : tokens) {
+                if (token == null || token.length() < 4) {
+                    continue;
+                }
+                if (candidateStem.contains(token)) {
+                    return true;
+                }
+            }
+        }
+        return likelyMultimodalModel && (candidateStem.contains("mmproj")
+                || hasAudioProjectorHint(candidateStem)
+                || hasVisionProjectorHint(candidateStem));
     }
 
     private static String inferPrecisionToken(String stem) {

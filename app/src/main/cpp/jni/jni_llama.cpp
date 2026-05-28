@@ -23,6 +23,11 @@
 #include <malloc.h>
 #endif
 
+#if defined(__BIONIC__)
+#include <dlfcn.h>
+#include <malloc.h>
+#endif
+
 #include <android/log.h>
 #define LOG_TAG "LLAMA_JNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
@@ -625,6 +630,29 @@ static void trim_native_allocator(const char * reason) {
     const int trimmed = malloc_trim(0);
     std::ostringstream ss;
     ss << reason << ": malloc_trim result=" << trimmed;
+    log_to_file(ss.str());
+#elif defined(__BIONIC__)
+    using mallopt_fn = int (*)(int, int);
+    mallopt_fn mallopt_ptr = reinterpret_cast<mallopt_fn>(dlsym(RTLD_DEFAULT, "mallopt"));
+    if (mallopt_ptr == nullptr) {
+        if (reason != nullptr) {
+            log_to_file(std::string(reason) + ": mallopt unavailable on this platform");
+        }
+        return;
+    }
+
+    int purge_all_result = 0;
+    int purge_result = 0;
+#if defined(M_PURGE_ALL)
+    purge_all_result = mallopt_ptr(M_PURGE_ALL, 0);
+#endif
+#if defined(M_PURGE)
+    purge_result = mallopt_ptr(M_PURGE, 0);
+#endif
+    std::ostringstream ss;
+    ss << reason
+       << ": mallopt purge_all=" << purge_all_result
+       << " purge=" << purge_result;
     log_to_file(ss.str());
 #else
     if (reason != nullptr) {
