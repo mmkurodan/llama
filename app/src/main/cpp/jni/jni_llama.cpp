@@ -59,6 +59,7 @@ static jmethodID g_token_onToken = nullptr;
 static jmethodID g_token_onComplete = nullptr;
 static jmethodID g_token_onError = nullptr;
 static std::atomic<bool> g_cancel_generation(false);
+static bool g_backend_initialized = false;
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -603,9 +604,13 @@ static void reset_generation_state_locked() {
     if (!g_ctx) {
         return;
     }
+    // Upstream Android llama.cpp examples only clear memory metadata between generations.
+    // Clearing backing buffers on every request exercises extra backend buffer operations and
+    // has correlated with repeated-run instability on recurrent/MTP models.
+    llama_synchronize(g_ctx);
     llama_memory_t mem = llama_get_memory(g_ctx);
     if (mem != nullptr) {
-        llama_memory_clear(mem, true);
+        llama_memory_clear(mem, false);
     }
     llama_synchronize(g_ctx);
     llama_perf_context_reset(g_ctx);
@@ -657,6 +662,23 @@ static void trim_native_allocator(const char * reason) {
         log_to_file(std::string(reason) + ": malloc_trim unavailable on this platform");
     }
 #endif
+}
+
+static void ensure_backend_initialized_locked(const char * log_prefix) {
+    if (g_backend_initialized) {
+        std::ostringstream ss;
+        ss << log_prefix << ": backend already initialized, reusing process-wide backend";
+        log_to_file(ss.str());
+        return;
+    }
+
+    llama_backend_init();
+    g_backend_initialized = true;
+
+    std::ostringstream ss;
+    ss << log_prefix << ": backend init complete, " << summarize_registered_backends();
+    const size_t backend_count = ggml_backend_reg_count();
+    log_to_file(ss.str(), backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
 }
 
 // ---------------- llama.cpp ログコールバック ----------------
@@ -1392,8 +1414,9 @@ static void llama_jni_free() {
     g_supports_vision = false;
     g_supports_audio = false;
 
-    llama_backend_free();
-    log_to_file("Backend freed (log kept open for re-init)");
+    if (g_backend_initialized) {
+        log_to_file("Backend retained for process reuse");
+    }
     trim_native_allocator("llama_jni_free");
 }
 
@@ -1681,12 +1704,9 @@ Java_com_micklab_llama_LlamaNative_init(
             log_to_file("init: JavaVM stored");
         }
 
-        llama_backend_init();
+        ensure_backend_initialized_locked("init");
         log_requested_load_params("init");
-
         const size_t backend_count = ggml_backend_reg_count();
-        log_to_file(std::string("init: backend init complete, ") + summarize_registered_backends(),
-                    backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
         if (backend_count == 0) {
             return new_java_string_utf8(env, "no ggml backends registered");
         }
@@ -1893,12 +1913,9 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             log_to_file("initWithMmproj: JavaVM stored");
         }
 
-        llama_backend_init();
+        ensure_backend_initialized_locked("initWithMmproj");
         log_requested_load_params("initWithMmproj");
-
         const size_t backend_count = ggml_backend_reg_count();
-        log_to_file(std::string("initWithMmproj: backend init complete, ") + summarize_registered_backends(),
-                    backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
         if (backend_count == 0) {
             return new_java_string_utf8(env, "no ggml backends registered");
         }
