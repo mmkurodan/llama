@@ -651,53 +651,30 @@ static void release_model_locked(const char * log_prefix) {
     }
 }
 
-static bool recreate_generation_context_locked(const char * log_prefix, std::string & error_message) {
-    if (!g_model) {
+static bool reset_generation_context_locked(const char * log_prefix, std::string & error_message) {
+    if (!g_model || !g_ctx) {
         error_message = "not initialized";
         return false;
     }
 
-    const std::string mmproj_path = g_current_mmproj_path;
+    llama_synchronize(g_ctx);
 
-    if (g_mtmd) {
-        release_multimodal_locked(log_prefix);
-    }
-    if (g_ctx) {
-        release_context_locked(log_prefix);
-    }
-
-    llama_context_params cparams = build_context_params_locked();
-    g_ctx = llama_init_from_model(g_model, cparams);
-    if (!g_ctx) {
-        error_message = "failed to recreate context";
+    llama_memory_t memory = llama_get_memory(g_ctx);
+    if (!memory) {
+        error_message = "generation memory unavailable";
         log_to_file(std::string(log_prefix) + ": " + error_message, GGML_LOG_LEVEL_ERROR);
         return false;
     }
 
-    {
-        std::ostringstream ss;
-        ss << log_prefix << ": generation context recreated"
-           << " n_ctx=" << cparams.n_ctx
-           << " n_batch=" << cparams.n_batch
-           << " n_threads=" << cparams.n_threads;
-        log_to_file(ss.str());
-    }
-
-    if (!mmproj_path.empty()) {
-        const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
-                g_current_model_path,
-                mmproj_path,
-                log_prefix);
-        if (selected_mmproj_path.empty()) {
-            error_message = "failed to reinitialize multimodal projector";
-            log_to_file(std::string(log_prefix) + ": " + error_message, GGML_LOG_LEVEL_ERROR);
-            release_context_locked(log_prefix);
-            return false;
-        }
-        g_current_mmproj_path = selected_mmproj_path;
-    }
-
+    llama_memory_clear(memory, true);
     llama_perf_context_reset(g_ctx);
+
+    std::ostringstream ss;
+    ss << log_prefix << ": generation context reset"
+       << " n_ctx=" << g_n_ctx
+       << " n_batch=" << g_n_batch
+       << " n_threads=" << g_n_threads;
+    log_to_file(ss.str());
     return true;
 }
 
@@ -2443,7 +2420,7 @@ static jstring generate_locked(
 
     const int max_tokens = 1024;
     std::string context_error;
-    if (!recreate_generation_context_locked("generate", context_error)) {
+    if (!reset_generation_context_locked("generate", context_error)) {
         log_to_file(std::string("generate: ") + context_error, GGML_LOG_LEVEL_ERROR);
         notify_token_error(context_error.c_str());
         return new_java_string_utf8(env, context_error);
@@ -2731,7 +2708,7 @@ static jstring generate_openai_chat_completion_locked(
         }
 
         std::string context_error;
-        if (!recreate_generation_context_locked("generateOpenAiChatCompletion", context_error)) {
+        if (!reset_generation_context_locked("generateOpenAiChatCompletion", context_error)) {
             return build_error(context_error);
         }
 

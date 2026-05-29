@@ -1,5 +1,0 @@
-2026-05-29 22:50:23.330 pid=29672 [generation-start] id=24 config=Qwen3.5 2B model=Qwen3.5-2B-UD-Q8_K_XL.gguf promptLen=1048 mediaCount=0
-  javaUsed=2.8MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=362.3MB nativeHeapFree=8.9MB nativeHeapSize=374.9MB
-  pssTotal=2.9GB privateDirty=172.0MB sharedDirty=52.2MB nativePss=166.0MB dalvikPss=1.5MB otherPss=2.7GB
-  systemAvail=14.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
-  procStatus VmRSS=3152228 kB VmHWM=3168088 kB VmSize=20148412 kB VmSwap=2376 kB Threads=29 FDSize=256
