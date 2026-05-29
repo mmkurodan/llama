@@ -1,0 +1,19 @@
+﻿2026-05-29T11:35:27.3810223Z ##[group]Run actions/download-artifact@v4
+2026-05-29T11:35:27.3810667Z with:
+2026-05-29T11:35:27.3811018Z   name: libcurl-arm64
+2026-05-29T11:35:27.3811409Z   path: app/src/main/cpp/third_party/libcurl
+2026-05-29T11:35:27.3811838Z   merge-multiple: false
+2026-05-29T11:35:27.3812215Z   repository: mmkurodan/llama
+2026-05-29T11:35:27.3812588Z   run-id: 26634797490
+2026-05-29T11:35:27.3812926Z ##[endgroup]
+2026-05-29T11:35:27.5717737Z Downloading single artifact
+2026-05-29T11:35:27.7866454Z Preparing to download the following artifacts:
+2026-05-29T11:35:27.7868345Z - libcurl-arm64 (ID: 7289705894, Size: 2845659, Expected Digest: sha256:03180841a36abb2d39b61792e55452103913872e41db359957f6271f0a283c90)
+2026-05-29T11:35:27.9450788Z Redirecting to blob download url: https://productionresultssa17.blob.core.windows.net/actions-results/5b06bbc4-aaf9-4feb-b4ea-23972df47e2c/workflow-job-run-1ae3b61c-3162-584f-8f41-f488d8abc0e0/artifacts/ce546ef97dfb0326baac9b868b99a47b12372d940ec30efbff7467577430ecff.zip
+2026-05-29T11:35:27.9453645Z Starting download of artifact to: /home/runner/work/llama/llama/app/src/main/cpp/third_party/libcurl
+2026-05-29T11:35:28.1139390Z (node:2224) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-05-29T11:35:28.1140859Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-05-29T11:35:28.6150539Z SHA256 digest of downloaded artifact is 03180841a36abb2d39b61792e55452103913872e41db359957f6271f0a283c90
+2026-05-29T11:35:28.6151796Z Artifact download completed successfully.
+2026-05-29T11:35:28.6152258Z Total of 1 artifact(s) downloaded
+2026-05-29T11:35:28.6158239Z Download artifact has finished successfully

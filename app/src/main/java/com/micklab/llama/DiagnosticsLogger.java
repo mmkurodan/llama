@@ -24,6 +24,7 @@ public final class DiagnosticsLogger {
     private static final String PROCESS_LOG_FILENAME = "process_diagnostics.log";
     private static final String LAST_STATE_FILENAME = "last_state.txt";
     private static final String LOGCAT_FILENAME = "recent_logcat.txt";
+    private static final String INCOMPLETE_GENERATION_FILENAME = "generation_in_progress.txt";
     private static final long MAX_PROCESS_LOG_BYTES = 512L * 1024L;
     private static final Object LOCK = new Object();
 
@@ -59,12 +60,20 @@ public final class DiagnosticsLogger {
                     "-v",
                     "time",
                     "-t",
-                    "200",
+                    "400",
                     "LLAMA_JNI:I",
                     "ModelManager:I",
                     "MainActivity:I",
                     "LlamaApplication:I",
                     "OllamaApiServer:I",
+                    "AndroidRuntime:E",
+                    "ActivityManager:I",
+                    "DEBUG:I",
+                    "crash_dump64:I",
+                    "libc:F",
+                    "libc:E",
+                    "lmkd:I",
+                    "lowmemorykiller:I",
                     "*:S")
                     .redirectErrorStream(true)
                     .start();
@@ -88,6 +97,50 @@ public final class DiagnosticsLogger {
         }
         synchronized (LOCK) {
             overwriteFile(context, LOGCAT_FILENAME, output.toString());
+        }
+    }
+
+    public static void markGenerationInProgress(
+            Context context,
+            int generationId,
+            String configName,
+            String modelName,
+            int promptLen,
+            int mediaCount) {
+        String line = buildHeader("generation-pending")
+                + " id=" + generationId
+                + " config=" + safe(configName)
+                + " model=" + safe(modelName)
+                + " promptLen=" + Math.max(promptLen, 0)
+                + " mediaCount=" + Math.max(mediaCount, 0);
+        synchronized (LOCK) {
+            overwriteFile(context, INCOMPLETE_GENERATION_FILENAME, line + "\n");
+        }
+    }
+
+    public static void clearGenerationInProgress(Context context) {
+        synchronized (LOCK) {
+            deleteFile(context, INCOMPLETE_GENERATION_FILENAME);
+        }
+    }
+
+    public static void logIncompleteGenerationIfPresent(Context context) {
+        synchronized (LOCK) {
+            File markerFile = getDiagnosticsFile(context, INCOMPLETE_GENERATION_FILENAME);
+            if (markerFile == null || !markerFile.exists()) {
+                return;
+            }
+
+            String marker = readFileContents(markerFile).trim();
+            if (!marker.isEmpty()) {
+                appendLine(
+                        context,
+                        PROCESS_LOG_FILENAME,
+                        buildHeader("previous-crash")
+                                + " Detected unfinished generation from previous process: "
+                                + toSingleLine(marker));
+            }
+            deleteFile(markerFile);
         }
     }
 
@@ -219,6 +272,38 @@ public final class DiagnosticsLogger {
         }
     }
 
+    private static String readFileContents(File file) {
+        StringBuilder contents = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            boolean firstLine = true;
+            while ((line = reader.readLine()) != null) {
+                if (!firstLine) {
+                    contents.append('\n');
+                }
+                contents.append(line);
+                firstLine = false;
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to read diagnostics file", e);
+        }
+        return contents.toString();
+    }
+
+    private static void deleteFile(Context context, String filename) {
+        File file = getDiagnosticsFile(context, filename);
+        deleteFile(file);
+    }
+
+    private static void deleteFile(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+        if (!file.delete()) {
+            Log.w(TAG, "Failed to delete diagnostics file: " + file.getAbsolutePath());
+        }
+    }
+
     private static void trimIfNeeded(File file) {
         if (file == null || !file.exists() || file.length() < MAX_PROCESS_LOG_BYTES) {
             return;
@@ -251,6 +336,10 @@ public final class DiagnosticsLogger {
 
     private static String safe(String value) {
         return value != null ? value : "";
+    }
+
+    private static String toSingleLine(String value) {
+        return safe(value).replace('\r', ' ').replace('\n', ' ').trim();
     }
 
     private static String formatBytes(long bytes) {

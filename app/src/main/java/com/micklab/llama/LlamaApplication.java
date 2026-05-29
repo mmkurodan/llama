@@ -22,6 +22,7 @@ public class LlamaApplication extends Application {
     public void onCreate() {
         super.onCreate();
         configureNativeLogging();
+        DiagnosticsLogger.logIncompleteGenerationIfPresent(this);
         DiagnosticsLogger.logEvent(this, "app", "Application created");
         DiagnosticsLogger.logMemorySnapshot(this, "app-start", "Application onCreate");
         new Thread(() -> DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, "app-start"), "diag-logcat").start();

@@ -1,0 +1,20 @@
+﻿2026-05-29T11:35:09.5946655Z ##[group]Run actions/upload-artifact@v4
+2026-05-29T11:35:09.5946958Z with:
+2026-05-29T11:35:09.5947154Z   name: libcurl-arm64
+2026-05-29T11:35:09.5947380Z   path: curl/build/arm64
+2026-05-29T11:35:09.5947616Z   if-no-files-found: warn
+2026-05-29T11:35:09.5947852Z   compression-level: 6
+2026-05-29T11:35:09.5948070Z   overwrite: false
+2026-05-29T11:35:09.5948284Z   include-hidden-files: false
+2026-05-29T11:35:09.5948525Z ##[endgroup]
+2026-05-29T11:35:09.9043952Z With the provided path, there will be 513 files uploaded
+2026-05-29T11:35:09.9049841Z Artifact name is valid!
+2026-05-29T11:35:09.9051236Z Root directory input is valid!
+2026-05-29T11:35:10.2516410Z Beginning upload of artifact content to blob storage
+2026-05-29T11:35:11.8761899Z Uploaded bytes 2845659
+2026-05-29T11:35:11.9520989Z Finished uploading artifact content to blob storage!
+2026-05-29T11:35:11.9523755Z SHA256 digest of uploaded artifact zip is 03180841a36abb2d39b61792e55452103913872e41db359957f6271f0a283c90
+2026-05-29T11:35:11.9525452Z Finalizing artifact upload
+2026-05-29T11:35:12.1597864Z Artifact libcurl-arm64.zip successfully finalized. Artifact ID 7289705894
+2026-05-29T11:35:12.1599329Z Artifact libcurl-arm64 has been successfully uploaded! Final size is 2845659 bytes. Artifact ID is 7289705894
+2026-05-29T11:35:12.1606725Z Artifact download URL: https://github.com/mmkurodan/llama/actions/runs/26634797490/artifacts/7289705894

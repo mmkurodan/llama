@@ -1,0 +1,1389 @@
+﻿2026-05-29T11:33:24.5419214Z Current runner version: '2.334.0'
+2026-05-29T11:33:24.5444059Z ##[group]Runner Image Provisioner
+2026-05-29T11:33:24.5445083Z Hosted Compute Agent
+2026-05-29T11:33:24.5445684Z Version: 20260520.533
+2026-05-29T11:33:24.5446296Z Commit: 189110e25284a9812c124fd27b339e2fb4f2f9db
+2026-05-29T11:33:24.5447124Z Build Date: 2026-05-20T17:44:04Z
+2026-05-29T11:33:24.5447904Z Worker ID: {c771fc52-ed84-45bf-8c61-8a50d0ca0fac}
+2026-05-29T11:33:24.5448669Z Azure Region: westus
+2026-05-29T11:33:24.5449258Z ##[endgroup]
+2026-05-29T11:33:24.5450702Z ##[group]Operating System
+2026-05-29T11:33:24.5451434Z Ubuntu
+2026-05-29T11:33:24.5452012Z 24.04.4
+2026-05-29T11:33:24.5452832Z LTS
+2026-05-29T11:33:24.5453430Z ##[endgroup]
+2026-05-29T11:33:24.5453995Z ##[group]Runner Image
+2026-05-29T11:33:24.5454763Z Image: ubuntu-24.04
+2026-05-29T11:33:24.5455336Z Version: 20260525.161.1
+2026-05-29T11:33:24.5456571Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260525.161/images/ubuntu/Ubuntu2404-Readme.md
+2026-05-29T11:33:24.5458142Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260525.161
+2026-05-29T11:33:24.5459127Z ##[endgroup]
+2026-05-29T11:33:24.5460453Z ##[group]GITHUB_TOKEN Permissions
+2026-05-29T11:33:24.5462615Z Contents: read
+2026-05-29T11:33:24.5463299Z Metadata: read
+2026-05-29T11:33:24.5463856Z Packages: read
+2026-05-29T11:33:24.5464522Z ##[endgroup]
+2026-05-29T11:33:24.5466558Z Secret source: Actions
+2026-05-29T11:33:24.5467734Z Prepare workflow directory
+2026-05-29T11:33:24.5795234Z Prepare all required actions
+2026-05-29T11:33:24.5831987Z Getting action download info
+2026-05-29T11:33:25.1785275Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-05-29T11:33:25.2942430Z Download action repository 'nttld/setup-ndk@v1' (SHA:ed92fe6cadad69be94a966a7ee3271275e62f779)
+2026-05-29T11:33:25.7566102Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+2026-05-29T11:33:26.1919624Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-05-29T11:33:26.4295195Z Complete job name: build-libcurl
+2026-05-29T11:33:26.5203307Z ##[group]Run actions/checkout@v4
+2026-05-29T11:33:26.5205416Z with:
+2026-05-29T11:33:26.5206629Z   repository: mmkurodan/llama
+2026-05-29T11:33:26.5225159Z   token: ***
+2026-05-29T11:33:26.5226509Z   ssh-strict: true
+2026-05-29T11:33:26.5227916Z   ssh-user: git
+2026-05-29T11:33:26.5229364Z   persist-credentials: true
+2026-05-29T11:33:26.5230947Z   clean: true
+2026-05-29T11:33:26.5232735Z   sparse-checkout-cone-mode: true
+2026-05-29T11:33:26.5234497Z   fetch-depth: 1
+2026-05-29T11:33:26.5235922Z   fetch-tags: false
+2026-05-29T11:33:26.5237359Z   show-progress: true
+2026-05-29T11:33:26.5238805Z   lfs: false
+2026-05-29T11:33:26.5240163Z   submodules: false
+2026-05-29T11:33:26.5241817Z   set-safe-directory: true
+2026-05-29T11:33:26.5244039Z ##[endgroup]
+2026-05-29T11:33:26.6445761Z Syncing repository: mmkurodan/llama
+2026-05-29T11:33:26.6450273Z ##[group]Getting Git version info
+2026-05-29T11:33:26.6452746Z Working directory is '/home/runner/work/llama/llama'
+2026-05-29T11:33:26.6455225Z [command]/usr/bin/git version
+2026-05-29T11:33:26.6519925Z git version 2.54.0
+2026-05-29T11:33:26.6563110Z ##[endgroup]
+2026-05-29T11:33:26.6584882Z Temporarily overriding HOME='/home/runner/work/_temp/4ed44255-d361-4d5e-a409-5616142c1c13' before making global git config changes
+2026-05-29T11:33:26.6589411Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-29T11:33:26.6603500Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/llama/llama
+2026-05-29T11:33:26.6656753Z Deleting the contents of '/home/runner/work/llama/llama'
+2026-05-29T11:33:26.6660307Z ##[group]Initializing the repository
+2026-05-29T11:33:26.6664449Z [command]/usr/bin/git init /home/runner/work/llama/llama
+2026-05-29T11:33:26.6764180Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-05-29T11:33:26.6766519Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-05-29T11:33:26.6768455Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-05-29T11:33:26.6770466Z hint: call:
+2026-05-29T11:33:26.6771510Z hint:
+2026-05-29T11:33:26.6773559Z hint: 	git config --global init.defaultBranch <name>
+2026-05-29T11:33:26.6775657Z hint:
+2026-05-29T11:33:26.6777632Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-05-29T11:33:26.6780882Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-05-29T11:33:26.6783756Z hint:
+2026-05-29T11:33:26.6785205Z hint: 	git branch -m <name>
+2026-05-29T11:33:26.6786789Z hint:
+2026-05-29T11:33:26.6788816Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-05-29T11:33:26.6791950Z Initialized empty Git repository in /home/runner/work/llama/llama/.git/
+2026-05-29T11:33:26.6795304Z [command]/usr/bin/git remote add origin https://github.com/mmkurodan/llama
+2026-05-29T11:33:26.6830637Z ##[endgroup]
+2026-05-29T11:33:26.6833427Z ##[group]Disabling automatic garbage collection
+2026-05-29T11:33:26.6835755Z [command]/usr/bin/git config --local gc.auto 0
+2026-05-29T11:33:26.6866027Z ##[endgroup]
+2026-05-29T11:33:26.6868327Z ##[group]Setting up auth
+2026-05-29T11:33:26.6873743Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-29T11:33:26.6907538Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-29T11:33:26.7233236Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-29T11:33:26.7263010Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-29T11:33:26.7477813Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-29T11:33:26.7510500Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-29T11:33:26.7738465Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-05-29T11:33:26.7771085Z ##[endgroup]
+2026-05-29T11:33:26.7779465Z ##[group]Fetching the repository
+2026-05-29T11:33:26.7782408Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +154c563a0bdb61f2691584bffb752825006c1e01:refs/remotes/origin/main
+2026-05-29T11:33:32.0750214Z From https://github.com/mmkurodan/llama
+2026-05-29T11:33:32.0751776Z  * [new ref]         154c563a0bdb61f2691584bffb752825006c1e01 -> origin/main
+2026-05-29T11:33:32.0794042Z ##[endgroup]
+2026-05-29T11:33:32.0800761Z ##[group]Determining the checkout info
+2026-05-29T11:33:32.0801660Z ##[endgroup]
+2026-05-29T11:33:32.0802438Z [command]/usr/bin/git sparse-checkout disable
+2026-05-29T11:33:32.0838132Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-05-29T11:33:32.0863521Z ##[group]Checking out the ref
+2026-05-29T11:33:32.0867384Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-05-29T11:33:32.6956107Z Switched to a new branch 'main'
+2026-05-29T11:33:32.6956688Z branch 'main' set up to track 'origin/main'.
+2026-05-29T11:33:32.6994573Z ##[endgroup]
+2026-05-29T11:33:32.7039150Z [command]/usr/bin/git log -1 --format=%H
+2026-05-29T11:33:32.7062216Z 154c563a0bdb61f2691584bffb752825006c1e01
+2026-05-29T11:33:32.7255969Z ##[group]Run sudo apt update
+2026-05-29T11:33:32.7256372Z [36;1msudo apt update[0m
+2026-05-29T11:33:32.7256801Z [36;1msudo apt install -y autoconf automake libtool pkg-config build-essential git[0m
+2026-05-29T11:33:32.7286124Z shell: /usr/bin/bash -e {0}
+2026-05-29T11:33:32.7286405Z ##[endgroup]
+2026-05-29T11:33:32.7545912Z 
+2026-05-29T11:33:32.7546441Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-29T11:33:32.7546836Z 
+2026-05-29T11:33:32.8135351Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-29T11:33:32.8446462Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-05-29T11:33:32.8447723Z Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
+2026-05-29T11:33:32.8464040Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-05-29T11:33:32.8493641Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-05-29T11:33:32.8553309Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-05-29T11:33:32.8554778Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-05-29T11:33:32.8867639Z Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+2026-05-29T11:33:33.0087030Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [133 kB]
+2026-05-29T11:33:33.0226452Z Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [162 kB]
+2026-05-29T11:33:33.0493781Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [2049 kB]
+2026-05-29T11:33:33.0606213Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [360 kB]
+2026-05-29T11:33:33.0629415Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [177 kB]
+2026-05-29T11:33:33.0643832Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1694 kB]
+2026-05-29T11:33:33.0734612Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [330 kB]
+2026-05-29T11:33:33.0774624Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [386 kB]
+2026-05-29T11:33:33.0803103Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [3278 kB]
+2026-05-29T11:33:33.0983924Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [760 kB]
+2026-05-29T11:33:33.0998336Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [11.3 kB]
+2026-05-29T11:33:33.1007578Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2026-05-29T11:33:33.1517074Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5760 B]
+2026-05-29T11:33:33.1524949Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+2026-05-29T11:33:33.1615186Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1704 kB]
+2026-05-29T11:33:33.1723381Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [268 kB]
+2026-05-29T11:33:33.1741614Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [42.5 kB]
+2026-05-29T11:33:33.1753164Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1192 kB]
+2026-05-29T11:33:33.1822669Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [230 kB]
+2026-05-29T11:33:33.1841706Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [74.2 kB]
+2026-05-29T11:33:33.1854900Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [3006 kB]
+2026-05-29T11:33:33.2020410Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [698 kB]
+2026-05-29T11:33:33.2066789Z Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [9000 B]
+2026-05-29T11:33:33.2311172Z Get:32 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1218 B]
+2026-05-29T11:33:37.8249004Z Fetched 17.0 MB in 2s (9029 kB/s)
+2026-05-29T11:33:38.6129390Z Reading package lists...
+2026-05-29T11:33:38.7874543Z Building dependency tree...
+2026-05-29T11:33:38.7881571Z Reading state information...
+2026-05-29T11:33:38.8023471Z 48 packages can be upgraded. Run 'apt list --upgradable' to see them.
+2026-05-29T11:33:38.8137355Z 
+2026-05-29T11:33:38.8137906Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-29T11:33:38.8138435Z 
+2026-05-29T11:33:38.8249221Z Reading package lists...
+2026-05-29T11:33:38.9932932Z Building dependency tree...
+2026-05-29T11:33:38.9940301Z Reading state information...
+2026-05-29T11:33:39.1490840Z autoconf is already the newest version (2.71-3).
+2026-05-29T11:33:39.1491487Z automake is already the newest version (1:1.16.5-1.3ubuntu1).
+2026-05-29T11:33:39.1492465Z libtool is already the newest version (2.4.7-7build1).
+2026-05-29T11:33:39.1493148Z pkg-config is already the newest version (1.8.1-2build1).
+2026-05-29T11:33:39.1493833Z git is already the newest version (1:2.54.0-0ppa1~ubuntu24.04.1).
+2026-05-29T11:33:39.1494427Z git set to manually installed.
+2026-05-29T11:33:39.2071818Z The following NEW packages will be installed:
+2026-05-29T11:33:39.2080427Z   build-essential
+2026-05-29T11:33:39.2553935Z 0 upgraded, 1 newly installed, 0 to remove and 48 not upgraded.
+2026-05-29T11:33:39.3075863Z Need to get 4928 B of archives.
+2026-05-29T11:33:39.3076302Z After this operation, 17.4 kB of additional disk space will be used.
+2026-05-29T11:33:39.3076726Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-29T11:33:39.5524722Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 build-essential amd64 12.10ubuntu1 [4928 B]
+2026-05-29T11:33:39.7970506Z Fetched 4928 B in 0s (19.3 kB/s)
+2026-05-29T11:33:39.8189900Z Selecting previously unselected package build-essential.
+2026-05-29T11:33:39.8470018Z (Reading database ... 
+2026-05-29T11:33:39.8470776Z (Reading database ... 5%
+2026-05-29T11:33:39.8471192Z (Reading database ... 10%
+2026-05-29T11:33:39.8471631Z (Reading database ... 15%
+2026-05-29T11:33:39.8472031Z (Reading database ... 20%
+2026-05-29T11:33:39.8472659Z (Reading database ... 25%
+2026-05-29T11:33:39.8472926Z (Reading database ... 30%
+2026-05-29T11:33:39.8473232Z (Reading database ... 35%
+2026-05-29T11:33:39.8473522Z (Reading database ... 40%
+2026-05-29T11:33:39.8473810Z (Reading database ... 45%
+2026-05-29T11:33:39.8474058Z (Reading database ... 50%
+2026-05-29T11:33:39.8531017Z (Reading database ... 55%
+2026-05-29T11:33:39.9724443Z (Reading database ... 60%
+2026-05-29T11:33:40.1773360Z (Reading database ... 65%
+2026-05-29T11:33:40.3256502Z (Reading database ... 70%
+2026-05-29T11:33:40.4215722Z (Reading database ... 75%
+2026-05-29T11:33:40.6226447Z (Reading database ... 80%
+2026-05-29T11:33:40.7655259Z (Reading database ... 85%
+2026-05-29T11:33:40.9272100Z (Reading database ... 90%
+2026-05-29T11:33:41.0587553Z (Reading database ... 95%
+2026-05-29T11:33:41.0588138Z (Reading database ... 100%
+2026-05-29T11:33:41.0588855Z (Reading database ... 202271 files and directories currently installed.)
+2026-05-29T11:33:41.0629575Z Preparing to unpack .../build-essential_12.10ubuntu1_amd64.deb ...
+2026-05-29T11:33:41.0660910Z Unpacking build-essential (12.10ubuntu1) ...
+2026-05-29T11:33:41.1031490Z Setting up build-essential (12.10ubuntu1) ...
+2026-05-29T11:33:41.7148373Z 
+2026-05-29T11:33:41.7150869Z Running kernel seems to be up-to-date.
+2026-05-29T11:33:41.7151352Z 
+2026-05-29T11:33:41.7151568Z No services need to be restarted.
+2026-05-29T11:33:41.7151925Z 
+2026-05-29T11:33:41.7152435Z No containers need to be restarted.
+2026-05-29T11:33:41.7152820Z 
+2026-05-29T11:33:41.7153084Z No user sessions are running outdated binaries.
+2026-05-29T11:33:41.7153487Z 
+2026-05-29T11:33:41.7153746Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026-05-29T11:33:42.5968577Z ##[group]Run nttld/setup-ndk@v1
+2026-05-29T11:33:42.5968866Z with:
+2026-05-29T11:33:42.5969060Z   ndk-version: r27
+2026-05-29T11:33:42.5969271Z   add-to-path: true
+2026-05-29T11:33:42.5969478Z   link-to-sdk: false
+2026-05-29T11:33:42.5969685Z   local-cache: false
+2026-05-29T11:33:42.5969887Z ##[endgroup]
+2026-05-29T11:33:42.7045389Z Attempting to download r27...
+2026-05-29T11:33:45.8533239Z Extracting...
+2026-05-29T11:33:45.8572841Z [command]/usr/bin/unzip -o -q /home/runner/work/_temp/129e5fe8-ec72-4042-b64f-4d1a92db1365
+2026-05-29T11:33:59.8899168Z Adding to the tool cache...
+2026-05-29T11:34:06.8521993Z Done
+2026-05-29T11:34:06.8522367Z Added to path
+2026-05-29T11:34:06.8523144Z Detecting full version...
+2026-05-29T11:34:06.8726899Z ##[group]Run actions/download-artifact@v4
+2026-05-29T11:34:06.8727194Z with:
+2026-05-29T11:34:06.8727391Z   name: mbedtls-arm64
+2026-05-29T11:34:06.8727604Z   path: mbedtls-arm64
+2026-05-29T11:34:06.8727820Z   merge-multiple: false
+2026-05-29T11:34:06.8728049Z   repository: mmkurodan/llama
+2026-05-29T11:34:06.8728286Z   run-id: 26634797490
+2026-05-29T11:34:06.8728485Z ##[endgroup]
+2026-05-29T11:34:07.0702764Z Downloading single artifact
+2026-05-29T11:34:07.3820351Z Preparing to download the following artifacts:
+2026-05-29T11:34:07.3821572Z - mbedtls-arm64 (ID: 7289672968, Size: 2047927, Expected Digest: sha256:7bd8ffe52516cb8d9421bbeff51f35041b608e7073a307aa21e0e6b35bbea3df)
+2026-05-29T11:34:07.6092963Z Redirecting to blob download url: https://productionresultssa17.blob.core.windows.net/actions-results/5b06bbc4-aaf9-4feb-b4ea-23972df47e2c/workflow-job-run-191b26bc-4e8e-51fd-aaca-bb1e3107a6dc/artifacts/da54aa56e51a6bf59103ee1a51aa4ecbe420cbc6810aa574dbe4434c456d8e9b.zip
+2026-05-29T11:34:07.6095474Z Starting download of artifact to: /home/runner/work/llama/llama/mbedtls-arm64
+2026-05-29T11:34:07.9305186Z (node:2824) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-05-29T11:34:07.9307074Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-05-29T11:34:08.6086559Z SHA256 digest of downloaded artifact is 7bd8ffe52516cb8d9421bbeff51f35041b608e7073a307aa21e0e6b35bbea3df
+2026-05-29T11:34:08.6087462Z Artifact download completed successfully.
+2026-05-29T11:34:08.6087804Z Total of 1 artifact(s) downloaded
+2026-05-29T11:34:08.6095668Z Download artifact has finished successfully
+2026-05-29T11:34:08.6203235Z ##[group]Run set -e
+2026-05-29T11:34:08.6203564Z [36;1mset -e[0m
+2026-05-29T11:34:08.6203853Z [36;1mgit clone https://github.com/curl/curl.git[0m
+2026-05-29T11:34:08.6204174Z [36;1mcd curl[0m
+2026-05-29T11:34:08.6204391Z [36;1mgit checkout curl-8_5_0[0m
+2026-05-29T11:34:08.6204635Z [36;1m[0m
+2026-05-29T11:34:08.6204844Z [36;1mautoreconf -fi[0m
+2026-05-29T11:34:08.6205070Z [36;1m[0m
+2026-05-29T11:34:08.6205263Z [36;1mexport API=24[0m
+2026-05-29T11:34:08.6205510Z [36;1mexport HOST_TAG=linux-x86_64[0m
+2026-05-29T11:34:08.6205897Z [36;1mexport TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG[0m
+2026-05-29T11:34:08.6206374Z [36;1mexport CC=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang[0m
+2026-05-29T11:34:08.6206819Z [36;1mexport CXX=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang++[0m
+2026-05-29T11:34:08.6207206Z [36;1mexport AR=$TOOLCHAIN/bin/llvm-ar[0m
+2026-05-29T11:34:08.6207512Z [36;1mexport RANLIB=$TOOLCHAIN/bin/llvm-ranlib[0m
+2026-05-29T11:34:08.6207826Z [36;1m[0m
+2026-05-29T11:34:08.6208013Z [36;1m./configure \[0m
+2026-05-29T11:34:08.6208250Z [36;1m  --host=aarch64-linux-android \[0m
+2026-05-29T11:34:08.6208597Z [36;1m  --with-mbedtls=$GITHUB_WORKSPACE/mbedtls-arm64 \[0m
+2026-05-29T11:34:08.6208922Z [36;1m  --disable-shared \[0m
+2026-05-29T11:34:08.6209163Z [36;1m  --enable-static \[0m
+2026-05-29T11:34:08.6209400Z [36;1m  --without-zlib \[0m
+2026-05-29T11:34:08.6209630Z [36;1m  --without-zstd \[0m
+2026-05-29T11:34:08.6209865Z [36;1m  --without-brotli \[0m
+2026-05-29T11:34:08.6210112Z [36;1m  --prefix=$PWD/build/arm64[0m
+2026-05-29T11:34:08.6210361Z [36;1m[0m
+2026-05-29T11:34:08.6210549Z [36;1mmake -j"$(nproc)"[0m
+2026-05-29T11:34:08.6210782Z [36;1mmake install[0m
+2026-05-29T11:34:08.6237321Z shell: /usr/bin/bash -e {0}
+2026-05-29T11:34:08.6237584Z ##[endgroup]
+2026-05-29T11:34:08.6298465Z Cloning into 'curl'...
+2026-05-29T11:34:21.2472822Z Note: switching to 'curl-8_5_0'.
+2026-05-29T11:34:21.2473601Z 
+2026-05-29T11:34:21.2474071Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-05-29T11:34:21.2474735Z changes and commit them, and you can discard any commits you make in this
+2026-05-29T11:34:21.2475356Z state without impacting any branches by switching back to a branch.
+2026-05-29T11:34:21.2475711Z 
+2026-05-29T11:34:21.2475952Z If you want to create a new branch to retain commits you create, you may
+2026-05-29T11:34:21.2476542Z do so (now or later) by using -c with the switch command. Example:
+2026-05-29T11:34:21.2476883Z 
+2026-05-29T11:34:21.2477021Z   git switch -c <new-branch-name>
+2026-05-29T11:34:21.2477243Z 
+2026-05-29T11:34:21.2477371Z Or undo this operation with:
+2026-05-29T11:34:21.2477574Z 
+2026-05-29T11:34:21.2477685Z   git switch -
+2026-05-29T11:34:21.2477840Z 
+2026-05-29T11:34:21.2478114Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-05-29T11:34:21.2478572Z 
+2026-05-29T11:34:21.2478735Z HEAD is now at 7161cb17c0 RELEASE-NOTES: synced
+2026-05-29T11:34:25.6684803Z libtoolize: putting auxiliary files in '.'.
+2026-05-29T11:34:25.6685219Z libtoolize: copying file './ltmain.sh'
+2026-05-29T11:34:25.6966282Z libtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'm4'.
+2026-05-29T11:34:25.6966971Z libtoolize: copying file 'm4/libtool.m4'
+2026-05-29T11:34:25.7651101Z libtoolize: copying file 'm4/ltoptions.m4'
+2026-05-29T11:34:25.8347665Z libtoolize: copying file 'm4/ltsugar.m4'
+2026-05-29T11:34:25.9035541Z libtoolize: copying file 'm4/ltversion.m4'
+2026-05-29T11:34:25.9738862Z libtoolize: copying file 'm4/lt~obsolete.m4'
+2026-05-29T11:34:26.0449682Z libtoolize: Remember to add 'LT_INIT' to configure.ac.
+2026-05-29T11:34:30.1450306Z configure.ac:123: installing './compile'
+2026-05-29T11:34:30.1478315Z configure.ac:424: installing './config.guess'
+2026-05-29T11:34:30.1553317Z configure.ac:424: installing './config.sub'
+2026-05-29T11:34:30.1572721Z configure.ac:123: installing './install-sh'
+2026-05-29T11:34:30.1663332Z configure.ac:129: installing './missing'
+2026-05-29T11:34:30.3777703Z docs/examples/Makefile.am: installing './depcomp'
+2026-05-29T11:34:30.4308445Z parallel-tests: installing './test-driver'
+2026-05-29T11:34:31.9675358Z checking whether to enable maintainer-specific portions of Makefiles... no
+2026-05-29T11:34:31.9709648Z checking whether make supports nested variables... yes
+2026-05-29T11:34:31.9710767Z checking whether to enable debug build options... no
+2026-05-29T11:34:31.9712024Z checking whether to enable compiler optimizer... (assumed) yes
+2026-05-29T11:34:31.9713299Z checking whether to enable strict compiler warnings... no
+2026-05-29T11:34:31.9714192Z checking whether to enable compiler warnings as errors... no
+2026-05-29T11:34:31.9715362Z checking whether to enable curl debug memory tracking... no
+2026-05-29T11:34:31.9716460Z checking whether to enable hiding of library internal symbols... yes
+2026-05-29T11:34:31.9717288Z checking whether to enable c-ares for DNS lookups... no
+2026-05-29T11:34:31.9718380Z checking whether to disable dependency on -lrt... (assumed no)
+2026-05-29T11:34:31.9719286Z checking whether to enable ECH support... no
+2026-05-29T11:34:31.9720257Z checking for path separator... :
+2026-05-29T11:34:31.9724650Z checking for sed... /usr/bin/sed
+2026-05-29T11:34:31.9728106Z checking for grep... /usr/bin/grep
+2026-05-29T11:34:31.9743848Z checking that grep -E works... yes
+2026-05-29T11:34:31.9844447Z checking for a BSD-compatible install... /usr/bin/install -c
+2026-05-29T11:34:31.9852454Z checking for aarch64-linux-android-gcc... /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
+2026-05-29T11:34:40.0478165Z checking whether the C compiler works... yes
+2026-05-29T11:34:40.0478802Z checking for C compiler default output file name... a.out
+2026-05-29T11:34:40.0782800Z checking for suffix of executables... 
+2026-05-29T11:34:40.9528483Z checking whether we are cross compiling... yes
+2026-05-29T11:34:41.0023547Z checking for suffix of object files... o
+2026-05-29T11:34:41.0201693Z checking whether the compiler supports GNU C... yes
+2026-05-29T11:34:41.0990667Z checking whether /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang accepts -g... yes
+2026-05-29T11:34:41.6921285Z checking for /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang option to enable C11 features... none needed
+2026-05-29T11:34:41.7248451Z checking whether /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang understands -c and -o together... yes
+2026-05-29T11:34:41.8062905Z checking how to run the C preprocessor... /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang -E
+2026-05-29T11:34:41.8583934Z checking for stdio.h... yes
+2026-05-29T11:34:41.9142847Z checking for stdlib.h... yes
+2026-05-29T11:34:41.9410145Z checking for string.h... yes
+2026-05-29T11:34:41.9738419Z checking for inttypes.h... yes
+2026-05-29T11:34:41.9969076Z checking for stdint.h... yes
+2026-05-29T11:34:42.0245982Z checking for strings.h... yes
+2026-05-29T11:34:42.0650615Z checking for sys/stat.h... yes
+2026-05-29T11:34:42.0875088Z checking for sys/types.h... yes
+2026-05-29T11:34:42.1997064Z checking for unistd.h... yes
+2026-05-29T11:34:42.2336458Z checking for stdatomic.h... yes
+2026-05-29T11:34:42.2783926Z checking if _Atomic is available... yes
+2026-05-29T11:34:42.2796618Z checking for a sed that does not truncate output... (cached) /usr/bin/sed
+2026-05-29T11:34:42.2807137Z checking for code coverage support... no
+2026-05-29T11:34:42.2840423Z checking whether build environment is sane... yes
+2026-05-29T11:34:42.2903387Z checking for aarch64-linux-android-strip... no
+2026-05-29T11:34:42.2906407Z checking for strip... strip
+2026-05-29T11:34:42.2906860Z configure: WARNING: using cross tools not prefixed with host triplet
+2026-05-29T11:34:42.2928971Z checking for a race-free mkdir -p... /usr/bin/mkdir -p
+2026-05-29T11:34:42.2932492Z checking for gawk... gawk
+2026-05-29T11:34:42.2999220Z checking whether make sets $(MAKE)... yes
+2026-05-29T11:34:42.3102981Z checking whether make supports the include directive... yes (GNU style)
+2026-05-29T11:34:42.3453772Z checking dependency style of /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang... gcc3
+2026-05-29T11:34:42.3478549Z checking curl version... 8.5.0-DEV
+2026-05-29T11:34:42.3516519Z checking for apxs... no
+2026-05-29T11:34:42.3517025Z configure: apache2-dev not installed, httpd tests disabled
+2026-05-29T11:34:42.3521571Z checking for nghttpx... no
+2026-05-29T11:34:42.3526260Z checking for caddy... no
+2026-05-29T11:34:42.4524186Z checking build system type... x86_64-pc-linux-gnu
+2026-05-29T11:34:42.4571276Z checking host system type... aarch64-unknown-linux-android
+2026-05-29T11:34:42.4574571Z checking for grep that handles long lines and -e... (cached) /usr/bin/grep
+2026-05-29T11:34:42.4589981Z checking for egrep... /usr/bin/grep -E
+2026-05-29T11:34:42.4726947Z checking if OS is AIX (to define _ALL_SOURCE)... no
+2026-05-29T11:34:42.6667524Z checking if _THREAD_SAFE is already defined... no
+2026-05-29T11:34:42.6677628Z checking if _THREAD_SAFE is actually needed... no
+2026-05-29T11:34:42.6678505Z checking if _THREAD_SAFE is onwards defined... no
+2026-05-29T11:34:42.6875202Z checking if _REENTRANT is already defined... no
+2026-05-29T11:34:43.1664432Z checking if _REENTRANT is actually needed... no
+2026-05-29T11:34:43.1665829Z checking if _REENTRANT is onwards defined... no
+2026-05-29T11:34:43.1669612Z checking for special C compiler options needed for large files... no
+2026-05-29T11:34:43.1869530Z checking for _FILE_OFFSET_BITS value needed for large files... no
+2026-05-29T11:34:43.1908074Z checking how to print strings... printf
+2026-05-29T11:34:43.1909854Z checking for a sed that does not truncate output... (cached) /usr/bin/sed
+2026-05-29T11:34:43.1938564Z checking for fgrep... /usr/bin/grep -F
+2026-05-29T11:34:43.2093086Z checking for ld used by /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang... /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/ld
+2026-05-29T11:34:43.2146369Z checking if the linker (/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/ld) is GNU ld... yes
+2026-05-29T11:34:43.2151551Z checking for BSD- or MS-compatible name lister (nm)... no
+2026-05-29T11:34:43.2157220Z checking for aarch64-linux-android-dumpbin... no
+2026-05-29T11:34:43.2160726Z checking for aarch64-linux-android-link... no
+2026-05-29T11:34:43.2164607Z checking for dumpbin... no
+2026-05-29T11:34:43.2167713Z checking for link... link -dump
+2026-05-29T11:34:43.8929413Z checking the name lister (nm) interface... BSD nm
+2026-05-29T11:34:43.8930069Z checking whether ln -s works... yes
+2026-05-29T11:34:43.8978214Z checking the maximum length of command line arguments... 3145728
+2026-05-29T11:34:43.9005699Z checking how to convert x86_64-pc-linux-gnu file names to aarch64-unknown-linux-android format... func_convert_file_noop
+2026-05-29T11:34:43.9006755Z checking how to convert x86_64-pc-linux-gnu file names to toolchain format... func_convert_file_noop
+2026-05-29T11:34:43.9007995Z checking for /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/ld option to reload object files... -r
+2026-05-29T11:34:43.9011869Z checking for aarch64-linux-android-file... no
+2026-05-29T11:34:43.9016180Z checking for file... file
+2026-05-29T11:34:43.9020476Z checking for aarch64-linux-android-objdump... no
+2026-05-29T11:34:43.9024651Z checking for objdump... objdump
+2026-05-29T11:34:43.9027807Z checking how to recognize dependent libraries... pass_all
+2026-05-29T11:34:43.9032373Z checking for aarch64-linux-android-dlltool... no
+2026-05-29T11:34:43.9036912Z checking for dlltool... no
+2026-05-29T11:34:43.9038771Z checking how to associate runtime and link libraries... printf %s\n
+2026-05-29T11:34:43.9040443Z checking for aarch64-linux-android-ar... /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+2026-05-29T11:34:44.4681964Z checking for archiver @FILE support... @
+2026-05-29T11:34:44.4683331Z checking for aarch64-linux-android-strip... strip
+2026-05-29T11:34:44.4686814Z checking for aarch64-linux-android-ranlib... /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib
+2026-05-29T11:34:44.5650696Z checking command to parse nm output from /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang object... ok
+2026-05-29T11:34:44.5667022Z checking for sysroot... no
+2026-05-29T11:34:44.5776541Z checking for a working dd... /usr/bin/dd
+2026-05-29T11:34:44.5815495Z checking how to truncate binary pipes... /usr/bin/dd bs=4096 count=1
+2026-05-29T11:34:44.5822960Z checking for aarch64-linux-android-mt... no
+2026-05-29T11:34:44.5827057Z checking for mt... mt
+2026-05-29T11:34:44.6137467Z checking if mt is a manifest tool... no
+2026-05-29T11:34:44.6477849Z checking for dlfcn.h... yes
+2026-05-29T11:34:44.6519204Z checking for objdir... .libs
+2026-05-29T11:34:44.7250578Z checking if /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang supports -fno-rtti -fno-exceptions... yes
+2026-05-29T11:34:44.7251956Z checking for /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang option to produce PIC... -fPIC -DPIC
+2026-05-29T11:34:44.7462788Z checking if /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang PIC flag -fPIC -DPIC works... yes
+2026-05-29T11:34:45.2899217Z checking if /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang static flag -static works... yes
+2026-05-29T11:34:45.3180031Z checking if /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang supports -c -o file.o... yes
+2026-05-29T11:34:45.3181215Z checking if /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang supports -c -o file.o... (cached) yes
+2026-05-29T11:34:45.3549751Z checking whether the /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang linker (/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/ld) supports shared libraries... yes
+2026-05-29T11:34:45.3806815Z checking dynamic linker characteristics... Android linker
+2026-05-29T11:34:45.3807656Z checking how to hardcode library paths into programs... immediate
+2026-05-29T11:34:45.4009610Z checking whether stripping libraries is possible... yes
+2026-05-29T11:34:45.4010480Z checking if libtool supports shared libraries... yes
+2026-05-29T11:34:45.4011234Z checking whether to build shared libraries... no
+2026-05-29T11:34:45.4011867Z checking whether to build static libraries... yes
+2026-05-29T11:34:45.4018101Z checking whether to build shared libraries with -version-info... no
+2026-05-29T11:34:45.4018889Z checking whether to build shared libraries with -no-undefined... no
+2026-05-29T11:34:45.4019837Z checking whether to build shared libraries with -mimpure-text... no
+2026-05-29T11:34:45.4020802Z checking whether to build shared libraries with PIC... yes
+2026-05-29T11:34:45.4021470Z checking whether to build static libraries with PIC... no
+2026-05-29T11:34:45.4022522Z checking whether to build shared libraries only... no
+2026-05-29T11:34:45.4023477Z checking whether to build static libraries only... yes
+2026-05-29T11:34:45.4028138Z checking for aarch64-linux-android-windres... no
+2026-05-29T11:34:45.4032408Z checking for windres... no
+2026-05-29T11:34:45.4541282Z checking for inline... inline
+2026-05-29T11:34:45.4694146Z checking if cpp -P is needed... no
+2026-05-29T11:34:45.5258117Z checking if compiler is DEC/Compaq/HP C... no
+2026-05-29T11:34:45.5573614Z checking if compiler is HP-UX C... no
+2026-05-29T11:34:45.5869963Z checking if compiler is IBM C... no
+2026-05-29T11:34:45.6151469Z checking if compiler is Intel C... no
+2026-05-29T11:34:45.6436468Z checking if compiler is clang... yes
+2026-05-29T11:34:45.6718984Z checking if compiler is xlclang... no
+2026-05-29T11:34:45.6924060Z checking compiler version... clang '1800' (raw: 'Android (13691557, +pgo, +bolt, +lto, +mlgo, based on r522817d) clang version 18.0.4 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)' / '18.0')
+2026-05-29T11:34:45.7205559Z checking if compiler is GNU C... no
+2026-05-29T11:34:45.8068160Z checking if compiler is SGI MIPSpro C... no
+2026-05-29T11:34:45.8656134Z checking if compiler is SGI MIPS C... no
+2026-05-29T11:34:45.8974840Z checking if compiler is SunPro C... no
+2026-05-29T11:34:45.9284463Z checking if compiler is Tiny C... no
+2026-05-29T11:34:45.9791172Z checking if compiler accepts some basic options... yes
+2026-05-29T11:34:45.9791722Z configure: compiler options added: -Qunused-arguments 
+2026-05-29T11:34:45.9797269Z checking if compiler optimizer assumed setting might be used... yes
+2026-05-29T11:34:46.0324248Z checking if compiler accepts optimizer enabling options... yes
+2026-05-29T11:34:46.0324716Z configure: compiler options added: -O2
+2026-05-29T11:34:46.0872579Z checking if compiler accepts strict warning options... yes
+2026-05-29T11:34:46.0873343Z configure: compiler options added: -Wno-pointer-bool-conversion 
+2026-05-29T11:34:46.1079806Z checking if compiler halts on compilation errors... yes
+2026-05-29T11:34:46.1733843Z checking if compiler halts on negative sized arrays... yes
+2026-05-29T11:34:46.2955747Z checking if compiler halts on function prototype mismatch... yes
+2026-05-29T11:34:46.3191620Z checking if compiler supports hiding library internal symbols... yes
+2026-05-29T11:34:46.4404226Z checking for windows.h... no
+2026-05-29T11:34:46.4405057Z checking whether build target is a native Windows one... no
+2026-05-29T11:34:46.4407771Z checking whether build target supports WIN32 file API... no
+2026-05-29T11:34:46.4408889Z checking whether build target supports WIN32 crypto API... no
+2026-05-29T11:34:46.4409732Z checking for good-to-use Darwin CFLAGS... no
+2026-05-29T11:34:46.4411818Z checking whether to link macOS CoreFoundation, CoreServices, and SystemConfiguration frameworks... no
+2026-05-29T11:34:46.5049603Z checking to see if the compiler supports __builtin_available()... yes
+2026-05-29T11:34:46.5063240Z checking whether to support http... yes
+2026-05-29T11:34:46.5064040Z checking whether to support ftp... yes
+2026-05-29T11:34:46.5065035Z checking whether to support file... yes
+2026-05-29T11:34:46.5066018Z checking whether to support ldap... yes
+2026-05-29T11:34:46.5067471Z checking whether to support ldaps... yes
+2026-05-29T11:34:46.5072540Z checking whether to support rtsp... yes
+2026-05-29T11:34:46.5073832Z checking whether to support proxies... yes
+2026-05-29T11:34:46.5074740Z checking whether to support dict... yes
+2026-05-29T11:34:46.5075705Z checking whether to support telnet... yes
+2026-05-29T11:34:46.5076617Z checking whether to support tftp... yes
+2026-05-29T11:34:46.5077586Z checking whether to support pop3... yes
+2026-05-29T11:34:46.5078525Z checking whether to support imap... yes
+2026-05-29T11:34:46.5079430Z checking whether to support smb... yes
+2026-05-29T11:34:46.5080323Z checking whether to support smtp... yes
+2026-05-29T11:34:46.5081277Z checking whether to support gopher... yes
+2026-05-29T11:34:46.5082553Z checking whether to support mqtt... no
+2026-05-29T11:34:46.5083638Z checking whether to provide built-in manual... yes
+2026-05-29T11:34:46.5084635Z checking whether to enable generation of C code... yes
+2026-05-29T11:34:46.5085470Z checking whether to use libgcc... no
+2026-05-29T11:34:46.5296929Z checking if X/Open network library is required... no
+2026-05-29T11:34:46.5648283Z checking for gethostbyname... yes
+2026-05-29T11:34:46.5653670Z checking for windows.h... (cached) no
+2026-05-29T11:34:46.5654766Z checking for winsock2.h... (cached) no
+2026-05-29T11:34:46.5870818Z checking for proto/bsdsocket.h... no
+2026-05-29T11:34:46.6213145Z checking for connect in libraries... yes
+2026-05-29T11:34:46.6214231Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:46.6468516Z checking for sys/time.h... yes
+2026-05-29T11:34:46.6700009Z checking for monotonic clock_gettime... yes
+2026-05-29T11:34:46.7092955Z checking for clock_gettime in libraries... no additional lib required
+2026-05-29T11:34:46.7095350Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:46.7097052Z checking for sys/time.h... (cached) yes
+2026-05-29T11:34:46.7330672Z checking for raw monotonic clock_gettime... yes
+2026-05-29T11:34:46.7347011Z configure: WARNING: zlib disabled
+2026-05-29T11:34:46.7943321Z checking for lber.h... no
+2026-05-29T11:34:46.8173372Z checking for ldap.h... no
+2026-05-29T11:34:46.8402642Z checking for ldap_ssl.h... no
+2026-05-29T11:34:47.1026164Z configure: WARNING: Cannot find libraries for LDAP support: LDAP disabled
+2026-05-29T11:34:47.1026817Z checking for LDAP libraries... cannot find LDAP libraries
+2026-05-29T11:34:47.1029612Z checking whether to enable IPv6... yes
+2026-05-29T11:34:47.1999618Z checking if struct sockaddr_in6 has sin6_scope_id member... yes
+2026-05-29T11:34:47.2014397Z configure: WARNING: the previous check could not be made default was used
+2026-05-29T11:34:47.2015144Z checking if argv can be written to... no
+2026-05-29T11:34:47.2020622Z checking if GSS-API support is requested... no
+2026-05-29T11:34:47.2026696Z checking whether to enable Windows native SSL/TLS... no
+2026-05-29T11:34:47.2027582Z checking whether to enable Secure Transport... no
+2026-05-29T11:34:47.2029458Z checking whether to enable Amiga native SSL/TLS (AmiSSL v5)... no
+2026-05-29T11:34:47.2652292Z checking for mbedtls_ssl_init in -lmbedtls... yes
+2026-05-29T11:34:47.2652903Z configure: detected mbedTLS
+2026-05-29T11:34:47.2662432Z configure: built with one SSL backend
+2026-05-29T11:34:47.2666896Z configure: WARNING: skipped the ca-cert path detection when cross-compiling
+2026-05-29T11:34:47.2667639Z checking default CA cert bundle/path... no
+2026-05-29T11:34:47.2668261Z checking whether to use builtin CA store of SSL library... no
+2026-05-29T11:34:47.3425509Z configure: WARNING: libpsl was not found
+2026-05-29T11:34:47.3426211Z checking for library containing psl_builtin... no
+2026-05-29T11:34:47.4182844Z configure: WARNING: libgsasl was not found
+2026-05-29T11:34:47.4183270Z checking for library containing gsasl_init... no
+2026-05-29T11:34:47.4564603Z checking for RTMP_Init in -lrtmp... no
+2026-05-29T11:34:47.4567131Z checking whether versioned symbols are wanted... no
+2026-05-29T11:34:47.4568647Z checking whether to enable Windows native IDN (Windows native builds only)... no
+2026-05-29T11:34:47.4570684Z checking whether to build with libidn2... (assumed) yes
+2026-05-29T11:34:47.4580304Z checking for aarch64-linux-android-pkg-config... no
+2026-05-29T11:34:47.4583718Z checking for pkg-config... /usr/bin/pkg-config
+2026-05-29T11:34:47.4761852Z checking for libidn2 options with pkg-config... no
+2026-05-29T11:34:47.4762806Z configure: IDN_LIBS: "-lidn2"
+2026-05-29T11:34:47.4763237Z configure: IDN_LDFLAGS: ""
+2026-05-29T11:34:47.4763705Z configure: IDN_CPPFLAGS: ""
+2026-05-29T11:34:47.4764225Z configure: IDN_DIR: ""
+2026-05-29T11:34:47.5151134Z checking if idn2_lookup_ul can be linked... no
+2026-05-29T11:34:47.5459495Z checking for idn2.h... no
+2026-05-29T11:34:47.5460182Z configure: WARNING: Cannot find libraries for IDN support: IDN disabled
+2026-05-29T11:34:47.5468581Z checking for aarch64-linux-android-pkg-config... no
+2026-05-29T11:34:47.5469268Z checking for pkg-config... (cached) /usr/bin/pkg-config
+2026-05-29T11:34:47.5502622Z checking for libnghttp2 options with pkg-config... no
+2026-05-29T11:34:47.5876280Z checking for nghttp2_session_get_stream_local_window_size in -lnghttp2... no
+2026-05-29T11:34:47.5900851Z checking for aarch64-linux-android-pkg-config... no
+2026-05-29T11:34:47.5901528Z checking for pkg-config... (cached) /usr/bin/pkg-config
+2026-05-29T11:34:47.5934588Z checking for fish options with pkg-config... no
+2026-05-29T11:34:47.5937217Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:47.5939400Z checking for sys/time.h... (cached) yes
+2026-05-29T11:34:47.6169220Z checking for sys/select.h... yes
+2026-05-29T11:34:47.6394644Z checking for sys/socket.h... yes
+2026-05-29T11:34:47.6809160Z checking for sys/ioctl.h... yes
+2026-05-29T11:34:47.6810778Z checking for unistd.h... (cached) yes
+2026-05-29T11:34:47.6812686Z checking for stdlib.h... (cached) yes
+2026-05-29T11:34:47.7164141Z checking for arpa/inet.h... yes
+2026-05-29T11:34:47.7518616Z checking for net/if.h... yes
+2026-05-29T11:34:47.7769545Z checking for netinet/in.h... yes
+2026-05-29T11:34:47.8013002Z checking for netinet/in6.h... yes
+2026-05-29T11:34:47.8376290Z checking for sys/un.h... yes
+2026-05-29T11:34:47.8689806Z checking for linux/tcp.h... yes
+2026-05-29T11:34:47.8990062Z checking for netinet/tcp.h... yes
+2026-05-29T11:34:47.9307118Z checking for netinet/udp.h... yes
+2026-05-29T11:34:47.9559900Z checking for netdb.h... yes
+2026-05-29T11:34:47.9849117Z checking for sys/sockio.h... no
+2026-05-29T11:34:47.9850904Z checking for sys/stat.h... (cached) yes
+2026-05-29T11:34:48.0097911Z checking for sys/param.h... yes
+2026-05-29T11:34:48.0519910Z checking for termios.h... yes
+2026-05-29T11:34:48.0835781Z checking for termio.h... yes
+2026-05-29T11:34:48.1663303Z checking for fcntl.h... yes
+2026-05-29T11:34:48.1941285Z checking for io.h... no
+2026-05-29T11:34:48.2187497Z checking for pwd.h... yes
+2026-05-29T11:34:48.2479196Z checking for utime.h... yes
+2026-05-29T11:34:48.2754522Z checking for sys/utime.h... no
+2026-05-29T11:34:48.3204799Z checking for sys/poll.h... yes
+2026-05-29T11:34:48.3452905Z checking for poll.h... yes
+2026-05-29T11:34:48.3730766Z checking for socket.h... no
+2026-05-29T11:34:48.4043144Z checking for sys/resource.h... yes
+2026-05-29T11:34:48.4290973Z checking for libgen.h... yes
+2026-05-29T11:34:48.4588538Z checking for locale.h... yes
+2026-05-29T11:34:48.4827390Z checking for stdbool.h... yes
+2026-05-29T11:34:48.5105751Z checking for sys/filio.h... no
+2026-05-29T11:34:48.5357551Z checking for sys/wait.h... yes
+2026-05-29T11:34:48.5605552Z checking for setjmp.h... yes
+2026-05-29T11:34:48.5819118Z checking for an ANSI C-conforming const... yes
+2026-05-29T11:34:48.6384255Z checking for size_t... yes
+2026-05-29T11:34:48.6386438Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:48.6388537Z checking for sys/time.h... (cached) yes
+2026-05-29T11:34:48.6390502Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:48.6640868Z checking for struct timeval... yes
+2026-05-29T11:34:48.6850642Z checking size of size_t... 8
+2026-05-29T11:34:48.7074940Z checking size of long... 8
+2026-05-29T11:34:48.7536266Z checking size of int... 4
+2026-05-29T11:34:48.7769820Z checking size of time_t... 8
+2026-05-29T11:34:48.8000483Z checking size of off_t... 8
+2026-05-29T11:34:48.8242576Z checking size of curl_off_t... 8
+2026-05-29T11:34:48.8865639Z checking size of curl_socket_t... 4
+2026-05-29T11:34:48.9449676Z checking for long long... yes
+2026-05-29T11:34:49.0006061Z checking for ssize_t... yes
+2026-05-29T11:34:49.0437378Z checking for bool... yes
+2026-05-29T11:34:49.0906554Z checking for sa_family_t... yes
+2026-05-29T11:34:49.1386703Z checking for suseconds_t... yes
+2026-05-29T11:34:49.1389302Z checking if time_t is unsigned... no
+2026-05-29T11:34:49.1390699Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.1392846Z checking for poll.h... (cached) yes
+2026-05-29T11:34:49.1394823Z checking for sys/poll.h... (cached) yes
+2026-05-29T11:34:49.2142363Z checking for in_addr_t... yes
+2026-05-29T11:34:49.2628117Z checking for struct sockaddr_storage... yes
+2026-05-29T11:34:49.2630503Z checking for sys/select.h... (cached) yes
+2026-05-29T11:34:49.2632456Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:49.3017333Z checking for select... yes
+2026-05-29T11:34:49.3030595Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.3031416Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:49.3401403Z checking for recv... yes
+2026-05-29T11:34:49.3414169Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.3415824Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:49.3815253Z checking for send... yes
+2026-05-29T11:34:49.3827166Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.3828707Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:49.4051125Z checking for MSG_NOSIGNAL... yes
+2026-05-29T11:34:49.4070021Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.4070782Z checking for unistd.h... (cached) yes
+2026-05-29T11:34:49.4396713Z checking if alarm can be linked... yes
+2026-05-29T11:34:49.4577424Z checking if alarm is prototyped... yes
+2026-05-29T11:34:49.4822401Z checking if alarm is compilable... yes
+2026-05-29T11:34:49.4834523Z checking if alarm usage allowed... yes
+2026-05-29T11:34:49.4835380Z checking if alarm might be used... yes
+2026-05-29T11:34:49.4837551Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.4839359Z checking for strings.h... (cached) yes
+2026-05-29T11:34:49.4841293Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.4843223Z checking for libgen.h... (cached) yes
+2026-05-29T11:34:49.5182045Z checking if basename can be linked... yes
+2026-05-29T11:34:49.5366198Z checking if basename is prototyped... yes
+2026-05-29T11:34:49.5612944Z checking if basename is compilable... yes
+2026-05-29T11:34:49.5624475Z checking if basename usage allowed... yes
+2026-05-29T11:34:49.5625184Z checking if basename might be used... yes
+2026-05-29T11:34:49.5627829Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.5629216Z checking for socket.h... (cached) no
+2026-05-29T11:34:49.5937749Z checking if closesocket can be linked... no
+2026-05-29T11:34:49.5950111Z checking if closesocket might be used... no
+2026-05-29T11:34:49.5951599Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.5953545Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:49.6259876Z checking if CloseSocket can be linked... no
+2026-05-29T11:34:49.6271581Z checking if CloseSocket might be used... no
+2026-05-29T11:34:49.6273345Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.6275032Z checking for unistd.h... (cached) yes
+2026-05-29T11:34:49.6276626Z checking for fcntl.h... (cached) yes
+2026-05-29T11:34:49.6621538Z checking if fcntl can be linked... yes
+2026-05-29T11:34:49.6808887Z checking if fcntl is prototyped... yes
+2026-05-29T11:34:49.7052932Z checking if fcntl is compilable... yes
+2026-05-29T11:34:49.7064753Z checking if fcntl usage allowed... yes
+2026-05-29T11:34:49.7066718Z checking if fcntl might be used... yes
+2026-05-29T11:34:49.7297355Z checking if fcntl O_NONBLOCK is compilable... yes
+2026-05-29T11:34:49.7308149Z checking if fcntl O_NONBLOCK usage allowed... yes
+2026-05-29T11:34:49.7308631Z checking if fcntl O_NONBLOCK might be used... yes
+2026-05-29T11:34:49.7310932Z checking for windows.h... (cached) no
+2026-05-29T11:34:49.7311914Z checking for winsock2.h... (cached) no
+2026-05-29T11:34:49.7313706Z checking for ws2tcpip.h... (cached) no
+2026-05-29T11:34:49.7315141Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.7316704Z checking for netdb.h... (cached) yes
+2026-05-29T11:34:49.7677184Z checking if freeaddrinfo can be linked... yes
+2026-05-29T11:34:49.7849296Z checking if freeaddrinfo is prototyped... yes
+2026-05-29T11:34:49.8077768Z checking if freeaddrinfo is compilable... yes
+2026-05-29T11:34:49.8089493Z checking if freeaddrinfo usage allowed... yes
+2026-05-29T11:34:49.8090219Z checking if freeaddrinfo might be used... yes
+2026-05-29T11:34:49.8092376Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:49.8346827Z checking for sys/xattr.h... yes
+2026-05-29T11:34:49.8688714Z checking if fsetxattr can be linked... yes
+2026-05-29T11:34:49.8853031Z checking if fsetxattr is prototyped... yes
+2026-05-29T11:34:49.9104614Z checking if fsetxattr takes 5 args.... yes
+2026-05-29T11:34:49.9114837Z checking if fsetxattr is compilable... yes
+2026-05-29T11:34:49.9116605Z checking if fsetxattr usage allowed... yes
+2026-05-29T11:34:49.9117637Z checking if fsetxattr might be used... yes
+2026-05-29T11:34:49.9467477Z checking if ftruncate can be linked... yes
+2026-05-29T11:34:49.9653137Z checking if ftruncate is prototyped... yes
+2026-05-29T11:34:49.9901105Z checking if ftruncate is compilable... yes
+2026-05-29T11:34:49.9913401Z checking if ftruncate usage allowed... yes
+2026-05-29T11:34:49.9914068Z checking if ftruncate might be used... yes
+2026-05-29T11:34:49.9916079Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:50.0326796Z checking if getaddrinfo can be linked... yes
+2026-05-29T11:34:50.0503388Z checking if getaddrinfo is prototyped... yes
+2026-05-29T11:34:50.0780430Z checking if getaddrinfo is compilable... yes
+2026-05-29T11:34:50.0793348Z checking if getaddrinfo usage allowed... yes
+2026-05-29T11:34:50.0794225Z checking if getaddrinfo might be used... yes
+2026-05-29T11:34:50.1458259Z checking if getaddrinfo is threadsafe... yes
+2026-05-29T11:34:50.1862062Z checking if gethostbyname can be linked... yes
+2026-05-29T11:34:50.2035264Z checking if gethostbyname is prototyped... yes
+2026-05-29T11:34:50.2302773Z checking if gethostbyname is compilable... yes
+2026-05-29T11:34:50.2313495Z checking if gethostbyname usage allowed... yes
+2026-05-29T11:34:50.2314366Z checking if gethostbyname might be used... yes
+2026-05-29T11:34:50.2666755Z checking if gethostbyname_r can be linked... yes
+2026-05-29T11:34:50.2838073Z checking if gethostbyname_r is prototyped... yes
+2026-05-29T11:34:50.3088185Z checking if gethostbyname_r takes 3 args.... no
+2026-05-29T11:34:50.3343474Z checking if gethostbyname_r takes 5 args.... no
+2026-05-29T11:34:50.3602339Z checking if gethostbyname_r takes 6 args.... yes
+2026-05-29T11:34:50.3612191Z checking if gethostbyname_r is compilable... yes
+2026-05-29T11:34:50.3614243Z checking if gethostbyname_r usage allowed... yes
+2026-05-29T11:34:50.3615716Z checking if gethostbyname_r might be used... yes
+2026-05-29T11:34:50.4025305Z checking if gethostname can be linked... yes
+2026-05-29T11:34:50.4209035Z checking if gethostname is prototyped... yes
+2026-05-29T11:34:50.4484003Z checking if gethostname is compilable... yes
+2026-05-29T11:34:50.5325361Z checking for gethostname arg 2 data type... size_t
+2026-05-29T11:34:50.5326232Z checking if gethostname usage allowed... yes
+2026-05-29T11:34:50.5327414Z checking if gethostname might be used... yes
+2026-05-29T11:34:50.5742581Z checking if getpeername can be linked... yes
+2026-05-29T11:34:50.5917383Z checking if getpeername is prototyped... yes
+2026-05-29T11:34:50.6185577Z checking if getpeername is compilable... yes
+2026-05-29T11:34:50.6196149Z checking if getpeername usage allowed... yes
+2026-05-29T11:34:50.6196953Z checking if getpeername might be used... yes
+2026-05-29T11:34:50.6605649Z checking if getsockname can be linked... yes
+2026-05-29T11:34:50.6787535Z checking if getsockname is prototyped... yes
+2026-05-29T11:34:50.7057898Z checking if getsockname is compilable... yes
+2026-05-29T11:34:50.7068952Z checking if getsockname usage allowed... yes
+2026-05-29T11:34:50.7069773Z checking if getsockname might be used... yes
+2026-05-29T11:34:50.7072028Z checking for net/if.h... (cached) yes
+2026-05-29T11:34:50.7453355Z checking if if_nametoindex can be linked... yes
+2026-05-29T11:34:50.7632003Z checking if if_nametoindex is prototyped... yes
+2026-05-29T11:34:50.7868761Z checking if if_nametoindex is compilable... yes
+2026-05-29T11:34:50.7881684Z checking if if_nametoindex usage allowed... yes
+2026-05-29T11:34:50.7883035Z checking if if_nametoindex might be used... yes
+2026-05-29T11:34:50.7885459Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:50.7887183Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:50.7889026Z checking for netinet/in.h... (cached) yes
+2026-05-29T11:34:50.8210321Z checking for ifaddrs.h... yes
+2026-05-29T11:34:50.8575925Z checking if getifaddrs can be linked... yes
+2026-05-29T11:34:50.8774680Z checking if getifaddrs is prototyped... yes
+2026-05-29T11:34:50.9058902Z checking if getifaddrs is compilable... yes
+2026-05-29T11:34:50.9071044Z checking if getifaddrs usage allowed... yes
+2026-05-29T11:34:50.9071746Z checking if getifaddrs might be used... yes
+2026-05-29T11:34:50.9074398Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:50.9076438Z checking for sys/time.h... (cached) yes
+2026-05-29T11:34:50.9430491Z checking if gmtime_r can be linked... yes
+2026-05-29T11:34:50.9614247Z checking if gmtime_r is prototyped... yes
+2026-05-29T11:34:50.9893782Z checking if gmtime_r is compilable... yes
+2026-05-29T11:34:50.9906186Z checking if gmtime_r usage allowed... yes
+2026-05-29T11:34:50.9906996Z checking if gmtime_r might be used... yes
+2026-05-29T11:34:50.9909434Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:50.9911476Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:50.9913129Z checking for netinet/in.h... (cached) yes
+2026-05-29T11:34:50.9915201Z checking for arpa/inet.h... (cached) yes
+2026-05-29T11:34:51.0277079Z checking if inet_ntop can be linked... yes
+2026-05-29T11:34:51.0461083Z checking if inet_ntop is prototyped... yes
+2026-05-29T11:34:51.0750382Z checking if inet_ntop is compilable... yes
+2026-05-29T11:34:51.0762430Z checking if inet_ntop usage allowed... yes
+2026-05-29T11:34:51.0763632Z checking if inet_ntop might be used... yes
+2026-05-29T11:34:51.1119506Z checking if inet_pton can be linked... yes
+2026-05-29T11:34:51.1317257Z checking if inet_pton is prototyped... yes
+2026-05-29T11:34:51.1603871Z checking if inet_pton is compilable... yes
+2026-05-29T11:34:51.1616229Z checking if inet_pton usage allowed... yes
+2026-05-29T11:34:51.1617172Z checking if inet_pton might be used... yes
+2026-05-29T11:34:51.1619524Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:51.1620966Z checking for unistd.h... (cached) yes
+2026-05-29T11:34:51.1623082Z checking for sys/socket.h... (cached) yes
+2026-05-29T11:34:51.1625150Z checking for sys/ioctl.h... (cached) yes
+2026-05-29T11:34:51.1907864Z checking for stropts.h... no
+2026-05-29T11:34:51.2277557Z checking if ioctl can be linked... yes
+2026-05-29T11:34:51.2478012Z checking if ioctl is prototyped... yes
+2026-05-29T11:34:51.2764918Z checking if ioctl is compilable... yes
+2026-05-29T11:34:51.2778437Z checking if ioctl usage allowed... yes
+2026-05-29T11:34:51.2781334Z checking if ioctl might be used... yes
+2026-05-29T11:34:51.3037596Z checking if ioctl FIONBIO is compilable... yes
+2026-05-29T11:34:51.3049006Z checking if ioctl FIONBIO usage allowed... yes
+2026-05-29T11:34:51.3049394Z checking if ioctl FIONBIO might be used... yes
+2026-05-29T11:34:51.3304754Z checking if ioctl SIOCGIFADDR is compilable... yes
+2026-05-29T11:34:51.3316786Z checking if ioctl SIOCGIFADDR usage allowed... yes
+2026-05-29T11:34:51.3317269Z checking if ioctl SIOCGIFADDR might be used... yes
+2026-05-29T11:34:51.3607939Z checking if ioctlsocket can be linked... no
+2026-05-29T11:34:51.3620871Z checking if ioctlsocket might be used... no
+2026-05-29T11:34:51.3904071Z checking if IoctlSocket can be linked... no
+2026-05-29T11:34:51.3916784Z checking if IoctlSocket might be used... no
+2026-05-29T11:34:51.4264287Z checking if memrchr can be linked... yes
+2026-05-29T11:34:51.4431037Z checking if memrchr is prototyped... yes
+2026-05-29T11:34:51.4833293Z checking if memrchr is compilable... yes
+2026-05-29T11:34:51.4844786Z checking if memrchr usage allowed... yes
+2026-05-29T11:34:51.4851643Z checking if memrchr might be used... yes
+2026-05-29T11:34:51.5246295Z checking if poll can be linked... yes
+2026-05-29T11:34:51.5448748Z checking if poll is prototyped... yes
+2026-05-29T11:34:51.5705286Z checking if poll is compilable... yes
+2026-05-29T11:34:51.5719326Z checking if poll usage allowed... yes
+2026-05-29T11:34:51.5720231Z checking if poll might be used... yes
+2026-05-29T11:34:51.5722354Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:51.6077056Z checking if sigaction can be linked... yes
+2026-05-29T11:34:51.6255084Z checking if sigaction is prototyped... yes
+2026-05-29T11:34:51.6491456Z checking if sigaction is compilable... yes
+2026-05-29T11:34:51.6504390Z checking if sigaction usage allowed... yes
+2026-05-29T11:34:51.6505279Z checking if sigaction might be used... yes
+2026-05-29T11:34:51.6864428Z checking if siginterrupt can be linked... yes
+2026-05-29T11:34:51.7045484Z checking if siginterrupt is prototyped... yes
+2026-05-29T11:34:51.7282658Z checking if siginterrupt is compilable... yes
+2026-05-29T11:34:51.7294772Z checking if siginterrupt usage allowed... yes
+2026-05-29T11:34:51.7295805Z checking if siginterrupt might be used... yes
+2026-05-29T11:34:51.7665273Z checking if signal can be linked... yes
+2026-05-29T11:34:51.7849580Z checking if signal is prototyped... yes
+2026-05-29T11:34:51.8079593Z checking if signal is compilable... yes
+2026-05-29T11:34:51.8091505Z checking if signal usage allowed... yes
+2026-05-29T11:34:51.8092056Z checking if signal might be used... yes
+2026-05-29T11:34:51.8094374Z checking for sys/types.h... (cached) yes
+2026-05-29T11:34:51.8445632Z checking if sigsetjmp can be linked... yes
+2026-05-29T11:34:51.8608743Z checking if sigsetjmp is prototyped... yes
+2026-05-29T11:34:51.8828763Z checking if sigsetjmp is compilable... yes
+2026-05-29T11:34:51.8841582Z checking if sigsetjmp usage allowed... yes
+2026-05-29T11:34:51.8848804Z checking if sigsetjmp might be used... yes
+2026-05-29T11:34:51.9248908Z checking if socket can be linked... yes
+2026-05-29T11:34:51.9441133Z checking if socket is prototyped... yes
+2026-05-29T11:34:51.9675617Z checking if socket is compilable... yes
+2026-05-29T11:34:51.9687583Z checking if socket usage allowed... yes
+2026-05-29T11:34:51.9688489Z checking if socket might be used... yes
+2026-05-29T11:34:52.0040772Z checking if socketpair can be linked... yes
+2026-05-29T11:34:52.0216830Z checking if socketpair is prototyped... yes
+2026-05-29T11:34:52.0443468Z checking if socketpair is compilable... yes
+2026-05-29T11:34:52.0455589Z checking if socketpair usage allowed... yes
+2026-05-29T11:34:52.0456353Z checking if socketpair might be used... yes
+2026-05-29T11:34:52.0854411Z checking if strcasecmp can be linked... yes
+2026-05-29T11:34:52.1023316Z checking if strcasecmp is prototyped... yes
+2026-05-29T11:34:52.1287665Z checking if strcasecmp is compilable... yes
+2026-05-29T11:34:52.1299807Z checking if strcasecmp usage allowed... yes
+2026-05-29T11:34:52.1300622Z checking if strcasecmp might be used... yes
+2026-05-29T11:34:52.1708734Z checking if strcmpi can be linked... no
+2026-05-29T11:34:52.1720698Z checking if strcmpi might be used... no
+2026-05-29T11:34:52.2114312Z checking if strdup can be linked... yes
+2026-05-29T11:34:52.2299297Z checking if strdup is prototyped... yes
+2026-05-29T11:34:52.2574496Z checking if strdup is compilable... yes
+2026-05-29T11:34:52.2585779Z checking if strdup usage allowed... yes
+2026-05-29T11:34:52.2586748Z checking if strdup might be used... yes
+2026-05-29T11:34:52.2939298Z checking if strerror_r can be linked... yes
+2026-05-29T11:34:52.3109638Z checking if strerror_r is prototyped... yes
+2026-05-29T11:34:52.3368832Z checking if strerror_r is compilable... yes
+2026-05-29T11:34:52.4106734Z checking if strerror_r is glibc like... no
+2026-05-29T11:34:52.4370253Z checking if strerror_r is POSIX like... yes
+2026-05-29T11:34:52.4372751Z checking if strerror_r usage allowed... yes
+2026-05-29T11:34:52.4374000Z checking if strerror_r might be used... yes
+2026-05-29T11:34:52.4770039Z checking if stricmp can be linked... no
+2026-05-29T11:34:52.4782831Z checking if stricmp might be used... no
+2026-05-29T11:34:52.5137281Z checking if strtok_r can be linked... yes
+2026-05-29T11:34:52.5324692Z checking if strtok_r is prototyped... yes
+2026-05-29T11:34:52.5605993Z checking if strtok_r is compilable... yes
+2026-05-29T11:34:52.5616604Z checking if strtok_r usage allowed... yes
+2026-05-29T11:34:52.5617272Z checking if strtok_r might be used... yes
+2026-05-29T11:34:52.6009765Z checking if strtoll can be linked... yes
+2026-05-29T11:34:52.6187142Z checking if strtoll is prototyped... yes
+2026-05-29T11:34:52.6465770Z checking if strtoll is compilable... yes
+2026-05-29T11:34:52.6476719Z checking if strtoll usage allowed... yes
+2026-05-29T11:34:52.6477513Z checking if strtoll might be used... yes
+2026-05-29T11:34:52.6947477Z checking for /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang options needed to detect all undeclared functions... none needed
+2026-05-29T11:34:52.7215154Z checking whether getpwuid_r is declared... yes
+2026-05-29T11:34:52.7646450Z checking for _fseeki64... no
+2026-05-29T11:34:52.7920157Z checking deeper for _fseeki64... but still no
+2026-05-29T11:34:52.8326717Z checking for arc4random... yes
+2026-05-29T11:34:52.8745525Z checking for fnmatch... yes
+2026-05-29T11:34:52.9159831Z checking for fseeko... yes
+2026-05-29T11:34:52.9574533Z checking for geteuid... yes
+2026-05-29T11:34:53.0039842Z checking for getpass_r... no
+2026-05-29T11:34:53.0315945Z checking deeper for getpass_r... but still no
+2026-05-29T11:34:53.0718236Z checking for getppid... yes
+2026-05-29T11:34:53.1144591Z checking for getpwuid... yes
+2026-05-29T11:34:53.1561753Z checking for getpwuid_r... yes
+2026-05-29T11:34:53.1981889Z checking for getrlimit... yes
+2026-05-29T11:34:53.2405868Z checking for gettimeofday... yes
+2026-05-29T11:34:53.2832562Z checking for if_nametoindex... yes
+2026-05-29T11:34:53.3310126Z checking for mach_absolute_time... no
+2026-05-29T11:34:53.3627499Z checking deeper for mach_absolute_time... but still no
+2026-05-29T11:34:53.4024570Z checking for pipe... yes
+2026-05-29T11:34:53.4442000Z checking for sched_yield... yes
+2026-05-29T11:34:53.4856854Z checking for sendmsg... yes
+2026-05-29T11:34:53.5276548Z checking for setlocale... yes
+2026-05-29T11:34:53.5744792Z checking for setmode... no
+2026-05-29T11:34:53.6024196Z checking deeper for setmode... but still no
+2026-05-29T11:34:53.6418478Z checking for setrlimit... yes
+2026-05-29T11:34:53.6904044Z checking for snprintf... yes
+2026-05-29T11:34:53.7320691Z checking for utime... yes
+2026-05-29T11:34:53.7738956Z checking for utimes... yes
+2026-05-29T11:34:53.8033749Z checking whether fseeko is declared... yes
+2026-05-29T11:34:53.8035486Z checking how to set a socket into non-blocking mode... fcntl O_NONBLOCK
+2026-05-29T11:34:53.8039639Z checking for perl... /usr/bin/perl
+2026-05-29T11:34:53.8044789Z checking for gnroff... no
+2026-05-29T11:34:53.8048526Z checking for nroff... /usr/bin/nroff
+2026-05-29T11:34:54.0461977Z checking how to use *nroff to get plain text from man pages... -man
+2026-05-29T11:34:54.0469239Z checking whether to enable the threaded resolver... yes
+2026-05-29T11:34:54.0470342Z checking whether to use POSIX threads for threaded resolver... auto
+2026-05-29T11:34:54.0845437Z checking for pthread.h... yes
+2026-05-29T11:34:54.1198459Z checking for pthread_create... yes
+2026-05-29T11:34:54.1201243Z checking convert -I options to -isystem... yes
+2026-05-29T11:34:54.1242073Z checking whether to enable verbose strings... yes
+2026-05-29T11:34:54.1243942Z checking whether to enable SSPI support (Windows native builds only)... no
+2026-05-29T11:34:54.1244972Z checking whether to enable basic authentication method... yes
+2026-05-29T11:34:54.1246091Z checking whether to enable bearer authentication method... yes
+2026-05-29T11:34:54.1247172Z checking whether to enable digest authentication method... yes
+2026-05-29T11:34:54.1248337Z checking whether to enable kerberos authentication method... yes
+2026-05-29T11:34:54.1249431Z checking whether to enable negotiate authentication method... yes
+2026-05-29T11:34:54.1250425Z checking whether to enable aws sig methods... yes
+2026-05-29T11:34:54.1251432Z checking whether to support NTLM... yes
+2026-05-29T11:34:54.1253855Z checking whether to enable NTLM delegation to winbind's helper... no
+2026-05-29T11:34:54.1254828Z checking whether to enable TLS-SRP authentication... yes
+2026-05-29T11:34:54.1262013Z checking whether to enable Unix domain sockets... auto
+2026-05-29T11:34:54.1664339Z checking for struct sockaddr_un.sun_path... yes
+2026-05-29T11:34:54.1666171Z checking whether to support cookies... yes
+2026-05-29T11:34:54.1667044Z checking whether to support socketpair... yes
+2026-05-29T11:34:54.1668263Z checking whether to support HTTP authentication... yes
+2026-05-29T11:34:54.1669287Z checking whether to support DoH... yes
+2026-05-29T11:34:54.1670453Z checking whether to support the MIME API... yes
+2026-05-29T11:34:54.1671692Z checking whether to support binding connections locally... yes
+2026-05-29T11:34:54.1673374Z checking whether to support the form API... yes
+2026-05-29T11:34:54.1674450Z checking whether to support date parsing... yes
+2026-05-29T11:34:54.1675506Z checking whether to support netrc parsing... yes
+2026-05-29T11:34:54.1676666Z checking whether to support progress-meter... yes
+2026-05-29T11:34:54.1677688Z checking whether to support DNS shuffling... yes
+2026-05-29T11:34:54.1678843Z checking whether to support curl_easy_option*... yes
+2026-05-29T11:34:54.1679858Z checking whether to support alt-svc... yes
+2026-05-29T11:34:54.1680978Z checking whether to support headers-api... yes
+2026-05-29T11:34:54.1682399Z checking whether to support HSTS... yes
+2026-05-29T11:34:54.1685136Z checking whether to support WebSockets... no
+2026-05-29T11:34:54.1686537Z checking whether hiding of library internal symbols will actually happen... yes
+2026-05-29T11:34:54.1702739Z checking if this build supports HTTPS-proxy... yes
+2026-05-29T11:34:54.2087427Z checking that generated files are newer than configure... done
+2026-05-29T11:34:54.2090624Z configure: creating ./config.status
+2026-05-29T11:34:54.6949166Z config.status: creating Makefile
+2026-05-29T11:34:54.7070191Z config.status: creating docs/Makefile
+2026-05-29T11:34:54.7213324Z config.status: creating docs/examples/Makefile
+2026-05-29T11:34:54.7382995Z config.status: creating docs/libcurl/Makefile
+2026-05-29T11:34:54.7530305Z config.status: creating docs/libcurl/opts/Makefile
+2026-05-29T11:34:54.7678434Z config.status: creating docs/cmdline-opts/Makefile
+2026-05-29T11:34:54.7822930Z config.status: creating include/Makefile
+2026-05-29T11:34:54.7973994Z config.status: creating include/curl/Makefile
+2026-05-29T11:34:54.8127032Z config.status: creating src/Makefile
+2026-05-29T11:34:54.8300964Z config.status: creating lib/Makefile
+2026-05-29T11:34:54.8537388Z config.status: creating scripts/Makefile
+2026-05-29T11:34:54.8688316Z config.status: creating lib/libcurl.vers
+2026-05-29T11:34:54.8836230Z config.status: creating lib/libcurl.plist
+2026-05-29T11:34:54.8985056Z config.status: creating tests/Makefile
+2026-05-29T11:34:54.9130467Z config.status: creating tests/config
+2026-05-29T11:34:54.9278384Z config.status: creating tests/certs/Makefile
+2026-05-29T11:34:54.9424392Z config.status: creating tests/certs/scripts/Makefile
+2026-05-29T11:34:54.9566499Z config.status: creating tests/data/Makefile
+2026-05-29T11:34:54.9712451Z config.status: creating tests/server/Makefile
+2026-05-29T11:34:54.9912967Z config.status: creating tests/libtest/Makefile
+2026-05-29T11:34:55.0142336Z config.status: creating tests/unit/Makefile
+2026-05-29T11:34:55.0295561Z config.status: creating tests/http/config.ini
+2026-05-29T11:34:55.0442938Z config.status: creating tests/http/Makefile
+2026-05-29T11:34:55.0587625Z config.status: creating tests/http/clients/Makefile
+2026-05-29T11:34:55.0733082Z config.status: creating packages/Makefile
+2026-05-29T11:34:55.0881735Z config.status: creating packages/vms/Makefile
+2026-05-29T11:34:55.1035129Z config.status: creating curl-config
+2026-05-29T11:34:55.1157469Z config.status: creating libcurl.pc
+2026-05-29T11:34:55.1273013Z config.status: creating lib/curl_config.h
+2026-05-29T11:34:55.1408400Z config.status: executing depfiles commands
+2026-05-29T11:34:58.8210536Z config.status: executing libtool commands
+2026-05-29T11:34:58.8326516Z configure: Configured to build curl/libcurl:
+2026-05-29T11:34:58.8326965Z 
+2026-05-29T11:34:58.8327195Z   Host setup:       aarch64-unknown-linux-android
+2026-05-29T11:34:58.8327924Z   Install prefix:   /home/runner/work/llama/llama/curl/build/arm64
+2026-05-29T11:34:58.8329582Z   Compiler:         /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
+2026-05-29T11:34:58.8330611Z    CFLAGS:          -Qunused-arguments -O2 -Wno-pointer-bool-conversion
+2026-05-29T11:34:58.8331117Z    CPPFLAGS:        -isystem /home/runner/work/llama/llama/mbedtls-arm64/include
+2026-05-29T11:34:58.8331601Z    LDFLAGS:         -L/home/runner/work/llama/llama/mbedtls-arm64/lib
+2026-05-29T11:34:58.8331993Z    LIBS:            -lmbedtls -lmbedx509 -lmbedcrypto
+2026-05-29T11:34:58.8332614Z 
+2026-05-29T11:34:58.8332713Z   curl version:     8.5.0-DEV
+2026-05-29T11:34:58.8332972Z   SSL:              enabled (mbedTLS)
+2026-05-29T11:34:58.8333307Z   SSH:              no      (--with-{libssh,libssh2})
+2026-05-29T11:34:58.8333605Z   zlib:             no      (--with-zlib)
+2026-05-29T11:34:58.8333887Z   brotli:           no      (--with-brotli)
+2026-05-29T11:34:58.8334177Z   zstd:             no      (--with-zstd)
+2026-05-29T11:34:58.8334455Z   GSS-API:          no      (--with-gssapi)
+2026-05-29T11:34:58.8334750Z   GSASL:            no      (libgsasl not found)
+2026-05-29T11:34:58.8335052Z   TLS-SRP:          no      (--enable-tls-srp)
+2026-05-29T11:34:58.8335336Z   resolver:         POSIX threaded
+2026-05-29T11:34:58.8335581Z   IPv6:             enabled
+2026-05-29T11:34:58.8335816Z   Unix sockets:     enabled
+2026-05-29T11:34:58.8336260Z   IDN:              no      (--with-{libidn2,winidn})
+2026-05-29T11:34:58.8336773Z   Build libcurl:    Shared=no, Static=yes
+2026-05-29T11:34:58.8337298Z   Built-in manual:  enabled
+2026-05-29T11:34:58.8337790Z   --libcurl option: enabled (--disable-libcurl-option)
+2026-05-29T11:34:58.8338383Z   Verbose errors:   enabled (--disable-verbose)
+2026-05-29T11:34:58.8338876Z   Code coverage:    disabled
+2026-05-29T11:34:58.8339309Z   SSPI:             no      (--enable-sspi)
+2026-05-29T11:34:58.8340008Z   ca cert bundle:   no
+2026-05-29T11:34:58.8340391Z   ca cert path:     no
+2026-05-29T11:34:58.8340824Z   ca fallback:      no
+2026-05-29T11:34:58.8341372Z   LDAP:             no      (--enable-ldap / --with-ldap-lib / --with-lber-lib)
+2026-05-29T11:34:58.8342424Z   LDAPS:            no      (--enable-ldaps)
+2026-05-29T11:34:58.8342940Z   RTSP:             enabled
+2026-05-29T11:34:58.8343379Z   RTMP:             no      (--with-librtmp)
+2026-05-29T11:34:58.8343907Z   PSL:              no      (libpsl not found)
+2026-05-29T11:34:58.8344458Z   Alt-svc:          enabled (--disable-alt-svc)
+2026-05-29T11:34:58.8345031Z   Headers API:      enabled (--disable-headers-api)
+2026-05-29T11:34:58.8345584Z   HSTS:             enabled (--disable-hsts)
+2026-05-29T11:34:58.8346088Z   HTTP1:            enabled (internal)
+2026-05-29T11:34:58.8346567Z   HTTP2:            no      (--with-nghttp2)
+2026-05-29T11:34:58.8347242Z   HTTP3:            no      (--with-ngtcp2 --with-nghttp3, --with-quiche, --with-msh3)
+2026-05-29T11:34:58.8347939Z   ECH:              no      (--enable-ech)
+2026-05-29T11:34:58.8348263Z   WebSockets:       no      (--enable-websockets)
+2026-05-29T11:34:58.8348836Z   Protocols:        DICT FILE FTP FTPS GOPHER GOPHERS HTTP HTTPS IMAP IMAPS MQTT POP3 POP3S RTSP SMB SMBS SMTP SMTPS TELNET TFTP
+2026-05-29T11:34:58.8349554Z   Features:         AsynchDNS HSTS HTTPS-proxy IPv6 Largefile NTLM SSL UnixSockets alt-svc threadsafe
+2026-05-29T11:34:58.8349926Z 
+2026-05-29T11:34:58.8867876Z Making all in lib
+2026-05-29T11:34:58.8953487Z make[1]: Entering directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:34:58.8980077Z make  all-am
+2026-05-29T11:34:58.9068964Z make[2]: Entering directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:34:58.9122894Z   CC       libcurl_la-altsvc.lo
+2026-05-29T11:34:58.9127281Z   CC       libcurl_la-amigaos.lo
+2026-05-29T11:34:58.9128023Z   CC       libcurl_la-asyn-ares.lo
+2026-05-29T11:34:58.9128847Z   CC       libcurl_la-asyn-thread.lo
+2026-05-29T11:34:59.0083937Z   CC       libcurl_la-base64.lo
+2026-05-29T11:34:59.0112796Z   CC       libcurl_la-bufq.lo
+2026-05-29T11:34:59.1009529Z   CC       libcurl_la-bufref.lo
+2026-05-29T11:34:59.1360785Z   CC       libcurl_la-c-hyper.lo
+2026-05-29T11:34:59.1763317Z   CC       libcurl_la-cf-h1-proxy.lo
+2026-05-29T11:34:59.1792737Z   CC       libcurl_la-cf-h2-proxy.lo
+2026-05-29T11:34:59.2229920Z   CC       libcurl_la-cf-haproxy.lo
+2026-05-29T11:34:59.2349144Z   CC       libcurl_la-cf-https-connect.lo
+2026-05-29T11:34:59.2783730Z   CC       libcurl_la-cf-socket.lo
+2026-05-29T11:34:59.3743425Z   CC       libcurl_la-cfilters.lo
+2026-05-29T11:34:59.4053355Z   CC       libcurl_la-conncache.lo
+2026-05-29T11:34:59.4193067Z   CC       libcurl_la-connect.lo
+2026-05-29T11:34:59.5833323Z   CC       libcurl_la-content_encoding.lo
+2026-05-29T11:34:59.5883147Z   CC       libcurl_la-cookie.lo
+2026-05-29T11:34:59.6097223Z   CC       libcurl_la-curl_addrinfo.lo
+2026-05-29T11:34:59.7153268Z   CC       libcurl_la-curl_des.lo
+2026-05-29T11:34:59.7593139Z   CC       libcurl_la-curl_endian.lo
+2026-05-29T11:34:59.7729869Z   CC       libcurl_la-curl_fnmatch.lo
+2026-05-29T11:34:59.8143154Z   CC       libcurl_la-curl_get_line.lo
+2026-05-29T11:34:59.8600367Z   CC       libcurl_la-curl_gethostname.lo
+2026-05-29T11:34:59.8871829Z   CC       libcurl_la-curl_gssapi.lo
+2026-05-29T11:34:59.9113246Z   CC       libcurl_la-curl_memrchr.lo
+2026-05-29T11:34:59.9379426Z   CC       libcurl_la-curl_multibyte.lo
+2026-05-29T11:34:59.9638096Z   CC       libcurl_la-curl_ntlm_core.lo
+2026-05-29T11:34:59.9913244Z   CC       libcurl_la-curl_ntlm_wb.lo
+2026-05-29T11:35:00.0171813Z   CC       libcurl_la-curl_path.lo
+2026-05-29T11:35:00.0317081Z   CC       libcurl_la-curl_range.lo
+2026-05-29T11:35:00.0877340Z   CC       libcurl_la-curl_rtmp.lo
+2026-05-29T11:35:00.1183395Z   CC       libcurl_la-curl_sasl.lo
+2026-05-29T11:35:00.1385119Z   CC       libcurl_la-curl_sspi.lo
+2026-05-29T11:35:00.1539718Z   CC       libcurl_la-curl_threads.lo
+2026-05-29T11:35:00.1872612Z   CC       libcurl_la-curl_trc.lo
+2026-05-29T11:35:00.2363265Z   CC       libcurl_la-dict.lo
+2026-05-29T11:35:00.2676531Z   CC       libcurl_la-doh.lo
+2026-05-29T11:35:00.2893363Z   CC       libcurl_la-dynbuf.lo
+2026-05-29T11:35:00.3323198Z   CC       libcurl_la-dynhds.lo
+2026-05-29T11:35:00.3793389Z   CC       libcurl_la-easy.lo
+2026-05-29T11:35:00.4243132Z   CC       libcurl_la-easygetopt.lo
+2026-05-29T11:35:00.4772828Z   CC       libcurl_la-easyoptions.lo
+2026-05-29T11:35:00.5173308Z   CC       libcurl_la-escape.lo
+2026-05-29T11:35:00.5473329Z   CC       libcurl_la-file.lo
+2026-05-29T11:35:00.5836319Z   CC       libcurl_la-fileinfo.lo
+2026-05-29T11:35:00.6324168Z   CC       libcurl_la-fopen.lo
+2026-05-29T11:35:00.6628735Z   CC       libcurl_la-formdata.lo
+2026-05-29T11:35:00.6743093Z   CC       libcurl_la-ftp.lo
+2026-05-29T11:35:00.7017055Z   CC       libcurl_la-ftplistparser.lo
+2026-05-29T11:35:00.7667507Z   CC       libcurl_la-getenv.lo
+2026-05-29T11:35:00.8773388Z   CC       libcurl_la-getinfo.lo
+2026-05-29T11:35:00.9121223Z   CC       libcurl_la-gopher.lo
+2026-05-29T11:35:00.9202921Z   CC       libcurl_la-hash.lo
+2026-05-29T11:35:01.0384978Z   CC       libcurl_la-headers.lo
+2026-05-29T11:35:01.0465438Z   CC       libcurl_la-hmac.lo
+2026-05-29T11:35:01.0705764Z   CC       libcurl_la-hostasyn.lo
+2026-05-29T11:35:01.1613193Z   CC       libcurl_la-hostip.lo
+2026-05-29T11:35:01.1883451Z   CC       libcurl_la-hostip4.lo
+2026-05-29T11:35:01.1961766Z   CC       libcurl_la-hostip6.lo
+2026-05-29T11:35:01.2025482Z   CC       libcurl_la-hostsyn.lo
+2026-05-29T11:35:01.2813117Z   CC       libcurl_la-hsts.lo
+2026-05-29T11:35:01.3023243Z   CC       libcurl_la-http.lo
+2026-05-29T11:35:01.3345604Z   CC       libcurl_la-http1.lo
+2026-05-29T11:35:01.4003298Z   CC       libcurl_la-http2.lo
+2026-05-29T11:35:01.4881302Z   CC       libcurl_la-http_aws_sigv4.lo
+2026-05-29T11:35:01.5013663Z   CC       libcurl_la-http_chunks.lo
+2026-05-29T11:35:01.5181280Z   CC       libcurl_la-http_digest.lo
+2026-05-29T11:35:01.6283941Z   CC       libcurl_la-http_negotiate.lo
+2026-05-29T11:35:01.6550259Z   CC       libcurl_la-http_ntlm.lo
+2026-05-29T11:35:01.7306677Z   CC       libcurl_la-http_proxy.lo
+2026-05-29T11:35:01.7332832Z   CC       libcurl_la-idn.lo
+2026-05-29T11:35:01.7974007Z   CC       libcurl_la-if2ip.lo
+2026-05-29T11:35:01.8513002Z   CC       libcurl_la-imap.lo
+2026-05-29T11:35:01.8753169Z   CC       libcurl_la-inet_ntop.lo
+2026-05-29T11:35:01.8782742Z   CC       libcurl_la-inet_pton.lo
+2026-05-29T11:35:01.9273214Z   CC       libcurl_la-krb5.lo
+2026-05-29T11:35:01.9743293Z   CC       libcurl_la-ldap.lo
+2026-05-29T11:35:01.9774801Z   CC       libcurl_la-llist.lo
+2026-05-29T11:35:02.0268058Z   CC       libcurl_la-macos.lo
+2026-05-29T11:35:02.0733408Z   CC       libcurl_la-md4.lo
+2026-05-29T11:35:02.1003212Z   CC       libcurl_la-md5.lo
+2026-05-29T11:35:02.1413650Z   CC       libcurl_la-memdebug.lo
+2026-05-29T11:35:02.1893133Z   CC       libcurl_la-mime.lo
+2026-05-29T11:35:02.2153192Z   CC       libcurl_la-mprintf.lo
+2026-05-29T11:35:02.2408380Z   CC       libcurl_la-mqtt.lo
+2026-05-29T11:35:02.2443555Z   CC       libcurl_la-multi.lo
+2026-05-29T11:35:02.4513381Z   CC       libcurl_la-netrc.lo
+2026-05-29T11:35:02.5005554Z   CC       libcurl_la-nonblock.lo
+2026-05-29T11:35:02.5973427Z   CC       libcurl_la-noproxy.lo
+2026-05-29T11:35:02.6163214Z   CC       libcurl_la-openldap.lo
+2026-05-29T11:35:02.7213142Z   CC       libcurl_la-parsedate.lo
+2026-05-29T11:35:02.7453361Z   CC       libcurl_la-pingpong.lo
+2026-05-29T11:35:02.7859947Z   CC       libcurl_la-pop3.lo
+2026-05-29T11:35:02.8984218Z   CC       libcurl_la-progress.lo
+2026-05-29T11:35:02.9061490Z   CC       libcurl_la-psl.lo
+2026-05-29T11:35:02.9093128Z   CC       libcurl_la-rand.lo
+2026-05-29T11:35:03.0164585Z   CC       libcurl_la-rename.lo
+2026-05-29T11:35:03.0476184Z   CC       libcurl_la-rtsp.lo
+2026-05-29T11:35:03.0514282Z   CC       libcurl_la-select.lo
+2026-05-29T11:35:03.0782612Z   CC       libcurl_la-sendf.lo
+2026-05-29T11:35:03.1291900Z   CC       libcurl_la-setopt.lo
+2026-05-29T11:35:03.1852633Z   CC       libcurl_la-sha256.lo
+2026-05-29T11:35:03.2615739Z   CC       libcurl_la-share.lo
+2026-05-29T11:35:03.2878838Z   CC       libcurl_la-slist.lo
+2026-05-29T11:35:03.3000939Z   CC       libcurl_la-smb.lo
+2026-05-29T11:35:03.4033183Z   CC       libcurl_la-smtp.lo
+2026-05-29T11:35:03.4098131Z   CC       libcurl_la-socketpair.lo
+2026-05-29T11:35:03.5063564Z   CC       libcurl_la-socks.lo
+2026-05-29T11:35:03.5286281Z   CC       libcurl_la-socks_gssapi.lo
+2026-05-29T11:35:03.6303979Z   CC       libcurl_la-socks_sspi.lo
+2026-05-29T11:35:03.6333132Z   CC       libcurl_la-speedcheck.lo
+2026-05-29T11:35:03.7163224Z   CC       libcurl_la-splay.lo
+2026-05-29T11:35:03.7403349Z   CC       libcurl_la-strcase.lo
+2026-05-29T11:35:03.7577816Z   CC       libcurl_la-strdup.lo
+2026-05-29T11:35:03.7708557Z   CC       libcurl_la-strerror.lo
+2026-05-29T11:35:03.8333437Z   CC       libcurl_la-strtok.lo
+2026-05-29T11:35:03.8644488Z   CC       libcurl_la-strtoofft.lo
+2026-05-29T11:35:03.8698329Z   CC       libcurl_la-system_win32.lo
+2026-05-29T11:35:03.9003297Z   CC       libcurl_la-telnet.lo
+2026-05-29T11:35:03.9364237Z   CC       libcurl_la-tftp.lo
+2026-05-29T11:35:03.9642460Z   CC       libcurl_la-timediff.lo
+2026-05-29T11:35:03.9697456Z   CC       libcurl_la-timeval.lo
+2026-05-29T11:35:04.0693426Z   CC       libcurl_la-transfer.lo
+2026-05-29T11:35:04.0823054Z   CC       libcurl_la-url.lo
+2026-05-29T11:35:04.1693277Z   CC       libcurl_la-urlapi.lo
+2026-05-29T11:35:04.2383203Z   CC       libcurl_la-version.lo
+2026-05-29T11:35:04.3713190Z   CC       libcurl_la-version_win32.lo
+2026-05-29T11:35:04.3967291Z   CC       libcurl_la-warnless.lo
+2026-05-29T11:35:04.4833431Z   CC       libcurl_la-ws.lo
+2026-05-29T11:35:04.5423908Z   CC       vauth/libcurl_la-cleartext.lo
+2026-05-29T11:35:04.5452817Z   CC       vauth/libcurl_la-cram.lo
+2026-05-29T11:35:04.5863323Z   CC       vauth/libcurl_la-digest.lo
+2026-05-29T11:35:04.5973093Z   CC       vauth/libcurl_la-digest_sspi.lo
+2026-05-29T11:35:04.6609437Z   CC       vauth/libcurl_la-gsasl.lo
+2026-05-29T11:35:04.6643412Z   CC       vauth/libcurl_la-krb5_gssapi.lo
+2026-05-29T11:35:04.6913603Z   CC       vauth/libcurl_la-krb5_sspi.lo
+2026-05-29T11:35:04.7574351Z   CC       vauth/libcurl_la-ntlm.lo
+2026-05-29T11:35:04.7602990Z   CC       vauth/libcurl_la-ntlm_sspi.lo
+2026-05-29T11:35:04.7927343Z   CC       vauth/libcurl_la-oauth2.lo
+2026-05-29T11:35:04.8576538Z   CC       vauth/libcurl_la-spnego_gssapi.lo
+2026-05-29T11:35:04.8637821Z   CC       vauth/libcurl_la-spnego_sspi.lo
+2026-05-29T11:35:04.9159773Z   CC       vauth/libcurl_la-vauth.lo
+2026-05-29T11:35:04.9477201Z   CC       vtls/libcurl_la-bearssl.lo
+2026-05-29T11:35:04.9503725Z   CC       vtls/libcurl_la-gtls.lo
+2026-05-29T11:35:04.9553888Z   CC       vtls/libcurl_la-hostcheck.lo
+2026-05-29T11:35:05.0427149Z   CC       vtls/libcurl_la-keylog.lo
+2026-05-29T11:35:05.0429036Z   CC       vtls/libcurl_la-mbedtls.lo
+2026-05-29T11:35:05.0446715Z   CC       vtls/libcurl_la-mbedtls_threadlock.lo
+2026-05-29T11:35:05.0515268Z   CC       vtls/libcurl_la-openssl.lo
+2026-05-29T11:35:05.1383308Z   CC       vtls/libcurl_la-rustls.lo
+2026-05-29T11:35:05.1467091Z   CC       vtls/libcurl_la-schannel.lo
+2026-05-29T11:35:05.1557706Z   CC       vtls/libcurl_la-schannel_verify.lo
+2026-05-29T11:35:05.2302877Z   CC       vtls/libcurl_la-sectransp.lo
+2026-05-29T11:35:05.2513655Z   CC       vtls/libcurl_la-vtls.lo
+2026-05-29T11:35:05.2514328Z   CC       vtls/libcurl_la-wolfssl.lo
+2026-05-29T11:35:05.2684241Z   CC       vtls/libcurl_la-x509asn1.lo
+2026-05-29T11:35:05.3483187Z   CC       vquic/libcurl_la-curl_msh3.lo
+2026-05-29T11:35:05.3513037Z   CC       vquic/libcurl_la-curl_ngtcp2.lo
+2026-05-29T11:35:05.3651201Z   CC       vquic/libcurl_la-curl_quiche.lo
+2026-05-29T11:35:05.4413423Z   CC       vquic/libcurl_la-vquic.lo
+2026-05-29T11:35:05.4443350Z   CC       vssh/libcurl_la-libssh.lo
+2026-05-29T11:35:05.4693574Z   CC       vssh/libcurl_la-libssh2.lo
+2026-05-29T11:35:05.5246255Z   CC       vssh/libcurl_la-wolfssh.lo
+2026-05-29T11:35:05.6335136Z   CCLD     libcurl.la
+2026-05-29T11:35:06.4610115Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:35:06.4613653Z make[1]: Leaving directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:35:06.4616665Z Making all in src
+2026-05-29T11:35:06.4653632Z make[1]: Entering directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:06.4688336Z Making all in ../docs
+2026-05-29T11:35:06.4706814Z make[2]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:06.4741783Z Making all in .
+2026-05-29T11:35:06.4760222Z make[3]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:06.4760679Z if test "..x" != "..x" -a -e "./curl.1"; then \
+2026-05-29T11:35:06.4761277Z 	/usr/bin/install -c -m 644 "./curl.1" /home/runner/work/llama/llama/curl/docs/curl.1 \
+2026-05-29T11:35:06.4761864Z 	&& touch -r "./curl.1" /home/runner/work/llama/llama/curl/docs/curl.1; fi
+2026-05-29T11:35:06.4773156Z cd cmdline-opts && make
+2026-05-29T11:35:06.4813673Z make[4]: Entering directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:06.4826075Z   GENERATE ../../docs/curl.1
+2026-05-29T11:35:07.4626306Z make[4]: Leaving directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:07.4627795Z make[3]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:07.4630361Z Making all in cmdline-opts
+2026-05-29T11:35:07.4664348Z make[3]: Entering directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:07.4665133Z make[3]: Nothing to be done for 'all'.
+2026-05-29T11:35:07.4665715Z make[3]: Leaving directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:07.4668998Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:07.4704460Z make[2]: Entering directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:07.4719677Z   CC       slist_wc.o
+2026-05-29T11:35:07.4729064Z   CC       tool_binmode.o
+2026-05-29T11:35:07.4749699Z   CC       tool_bname.o
+2026-05-29T11:35:07.4753389Z   CC       tool_cb_dbg.o
+2026-05-29T11:35:07.5210703Z   CC       tool_cb_hdr.o
+2026-05-29T11:35:07.5224071Z   CC       tool_cb_prg.o
+2026-05-29T11:35:07.5272979Z   CC       tool_cb_rea.o
+2026-05-29T11:35:07.5643415Z   CC       tool_cb_see.o
+2026-05-29T11:35:07.5883462Z   CC       tool_cb_wrt.o
+2026-05-29T11:35:07.5974492Z   CC       tool_cfgable.o
+2026-05-29T11:35:07.6193470Z   CC       tool_dirhie.o
+2026-05-29T11:35:07.6207127Z   CC       tool_doswin.o
+2026-05-29T11:35:07.6563743Z   CC       tool_easysrc.o
+2026-05-29T11:35:07.6703230Z   CC       tool_filetime.o
+2026-05-29T11:35:07.6704212Z   CC       tool_findfile.o
+2026-05-29T11:35:07.6765206Z   CC       tool_formparse.o
+2026-05-29T11:35:07.7244694Z   CC       tool_getparam.o
+2026-05-29T11:35:07.7334205Z   CC       tool_getpass.o
+2026-05-29T11:35:07.7363196Z   CC       tool_help.o
+2026-05-29T11:35:07.7902810Z   CC       tool_helpers.o
+2026-05-29T11:35:07.8104333Z   HUGE     tool_hugehelp.c
+2026-05-29T11:35:07.8523272Z   CC       tool_ipfs.o
+2026-05-29T11:35:07.8588567Z   CC       tool_libinfo.o
+2026-05-29T11:35:07.9303351Z   CC       tool_listhelp.o
+2026-05-29T11:35:07.9304409Z   CC       tool_main.o
+2026-05-29T11:35:07.9843428Z   CC       tool_msgs.o
+2026-05-29T11:35:07.9893042Z   CC       tool_operate.o
+2026-05-29T11:35:08.0033202Z   CC       tool_operhlp.o
+2026-05-29T11:35:08.0530554Z   CC       tool_paramhlp.o
+2026-05-29T11:35:08.0733502Z   CC       tool_parsecfg.o
+2026-05-29T11:35:08.1613152Z   CC       tool_progress.o
+2026-05-29T11:35:08.1793259Z   CC       tool_setopt.o
+2026-05-29T11:35:08.2468882Z   CC       tool_sleep.o
+2026-05-29T11:35:08.2972945Z   CC       tool_stderr.o
+2026-05-29T11:35:08.3002787Z   CC       tool_strdup.o
+2026-05-29T11:35:08.3422989Z   CC       tool_urlglob.o
+2026-05-29T11:35:08.3482923Z   CC       tool_util.o
+2026-05-29T11:35:08.4043267Z   CC       tool_vms.o
+2026-05-29T11:35:08.4318373Z   CC       tool_writeout.o
+2026-05-29T11:35:08.4331427Z   CC       tool_writeout_json.o
+2026-05-29T11:35:08.4488274Z   CC       tool_xattr.o
+2026-05-29T11:35:08.5055621Z   CC       var.o
+2026-05-29T11:35:08.5095413Z   CC       tool_hugehelp.o
+2026-05-29T11:35:08.5115468Z   CC       ../lib/base64.o
+2026-05-29T11:35:08.5444604Z   CC       ../lib/curl_multibyte.o
+2026-05-29T11:35:08.5883325Z   CC       ../lib/dynbuf.o
+2026-05-29T11:35:08.5889124Z   CC       ../lib/nonblock.o
+2026-05-29T11:35:08.6193336Z   CC       ../lib/strtoofft.o
+2026-05-29T11:35:08.6390553Z   CC       ../lib/timediff.o
+2026-05-29T11:35:08.6412691Z   CC       ../lib/version_win32.o
+2026-05-29T11:35:08.6555661Z   CC       ../lib/warnless.o
+2026-05-29T11:35:08.6960188Z   CCLD     curl
+2026-05-29T11:35:08.8538660Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:08.8543625Z make[1]: Leaving directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:08.8567102Z make[1]: Entering directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:08.8567676Z make[1]: Nothing to be done for 'all-am'.
+2026-05-29T11:35:08.8569073Z make[1]: Leaving directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:08.8629754Z Making install in lib
+2026-05-29T11:35:08.9481338Z make[1]: Entering directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:35:09.0608564Z make[2]: Entering directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:35:09.0893095Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/lib'
+2026-05-29T11:35:09.0907139Z  /bin/bash ../libtool   --mode=install /usr/bin/install -c   libcurl.la '/home/runner/work/llama/llama/curl/build/arm64/lib'
+2026-05-29T11:35:09.1197404Z libtool: install: /usr/bin/install -c .libs/libcurl.lai /home/runner/work/llama/llama/curl/build/arm64/lib/libcurl.la
+2026-05-29T11:35:09.1247848Z libtool: install: /usr/bin/install -c .libs/libcurl.a /home/runner/work/llama/llama/curl/build/arm64/lib/libcurl.a
+2026-05-29T11:35:09.1284172Z libtool: install: chmod 644 /home/runner/work/llama/llama/curl/build/arm64/lib/libcurl.a
+2026-05-29T11:35:09.1314683Z libtool: install: /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib /home/runner/work/llama/llama/curl/build/arm64/lib/libcurl.a
+2026-05-29T11:35:09.1612872Z make[2]: Nothing to be done for 'install-data-am'.
+2026-05-29T11:35:09.1613586Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:35:09.1617503Z make[1]: Leaving directory '/home/runner/work/llama/llama/curl/lib'
+2026-05-29T11:35:09.1622941Z Making install in src
+2026-05-29T11:35:09.1869720Z make[1]: Entering directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:09.1909143Z Making install in ../docs
+2026-05-29T11:35:09.1927378Z make[2]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.1963395Z Making install in .
+2026-05-29T11:35:09.1981327Z make[3]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.2007130Z make[4]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.2007652Z make[4]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.2024816Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/share/man/man1'
+2026-05-29T11:35:09.2079642Z  /usr/bin/install -c -m 644 curl-config.1 /home/runner/work/llama/llama/curl/docs/curl.1 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man1'
+2026-05-29T11:35:09.2099795Z make[4]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.2101735Z make[3]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.2104229Z Making install in cmdline-opts
+2026-05-29T11:35:09.2124355Z make[3]: Entering directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.2152798Z make[4]: Entering directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.2153318Z make[4]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.2153673Z make[4]: Nothing to be done for 'install-data-am'.
+2026-05-29T11:35:09.2154420Z make[4]: Leaving directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.2155617Z make[3]: Leaving directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.2158356Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.2546578Z make[2]: Entering directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:09.2942673Z make[3]: Entering directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:09.2958110Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/bin'
+2026-05-29T11:35:09.3003865Z   /bin/bash ../libtool   --mode=install /usr/bin/install -c curl '/home/runner/work/llama/llama/curl/build/arm64/bin'
+2026-05-29T11:35:09.3295779Z libtool: install: /usr/bin/install -c curl /home/runner/work/llama/llama/curl/build/arm64/bin/curl
+2026-05-29T11:35:09.3329848Z make[3]: Nothing to be done for 'install-data-am'.
+2026-05-29T11:35:09.3330554Z make[3]: Leaving directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:09.3333782Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:09.3340488Z make[1]: Leaving directory '/home/runner/work/llama/llama/curl/src'
+2026-05-29T11:35:09.3364249Z make[1]: Entering directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:09.3393958Z make[2]: Entering directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:09.3405528Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/bin'
+2026-05-29T11:35:09.3444309Z  /usr/bin/install -c curl-config '/home/runner/work/llama/llama/curl/build/arm64/bin'
+2026-05-29T11:35:09.3473551Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/lib/pkgconfig'
+2026-05-29T11:35:09.3502706Z  /usr/bin/install -c -m 644 libcurl.pc '/home/runner/work/llama/llama/curl/build/arm64/lib/pkgconfig'
+2026-05-29T11:35:09.3518249Z make  install-data-hook
+2026-05-29T11:35:09.3547411Z make[3]: Entering directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:09.3548074Z (cd include && make install)
+2026-05-29T11:35:09.3575652Z make[4]: Entering directory '/home/runner/work/llama/llama/curl/include'
+2026-05-29T11:35:09.3611331Z Making install in curl
+2026-05-29T11:35:09.3628601Z make[5]: Entering directory '/home/runner/work/llama/llama/curl/include/curl'
+2026-05-29T11:35:09.3653265Z make[6]: Entering directory '/home/runner/work/llama/llama/curl/include/curl'
+2026-05-29T11:35:09.3653753Z make[6]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.3665948Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/include/curl'
+2026-05-29T11:35:09.3695304Z  /usr/bin/install -c -m 644 curl.h curlver.h easy.h mprintf.h stdcheaders.h multi.h typecheck-gcc.h system.h urlapi.h options.h header.h websockets.h '/home/runner/work/llama/llama/curl/build/arm64/include/curl'
+2026-05-29T11:35:09.3718950Z make[6]: Leaving directory '/home/runner/work/llama/llama/curl/include/curl'
+2026-05-29T11:35:09.3720508Z make[5]: Leaving directory '/home/runner/work/llama/llama/curl/include/curl'
+2026-05-29T11:35:09.3737404Z make[5]: Entering directory '/home/runner/work/llama/llama/curl/include'
+2026-05-29T11:35:09.3761655Z make[6]: Entering directory '/home/runner/work/llama/llama/curl/include'
+2026-05-29T11:35:09.3762603Z make[6]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.3762982Z make[6]: Nothing to be done for 'install-data-am'.
+2026-05-29T11:35:09.3763482Z make[6]: Leaving directory '/home/runner/work/llama/llama/curl/include'
+2026-05-29T11:35:09.3764333Z make[5]: Leaving directory '/home/runner/work/llama/llama/curl/include'
+2026-05-29T11:35:09.3768912Z make[4]: Leaving directory '/home/runner/work/llama/llama/curl/include'
+2026-05-29T11:35:09.3773035Z (cd docs && make install)
+2026-05-29T11:35:09.3801362Z make[4]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.3836591Z Making install in .
+2026-05-29T11:35:09.3854781Z make[5]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.3880774Z make[6]: Entering directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.3881698Z make[6]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.3898574Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/share/man/man1'
+2026-05-29T11:35:09.3954882Z  /usr/bin/install -c -m 644 curl-config.1 /home/runner/work/llama/llama/curl/docs/curl.1 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man1'
+2026-05-29T11:35:09.3974740Z make[6]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.3976509Z make[5]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.3978623Z Making install in cmdline-opts
+2026-05-29T11:35:09.3999063Z make[5]: Entering directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.4027794Z make[6]: Entering directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.4028553Z make[6]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.4029131Z make[6]: Nothing to be done for 'install-data-am'.
+2026-05-29T11:35:09.4029876Z make[6]: Leaving directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.4030789Z make[5]: Leaving directory '/home/runner/work/llama/llama/curl/docs/cmdline-opts'
+2026-05-29T11:35:09.4034148Z make[4]: Leaving directory '/home/runner/work/llama/llama/curl/docs'
+2026-05-29T11:35:09.4038170Z (cd docs/libcurl && make install)
+2026-05-29T11:35:09.4077761Z make[4]: Entering directory '/home/runner/work/llama/llama/curl/docs/libcurl'
+2026-05-29T11:35:09.4113698Z Making install in opts
+2026-05-29T11:35:09.4167152Z make[5]: Entering directory '/home/runner/work/llama/llama/curl/docs/libcurl/opts'
+2026-05-29T11:35:09.4207448Z make[6]: Entering directory '/home/runner/work/llama/llama/curl/docs/libcurl/opts'
+2026-05-29T11:35:09.4208287Z make[6]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.4255781Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.4939957Z  /usr/bin/install -c -m 644 CURLINFO_ACTIVESOCKET.3 CURLINFO_APPCONNECT_TIME.3 CURLINFO_APPCONNECT_TIME_T.3 CURLINFO_CAINFO.3 CURLINFO_CAPATH.3 CURLINFO_CERTINFO.3 CURLINFO_CONDITION_UNMET.3 CURLINFO_CONNECT_TIME.3 CURLINFO_CONNECT_TIME_T.3 CURLINFO_CONN_ID.3 CURLINFO_CONTENT_LENGTH_DOWNLOAD.3 CURLINFO_CONTENT_LENGTH_DOWNLOAD_T.3 CURLINFO_CONTENT_LENGTH_UPLOAD.3 CURLINFO_CONTENT_LENGTH_UPLOAD_T.3 CURLINFO_CONTENT_TYPE.3 CURLINFO_COOKIELIST.3 CURLINFO_EFFECTIVE_METHOD.3 CURLINFO_EFFECTIVE_URL.3 CURLINFO_FILETIME.3 CURLINFO_FILETIME_T.3 CURLINFO_FTP_ENTRY_PATH.3 CURLINFO_HEADER_SIZE.3 CURLINFO_HTTP_CONNECTCODE.3 CURLINFO_HTTP_VERSION.3 CURLINFO_HTTPAUTH_AVAIL.3 CURLINFO_LASTSOCKET.3 CURLINFO_LOCAL_IP.3 CURLINFO_LOCAL_PORT.3 CURLINFO_NAMELOOKUP_TIME.3 CURLINFO_NAMELOOKUP_TIME_T.3 CURLINFO_NUM_CONNECTS.3 CURLINFO_OS_ERRNO.3 CURLINFO_PRETRANSFER_TIME.3 CURLINFO_PRETRANSFER_TIME_T.3 CURLINFO_PRIMARY_IP.3 CURLINFO_PRIMARY_PORT.3 CURLINFO_PRIVATE.3 CURLINFO_PROTOCOL.3 CURLINFO_PROXY_ERROR.3 CURLINFO_PROXY_SSL_VERIFYRESULT.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.4977258Z  /usr/bin/install -c -m 644 CURLINFO_PROXYAUTH_AVAIL.3 CURLINFO_REDIRECT_COUNT.3 CURLINFO_REDIRECT_TIME.3 CURLINFO_REDIRECT_TIME_T.3 CURLINFO_REDIRECT_URL.3 CURLINFO_REFERER.3 CURLINFO_REQUEST_SIZE.3 CURLINFO_RESPONSE_CODE.3 CURLINFO_RETRY_AFTER.3 CURLINFO_RTSP_CLIENT_CSEQ.3 CURLINFO_RTSP_CSEQ_RECV.3 CURLINFO_RTSP_SERVER_CSEQ.3 CURLINFO_RTSP_SESSION_ID.3 CURLINFO_SCHEME.3 CURLINFO_SIZE_DOWNLOAD.3 CURLINFO_SIZE_DOWNLOAD_T.3 CURLINFO_SIZE_UPLOAD.3 CURLINFO_SIZE_UPLOAD_T.3 CURLINFO_SPEED_DOWNLOAD.3 CURLINFO_SPEED_DOWNLOAD_T.3 CURLINFO_SPEED_UPLOAD.3 CURLINFO_SPEED_UPLOAD_T.3 CURLINFO_SSL_ENGINES.3 CURLINFO_SSL_VERIFYRESULT.3 CURLINFO_STARTTRANSFER_TIME.3 CURLINFO_STARTTRANSFER_TIME_T.3 CURLINFO_TLS_SESSION.3 CURLINFO_TLS_SSL_PTR.3 CURLINFO_TOTAL_TIME.3 CURLINFO_TOTAL_TIME_T.3 CURLINFO_XFER_ID.3 CURLMOPT_CHUNK_LENGTH_PENALTY_SIZE.3 CURLMOPT_CONTENT_LENGTH_PENALTY_SIZE.3 CURLMOPT_MAX_CONCURRENT_STREAMS.3 CURLMOPT_MAX_HOST_CONNECTIONS.3 CURLMOPT_MAX_PIPELINE_LENGTH.3 CURLMOPT_MAX_TOTAL_CONNECTIONS.3 CURLMOPT_MAXCONNECTS.3 CURLMOPT_PIPELINING.3 CURLMOPT_PIPELINING_SERVER_BL.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5013892Z  /usr/bin/install -c -m 644 CURLMOPT_PIPELINING_SITE_BL.3 CURLMOPT_PUSHDATA.3 CURLMOPT_PUSHFUNCTION.3 CURLMOPT_SOCKETDATA.3 CURLMOPT_SOCKETFUNCTION.3 CURLMOPT_TIMERDATA.3 CURLMOPT_TIMERFUNCTION.3 CURLOPT_ABSTRACT_UNIX_SOCKET.3 CURLOPT_ACCEPT_ENCODING.3 CURLOPT_ACCEPTTIMEOUT_MS.3 CURLOPT_ADDRESS_SCOPE.3 CURLOPT_ALTSVC.3 CURLOPT_ALTSVC_CTRL.3 CURLOPT_APPEND.3 CURLOPT_AUTOREFERER.3 CURLOPT_AWS_SIGV4.3 CURLOPT_BUFFERSIZE.3 CURLOPT_CAINFO.3 CURLOPT_CAINFO_BLOB.3 CURLOPT_CAPATH.3 CURLOPT_CA_CACHE_TIMEOUT.3 CURLOPT_CERTINFO.3 CURLOPT_CHUNK_BGN_FUNCTION.3 CURLOPT_CHUNK_DATA.3 CURLOPT_CHUNK_END_FUNCTION.3 CURLOPT_CLOSESOCKETDATA.3 CURLOPT_CLOSESOCKETFUNCTION.3 CURLOPT_CONNECT_ONLY.3 CURLOPT_CONNECT_TO.3 CURLOPT_CONNECTTIMEOUT.3 CURLOPT_CONNECTTIMEOUT_MS.3 CURLOPT_CONV_FROM_NETWORK_FUNCTION.3 CURLOPT_CONV_FROM_UTF8_FUNCTION.3 CURLOPT_CONV_TO_NETWORK_FUNCTION.3 CURLOPT_COOKIE.3 CURLOPT_COOKIEFILE.3 CURLOPT_COOKIEJAR.3 CURLOPT_COOKIELIST.3 CURLOPT_COOKIESESSION.3 CURLOPT_COPYPOSTFIELDS.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5052645Z  /usr/bin/install -c -m 644 CURLOPT_CRLF.3 CURLOPT_CRLFILE.3 CURLOPT_CURLU.3 CURLOPT_CUSTOMREQUEST.3 CURLOPT_DEBUGDATA.3 CURLOPT_DEBUGFUNCTION.3 CURLOPT_DEFAULT_PROTOCOL.3 CURLOPT_DIRLISTONLY.3 CURLOPT_DISALLOW_USERNAME_IN_URL.3 CURLOPT_DNS_CACHE_TIMEOUT.3 CURLOPT_DNS_INTERFACE.3 CURLOPT_DNS_LOCAL_IP4.3 CURLOPT_DNS_LOCAL_IP6.3 CURLOPT_DNS_SERVERS.3 CURLOPT_DNS_SHUFFLE_ADDRESSES.3 CURLOPT_DNS_USE_GLOBAL_CACHE.3 CURLOPT_DOH_SSL_VERIFYHOST.3 CURLOPT_DOH_SSL_VERIFYPEER.3 CURLOPT_DOH_SSL_VERIFYSTATUS.3 CURLOPT_DOH_URL.3 CURLOPT_EGDSOCKET.3 CURLOPT_ERRORBUFFER.3 CURLOPT_EXPECT_100_TIMEOUT_MS.3 CURLOPT_FAILONERROR.3 CURLOPT_FILETIME.3 CURLOPT_FNMATCH_DATA.3 CURLOPT_FNMATCH_FUNCTION.3 CURLOPT_FOLLOWLOCATION.3 CURLOPT_FORBID_REUSE.3 CURLOPT_FRESH_CONNECT.3 CURLOPT_FTP_ACCOUNT.3 CURLOPT_FTP_ALTERNATIVE_TO_USER.3 CURLOPT_FTP_CREATE_MISSING_DIRS.3 CURLOPT_FTP_FILEMETHOD.3 CURLOPT_FTP_SKIP_PASV_IP.3 CURLOPT_FTP_SSL_CCC.3 CURLOPT_FTP_USE_EPRT.3 CURLOPT_FTP_USE_EPSV.3 CURLOPT_FTP_USE_PRET.3 CURLOPT_FTPPORT.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5090936Z  /usr/bin/install -c -m 644 CURLOPT_FTPSSLAUTH.3 CURLOPT_GSSAPI_DELEGATION.3 CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS.3 CURLOPT_HAPROXYPROTOCOL.3 CURLOPT_HAPROXY_CLIENT_IP.3 CURLOPT_HEADER.3 CURLOPT_HEADERDATA.3 CURLOPT_HEADERFUNCTION.3 CURLOPT_HEADEROPT.3 CURLOPT_HSTS.3 CURLOPT_HSTS_CTRL.3 CURLOPT_HSTSREADDATA.3 CURLOPT_HSTSREADFUNCTION.3 CURLOPT_HSTSWRITEDATA.3 CURLOPT_HSTSWRITEFUNCTION.3 CURLOPT_HTTP09_ALLOWED.3 CURLOPT_HTTP200ALIASES.3 CURLOPT_HTTP_CONTENT_DECODING.3 CURLOPT_HTTP_TRANSFER_DECODING.3 CURLOPT_HTTP_VERSION.3 CURLOPT_HTTPAUTH.3 CURLOPT_HTTPGET.3 CURLOPT_HTTPHEADER.3 CURLOPT_HTTPPOST.3 CURLOPT_HTTPPROXYTUNNEL.3 CURLOPT_IGNORE_CONTENT_LENGTH.3 CURLOPT_INFILESIZE.3 CURLOPT_INFILESIZE_LARGE.3 CURLOPT_INTERFACE.3 CURLOPT_INTERLEAVEDATA.3 CURLOPT_INTERLEAVEFUNCTION.3 CURLOPT_IOCTLDATA.3 CURLOPT_IOCTLFUNCTION.3 CURLOPT_IPRESOLVE.3 CURLOPT_ISSUERCERT.3 CURLOPT_ISSUERCERT_BLOB.3 CURLOPT_KEEP_SENDING_ON_ERROR.3 CURLOPT_KEYPASSWD.3 CURLOPT_KRBLEVEL.3 CURLOPT_LOCALPORT.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5128967Z  /usr/bin/install -c -m 644 CURLOPT_LOCALPORTRANGE.3 CURLOPT_LOGIN_OPTIONS.3 CURLOPT_LOW_SPEED_LIMIT.3 CURLOPT_LOW_SPEED_TIME.3 CURLOPT_MAIL_AUTH.3 CURLOPT_MAIL_FROM.3 CURLOPT_MAIL_RCPT.3 CURLOPT_MAIL_RCPT_ALLOWFAILS.3 CURLOPT_MAX_RECV_SPEED_LARGE.3 CURLOPT_MAX_SEND_SPEED_LARGE.3 CURLOPT_MAXAGE_CONN.3 CURLOPT_MAXCONNECTS.3 CURLOPT_MAXFILESIZE.3 CURLOPT_MAXFILESIZE_LARGE.3 CURLOPT_MAXLIFETIME_CONN.3 CURLOPT_MAXREDIRS.3 CURLOPT_MIME_OPTIONS.3 CURLOPT_MIMEPOST.3 CURLOPT_NETRC.3 CURLOPT_NETRC_FILE.3 CURLOPT_NEW_DIRECTORY_PERMS.3 CURLOPT_NEW_FILE_PERMS.3 CURLOPT_NOBODY.3 CURLOPT_NOPROGRESS.3 CURLOPT_NOPROXY.3 CURLOPT_NOSIGNAL.3 CURLOPT_OPENSOCKETDATA.3 CURLOPT_OPENSOCKETFUNCTION.3 CURLOPT_PASSWORD.3 CURLOPT_PATH_AS_IS.3 CURLOPT_PINNEDPUBLICKEY.3 CURLOPT_PIPEWAIT.3 CURLOPT_PORT.3 CURLOPT_POST.3 CURLOPT_POSTFIELDS.3 CURLOPT_POSTFIELDSIZE.3 CURLOPT_POSTFIELDSIZE_LARGE.3 CURLOPT_POSTQUOTE.3 CURLOPT_POSTREDIR.3 CURLOPT_PRE_PROXY.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5168439Z  /usr/bin/install -c -m 644 CURLOPT_PREQUOTE.3 CURLOPT_PREREQDATA.3 CURLOPT_PREREQFUNCTION.3 CURLOPT_PRIVATE.3 CURLOPT_PROGRESSDATA.3 CURLOPT_PROGRESSFUNCTION.3 CURLOPT_PROTOCOLS.3 CURLOPT_PROTOCOLS_STR.3 CURLOPT_PROXY.3 CURLOPT_PROXY_CAINFO.3 CURLOPT_PROXY_CAINFO_BLOB.3 CURLOPT_PROXY_CAPATH.3 CURLOPT_PROXY_CRLFILE.3 CURLOPT_PROXY_ISSUERCERT.3 CURLOPT_PROXY_ISSUERCERT_BLOB.3 CURLOPT_PROXY_KEYPASSWD.3 CURLOPT_PROXY_PINNEDPUBLICKEY.3 CURLOPT_PROXY_SERVICE_NAME.3 CURLOPT_PROXY_SSL_CIPHER_LIST.3 CURLOPT_PROXY_SSL_OPTIONS.3 CURLOPT_PROXY_SSL_VERIFYHOST.3 CURLOPT_PROXY_SSL_VERIFYPEER.3 CURLOPT_PROXY_SSLCERT.3 CURLOPT_PROXY_SSLCERT_BLOB.3 CURLOPT_PROXY_SSLCERTTYPE.3 CURLOPT_PROXY_SSLKEY.3 CURLOPT_PROXY_SSLKEY_BLOB.3 CURLOPT_PROXY_SSLKEYTYPE.3 CURLOPT_PROXY_SSLVERSION.3 CURLOPT_PROXY_TLS13_CIPHERS.3 CURLOPT_PROXY_TLSAUTH_PASSWORD.3 CURLOPT_PROXY_TLSAUTH_TYPE.3 CURLOPT_PROXY_TLSAUTH_USERNAME.3 CURLOPT_PROXY_TRANSFER_MODE.3 CURLOPT_PROXYAUTH.3 CURLOPT_PROXYHEADER.3 CURLOPT_PROXYPASSWORD.3 CURLOPT_PROXYPORT.3 CURLOPT_PROXYTYPE.3 CURLOPT_PROXYUSERNAME.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5207053Z  /usr/bin/install -c -m 644 CURLOPT_PROXYUSERPWD.3 CURLOPT_PUT.3 CURLOPT_QUICK_EXIT.3 CURLOPT_QUOTE.3 CURLOPT_RANDOM_FILE.3 CURLOPT_RANGE.3 CURLOPT_READDATA.3 CURLOPT_READFUNCTION.3 CURLOPT_REDIR_PROTOCOLS.3 CURLOPT_REDIR_PROTOCOLS_STR.3 CURLOPT_REFERER.3 CURLOPT_REQUEST_TARGET.3 CURLOPT_RESOLVE.3 CURLOPT_RESOLVER_START_DATA.3 CURLOPT_RESOLVER_START_FUNCTION.3 CURLOPT_RESUME_FROM.3 CURLOPT_RESUME_FROM_LARGE.3 CURLOPT_RTSP_CLIENT_CSEQ.3 CURLOPT_RTSP_REQUEST.3 CURLOPT_RTSP_SERVER_CSEQ.3 CURLOPT_RTSP_SESSION_ID.3 CURLOPT_RTSP_STREAM_URI.3 CURLOPT_RTSP_TRANSPORT.3 CURLOPT_SASL_AUTHZID.3 CURLOPT_SASL_IR.3 CURLOPT_SEEKDATA.3 CURLOPT_SEEKFUNCTION.3 CURLOPT_SERVER_RESPONSE_TIMEOUT.3 CURLOPT_SERVICE_NAME.3 CURLOPT_SHARE.3 CURLOPT_SOCKOPTDATA.3 CURLOPT_SOCKOPTFUNCTION.3 CURLOPT_SOCKS5_AUTH.3 CURLOPT_SOCKS5_GSSAPI_NEC.3 CURLOPT_SOCKS5_GSSAPI_SERVICE.3 CURLOPT_SSH_AUTH_TYPES.3 CURLOPT_SSH_COMPRESSION.3 CURLOPT_SSH_HOSTKEYDATA.3 CURLOPT_SSH_HOSTKEYFUNCTION.3 CURLOPT_SSH_HOST_PUBLIC_KEY_MD5.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5245506Z  /usr/bin/install -c -m 644 CURLOPT_SSH_HOST_PUBLIC_KEY_SHA256.3 CURLOPT_SSH_KEYDATA.3 CURLOPT_SSH_KEYFUNCTION.3 CURLOPT_SSH_KNOWNHOSTS.3 CURLOPT_SSH_PRIVATE_KEYFILE.3 CURLOPT_SSH_PUBLIC_KEYFILE.3 CURLOPT_SSL_CIPHER_LIST.3 CURLOPT_SSL_CTX_DATA.3 CURLOPT_SSL_CTX_FUNCTION.3 CURLOPT_SSL_EC_CURVES.3 CURLOPT_SSL_ENABLE_ALPN.3 CURLOPT_SSL_ENABLE_NPN.3 CURLOPT_SSL_FALSESTART.3 CURLOPT_SSL_OPTIONS.3 CURLOPT_SSL_SESSIONID_CACHE.3 CURLOPT_SSL_VERIFYHOST.3 CURLOPT_SSL_VERIFYPEER.3 CURLOPT_SSL_VERIFYSTATUS.3 CURLOPT_SSLCERT.3 CURLOPT_SSLCERT_BLOB.3 CURLOPT_SSLCERTTYPE.3 CURLOPT_SSLENGINE.3 CURLOPT_SSLENGINE_DEFAULT.3 CURLOPT_SSLKEY.3 CURLOPT_SSLKEY_BLOB.3 CURLOPT_SSLKEYTYPE.3 CURLOPT_SSLVERSION.3 CURLOPT_STDERR.3 CURLOPT_STREAM_DEPENDS.3 CURLOPT_STREAM_DEPENDS_E.3 CURLOPT_STREAM_WEIGHT.3 CURLOPT_SUPPRESS_CONNECT_HEADERS.3 CURLOPT_TCP_FASTOPEN.3 CURLOPT_TCP_KEEPALIVE.3 CURLOPT_TCP_KEEPIDLE.3 CURLOPT_TCP_KEEPINTVL.3 CURLOPT_TCP_NODELAY.3 CURLOPT_TELNETOPTIONS.3 CURLOPT_TFTP_BLKSIZE.3 CURLOPT_TFTP_NO_OPTIONS.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5282995Z  /usr/bin/install -c -m 644 CURLOPT_TIMECONDITION.3 CURLOPT_TIMEOUT.3 CURLOPT_TIMEOUT_MS.3 CURLOPT_TIMEVALUE.3 CURLOPT_TIMEVALUE_LARGE.3 CURLOPT_TLS13_CIPHERS.3 CURLOPT_TLSAUTH_PASSWORD.3 CURLOPT_TLSAUTH_TYPE.3 CURLOPT_TLSAUTH_USERNAME.3 CURLOPT_TRAILERDATA.3 CURLOPT_TRAILERFUNCTION.3 CURLOPT_TRANSFER_ENCODING.3 CURLOPT_TRANSFERTEXT.3 CURLOPT_UNIX_SOCKET_PATH.3 CURLOPT_UNRESTRICTED_AUTH.3 CURLOPT_UPKEEP_INTERVAL_MS.3 CURLOPT_UPLOAD.3 CURLOPT_UPLOAD_BUFFERSIZE.3 CURLOPT_URL.3 CURLOPT_USE_SSL.3 CURLOPT_USERAGENT.3 CURLOPT_USERNAME.3 CURLOPT_USERPWD.3 CURLOPT_VERBOSE.3 CURLOPT_WILDCARDMATCH.3 CURLOPT_WRITEDATA.3 CURLOPT_WRITEFUNCTION.3 CURLOPT_WS_OPTIONS.3 CURLOPT_XFERINFODATA.3 CURLOPT_XFERINFOFUNCTION.3 CURLOPT_XOAUTH2_BEARER.3 CURLSHOPT_LOCKFUNC.3 CURLSHOPT_SHARE.3 CURLSHOPT_UNLOCKFUNC.3 CURLSHOPT_UNSHARE.3 CURLSHOPT_USERDATA.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5318187Z make[6]: Leaving directory '/home/runner/work/llama/llama/curl/docs/libcurl/opts'
+2026-05-29T11:35:09.5320735Z make[5]: Leaving directory '/home/runner/work/llama/llama/curl/docs/libcurl/opts'
+2026-05-29T11:35:09.5356366Z make[5]: Entering directory '/home/runner/work/llama/llama/curl/docs/libcurl'
+2026-05-29T11:35:09.5357221Z perl ./mksymbolsmanpage.pl < ./symbols-in-versions > libcurl-symbols.3
+2026-05-29T11:35:09.5547608Z make[6]: Entering directory '/home/runner/work/llama/llama/curl/docs/libcurl'
+2026-05-29T11:35:09.5548340Z make[6]: Nothing to be done for 'install-exec-am'.
+2026-05-29T11:35:09.5559840Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/share/aclocal'
+2026-05-29T11:35:09.5588012Z  /usr/bin/install -c -m 644 libcurl.m4 '/home/runner/work/llama/llama/curl/build/arm64/share/aclocal'
+2026-05-29T11:35:09.5630450Z  /usr/bin/mkdir -p '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5761147Z  /usr/bin/install -c -m 644 curl_easy_cleanup.3 curl_easy_duphandle.3 curl_easy_escape.3 curl_easy_getinfo.3 curl_easy_header.3 curl_easy_init.3 curl_easy_nextheader.3 curl_easy_option_by_id.3 curl_easy_option_by_name.3 curl_easy_option_next.3 curl_easy_pause.3 curl_easy_perform.3 curl_easy_recv.3 curl_easy_reset.3 curl_easy_send.3 curl_easy_setopt.3 curl_easy_strerror.3 curl_easy_unescape.3 curl_easy_upkeep.3 curl_escape.3 curl_formadd.3 curl_formfree.3 curl_formget.3 curl_free.3 curl_getdate.3 curl_getenv.3 curl_global_cleanup.3 curl_global_init.3 curl_global_init_mem.3 curl_global_trace.3 curl_global_sslset.3 curl_mime_addpart.3 curl_mime_data.3 curl_mime_data_cb.3 curl_mime_encoder.3 curl_mime_filedata.3 curl_mime_filename.3 curl_mime_free.3 curl_mime_headers.3 curl_mime_init.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5800170Z  /usr/bin/install -c -m 644 curl_mime_name.3 curl_mime_subparts.3 curl_mime_type.3 curl_mprintf.3 curl_multi_add_handle.3 curl_multi_assign.3 curl_multi_cleanup.3 curl_multi_fdset.3 curl_multi_get_handles.3 curl_multi_info_read.3 curl_multi_init.3 curl_multi_perform.3 curl_multi_poll.3 curl_multi_remove_handle.3 curl_multi_setopt.3 curl_multi_socket.3 curl_multi_socket_action.3 curl_multi_socket_all.3 curl_multi_strerror.3 curl_multi_timeout.3 curl_multi_wakeup.3 curl_multi_wait.3 curl_pushheader_bynum.3 curl_pushheader_byname.3 curl_share_cleanup.3 curl_share_init.3 curl_share_setopt.3 curl_share_strerror.3 curl_slist_append.3 curl_slist_free_all.3 curl_strequal.3 curl_strnequal.3 curl_unescape.3 curl_url.3 curl_url_cleanup.3 curl_url_dup.3 curl_url_get.3 curl_url_set.3 curl_url_strerror.3 curl_version.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5834642Z  /usr/bin/install -c -m 644 curl_version_info.3 curl_ws_meta.3 curl_ws_recv.3 curl_ws_send.3 libcurl-easy.3 libcurl-env.3 libcurl-env-dbg.3 libcurl-errors.3 libcurl-multi.3 libcurl-security.3 libcurl-share.3 libcurl-symbols.3 libcurl-thread.3 libcurl-tutorial.3 libcurl-url.3 libcurl-ws.3 libcurl.3 '/home/runner/work/llama/llama/curl/build/arm64/share/man/man3'
+2026-05-29T11:35:09.5862806Z make[6]: Leaving directory '/home/runner/work/llama/llama/curl/docs/libcurl'
+2026-05-29T11:35:09.5865435Z make[5]: Leaving directory '/home/runner/work/llama/llama/curl/docs/libcurl'
+2026-05-29T11:35:09.5870275Z make[4]: Leaving directory '/home/runner/work/llama/llama/curl/docs/libcurl'
+2026-05-29T11:35:09.5875632Z make[3]: Leaving directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:09.5877748Z make[2]: Leaving directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:09.5879865Z make[1]: Leaving directory '/home/runner/work/llama/llama/curl'
+2026-05-29T11:35:09.5946664Z ##[group]Run actions/upload-artifact@v4
+2026-05-29T11:35:09.5946961Z with:
+2026-05-29T11:35:09.5947156Z   name: libcurl-arm64
+2026-05-29T11:35:09.5947382Z   path: curl/build/arm64
+2026-05-29T11:35:09.5947617Z   if-no-files-found: warn
+2026-05-29T11:35:09.5947854Z   compression-level: 6
+2026-05-29T11:35:09.5948072Z   overwrite: false
+2026-05-29T11:35:09.5948286Z   include-hidden-files: false
+2026-05-29T11:35:09.5948527Z ##[endgroup]
+2026-05-29T11:35:09.9043996Z With the provided path, there will be 513 files uploaded
+2026-05-29T11:35:09.9049858Z Artifact name is valid!
+2026-05-29T11:35:09.9051247Z Root directory input is valid!
+2026-05-29T11:35:10.2516446Z Beginning upload of artifact content to blob storage
+2026-05-29T11:35:11.8761941Z Uploaded bytes 2845659
+2026-05-29T11:35:11.9521027Z Finished uploading artifact content to blob storage!
+2026-05-29T11:35:11.9523768Z SHA256 digest of uploaded artifact zip is 03180841a36abb2d39b61792e55452103913872e41db359957f6271f0a283c90
+2026-05-29T11:35:11.9525656Z Finalizing artifact upload
+2026-05-29T11:35:12.1597905Z Artifact libcurl-arm64.zip successfully finalized. Artifact ID 7289705894
+2026-05-29T11:35:12.1599336Z Artifact libcurl-arm64 has been successfully uploaded! Final size is 2845659 bytes. Artifact ID is 7289705894
+2026-05-29T11:35:12.1606753Z Artifact download URL: https://github.com/mmkurodan/llama/actions/runs/26634797490/artifacts/7289705894
+2026-05-29T11:35:12.1843632Z Post job cleanup.
+2026-05-29T11:35:12.2872929Z [command]/usr/bin/git version
+2026-05-29T11:35:12.2914611Z git version 2.54.0
+2026-05-29T11:35:12.2959139Z Temporarily overriding HOME='/home/runner/work/_temp/8444ef80-2c0c-4949-b8d3-040f5c7d30ee' before making global git config changes
+2026-05-29T11:35:12.2960522Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-29T11:35:12.2965178Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/llama/llama
+2026-05-29T11:35:12.3004058Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-29T11:35:12.3038322Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-29T11:35:12.3284192Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-29T11:35:12.3310320Z http.https://github.com/.extraheader
+2026-05-29T11:35:12.3323652Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-05-29T11:35:12.3357445Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-29T11:35:12.3594373Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-29T11:35:12.3628701Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-29T11:35:12.4060531Z Cleaning up orphan processes
+2026-05-29T11:35:12.4428053Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/download-artifact@v4, actions/upload-artifact@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

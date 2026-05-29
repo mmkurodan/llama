@@ -1,0 +1,14 @@
+﻿2026-05-29T11:33:42.5968564Z ##[group]Run nttld/setup-ndk@v1
+2026-05-29T11:33:42.5968858Z with:
+2026-05-29T11:33:42.5969057Z   ndk-version: r27
+2026-05-29T11:33:42.5969269Z   add-to-path: true
+2026-05-29T11:33:42.5969476Z   link-to-sdk: false
+2026-05-29T11:33:42.5969684Z   local-cache: false
+2026-05-29T11:33:42.5969885Z ##[endgroup]
+2026-05-29T11:33:42.7045344Z Attempting to download r27...
+2026-05-29T11:33:45.8533206Z Extracting...
+2026-05-29T11:33:45.8572820Z [command]/usr/bin/unzip -o -q /home/runner/work/_temp/129e5fe8-ec72-4042-b64f-4d1a92db1365
+2026-05-29T11:33:59.8899125Z Adding to the tool cache...
+2026-05-29T11:34:06.8521952Z Done
+2026-05-29T11:34:06.8522360Z Added to path
+2026-05-29T11:34:06.8523133Z Detecting full version...

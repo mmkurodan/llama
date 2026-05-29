@@ -1524,6 +1524,11 @@ Java_com_micklab_llama_LlamaNative_setLogPath(
                 replace_signal_fd(&g_signal_log_fd, signal_log_fd);
             } else {
                 LOGE("Failed to open signal log file: %s", g_log_path.c_str());
+                if (g_log_ofs) {
+                    g_log_ofs << current_time_str() << " [JNI] WARNING: Failed to open signal log file: "
+                              << g_log_path << std::endl;
+                    g_log_ofs.flush();
+                }
             }
 
             const std::string crash_path = derive_crash_log_path(g_log_path);
@@ -1537,7 +1542,22 @@ Java_com_micklab_llama_LlamaNative_setLogPath(
                     }
                 } else {
                     LOGE("Failed to open native crash log file: %s", crash_path.c_str());
+                    if (g_log_ofs) {
+                        g_log_ofs << current_time_str() << " [JNI] WARNING: Failed to open native crash log file: "
+                                  << crash_path << std::endl;
+                        g_log_ofs.flush();
+                    }
                 }
+            }
+
+            if (g_log_ofs) {
+                g_log_ofs << current_time_str()
+                          << " [JNI] Signal crash capture ready: signal_log_fd="
+                          << (g_signal_log_fd >= 0 ? "open" : "unavailable")
+                          << " signal_crash_fd="
+                          << (g_signal_crash_fd >= 0 ? "open" : "unavailable")
+                          << std::endl;
+                g_log_ofs.flush();
             }
         }
     }
@@ -2286,6 +2306,8 @@ static bool prefill_text_prompt_locked(
     tokens.resize(n_tokens);
     n_prompt_tokens = static_cast<size_t>(n_tokens);
     n_past = n_tokens;
+    log_to_file("generate: prefill start n_prompt_tokens=" + std::to_string(n_tokens)
+                + " n_batch=" + std::to_string(g_n_batch));
 
     reusable_token_batch prompt_batch(std::min(g_n_batch, n_tokens));
     if (!prompt_batch.valid()) {
@@ -2313,6 +2335,7 @@ static bool prefill_text_prompt_locked(
         }
     }
 
+    log_to_file("generate: prefill complete n_prompt_tokens=" + std::to_string(n_tokens));
     return true;
 }
 

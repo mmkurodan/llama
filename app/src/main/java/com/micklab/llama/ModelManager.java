@@ -509,14 +509,24 @@ public class ModelManager {
         
         String result;
         int generationId = generationCounter.incrementAndGet();
+        String loadedModelName = currentModelPath != null ? new File(currentModelPath).getName() : "(none)";
+        int promptLength = prompt != null ? prompt.length() : 0;
+        int mediaCount = mediaFiles != null ? mediaFiles.length : 0;
         DiagnosticsLogger.logMemorySnapshot(
                 context,
                 "generation-start",
                 "id=" + generationId
                         + " config=" + currentConfigName
-                        + " model=" + (currentModelPath != null ? new File(currentModelPath).getName() : "(none)")
-                        + " promptLen=" + (prompt != null ? prompt.length() : 0)
-                        + " mediaCount=" + (mediaFiles != null ? mediaFiles.length : 0));
+                        + " model=" + loadedModelName
+                        + " promptLen=" + promptLength
+                        + " mediaCount=" + mediaCount);
+        DiagnosticsLogger.markGenerationInProgress(
+                context,
+                generationId,
+                currentConfigName,
+                loadedModelName,
+                promptLength,
+                mediaCount);
         DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-start");
         try {
             result = (mediaFiles == null || mediaFiles.length == 0)
@@ -539,6 +549,8 @@ public class ModelManager {
             }
             // Return a clear error string so API layer can send a proper error response
             return "generate failed: " + t.toString();
+        } finally {
+            DiagnosticsLogger.clearGenerationInProgress(context);
         }
         DiagnosticsLogger.logMemorySnapshot(
                 context,

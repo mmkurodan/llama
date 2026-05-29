@@ -1,0 +1,42 @@
+Model: gpt-5-mini
+Timestamp: Fri May 29 12:09:11 PM UTC 2026
+---
+Warning: Ignoring invalid allowedUrls entry "https://http//127.0.0.1:11434$". Error: Invalid URL pattern: https://http//127.0.0.1:11434$
+1) 問題点の要約
+- 致命的ビルドエラー：C++ コンパイルで jni_llama.cpp 内の識別子 initialize_optional_multimodal_support_locked が未定義 → ninja/Gradle ビルド中断・失敗（exit code 1）。
+- Node.js の非推奨 API 使用：Buffer() の DeprecationWarning が複数ジョブで発生。
+- GitHub Actions ランナー上の Node.js 20 は非推奨（actions の更新要）。
+- Android/Gradle 周りの警告：compileSdk=35 に対して新しい AGP 推奨／一部 deprecated API 使用の警告あり。
+- libcurl / ビルド構成の警告：zlib 無効、LDAP/IDN/libpsl/libgsasl 欠如、ca-cert 検出スキップ、クロスツールの警告等。
+- apt / CMake の deprecation 警告や多数のビルド警告（非致命だが機能制限や将来の問題を示唆）。
+
+2) 根拠となるログ行（抜粋）
+- /root/llama/.../0_build-apk.txt:3900: ... /home/.../jni_llama.cpp:683:50: error: use of undeclared identifier 'initialize_optional_multimodal_support_locked'
+- /root/llama/.../0_build-apk.txt:3903: 1 error generated.
+- /root/llama/.../0_build-apk.txt:3914: > com.android.ide.common.process.ProcessException: ninja: Entering directory `...'
+- /root/llama/.../0_build-apk.txt:4175: BUILD FAILED in 36s
+- /root/llama/.../0_build-apk.txt:4176: ##[error]Process completed with exit code 1.
+- /root/llama/.../0_build-apk.txt:127: (node:2213) [DEP0005] DeprecationWarning: Buffer() is deprecated ...
+- /root/llama/.../0_build-apk.txt:146: (node:2224) [DEP0005] DeprecationWarning: Buffer() is deprecated ...
+- /root/llama/.../0_build-apk.txt:3337: WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+- /root/llama/.../0_build-apk.txt:3838: Note: Some input files use or override a deprecated API.
+- /root/llama/.../1_build-libcurl.txt:113: WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+- /root/llama/.../1_build-libcurl.txt:496: configure: WARNING: zlib disabled
+- /root/llama/.../1_build-libcurl.txt:500: configure: WARNING: Cannot find libraries for LDAP support: LDAP disabled
+- /root/llama/.../2_build-mbedtls.txt:295: CMake Deprecation Warning at CMakeLists.txt:21 (cmake_minimum_required):
+- /root/llama/.../build-apk/31_Complete job.txt:3: ##[warning]Node.js 20 actions are deprecated. ... actions/checkout@v4, actions/download-artifact@v4 ...
+
+3) 補足（対処方針）
+- 最優先：C++ エラーを修正（jni_llama.cpp の該当呼び出しを確認）。原因案：関数が削除/リネーム、条件付きコンパイルで除外、又はヘッダ未インクルード。リポジトリ内で initialize_optional_multimodal_support_locked を検索し定義を復元するか、呼び出しを新 API に置換する。
+- Node の DeprecationWarning：ログ出力元特定のため node --trace-deprecation を実行／該当スクリプト・依存ライブラリを Buffer.from/alloc に書き換え、または該当 Actions の最新版へ更新。
+- Actions の Node.js 20 非推奨：actions を Node.js24 対応版へ更新、あるいは当座の回避として FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true を設定（但し長期対応は action 更新推奨）。
+- Android/Gradle 警告：Android Gradle Plugin を compileSdk=35 に対応する最新版へ更新、もしくは compileSdk をサポートバージョンへ下げる。deprecated API は該当箇所を確認し移行。
+- libcurl の configure 警告：必要なライブラリ（zlib, libpsl, libgsasl, LDAP）をインストールするか、機能欠如を許容する設定を明示。クロスコンパイル時の ca-cert 検出はホスト側で対処。
+- apt / CMake 警告は非致命だが CI スクリプトと build toolchain を見直し、将来的な問題を防ぐ。
+- 再ビルドは上の修正後。ビルド失敗のスタック（Gradle → ProcessException → ninja） は上記 C++ エラーがトリガーなので、該当を直せば解消するはず。
+
+
+
+Changes    +0 -0
+Requests   0 Premium (2m 13s)
+Tokens     ↑ 37.0k • ↓ 6.0k (4.8k reasoning)
