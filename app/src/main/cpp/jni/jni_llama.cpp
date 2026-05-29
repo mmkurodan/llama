@@ -600,20 +600,101 @@ struct reusable_token_batch {
     }
 };
 
-static void reset_generation_state_locked() {
+static llama_context_params build_context_params_locked() {
+    llama_context_params cparams = llama_context_default_params();
+    cparams.n_ctx           = g_n_ctx;
+    cparams.n_threads       = g_n_threads;
+    cparams.n_batch         = g_n_batch;
+    cparams.n_threads_batch = g_n_threads;
+    return cparams;
+}
+
+static void release_multimodal_locked(const char * log_prefix) {
+    if (!g_mtmd) {
+        return;
+    }
+    mtmd_free(g_mtmd);
+    g_mtmd = nullptr;
+    g_current_mmproj_path.clear();
+    g_supports_vision = false;
+    g_supports_audio = false;
+    if (log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": multimodal context freed");
+    }
+}
+
+static void release_context_locked(const char * log_prefix) {
     if (!g_ctx) {
         return;
     }
-    // Upstream Android llama.cpp examples only clear memory metadata between generations.
-    // Clearing backing buffers on every request exercises extra backend buffer operations and
-    // has correlated with repeated-run instability on recurrent/MTP models.
     llama_synchronize(g_ctx);
-    llama_memory_t mem = llama_get_memory(g_ctx);
-    if (mem != nullptr) {
-        llama_memory_clear(mem, false);
+    llama_free(g_ctx);
+    g_ctx = nullptr;
+    if (log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": context freed");
     }
-    llama_synchronize(g_ctx);
+}
+
+static void release_model_locked(const char * log_prefix) {
+    if (!g_model) {
+        return;
+    }
+    llama_model_free(g_model);
+    g_model = nullptr;
+    g_current_model_path.clear();
+    if (log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": model freed");
+    }
+}
+
+static bool recreate_generation_context_locked(const char * log_prefix, std::string & error_message) {
+    if (!g_model) {
+        error_message = "not initialized";
+        return false;
+    }
+
+    const std::string mmproj_path = g_current_mmproj_path;
+
+    if (g_mtmd) {
+        release_multimodal_locked(log_prefix);
+    }
+    if (g_ctx) {
+        release_context_locked(log_prefix);
+    }
+
+    llama_context_params cparams = build_context_params_locked();
+    g_ctx = llama_init_from_model(g_model, cparams);
+    if (!g_ctx) {
+        error_message = "failed to recreate context";
+        log_to_file(std::string(log_prefix) + ": " + error_message, GGML_LOG_LEVEL_ERROR);
+        return false;
+    }
+
+    {
+        std::ostringstream ss;
+        ss << log_prefix << ": generation context recreated"
+           << " n_ctx=" << cparams.n_ctx
+           << " n_batch=" << cparams.n_batch
+           << " n_threads=" << cparams.n_threads;
+        log_to_file(ss.str());
+    }
+
+    if (!mmproj_path.empty()) {
+        const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
+                g_current_model_path,
+                mmproj_path,
+                log_prefix);
+        if (selected_mmproj_path.empty()) {
+            error_message = "failed to reinitialize multimodal projector";
+            log_to_file(std::string(log_prefix) + ": " + error_message, GGML_LOG_LEVEL_ERROR);
+            release_context_locked(log_prefix);
+            return false;
+        }
+        g_current_mmproj_path = selected_mmproj_path;
+    }
+
     llama_perf_context_reset(g_ctx);
+    return true;
 }
 
 static void log_to_file(const std::string& msg, ggml_log_level level) {
@@ -1391,25 +1472,9 @@ static void llama_jni_free() {
 
     log_to_file("llama_jni_free: freeing resources (explicit)");
 
-    if (g_mtmd) {
-        mtmd_free(g_mtmd);
-        g_mtmd = nullptr;
-        g_current_mmproj_path.clear();
-        g_supports_vision = false;
-        g_supports_audio = false;
-        log_to_file("Multimodal context freed");
-    }
-    if (g_ctx) {
-        llama_free(g_ctx);
-        g_ctx = nullptr;
-        log_to_file("Context freed");
-    }
-    if (g_model) {
-        llama_model_free(g_model);
-        g_model = nullptr;
-        g_current_model_path.clear();
-        log_to_file("Model freed");
-    }
+    release_multimodal_locked("llama_jni_free");
+    release_context_locked("llama_jni_free");
+    release_model_locked("llama_jni_free");
     g_current_mmproj_path.clear();
     g_supports_vision = false;
     g_supports_audio = false;
@@ -1579,19 +1644,9 @@ Java_com_micklab_llama_LlamaNative_init(
     ensure_fatal_signal_handlers_installed();
 
     auto clear_partial_init = []() {
-        if (g_mtmd) {
-            mtmd_free(g_mtmd);
-            g_mtmd = nullptr;
-        }
-        if (g_ctx) {
-            llama_free(g_ctx);
-            g_ctx = nullptr;
-        }
-        if (g_model) {
-            llama_model_free(g_model);
-            g_model = nullptr;
-        }
-        g_current_model_path.clear();
+        release_multimodal_locked("init");
+        release_context_locked("init");
+        release_model_locked("init");
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
@@ -1623,21 +1678,18 @@ Java_com_micklab_llama_LlamaNative_init(
         // Defensively free existing resources before loading a new model
         if (g_mtmd) {
             log_to_file("init: freeing existing multimodal context before re-init");
-            mtmd_free(g_mtmd);
-            g_mtmd = nullptr;
+            release_multimodal_locked("init");
         }
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
         if (g_ctx) {
             log_to_file("init: freeing existing context before re-init");
-            llama_free(g_ctx);
-            g_ctx = nullptr;
+            release_context_locked("init");
         }
         if (g_model) {
             log_to_file("init: freeing existing model before re-init");
-            llama_model_free(g_model);
-            g_model = nullptr;
+            release_model_locked("init");
         }
         if (!g_current_model_path.empty()) {
             log_to_file("init: clearing previous model path");
@@ -1736,11 +1788,7 @@ Java_com_micklab_llama_LlamaNative_init(
             }
         }
 
-        llama_context_params cparams = llama_context_default_params();
-        cparams.n_ctx           = g_n_ctx;
-        cparams.n_threads       = g_n_threads;
-        cparams.n_batch         = g_n_batch;
-        cparams.n_threads_batch = g_n_threads;
+        llama_context_params cparams = build_context_params_locked();
 
         {
             using namespace std::chrono;
@@ -1791,19 +1839,9 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
     ensure_fatal_signal_handlers_installed();
 
     auto clear_partial_init = []() {
-        if (g_mtmd) {
-            mtmd_free(g_mtmd);
-            g_mtmd = nullptr;
-        }
-        if (g_ctx) {
-            llama_free(g_ctx);
-            g_ctx = nullptr;
-        }
-        if (g_model) {
-            llama_model_free(g_model);
-            g_model = nullptr;
-        }
-        g_current_model_path.clear();
+        release_multimodal_locked("initWithMmproj");
+        release_context_locked("initWithMmproj");
+        release_model_locked("initWithMmproj");
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
@@ -1841,21 +1879,18 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
 
         if (g_mtmd) {
             log_to_file("initWithMmproj: freeing existing multimodal context before re-init");
-            mtmd_free(g_mtmd);
-            g_mtmd = nullptr;
+            release_multimodal_locked("initWithMmproj");
         }
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
         if (g_ctx) {
             log_to_file("initWithMmproj: freeing existing context before re-init");
-            llama_free(g_ctx);
-            g_ctx = nullptr;
+            release_context_locked("initWithMmproj");
         }
         if (g_model) {
             log_to_file("initWithMmproj: freeing existing model before re-init");
-            llama_model_free(g_model);
-            g_model = nullptr;
+            release_model_locked("initWithMmproj");
         }
         if (!g_current_model_path.empty()) {
             log_to_file("initWithMmproj: clearing previous model path");
@@ -1945,11 +1980,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             }
         }
 
-        llama_context_params cparams = llama_context_default_params();
-        cparams.n_ctx           = g_n_ctx;
-        cparams.n_threads       = g_n_threads;
-        cparams.n_batch         = g_n_batch;
-        cparams.n_threads_batch = g_n_threads;
+        llama_context_params cparams = build_context_params_locked();
 
         {
             using namespace std::chrono;
@@ -2384,7 +2415,12 @@ static jstring generate_locked(
     }
 
     const int max_tokens = 1024;
-    reset_generation_state_locked();
+    std::string context_error;
+    if (!recreate_generation_context_locked("generate", context_error)) {
+        log_to_file(std::string("generate: ") + context_error, GGML_LOG_LEVEL_ERROR);
+        notify_token_error(context_error.c_str());
+        return new_java_string_utf8(env, context_error);
+    }
 
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
     size_t n_prompt_tokens = 0;
@@ -2397,12 +2433,6 @@ static jstring generate_locked(
         notify_token_error(errmsg);
         return new_java_string_utf8(env, errmsg);
     }
-
-    struct generation_reset_guard {
-        ~generation_reset_guard() {
-            reset_generation_state_locked();
-        }
-    } reset_guard;
 
     const bool has_media = media_files != nullptr && !media_files->empty();
     const bool prefill_ok = has_media
@@ -2673,7 +2703,10 @@ static jstring generate_openai_chat_completion_locked(
             log_to_file(std::string("generateOpenAiChatCompletion: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
         }
 
-        reset_generation_state_locked();
+        std::string context_error;
+        if (!recreate_generation_context_locked("generateOpenAiChatCompletion", context_error)) {
+            return build_error(context_error);
+        }
 
         const llama_vocab * vocab = llama_model_get_vocab(g_model);
         size_t n_prompt_tokens = 0;
@@ -2683,11 +2716,6 @@ static jstring generate_openai_chat_completion_locked(
         if (!generation_batch.valid()) {
             return build_error("failed to allocate generation batch");
         }
-        struct generation_reset_guard {
-            ~generation_reset_guard() {
-                reset_generation_state_locked();
-            }
-        } reset_guard;
 
         const bool has_media = media_files != nullptr && !media_files->empty();
         const bool prefill_ok = has_media
