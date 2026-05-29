@@ -78,6 +78,10 @@ static volatile sig_atomic_t g_signal_crash_fd = -1;
 static std::atomic<bool> g_fatal_signal_handlers_installed(false);
 static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
+static std::string initialize_optional_multimodal_support_locked(
+        const std::string & model_path,
+        const std::string & requested_mmproj_path,
+        const char * log_prefix);
 
 // 設定
 static int   g_n_ctx      = 2048;
