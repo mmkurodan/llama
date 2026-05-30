@@ -30,6 +30,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.Switch;
@@ -75,6 +76,9 @@ public class SettingsActivity extends Activity {
     private EditText configNameInput;
     private Spinner configSpinner;
     private EditText modelUrlInput;
+    private TextView multimodalProjectorInfo;
+    private Button selectProjectorButton;
+    private Button clearProjectorButton;
     private Button searchGgufButton;
     private EditText nCtxInput;
     private EditText nThreadsInput;
@@ -151,6 +155,7 @@ public class SettingsActivity extends Activity {
     private ConfigurationManager.Configuration currentConfig;
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
+    private String selectedProjectorReference = "";
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
     private volatile boolean huggingFaceSearchInProgress = false;
@@ -190,6 +195,10 @@ public class SettingsActivity extends Activity {
             this.displayName = displayName;
             this.sizeBytes = sizeBytes;
         }
+    }
+
+    private interface SelectionHandler {
+        void onSelected(int selectedIndex);
     }
 
     private static final class CollapsibleSectionController {
@@ -248,6 +257,9 @@ public class SettingsActivity extends Activity {
         configNameInput = findViewById(R.id.configNameInput);
         configSpinner = findViewById(R.id.configSpinner);
         modelUrlInput = findViewById(R.id.modelUrlInput);
+        multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
+        selectProjectorButton = findViewById(R.id.selectProjectorButton);
+        clearProjectorButton = findViewById(R.id.clearProjectorButton);
         searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
         nThreadsInput = findViewById(R.id.nThreadsInput);
@@ -406,6 +418,33 @@ public class SettingsActivity extends Activity {
             }
             showModelMaintenanceDialog();
         });
+        selectProjectorButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showStoredProjectorSelectionDialog();
+        });
+        clearProjectorButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            setSelectedProjectorReference("");
+        });
+        modelUrlInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                clearIncompatibleProjectorSelection();
+                updateMultimodalProjectorInfo();
+            }
+        });
         backButton.setOnClickListener(v -> finish());
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
@@ -454,6 +493,10 @@ public class SettingsActivity extends Activity {
         if (searchGgufButton != null) searchGgufButton.setEnabled(!isBusy);
         if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
         if (maintainModelButton != null) maintainModelButton.setEnabled(!isBusy);
+        if (selectProjectorButton != null) selectProjectorButton.setEnabled(!isBusy);
+        if (clearProjectorButton != null) {
+            clearProjectorButton.setEnabled(!isBusy && !selectedProjectorReference.isEmpty());
+        }
 
         if (backButton != null) backButton.setEnabled(true);
         if (cancelButton != null) cancelButton.setEnabled(true);
@@ -529,6 +572,10 @@ public class SettingsActivity extends Activity {
                 case "Load Selected Config": return "選択した設定を読み込む";
                 case "Model Selection": return "モデル選択";
                 case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
+                case "Multimodal Projector (mmproj):": return "マルチモーダル Projector (mmproj):";
+                case "No multimodal projector selected": return "mmproj は未選択です";
+                case "Select mmproj": return "mmproj を選択";
+                case "Clear mmproj": return "mmproj を解除";
                 case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
                 case "gguf import from local device": return "ローカル端末からggufを取り込む";
                 case "Load Model": return "モデルを読み込む";
@@ -855,6 +902,7 @@ public class SettingsActivity extends Activity {
     
     private void updateUIFromConfig(ConfigurationManager.Configuration config) {
         configNameInput.setText(config.name);
+        selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         modelUrlInput.setText(config.modelUrl);
         nCtxInput.setText(String.valueOf(config.nCtx));
         nThreadsInput.setText(String.valueOf(config.nThreads));
@@ -901,6 +949,8 @@ public class SettingsActivity extends Activity {
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
         customChatTemplateInput.setText(config.customChatTemplate != null ? config.customChatTemplate : "");
+        clearIncompatibleProjectorSelection();
+        updateMultimodalProjectorInfo();
         updateAutoTemplatePreview(config);
     }
 
@@ -975,9 +1025,7 @@ public class SettingsActivity extends Activity {
         if (currentConfig != null && currentConfig.promptTemplate != null && !currentConfig.promptTemplate.isEmpty()) {
             config.promptTemplate = currentConfig.promptTemplate;
         }
-        if (shouldPreserveMultimodalProjectorReference(config.modelUrl)) {
-            config.multimodalProjectorUrl = currentConfig.multimodalProjectorUrl;
-        }
+        config.multimodalProjectorUrl = normalizeReference(selectedProjectorReference);
         
         // Penalty parameters
         try {
@@ -1107,36 +1155,6 @@ public class SettingsActivity extends Activity {
         config.customChatTemplate = customChatTemplateInput.getText().toString();
         
         return config;
-    }
-
-    private boolean shouldPreserveMultimodalProjectorReference(String nextModelReference) {
-        if (currentConfig == null) {
-            return false;
-        }
-        String currentProjectorReference = currentConfig.multimodalProjectorUrl;
-        if (currentProjectorReference == null || currentProjectorReference.trim().isEmpty()) {
-            return false;
-        }
-
-        String previousModelReference = currentConfig.modelUrl;
-        if (previousModelReference == null || previousModelReference.trim().isEmpty()) {
-            return false;
-        }
-        if (nextModelReference == null || nextModelReference.trim().isEmpty()) {
-            return false;
-        }
-        if (!ModelFileHelper.canAutoApplyProjectorReference(nextModelReference, currentProjectorReference)) {
-            return false;
-        }
-
-        String previousFilename = ModelFileHelper.extractFilename(previousModelReference);
-        String nextFilename = ModelFileHelper.extractFilename(nextModelReference);
-        if (previousFilename != null && !previousFilename.isEmpty()
-                && nextFilename != null && !nextFilename.isEmpty()) {
-            return previousFilename.equalsIgnoreCase(nextFilename);
-        }
-
-        return previousModelReference.trim().equalsIgnoreCase(nextModelReference.trim());
     }
 
     private int resolveApiPortFromUi() {
@@ -1412,18 +1430,14 @@ public class SettingsActivity extends Activity {
             fileItems[i] = modelFiles[i].getName() + " (" + modelFiles[i].length() + " bytes)";
         }
 
-        final int[] selectedIndex = {0};
-        new AlertDialog.Builder(this)
-            .setTitle(localizedText("モデル管理", "Model Maintenance"))
-            .setSingleChoiceItems(fileItems, 0, (dialog, which) -> selectedIndex[0] = which)
-            .setPositiveButton(
-                    localizedText("選択モデルを使用", "Use Selected Model"),
-                    (dialog, which) -> switchCurrentProfileToDownloadedModel(modelFiles[selectedIndex[0]]))
-            .setNeutralButton(
-                    localizedText("選択モデルを削除", "Delete Selected"),
-                    (dialog, which) -> confirmDeleteModelFile(modelFiles[selectedIndex[0]]))
-            .setNegativeButton(localizedText("閉じる", "Close"), null)
-            .show();
+        showScrollableSingleChoiceDialog(
+                localizedText("モデル管理", "Model Maintenance"),
+                fileItems,
+                0,
+                localizedText("選択モデルを使用", "Use Selected Model"),
+                selectedIndex -> switchCurrentProfileToDownloadedModel(modelFiles[selectedIndex]),
+                localizedText("選択モデルを削除", "Delete Selected"),
+                selectedIndex -> confirmDeleteModelFile(modelFiles[selectedIndex]));
     }
 
     private File[] getDownloadedModelFiles() {
@@ -1437,6 +1451,7 @@ public class SettingsActivity extends Activity {
                         && !"ollama.log".equals(file.getName())
                         && !"last_crash.txt".equals(file.getName())
                         && !"native_crash.txt".equals(file.getName())
+                        && !ModelFileHelper.isLikelyProjectorFilename(file.getName())
                         && !file.getName().endsWith(IMPORT_TEMP_SUFFIX)
                         && !PendingModelLoadStore.isMarkerFile(file.getName())
                         && !containsFile(modelFiles, file)) {
@@ -1447,7 +1462,10 @@ public class SettingsActivity extends Activity {
 
         if (loadedModelPath != null && !loadedModelPath.isEmpty()) {
             File loadedFile = new File(loadedModelPath);
-            if (loadedFile.isFile() && loadedFile.length() > 0 && !containsFile(modelFiles, loadedFile)) {
+            if (loadedFile.isFile()
+                    && loadedFile.length() > 0
+                    && !ModelFileHelper.isLikelyProjectorFilename(loadedFile.getName())
+                    && !containsFile(modelFiles, loadedFile)) {
                 modelFiles.add(loadedFile);
             }
         }
@@ -1669,29 +1687,34 @@ public class SettingsActivity extends Activity {
             HuggingFaceApiClient.RepositoryFiles repositoryFiles,
             HuggingFaceApiClient.GgufFileInfo selectedFile) {
         String downloadUrl = selectedFile.getDownloadUrl();
-        HuggingFaceApiClient.GgufFileInfo matchedProjector =
-                repositoryFiles.findMatchingProjector(selectedFile, false, false);
+        String previousModelReference = modelUrlInput.getText().toString().trim();
+        String previousProjectorReference = selectedProjectorReference;
         modelUrlInput.setText(downloadUrl);
+        setSelectedProjectorReference("");
         currentConfig = getConfigFromUI();
-        if (matchedProjector != null) {
-            currentConfig.multimodalProjectorUrl = matchedProjector.getDownloadUrl();
-        }
         updateAutoTemplatePreview(currentConfig);
-        String selectionMessage = matchedProjector != null
-                ? localizedText(
-                        "選択したモデル: " + selectedFile.getFilename() + "\n対応 mmproj: " + matchedProjector.getFilename(),
-                        "Selected model: " + selectedFile.getFilename() + "\nMatched mmproj: " + matchedProjector.getFilename())
-                : localizedText(
-                        "選択したモデル: " + selectedFile.getFilename(),
-                        "Selected model: " + selectedFile.getFilename());
-        modelFileInfo.setText(selectionMessage);
-        showToast(matchedProjector != null
-                ? localizedText(
-                        "ダウンロードを開始します: " + selectedFile.getFilename() + " / mmproj も設定しました",
-                        "Starting download: " + selectedFile.getFilename() + " / matched mmproj configured")
-                : localizedText(
-                        "ダウンロードを開始します: " + selectedFile.getFilename(),
-                        "Starting download: " + selectedFile.getFilename()));
+        List<HuggingFaceApiClient.GgufFileInfo> projectorFiles = repositoryFiles.getProjectorFiles();
+        HuggingFaceApiClient.GgufFileInfo suggestedProjectorInfo =
+                repositoryFiles.findMatchingProjector(selectedFile, false, false);
+        String suggestedProjector = suggestedProjectorInfo != null
+                ? suggestedProjectorInfo.getFilename()
+                : null;
+        if (!projectorFiles.isEmpty() && (suggestedProjector != null
+                || ModelFileHelper.isLikelyMultimodalModelReference(selectedFile.getFilename()))) {
+            promptForHuggingFaceProjectorSelection(
+                    repositoryFiles,
+                    selectedFile,
+                    previousModelReference,
+                    previousProjectorReference);
+            return;
+        }
+
+        modelFileInfo.setText(localizedText(
+                "選択したモデル: " + selectedFile.getFilename(),
+                "Selected model: " + selectedFile.getFilename()));
+        showToast(localizedText(
+                "ダウンロードを開始します: " + selectedFile.getFilename(),
+                "Starting download: " + selectedFile.getFilename()));
         loadModel();
     }
 
@@ -1826,14 +1849,264 @@ public class SettingsActivity extends Activity {
 
                 loadedModelPath = null;
                 modelLoadedSuccessfully = false;
-                modelUrlInput.setText(displayName);
-                modelFileInfo.setText("Model file: " + displayName + " (" + destFile.length() + " bytes)");
+                boolean importedProjector = ModelFileHelper.isLikelyProjectorFilename(displayName);
+                if (importedProjector) {
+                    modelFileInfo.setText(localizedText(
+                            "mmproj を取り込みました: " + displayName + " (" + destFile.length() + " bytes)",
+                            "Imported mmproj: " + displayName + " (" + destFile.length() + " bytes)"));
+                    String modelReference = modelUrlInput.getText().toString().trim();
+                    if (!modelReference.isEmpty()
+                            && ModelFileHelper.canAutoApplyProjectorReference(modelReference, displayName)) {
+                        setSelectedProjectorReference(displayName);
+                    }
+                } else {
+                    modelUrlInput.setText(displayName);
+                    modelFileInfo.setText("Model file: " + displayName + " (" + destFile.length() + " bytes)");
+                }
                 modelProgressBar.setProgress(0);
                 currentConfig = getConfigFromUI();
-                showToast(localizedText("モデルファイルを取り込みました: " + displayName, "Imported model file: " + displayName));
+                showToast(importedProjector
+                        ? localizedText("mmproj を取り込みました: " + displayName, "Imported mmproj: " + displayName)
+                        : localizedText("モデルファイルを取り込みました: " + displayName, "Imported model file: " + displayName));
                 updateAutoTemplatePreview(currentConfig);
             });
         }).start();
+    }
+
+    private void promptForHuggingFaceProjectorSelection(
+            HuggingFaceApiClient.RepositoryFiles repositoryFiles,
+            HuggingFaceApiClient.GgufFileInfo selectedFile,
+            String previousModelReference,
+            String previousProjectorReference) {
+        List<HuggingFaceApiClient.GgufFileInfo> projectorFiles = repositoryFiles.getProjectorFiles();
+        String[] labels = new String[projectorFiles.size()];
+        int recommendedIndex = -1;
+        HuggingFaceApiClient.GgufFileInfo recommendedProjector =
+                repositoryFiles.findMatchingProjector(selectedFile, false, false);
+        String recommendedReference = recommendedProjector != null
+                ? recommendedProjector.getFilename()
+                : null;
+        for (int i = 0; i < projectorFiles.size(); i++) {
+            HuggingFaceApiClient.GgufFileInfo projectorFile = projectorFiles.get(i);
+            boolean recommended = projectorFile.getFilename().equals(recommendedReference);
+            labels[i] = projectorFile.getFilename()
+                    + (recommended ? localizedText("  [推奨]", "  [Recommended]") : "");
+            if (recommended && recommendedIndex < 0) {
+                recommendedIndex = i;
+            }
+        }
+
+        final int initialSelection = recommendedIndex >= 0 ? recommendedIndex : 0;
+        showScrollableSingleChoiceDialog(
+                localizedText("mmproj を選択", "Select mmproj"),
+                labels,
+                initialSelection,
+                localizedText("選択して続行", "Continue with selection"),
+                selectedIndex -> {
+                    HuggingFaceApiClient.GgufFileInfo selectedProjector = projectorFiles.get(selectedIndex);
+                    setSelectedProjectorReference(selectedProjector.getDownloadUrl());
+                    currentConfig = getConfigFromUI();
+                    modelFileInfo.setText(localizedText(
+                            "選択したモデル: " + selectedFile.getFilename() + "\n選択した mmproj: " + selectedProjector.getFilename(),
+                            "Selected model: " + selectedFile.getFilename() + "\nSelected mmproj: " + selectedProjector.getFilename()));
+                    showToast(localizedText(
+                            "ダウンロードを開始します: " + selectedFile.getFilename(),
+                            "Starting download: " + selectedFile.getFilename()));
+                    loadModel();
+                },
+                localizedText("mmproj なしで続行", "Continue without mmproj"),
+                selectedIndex -> {
+                    setSelectedProjectorReference("");
+                    currentConfig = getConfigFromUI();
+                    modelFileInfo.setText(localizedText(
+                            "選択したモデル: " + selectedFile.getFilename(),
+                            "Selected model: " + selectedFile.getFilename()));
+                    showToast(localizedText(
+                            "ダウンロードを開始します: " + selectedFile.getFilename(),
+                            "Starting download: " + selectedFile.getFilename()));
+                    loadModel();
+                },
+                () -> {
+                    modelUrlInput.setText(previousModelReference);
+                    setSelectedProjectorReference(previousProjectorReference);
+                    currentConfig = getConfigFromUI();
+                    updateAutoTemplatePreview(currentConfig);
+                });
+    }
+
+    private void showStoredProjectorSelectionDialog() {
+        String modelReference = modelUrlInput.getText().toString().trim();
+        if (modelReference.isEmpty()) {
+            showToast(localizedText("先にモデルを選択してください", "Select a model first"));
+            return;
+        }
+
+        File[] projectorFiles = getDownloadedProjectorFiles();
+        if (projectorFiles.length == 0) {
+            showToast(localizedText("利用可能な mmproj が見つかりません", "No stored mmproj files were found"));
+            return;
+        }
+
+        String[] labels = new String[projectorFiles.length];
+        String currentSelection = normalizeReference(selectedProjectorReference);
+        int selectedIndex = 0;
+        for (int i = 0; i < projectorFiles.length; i++) {
+            File projectorFile = projectorFiles[i];
+            boolean recommended = ModelFileHelper.canAutoApplyProjectorReference(modelReference, projectorFile.getName());
+            labels[i] = projectorFile.getName()
+                    + (recommended ? localizedText("  [推奨]", "  [Recommended]") : "")
+                    + " (" + projectorFile.length() + " bytes)";
+            if (projectorFile.getName().equalsIgnoreCase(currentSelection)) {
+                selectedIndex = i;
+            }
+        }
+
+        showScrollableSingleChoiceDialog(
+                localizedText("mmproj を選択", "Select mmproj"),
+                labels,
+                selectedIndex,
+                localizedText("選択", "Select"),
+                index -> setSelectedProjectorReference(projectorFiles[index].getName()),
+                localizedText("解除", "Clear"),
+                index -> setSelectedProjectorReference(""));
+    }
+
+    private void showScrollableSingleChoiceDialog(
+            String title,
+            String[] items,
+            int initialSelection,
+            String positiveLabel,
+            SelectionHandler onPositive,
+            String neutralLabel,
+            SelectionHandler onNeutral) {
+        showScrollableSingleChoiceDialog(
+                title,
+                items,
+                initialSelection,
+                positiveLabel,
+                onPositive,
+                neutralLabel,
+                onNeutral,
+                null);
+    }
+
+    private void showScrollableSingleChoiceDialog(
+            String title,
+            String[] items,
+            int initialSelection,
+            String positiveLabel,
+            SelectionHandler onPositive,
+            String neutralLabel,
+            SelectionHandler onNeutral,
+            Runnable onCancel) {
+        if (items == null || items.length == 0) {
+            return;
+        }
+
+        final int[] selectedIndex = {Math.max(0, Math.min(initialSelection, items.length - 1))};
+        ListView listView = new ListView(this);
+        listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+        listView.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_single_choice, items));
+        listView.setVerticalScrollBarEnabled(true);
+        listView.setFastScrollEnabled(true);
+        listView.setItemChecked(selectedIndex[0], true);
+        listView.setOnItemClickListener((parent, view, position, id) -> selectedIndex[0] = position);
+
+        int rowHeight = (int) (56 * getResources().getDisplayMetrics().density);
+        int minHeight = (int) (180 * getResources().getDisplayMetrics().density);
+        int maxHeight = (getResources().getDisplayMetrics().heightPixels * 3) / 5;
+        int listHeight = Math.min(maxHeight, Math.max(minHeight, items.length * rowHeight));
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (12 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, 0, padding, 0);
+        container.addView(listView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                listHeight));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(container)
+                .setPositiveButton(positiveLabel, (dialogInterface, which) -> onPositive.onSelected(selectedIndex[0]))
+                .setNegativeButton(localizedText("閉じる", "Close"), (dialogInterface, which) -> {
+                    if (onCancel != null) {
+                        onCancel.run();
+                    }
+                })
+                .create();
+        if (neutralLabel != null && onNeutral != null) {
+            dialog.setButton(AlertDialog.BUTTON_NEUTRAL, neutralLabel,
+                    (dialogInterface, which) -> onNeutral.onSelected(selectedIndex[0]));
+        }
+        dialog.setOnCancelListener(dialogInterface -> {
+            if (onCancel != null) {
+                onCancel.run();
+            }
+        });
+        dialog.show();
+    }
+
+    private void clearIncompatibleProjectorSelection() {
+        String modelReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
+        if (selectedProjectorReference.isEmpty() || modelReference.isEmpty()) {
+            return;
+        }
+        if (!ModelFileHelper.canAutoApplyProjectorReference(modelReference, selectedProjectorReference)) {
+            selectedProjectorReference = "";
+        }
+    }
+
+    private void setSelectedProjectorReference(String projectorReference) {
+        selectedProjectorReference = normalizeReference(projectorReference);
+        updateMultimodalProjectorInfo();
+    }
+
+    private void updateMultimodalProjectorInfo() {
+        if (multimodalProjectorInfo == null) {
+            return;
+        }
+        if (selectedProjectorReference.isEmpty()) {
+            multimodalProjectorInfo.setText(localizedText(
+                    "mmproj: 未選択",
+                    "mmproj: not selected"));
+        } else {
+            multimodalProjectorInfo.setText(localizedText(
+                    "mmproj: " + extractFilenameFromUrl(selectedProjectorReference),
+                    "mmproj: " + extractFilenameFromUrl(selectedProjectorReference)));
+        }
+        updateActionButtonStateForBusy();
+    }
+
+    private File[] getDownloadedProjectorFiles() {
+        List<File> projectorFiles = new ArrayList<>();
+        File modelDir = getModelStorageDir();
+        File[] existingFiles = modelDir.listFiles();
+        if (existingFiles != null) {
+            for (File file : existingFiles) {
+                if (file.isFile()
+                        && file.length() > 0
+                        && ModelFileHelper.isLikelyProjectorFilename(file.getName())
+                        && !containsFile(projectorFiles, file)) {
+                    projectorFiles.add(file);
+                }
+            }
+        }
+        projectorFiles.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        String modelReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
+        projectorFiles.sort((a, b) -> {
+            boolean aRecommended = ModelFileHelper.canAutoApplyProjectorReference(modelReference, a.getName());
+            boolean bRecommended = ModelFileHelper.canAutoApplyProjectorReference(modelReference, b.getName());
+            if (aRecommended != bRecommended) {
+                return aRecommended ? -1 : 1;
+            }
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        return projectorFiles.toArray(new File[0]);
+    }
+
+    private String normalizeReference(String reference) {
+        return reference == null ? "" : reference.trim();
     }
 
     private ImportedModelCandidate resolveImportedModelCandidate(Uri sourceUri) {

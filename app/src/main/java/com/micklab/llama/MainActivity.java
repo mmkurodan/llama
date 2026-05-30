@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
     private Button copyLogButton;
     private boolean isViewingLog = false;
     private String savedOutputText = null;
+    private String displayedLogContent = null;
     private String pendingLogDownloadContent = null;
     private TextView apiServerStatusMain;
     
@@ -602,6 +603,7 @@ public class MainActivity extends Activity {
         } else {
             // Restore output view
             isViewingLog = false;
+            displayedLogContent = null;
             viewLogButton.setText(localizedText("ログ表示", "View Log"));
             updateLogButton.setEnabled(false);
             updateLogButton.setVisibility(Button.GONE);
@@ -613,25 +615,72 @@ public class MainActivity extends Activity {
     }
 
     private void refreshLogView() {
-        File logFile = new File(getExternalFilesDir(null), "ollama.log");
-        if (!logFile.exists()) {
+        File appFilesDir = getAppFilesBaseDir();
+        File logFile = new File(appFilesDir, "ollama.log");
+        if (!logFile.exists() && !isMaxDebugEnabled()) {
             showToast("Log file does not exist");
             return;
         }
 
         new Thread(() -> {
             try {
-                final String logContent = readLatestLogLines(logFile, LOG_DISPLAY_MAX_LINES);
+                final String logContent = readDisplayLogContent(appFilesDir);
                 runOnUiThread(() -> {
+                    displayedLogContent = logContent;
                     outputView.setText(logContent);
                     scrollTextViewToBottom(outputView);
-                    showToast("Displaying latest " + LOG_DISPLAY_MAX_LINES + " log lines");
+                    showToast(isMaxDebugEnabled()
+                            ? "Displaying merged MAX DEBUG logs"
+                            : "Displaying latest " + LOG_DISPLAY_MAX_LINES + " log lines");
                 });
             } catch (IOException e) {
                 Log.e(TAG, "Failed to read log file", e);
                 showToast("Failed to read log file: " + e.getMessage());
             }
         }).start();
+    }
+
+    private File getAppFilesBaseDir() {
+        File externalDir = getExternalFilesDir(null);
+        return externalDir != null ? externalDir : getFilesDir();
+    }
+
+    private String readDisplayLogContent(File appFilesDir) throws IOException {
+        File logFile = new File(appFilesDir, "ollama.log");
+        if (!isMaxDebugEnabled()) {
+            return readLatestLogLines(logFile, LOG_DISPLAY_MAX_LINES);
+        }
+        return buildMergedDebugLogContent(appFilesDir);
+    }
+
+    private String buildMergedDebugLogContent(File appFilesDir) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        appendMergedLogSection(sb, "ollama.log", new File(appFilesDir, "ollama.log"));
+        appendMergedLogSection(sb, "diagnostics/process_diagnostics.log",
+                new File(new File(appFilesDir, "diagnostics"), "process_diagnostics.log"));
+        appendMergedLogSection(sb, "diagnostics/last_state.txt",
+                new File(new File(appFilesDir, "diagnostics"), "last_state.txt"));
+        appendMergedLogSection(sb, "diagnostics/recent_logcat.txt",
+                new File(new File(appFilesDir, "diagnostics"), "recent_logcat.txt"));
+        appendMergedLogSection(sb, "diagnostics/generation_in_progress.txt",
+                new File(new File(appFilesDir, "diagnostics"), "generation_in_progress.txt"));
+        appendMergedLogSection(sb, "native_crash.txt", new File(appFilesDir, "native_crash.txt"));
+        appendMergedLogSection(sb, "last_crash.txt", new File(appFilesDir, "last_crash.txt"));
+        if (sb.length() == 0) {
+            return "";
+        }
+        return sb.toString();
+    }
+
+    private void appendMergedLogSection(StringBuilder sb, String title, File file) throws IOException {
+        if (file == null || !file.exists() || !file.isFile()) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append('\n');
+        }
+        sb.append("===== ").append(title).append(" =====\n");
+        sb.append(readLatestLogLines(file, LOG_DISPLAY_MAX_LINES));
     }
 
     private String readLatestLogLines(File logFile, int maxLines) throws IOException {
@@ -652,21 +701,11 @@ public class MainActivity extends Activity {
         return sb.toString();
     }
     
-    private String readEntireLogFile(File logFile) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append('\n');
-            }
-        }
-        return sb.toString();
-    }
-    
     private void clearLogFile() {
-        File logFile = new File(getExternalFilesDir(null), "ollama.log");
+        File logFile = new File(getAppFilesBaseDir(), "ollama.log");
         try (FileWriter writer = new FileWriter(logFile, false)) {
             writer.write(""); // Clear the file
+            displayedLogContent = null;
             appendMessage("Log file cleared.");
             showToast("Log file cleared");
         } catch (IOException e) {
@@ -1167,7 +1206,8 @@ public class MainActivity extends Activity {
     }
 
     private void downloadDisplayedLog() {
-        File logFile = new File(getExternalFilesDir(null), "ollama.log");
+        File appFilesDir = getAppFilesBaseDir();
+        File logFile = new File(appFilesDir, "ollama.log");
         String content = null;
         String suggestedFilename = "ollama-log.txt";
 
@@ -1177,9 +1217,9 @@ public class MainActivity extends Activity {
             if (response != null && !response.trim().isEmpty()) {
                 content = response;
                 suggestedFilename = "llm-response.txt";
-            } else if (logFile.exists()) {
+            } else if (logFile.exists() || isMaxDebugEnabled()) {
                 try {
-                    content = readEntireLogFile(logFile);
+                    content = readDisplayLogContent(appFilesDir);
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to read log file", e);
                     showToast("Failed to read log file: " + e.getMessage());
@@ -1187,10 +1227,11 @@ public class MainActivity extends Activity {
                 }
             }
         } else {
-            // When viewing log, prefer to download the full log
-            if (logFile.exists()) {
+            if (displayedLogContent != null && !displayedLogContent.trim().isEmpty()) {
+                content = displayedLogContent;
+            } else if (logFile.exists() || isMaxDebugEnabled()) {
                 try {
-                    content = readEntireLogFile(logFile);
+                    content = readDisplayLogContent(appFilesDir);
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to read log file", e);
                     showToast("Failed to read log file: " + e.getMessage());

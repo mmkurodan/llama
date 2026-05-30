@@ -1,6 +1,0 @@
-{
-  "configName": "Qwen3.5 2B MTP",
-  "modelPath": "\/storage\/emulated\/0\/Android\/data\/com.micklab.llama\/files\/Qwen3.5-2B-Q8_0.gguf",
-  "modelUrl": "https:\/\/huggingface.co\/unsloth\/Qwen3.5-2B-MTP-GGUF\/resolve\/e05864f8066d874d5f85aaff007ae57a2a7d1efe\/Qwen3.5-2B-Q8_0.gguf?download=true",
-  "createdAtMs": 1780090780812
-}

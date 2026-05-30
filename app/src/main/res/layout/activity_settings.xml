@@ -119,6 +119,42 @@
             android:inputType="text"
             android:minLines="2" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Multimodal Projector (mmproj):"
+            android:paddingTop="8dp" />
+
+        <TextView
+            android:id="@+id/multimodalProjectorInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No multimodal projector selected"
+            android:paddingTop="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="4dp">
+
+            <Button
+                android:id="@+id/selectProjectorButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Select mmproj" />
+
+            <Button
+                android:id="@+id/clearProjectorButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Clear mmproj" />
+        </LinearLayout>
+
         <Button
             android:id="@+id/searchGgufButton"
             android:layout_width="match_parent"

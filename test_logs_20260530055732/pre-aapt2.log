@@ -1,0 +1,922 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.12/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: The option setting 'android.aapt2FromMavenOverride=/root/android-sdk/build-tools/35.0.0/aapt2' is experimental.
+WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+
+This Android Gradle plugin (8.5.1) was tested up to compileSdk = 34.
+
+You are strongly encouraged to update your project to use a newer
+Android Gradle plugin that has been tested with compileSdk = 35.
+
+If you are already using the latest version of the Android Gradle plugin,
+you may need to wait until a newer version with support for compileSdk = 35 is available.
+
+For more information refer to the compatibility table:
+https://d.android.com/r/tools/api-level-support
+
+To suppress this warning, add/update
+    android.suppressUnsupportedCompileSdk=35
+to this project's gradle.properties.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-D> Task :app:processDebugResources
+
+> Task :app:compileDebugJavaWithJavac FAILED
+Java comp
+> Task :app:compileDebugJavaWithJavac
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:620: error: cannot find symbol
+        if (!logFile.exists() && !isMaxDebugLogEnabled()) {
+                                  ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:632: error: cannot find symbol
+                    showToast(isMaxDebugLogEnabled()
+                              ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:650: error: cannot find symbol
+        if (!isMaxDebugLogEnabled()) {
+             ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1220: error: cannot find symbol
+            } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                           ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1232: error: cannot find symbol
+            } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                           ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1699: error: cannot find symbol
+                repositoryFiles.getProjectorFileNames());
+                               ^
+  symbol:   method getProjectorFileNames()
+  location: variable repositoryFiles of type RepositoryFiles
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1884: error: cannot find symbol
+                repositoryFiles.getProjectorFileNames());
+                               ^
+  symbol:   method getProjectorFileNames()
+  location: variable repositoryFiles of type RepositoryFiles
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+7 errors
+3 warnings
+
+> Task :app:compileDebugJavaWithJavac FAILED
+
+[Incubating] Problems report is available at: file:///root/llama/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.Note: Recompile with -Xlint:deprecation for details.warning: [options] source value 8 is obsolete and will be removed in a future release/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:620: error: cannot find symbol
+          if (!logFile.exists() && !isMaxDebugLogEnabled()) {
+                                    ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:632: error: cannot find symbol
+                      showToast(isMaxDebugLogEnabled()
+                                ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:650: error: cannot find symbol
+          if (!isMaxDebugLogEnabled()) {
+               ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1220: error: cannot find symbol
+              } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                             ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1232: error: cannot find symbol
+              } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                             ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1699: error: cannot find symbol
+                  repositoryFiles.getProjectorFileNames());
+                                 ^
+    symbol:   method getProjectorFileNames()
+    location: variable repositoryFiles of type RepositoryFiles
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1884: error: cannot find symbol
+                  repositoryFiles.getProjectorFileNames());
+                                 ^
+    symbol:   method getProjectorFileNames()
+    location: variable repositoryFiles of type RepositoryFilesNote: Some input files use or override a deprecated API.warning: [options] target value 8 is obsolete and will be removed in a future release
+  7 errors
+  3 warnings
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.12/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 23s
+17 actionable tasks: 2 executed, 15 up-to-date
+er.java:2363: error: package PromptTemplateManager does not exist
+    private void logTemplateSelection(String contextLabel, PromptTemplateManager.TemplateSelectionResult selection) {
+                                                                                ^
+/root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2460: error: package SharedToolManager does not exist
+            SharedToolManager.ChatResult toolResult
+                             ^
+/root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2489: error: package SharedToolManager does not exist
+            SharedToolManager.ChatResult toolResult
+                             ^
+/root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2516: error: package SharedToolManager does not exist
+            SharedToolManager.ChatResult toolResult
+                             ^
+/root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2540: error: package SharedToolManager does not exist
+            SharedToolManager.ChatResult toolResult
+                             ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:54: error: package com.micklab.llama.ConfigurationManager does not exist
+import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
+                                                    ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:54: error: static import only from classes and interfaces
+import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
+^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:72: error: cannot find symbol
+    private ConfigurationManager configManager;
+            ^
+  symbol:   class ConfigurationManager
+  location: class SettingsActivity
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:155: error: package ConfigurationManager does not exist
+    private ConfigurationManager.Configuration currentConfig;
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:903: error: package ConfigurationManager does not exist
+    private void updateUIFromConfig(ConfigurationManager.Configuration config) {
+                                                        ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:957: error: package ConfigurationManager does not exist
+    private void updateAutoTemplatePreview(ConfigurationManager.Configuration config) {
+                                                               ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:979: error: package ConfigurationManager does not exist
+    private ConfigurationManager.Configuration getConfigFromUI() {
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1622: error: package HuggingFaceApiClient does not exist
+    private void showHuggingFaceRepositoryDialog(List<HuggingFaceApiClient.ModelSearchResult> results) {
+                                                                          ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1641: error: package HuggingFaceApiClient does not exist
+    private void fetchHuggingFaceRepositoryFiles(HuggingFaceApiClient.ModelSearchResult result) {
+                                                                     ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1672: error: package HuggingFaceApiClient does not exist
+    private void showHuggingFaceFileDialog(HuggingFaceApiClient.RepositoryFiles repositoryFiles) {
+                                                               ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1687: error: package HuggingFaceApiClient does not exist
+            HuggingFaceApiClient.RepositoryFiles repositoryFiles,
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1688: error: package HuggingFaceApiClient does not exist
+            HuggingFaceApiClient.GgufFileInfo selectedFile) {
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1737: error: package HuggingFaceApiClient does not exist
+    private String buildHuggingFaceRepositoryMeta(HuggingFaceApiClient.ModelSearchResult result) {
+                                                                      ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1875: error: package HuggingFaceApiClient does not exist
+            HuggingFaceApiClient.RepositoryFiles repositoryFiles,
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1876: error: package HuggingFaceApiClient does not exist
+            HuggingFaceApiClient.GgufFileInfo selectedFile,
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:39: error: cannot find symbol
+        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+                                ^
+  symbol:   variable AppLanguageManager
+  location: class DocumentsActivity
+/root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:88: error: cannot find symbol
+        return AppLanguageManager.isJapanese(this) ? ja : en;
+               ^
+  symbol:   variable AppLanguageManager
+  location: class DocumentsActivity
+/root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:144: error: cannot find symbol
+        return AppLanguageManager.isJapanese(this)
+               ^
+  symbol:   variable AppLanguageManager
+  location: class DocumentsActivity
+/root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:410: error: cannot find symbol
+        return AppLanguageManager.isJapanese(this)
+               ^
+  symbol:   variable AppLanguageManager
+  location: class DocumentsActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:74: error: cannot find symbol
+        return ResponseMarkerSanitizer.stripResponseMarkers(text);
+               ^
+  symbol:   variable ResponseMarkerSanitizer
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:132: error: cannot find symbol
+            holdbackLength = ResponseMarkerSanitizer.getStreamingHoldbackLength();
+                             ^
+  symbol:   variable ResponseMarkerSanitizer
+  location: class StreamOutputFilter
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:193: error: cannot find symbol
+        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+                                ^
+  symbol:   variable AppLanguageManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:200: error: cannot find symbol
+        currentDisplayLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+                                 ^
+  symbol:   variable AppLanguageManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:203: error: cannot find symbol
+        configManager = new ConfigurationManager(this);
+                            ^
+  symbol:   class ConfigurationManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:210: error: package ConfigurationManager does not exist
+            currentConfig = new ConfigurationManager.Configuration();
+                                                    ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:347: error: package LlamaNative does not exist
+        LlamaNative.TokenListener tListener = null;
+                   ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:358: error: package SharedToolManager does not exist
+                SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                                 ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:358: error: cannot find symbol
+                SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                                                          ^
+  symbol:   variable SharedToolManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:405: error: package LlamaNative does not exist
+                tListener = new LlamaNative.TokenListener() {
+                                           ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:406: error: method does not override or implement a method from a supertype
+                    @Override
+                    ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:408: error: cannot find symbol
+                        if (BuildConfig.DEBUG) {
+                            ^
+  symbol: variable BuildConfig
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:422: error: method does not override or implement a method from a supertype
+                    @Override
+                    ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:424: error: cannot find symbol
+                        if (BuildConfig.DEBUG) {
+                            ^
+  symbol: variable BuildConfig
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:438: error: method does not override or implement a method from a supertype
+                    @Override
+                    ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:440: error: cannot find symbol
+                        if (BuildConfig.DEBUG) {
+                            ^
+  symbol: variable BuildConfig
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:620: error: cannot find symbol
+        if (!logFile.exists() && !isMaxDebugLogEnabled()) {
+                                  ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:632: error: cannot find symbol
+                    showToast(isMaxDebugLogEnabled()
+                              ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:650: error: cannot find symbol
+        if (!isMaxDebugLogEnabled()) {
+             ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:772: error: cannot find symbol
+        File modelFile = ModelFileHelper.resolveStoredModelFile(this, modelUrl);
+                         ^
+  symbol:   variable ModelFileHelper
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:780: error: cannot find symbol
+        return McpSettingsHelper.hasSharedToolConfigForNonWebUi(this);
+               ^
+  symbol:   variable McpSettingsHelper
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:791: error: package PromptTemplateManager does not exist
+        PromptTemplateManager.PromptBuildResult result =
+                             ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:792: error: cannot find symbol
+                PromptTemplateManager.buildPromptForDirectInputWithSelection(
+                ^
+  symbol:   variable PromptTemplateManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:936: error: cannot find symbol
+        return AppLanguageManager.isJapanese(this) ? ja : en;
+               ^
+  symbol:   variable AppLanguageManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1140: error: package PendingModelLoadStore does not exist
+        final PendingModelLoadStore.PendingLoad pendingLoad;
+                                   ^
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1142: error: cannot find symbol
+            pendingLoad = PendingModelLoadStore.readPendingLoad(this);
+                          ^
+  symbol:   variable PendingModelLoadStore
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1194: error: cannot find symbol
+            PendingModelLoadStore.deletePendingLoad(this);
+            ^
+  symbol:   variable PendingModelLoadStore
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1220: error: cannot find symbol
+            } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                           ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1232: error: cannot find symbol
+            } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                           ^
+  symbol:   method isMaxDebugLogEnabled()
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1414: error: cannot find symbol
+        String latestLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+                                ^
+  symbol:   variable AppLanguageManager
+  location: class MainActivity
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:103: error: cannot find symbol
+        this.llama = new LlamaNative();
+                         ^
+  symbol:   class LlamaNative
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:104: error: cannot find symbol
+        this.configManager = new ConfigurationManager(this.context);
+                                 ^
+  symbol:   class ConfigurationManager
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:120: error: cannot find symbol
+        if (BuildConfig.DEBUG) {
+            ^
+  symbol:   variable BuildConfig
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:312: error: package ConfigurationManager does not exist
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                                ^
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:313: error: cannot find symbol
+            DiagnosticsLogger.logEvent(context, "model-load", "Loading configuration: " + configName);
+            ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:352: error: cannot find symbol
+                DiagnosticsLogger.logMemorySnapshot(
+                ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:371: error: cannot find symbol
+                    PendingModelLoadStore.writePendingLoad(context, configName, modelPath, config.modelUrl);
+                    ^
+  symbol:   variable PendingModelLoadStore
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:428: error: cannot find symbol
+            DiagnosticsLogger.logMemorySnapshot(
+            ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:444: error: cannot find symbol
+                    PendingModelLoadStore.deletePendingLoad(context);
+                    ^
+  symbol:   variable PendingModelLoadStore
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:543: error: cannot find symbol
+        DiagnosticsLogger.logMemorySnapshot(
+        ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:551: error: cannot find symbol
+        DiagnosticsLogger.markGenerationInProgress(
+        ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:558: error: cannot find symbol
+        DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-start");
+        ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:563: error: cannot find symbol
+            DiagnosticsLogger.logEvent(
+            ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:570: error: cannot find symbol
+            DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-throw error=" + t);
+            ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:571: error: cannot find symbol
+            DiagnosticsLogger.logMemorySnapshot(
+            ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:581: error: cannot find symbol
+            DiagnosticsLogger.clearGenerationInProgress(context);
+            ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:583: error: cannot find symbol
+        DiagnosticsLogger.logMemorySnapshot(
+        ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:630: error: cannot find symbol
+        DiagnosticsLogger.logMemorySnapshot(
+        ^
+  symbol:   variable DiagnosticsLogger
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:711: error: cannot find symbol
+        return ModelFileHelper.extractFilename(url);
+               ^
+  symbol:   variable ModelFileHelper
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:715: error: cannot find symbol
+        return ModelFileHelper.getModelStorageDir(context);
+               ^
+  symbol:   variable ModelFileHelper
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:728: error: cannot find symbol
+            if (!ModelFileHelper.isRemoteModelReference(config.modelUrl)) {
+                 ^
+  symbol:   variable ModelFileHelper
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:767: error: cannot find symbol
+        if (!ModelFileHelper.canAutoApplyProjectorReference(config.modelUrl, config.multimodalProjectorUrl)) {
+             ^
+  symbol:   variable ModelFileHelper
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:773: error: cannot find symbol
+        File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+                              ^
+  symbol:   variable ModelFileHelper
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:799: error: cannot find symbol
+        if (!ModelFileHelper.isRemoteModelReference(mmprojReference)) {
+             ^
+  symbol:   variable ModelFileHelper
+  location: class ModelManager
+/root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:104: error: cannot find symbol
+        return ResponseMarkerSanitizer.stripResponseMarkers(text);
+               ^
+  symbol:   variable ResponseMarkerSanitizer
+  location: class OllamaApiServer
+/root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:340: error: cannot find symbol
+                        PromptTemplateManager.stripTemplateMarkers((String) rawContent)
+                        ^
+  symbol:   variable PromptTemplateManager
+  location: class OllamaApiServer
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+100 errors
+3 warnings
+
+[Incubating] Problems report is available at: file:///root/llama/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:408: error: cannot find symbol
+                          if (BuildConfig.DEBUG) {
+                              ^
+    symbol: variable BuildConfig
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:424: error: cannot find symbol
+                          if (BuildConfig.DEBUG) {
+                              ^
+    symbol: variable BuildConfig
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:440: error: cannot find symbol
+                          if (BuildConfig.DEBUG) {
+                              ^
+    symbol: variable BuildConfig/root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:54: error: static import only from classes and interfaces
+  import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
+  ^warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.Note: Recompile with -Xlint:deprecation for details./root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:106: error: package ConfigurationManager does not exist
+      private ConfigurationManager.Configuration currentConfig;
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:803: error: package PromptTemplateManager does not exist
+      private void logTemplateSelection(String context, PromptTemplateManager.TemplateSelectionResult selection) {
+                                                                             ^
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:475: error: package ConfigurationManager does not exist
+      public void applyConfiguration(ConfigurationManager.Configuration config) {
+                                                         ^
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:499: error: package ConfigurationManager does not exist
+      private void applyLoadParameters(ConfigurationManager.Configuration config, int nCtxOverride) {
+                                                           ^
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:718: error: package ConfigurationManager does not exist
+      private String ensureModelFilesAvailable(ConfigurationManager.Configuration config, File destFile) {
+                                                                   ^
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:760: error: package ConfigurationManager does not exist
+              ConfigurationManager.Configuration config,
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:783: error: package ConfigurationManager does not exist
+              ConfigurationManager.Configuration config,
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:906: error: package ConfigurationManager does not exist
+      private ConfigurationManager.Configuration loadResolvedConfiguration(String requestedModel) throws IOException, JSONException {
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:999: error: package ConfigurationManager does not exist
+      private JSONObject buildPropsResponse(String modelName, ConfigurationManager.Configuration config) throws JSONException {
+                                                                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:1028: error: package ConfigurationManager does not exist
+              ConfigurationManager.Configuration config
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:1048: error: package ConfigurationManager does not exist
+      private JSONObject buildDefaultGenerationSettings(String modelName, ConfigurationManager.Configuration config) throws JSONException {
+                                                                                              ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:1068: error: package ConfigurationManager does not exist
+      private JSONObject buildPropsParams(ConfigurationManager.Configuration config) throws JSONException {
+                                                              ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:1122: error: package ConfigurationManager does not exist
+      private JSONObject buildWebUiSettings(ConfigurationManager.Configuration config) throws JSONException {
+                                                                ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:1168: error: package ConfigurationManager does not exist
+      private JSONObject buildSlotParams(ConfigurationManager.Configuration config) throws JSONException {
+                                                             ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:1298: error: package ConfigurationManager does not exist
+      private void applyRequestOverrides(ConfigurationManager.Configuration config, JSONObject request) {
+                                                             ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2363: error: package PromptTemplateManager does not exist
+      private void logTemplateSelection(String contextLabel, PromptTemplateManager.TemplateSelectionResult selection) {
+                                                                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2460: error: package SharedToolManager does not exist
+              SharedToolManager.ChatResult toolResult
+                               ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2489: error: package SharedToolManager does not exist
+              SharedToolManager.ChatResult toolResult
+                               ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2516: error: package SharedToolManager does not exist
+              SharedToolManager.ChatResult toolResult
+                               ^
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:2540: error: package SharedToolManager does not exist
+              SharedToolManager.ChatResult toolResult
+                               ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:54: error: package com.micklab.llama.ConfigurationManager does not exist
+  import static com.micklab.llama.ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS;
+                                                      ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:155: error: package ConfigurationManager does not exist
+      private ConfigurationManager.Configuration currentConfig;
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:903: error: package ConfigurationManager does not exist
+      private void updateUIFromConfig(ConfigurationManager.Configuration config) {
+                                                          ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:957: error: package ConfigurationManager does not exist
+      private void updateAutoTemplatePreview(ConfigurationManager.Configuration config) {
+                                                                 ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:979: error: package ConfigurationManager does not exist
+      private ConfigurationManager.Configuration getConfigFromUI() {
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1622: error: package HuggingFaceApiClient does not exist
+      private void showHuggingFaceRepositoryDialog(List<HuggingFaceApiClient.ModelSearchResult> results) {
+                                                                            ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1641: error: package HuggingFaceApiClient does not exist
+      private void fetchHuggingFaceRepositoryFiles(HuggingFaceApiClient.ModelSearchResult result) {
+                                                                       ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1672: error: package HuggingFaceApiClient does not exist
+      private void showHuggingFaceFileDialog(HuggingFaceApiClient.RepositoryFiles repositoryFiles) {
+                                                                 ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1687: error: package HuggingFaceApiClient does not exist
+              HuggingFaceApiClient.RepositoryFiles repositoryFiles,
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1688: error: package HuggingFaceApiClient does not exist
+              HuggingFaceApiClient.GgufFileInfo selectedFile) {
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1737: error: package HuggingFaceApiClient does not exist
+      private String buildHuggingFaceRepositoryMeta(HuggingFaceApiClient.ModelSearchResult result) {
+                                                                        ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1875: error: package HuggingFaceApiClient does not exist
+              HuggingFaceApiClient.RepositoryFiles repositoryFiles,
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:1876: error: package HuggingFaceApiClient does not exist
+              HuggingFaceApiClient.GgufFileInfo selectedFile,
+                                  ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:210: error: package ConfigurationManager does not exist
+              currentConfig = new ConfigurationManager.Configuration();
+                                                      ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:347: error: package LlamaNative does not exist
+          LlamaNative.TokenListener tListener = null;
+                     ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:358: error: package SharedToolManager does not exist
+                  SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                                   ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:405: error: package LlamaNative does not exist
+                  tListener = new LlamaNative.TokenListener() {
+                                             ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:791: error: package PromptTemplateManager does not exist
+          PromptTemplateManager.PromptBuildResult result =
+                               ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1140: error: package PendingModelLoadStore does not exist
+          final PendingModelLoadStore.PendingLoad pendingLoad;
+                                     ^
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:312: error: package ConfigurationManager does not exist
+              ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                                  ^/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:406: error: method does not override or implement a method from a supertype
+                      @Override
+                      ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:422: error: method does not override or implement a method from a supertype
+                      @Override
+                      ^
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:438: error: method does not override or implement a method from a supertype
+                      @Override
+                      ^/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:105: error: cannot find symbol
+      private ConfigurationManager configManager;
+              ^
+    symbol:   class ConfigurationManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:55: error: cannot find symbol
+      private final LlamaNative llama;
+                    ^
+    symbol:   class LlamaNative
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:56: error: cannot find symbol
+      private final ConfigurationManager configManager;
+                    ^
+    symbol:   class ConfigurationManager
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:151: error: cannot find symbol
+      public LlamaNative getLlama() {
+             ^
+    symbol:   class LlamaNative
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:78: error: cannot find symbol
+      private final ConfigurationManager configManager;
+                    ^
+    symbol:   class ConfigurationManager
+    location: class OllamaApiServer
+  /root/llama/app/src/main/java/com/micklab/llama/SettingsActivity.java:72: error: cannot find symbol
+      private ConfigurationManager configManager;
+              ^
+    symbol:   class ConfigurationManager
+    location: class SettingsActivity
+  /root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:39: error: cannot find symbol
+          super.attachBaseContext(AppLanguageManager.wrap(newBase));
+                                  ^
+    symbol:   variable AppLanguageManager
+    location: class DocumentsActivity
+  /root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:88: error: cannot find symbol
+          return AppLanguageManager.isJapanese(this) ? ja : en;
+                 ^
+    symbol:   variable AppLanguageManager
+    location: class DocumentsActivity
+  /root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:144: error: cannot find symbol
+          return AppLanguageManager.isJapanese(this)
+                 ^
+    symbol:   variable AppLanguageManager
+    location: class DocumentsActivity
+  /root/llama/app/src/main/java/com/micklab/llama/DocumentsActivity.java:410: error: cannot find symbol
+          return AppLanguageManager.isJapanese(this)
+                 ^
+    symbol:   variable AppLanguageManager
+    location: class DocumentsActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:74: error: cannot find symbol
+          return ResponseMarkerSanitizer.stripResponseMarkers(text);
+                 ^
+    symbol:   variable ResponseMarkerSanitizer
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:132: error: cannot find symbol
+              holdbackLength = ResponseMarkerSanitizer.getStreamingHoldbackLength();
+                               ^
+    symbol:   variable ResponseMarkerSanitizer
+    location: class StreamOutputFilter
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:193: error: cannot find symbol
+          super.attachBaseContext(AppLanguageManager.wrap(newBase));
+                                  ^
+    symbol:   variable AppLanguageManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:200: error: cannot find symbol
+          currentDisplayLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+                                   ^
+    symbol:   variable AppLanguageManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:203: error: cannot find symbol
+          configManager = new ConfigurationManager(this);
+                              ^
+    symbol:   class ConfigurationManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:358: error: cannot find symbol
+                  SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                                                            ^
+    symbol:   variable SharedToolManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:772: error: cannot find symbol
+          File modelFile = ModelFileHelper.resolveStoredModelFile(this, modelUrl);
+                           ^
+    symbol:   variable ModelFileHelper
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:780: error: cannot find symbol
+          return McpSettingsHelper.hasSharedToolConfigForNonWebUi(this);
+                 ^
+    symbol:   variable McpSettingsHelper
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:792: error: cannot find symbol
+                  PromptTemplateManager.buildPromptForDirectInputWithSelection(
+                  ^
+    symbol:   variable PromptTemplateManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:936: error: cannot find symbol
+          return AppLanguageManager.isJapanese(this) ? ja : en;
+                 ^
+    symbol:   variable AppLanguageManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1142: error: cannot find symbol
+              pendingLoad = PendingModelLoadStore.readPendingLoad(this);
+                            ^
+    symbol:   variable PendingModelLoadStore
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1194: error: cannot find symbol
+              PendingModelLoadStore.deletePendingLoad(this);
+              ^
+    symbol:   variable PendingModelLoadStore
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1414: error: cannot find symbol
+          String latestLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+                                  ^
+    symbol:   variable AppLanguageManager
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:103: error: cannot find symbol
+          this.llama = new LlamaNative();
+                           ^
+    symbol:   class LlamaNative
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:104: error: cannot find symbol
+          this.configManager = new ConfigurationManager(this.context);
+                                   ^
+    symbol:   class ConfigurationManager
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:120: error: cannot find symbol
+          if (BuildConfig.DEBUG) {
+              ^
+    symbol:   variable BuildConfig
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:313: error: cannot find symbol
+              DiagnosticsLogger.logEvent(context, "model-load", "Loading configuration: " + configName);
+              ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:352: error: cannot find symbol
+                  DiagnosticsLogger.logMemorySnapshot(
+                  ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:371: error: cannot find symbol
+                      PendingModelLoadStore.writePendingLoad(context, configName, modelPath, config.modelUrl);
+                      ^
+    symbol:   variable PendingModelLoadStore
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:428: error: cannot find symbol
+              DiagnosticsLogger.logMemorySnapshot(
+              ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:444: error: cannot find symbol
+                      PendingModelLoadStore.deletePendingLoad(context);
+                      ^
+    symbol:   variable PendingModelLoadStore
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:543: error: cannot find symbol
+          DiagnosticsLogger.logMemorySnapshot(
+          ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:551: error: cannot find symbol
+          DiagnosticsLogger.markGenerationInProgress(
+          ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:558: error: cannot find symbol
+          DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-start");
+          ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:563: error: cannot find symbol
+              DiagnosticsLogger.logEvent(
+              ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:570: error: cannot find symbol
+              DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-throw error=" + t);
+              ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:571: error: cannot find symbol
+              DiagnosticsLogger.logMemorySnapshot(
+              ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:581: error: cannot find symbol
+              DiagnosticsLogger.clearGenerationInProgress(context);
+              ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:583: error: cannot find symbol
+          DiagnosticsLogger.logMemorySnapshot(
+          ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:630: error: cannot find symbol
+          DiagnosticsLogger.logMemorySnapshot(
+          ^
+    symbol:   variable DiagnosticsLogger
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:711: error: cannot find symbol
+          return ModelFileHelper.extractFilename(url);
+                 ^
+    symbol:   variable ModelFileHelper
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:715: error: cannot find symbol
+          return ModelFileHelper.getModelStorageDir(context);
+                 ^
+    symbol:   variable ModelFileHelper
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:728: error: cannot find symbol
+              if (!ModelFileHelper.isRemoteModelReference(config.modelUrl)) {
+                   ^
+    symbol:   variable ModelFileHelper
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:767: error: cannot find symbol
+          if (!ModelFileHelper.canAutoApplyProjectorReference(config.modelUrl, config.multimodalProjectorUrl)) {
+               ^
+    symbol:   variable ModelFileHelper
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:773: error: cannot find symbol
+          File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+                                ^
+    symbol:   variable ModelFileHelper
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/ModelManager.java:799: error: cannot find symbol
+          if (!ModelFileHelper.isRemoteModelReference(mmprojReference)) {
+               ^
+    symbol:   variable ModelFileHelper
+    location: class ModelManager
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:104: error: cannot find symbol
+          return ResponseMarkerSanitizer.stripResponseMarkers(text);
+                 ^
+    symbol:   variable ResponseMarkerSanitizer
+    location: class OllamaApiServer
+  /root/llama/app/src/main/java/com/micklab/llama/OllamaApiServer.java:340: error: cannot find symbol
+                          PromptTemplateManager.stripTemplateMarkers((String) rawContent)
+                          ^
+    symbol:   variable PromptTemplateManager
+    location: class OllamaApiServerwarning: [options] source value 8 is obsolete and will be removed in a future release/root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:620: error: cannot find symbol
+          if (!logFile.exists() && !isMaxDebugLogEnabled()) {
+                                    ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:632: error: cannot find symbol
+                      showToast(isMaxDebugLogEnabled()
+                                ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:650: error: cannot find symbol
+          if (!isMaxDebugLogEnabled()) {
+               ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1220: error: cannot find symbol
+              } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                             ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivity
+  /root/llama/app/src/main/java/com/micklab/llama/MainActivity.java:1232: error: cannot find symbol
+              } else if (logFile.exists() || isMaxDebugLogEnabled()) {
+                                             ^
+    symbol:   method isMaxDebugLogEnabled()
+    location: class MainActivityNote: Some input files use or override a deprecated API.warning: [options] target value 8 is obsolete and will be removed in a future release
+  100 errors
+  3 warnings
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.12/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 22s
+17 actionable tasks: 7 executed, 10 up-to-date
