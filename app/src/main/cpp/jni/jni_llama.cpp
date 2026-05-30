@@ -60,6 +60,8 @@ static jmethodID g_token_onComplete = nullptr;
 static jmethodID g_token_onError = nullptr;
 static std::atomic<bool> g_cancel_generation(false);
 static bool g_backend_initialized = false;
+static uint32_t g_generations_since_context_reinit = 0;
+static constexpr uint32_t CONTEXT_RECYCLE_INTERVAL = 8;
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -78,6 +80,7 @@ static volatile sig_atomic_t g_signal_crash_fd = -1;
 static std::atomic<bool> g_fatal_signal_handlers_installed(false);
 static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
+static void trim_native_allocator(const char * reason);
 static std::string initialize_optional_multimodal_support_locked(
         const std::string & model_path,
         const std::string & requested_mmproj_path,
@@ -659,6 +662,7 @@ static void release_context_locked(const char * log_prefix) {
     llama_synchronize(g_ctx);
     llama_free(g_ctx);
     g_ctx = nullptr;
+    g_generations_since_context_reinit = 0;
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": context freed");
     }
@@ -693,6 +697,38 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         return false;
     }
 
+    if (g_generations_since_context_reinit >= CONTEXT_RECYCLE_INTERVAL) {
+        std::ostringstream recycle_reason;
+        recycle_reason << log_prefix
+                       << ": recycling context after "
+                       << g_generations_since_context_reinit
+                       << " generations";
+        log_to_file(recycle_reason.str());
+
+        release_context_locked(log_prefix);
+        trim_native_allocator(log_prefix);
+
+        llama_context_params cparams = build_context_params_locked();
+        using namespace std::chrono;
+        auto t0 = high_resolution_clock::now();
+        g_ctx = llama_init_from_model(g_model, cparams);
+        auto t1 = high_resolution_clock::now();
+        auto ms = duration_cast<milliseconds>(t1 - t0).count();
+        if (!g_ctx) {
+            std::ostringstream ss;
+            ss << build_context_load_failure_message(log_prefix)
+               << " after recycle in "
+               << ms << " ms";
+            error_message = ss.str();
+            log_to_file(error_message, GGML_LOG_LEVEL_ERROR);
+            return false;
+        }
+
+        std::ostringstream ss;
+        ss << log_prefix << ": recycled context successfully in " << ms << " ms";
+        log_to_file(ss.str());
+    }
+
     llama_synchronize(g_ctx);
 
     llama_memory_t memory = llama_get_memory(g_ctx);
@@ -709,8 +745,10 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
     ss << log_prefix << ": generation context reset"
        << " n_ctx=" << g_n_ctx
        << " n_batch=" << g_n_batch
-       << " n_threads=" << g_n_threads;
+       << " n_threads=" << g_n_threads
+       << " generation_index=" << (g_generations_since_context_reinit + 1);
     log_to_file(ss.str());
+    ++g_generations_since_context_reinit;
     return true;
 }
 
@@ -1496,7 +1534,7 @@ static void llama_jni_free() {
     g_supports_vision = false;
     g_supports_audio = false;
 
-    release_backend_locked("llama_jni_free");
+    log_to_file("llama_jni_free: retaining process-wide backend for future reloads");
     trim_native_allocator("llama_jni_free");
 }
 
@@ -1842,6 +1880,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 log_to_file(ss.str());
             }
         }
+        g_generations_since_context_reinit = 0;
 
         g_current_model_path = model_path;
         g_current_mmproj_path = initialize_optional_multimodal_support_locked(model_path, "", "init");
@@ -2032,6 +2071,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 log_to_file(ss.str());
             }
         }
+        g_generations_since_context_reinit = 0;
 
         const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
@@ -3024,4 +3064,18 @@ Java_com_micklab_llama_LlamaNative_supportsAudio(
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_supports_audio ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+JNI_OnUnload(JavaVM *, void *) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    release_multimodal_locked("JNI_OnUnload");
+    release_context_locked("JNI_OnUnload");
+    release_model_locked("JNI_OnUnload");
+    g_current_mmproj_path.clear();
+    g_supports_vision = false;
+    g_supports_audio = false;
+    release_backend_locked("JNI_OnUnload");
 }
