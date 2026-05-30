@@ -1888,7 +1888,12 @@ Java_com_micklab_llama_LlamaNative_init(
         g_generations_since_context_reinit = 0;
 
         g_current_model_path = model_path;
-        g_current_mmproj_path = initialize_optional_multimodal_support_locked(model_path, "", "init");
+        g_current_mmproj_path = initialize_optional_multimodal_support_locked(
+                model_path,
+                "",
+                false,
+                "init");
+        g_current_audio_requested = false;
         log_to_file("init: initialization complete");
 
         return new_java_string_utf8(env, "ok");
