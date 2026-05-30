@@ -675,6 +675,17 @@ static void release_model_locked(const char * log_prefix) {
     }
 }
 
+static void release_backend_locked(const char * log_prefix) {
+    if (!g_backend_initialized) {
+        return;
+    }
+    llama_backend_free();
+    g_backend_initialized = false;
+    if (log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": backend freed");
+    }
+}
+
 static bool reset_generation_context_locked(const char * log_prefix, std::string & error_message) {
     if (!g_model || !g_ctx) {
         error_message = "not initialized";
@@ -1484,9 +1495,7 @@ static void llama_jni_free() {
     g_supports_vision = false;
     g_supports_audio = false;
 
-    if (g_backend_initialized) {
-        log_to_file("Backend retained for process reuse");
-    }
+    release_backend_locked("llama_jni_free");
     trim_native_allocator("llama_jni_free");
 }
 
