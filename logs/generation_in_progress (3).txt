@@ -1,0 +1,1 @@
+2026-05-30 22:39:38.836 pid=30087 [generation-pending] id=24 config=Qwen3.5 2B MTP model=Qwen3.5-2B-Q8_0.gguf promptLen=1078 mediaCount=0

@@ -617,10 +617,11 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = g_n_gpu_layers;
 #if defined(__ANDROID__)
-    // Repeated text-model alternations on Android showed crashy mmap churn, but
-    // explicit multimodal projector loads are more memory-sensitive and need the
-    // original mmap-backed behavior to remain usable.
-    mparams.use_mmap = has_explicit_mmproj;
+    // Keep Android model weights mmap-backed. The JNI free path now tears down the
+    // backend between model switches, so avoiding giant heap-backed GGUF loads is
+    // more important than the earlier mmap-churn workaround.
+    (void) has_explicit_mmproj;
+    mparams.use_mmap = true;
 #else
     mparams.use_mmap = true;
 #endif
@@ -2562,14 +2563,24 @@ static jstring generate_locked(
     std::vector<llama_token> out_tokens;
     out_tokens.reserve(max_tokens);
     std::string prev_text;
+    bool logged_first_sampling_step = false;
+    bool logged_first_decode_step = false;
 
     for (int i = 0; i < max_tokens; ++i) {
         if (g_cancel_generation.load()) {
             break;
         }
 
+        if (!logged_first_sampling_step) {
+            log_to_file("generate: sampling first token");
+            logged_first_sampling_step = true;
+        }
+
         const llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
         llama_sampler_accept(smpl, id);
+        if (i == 0) {
+            log_to_file("generate: first token sampled id=" + std::to_string(id));
+        }
         if (llama_vocab_is_eog(vocab, id)) {
             break;
         }
@@ -2620,6 +2631,10 @@ static jstring generate_locked(
         generation_batch.batch.n_tokens = 1;
         generation_batch.set_token(0, id, generation_base_pos + i, true);
 
+        if (!logged_first_decode_step) {
+            log_to_file("generate: decoding first sampled token");
+            logged_first_decode_step = true;
+        }
         const int rc_step = llama_decode(g_ctx, generation_batch.batch);
         if (rc_step != 0) {
             const char * errmsg = "decode failed (generation)";
@@ -2627,6 +2642,9 @@ static jstring generate_locked(
             notify_token_error(errmsg);
             llama_sampler_free(smpl);
             return new_java_string_utf8(env, errmsg);
+        }
+        if (i == 0) {
+            log_to_file("generate: first sampled token decode complete");
         }
     }
 
