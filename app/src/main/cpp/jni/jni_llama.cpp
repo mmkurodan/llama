@@ -613,13 +613,14 @@ static llama_context_params build_context_params_locked() {
     return cparams;
 }
 
-static llama_model_params build_model_params_locked() {
+static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = g_n_gpu_layers;
 #if defined(__ANDROID__)
-    // Repeated large-model reloads on Android have shown crashy behavior after many
-    // alternations; prefer heap-backed loads over repeated mmap churn.
-    mparams.use_mmap = false;
+    // Repeated text-model alternations on Android showed crashy mmap churn, but
+    // explicit multimodal projector loads are more memory-sensitive and need the
+    // original mmap-backed behavior to remain usable.
+    mparams.use_mmap = has_explicit_mmproj;
 #else
     mparams.use_mmap = true;
 #endif
@@ -1787,7 +1788,7 @@ Java_com_micklab_llama_LlamaNative_init(
             return new_java_string_utf8(env, "no ggml backends registered");
         }
 
-        llama_model_params mparams = build_model_params_locked();
+        llama_model_params mparams = build_model_params_locked(false);
         log_model_params("init", mparams);
 
         {
@@ -1977,7 +1978,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             return new_java_string_utf8(env, "no ggml backends registered");
         }
 
-        llama_model_params mparams = build_model_params_locked();
+        llama_model_params mparams = build_model_params_locked(!mmproj_path.empty());
         log_model_params("initWithMmproj", mparams);
 
         {
