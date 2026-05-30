@@ -97,6 +97,8 @@ struct mtmd_context_params {
     // callback function passed over to mtmd proper
     ggml_backend_sched_eval_callback cb_eval;
     void * cb_eval_user_data;
+
+    bool skip_audio;
 };
 
 MTMD_API const char * mtmd_default_marker(void);

@@ -67,6 +67,7 @@ static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
 static bool g_supports_vision = false;
 static bool g_supports_audio = false;
+static bool g_current_audio_requested = false;
 static std::mutex g_download_ca_bundle_mutex;
 static std::string g_download_ca_bundle_path;
 
@@ -84,6 +85,7 @@ static void trim_native_allocator(const char * reason);
 static std::string initialize_optional_multimodal_support_locked(
         const std::string & model_path,
         const std::string & requested_mmproj_path,
+        bool enable_audio,
         const char * log_prefix);
 
 // 設定
@@ -917,6 +919,7 @@ static bool is_likely_multimodal_model_path(const std::string & model_path) {
 static std::string initialize_optional_multimodal_support_locked(
         const std::string & model_path,
         const std::string & requested_mmproj_path,
+        bool enable_audio,
         const char * log_prefix) {
     if (g_mtmd) {
         mtmd_free(g_mtmd);
@@ -954,6 +957,7 @@ static std::string initialize_optional_multimodal_support_locked(
         mparams_mtmd.print_timings = false;
         mparams_mtmd.n_threads = g_n_threads;
         mparams_mtmd.warmup = true;
+        mparams_mtmd.skip_audio = !enable_audio;
 
         mtmd_context * mtmd = mtmd_init_from_file(candidate_path.c_str(), g_model, mparams_mtmd);
         if (!mtmd) {
@@ -1533,6 +1537,7 @@ static void llama_jni_free() {
     g_current_mmproj_path.clear();
     g_supports_vision = false;
     g_supports_audio = false;
+    g_current_audio_requested = false;
 
     log_to_file("llama_jni_free: retaining process-wide backend for future reloads");
     trim_native_allocator("llama_jni_free");
@@ -1905,7 +1910,8 @@ JNIEXPORT jstring JNICALL
 Java_com_micklab_llama_LlamaNative_initWithMmproj(
         JNIEnv *env, jobject,
         jstring jModelPath,
-        jstring jMmprojPath
+        jstring jMmprojPath,
+        jboolean jEnableAudio
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
     ensure_fatal_signal_handlers_installed();
@@ -1917,6 +1923,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
+        g_current_audio_requested = false;
     };
 
     try {
@@ -1928,22 +1935,26 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
 
         std::string model_path = jstring_to_std(env, jModelPath);
         std::string mmproj_path = jMmprojPath ? jstring_to_std(env, jMmprojPath) : "";
+        const bool enable_audio = jEnableAudio == JNI_TRUE;
 
         {
             std::ostringstream ss;
             ss << "initWithMmproj: model_path=" << model_path
-               << " mmproj_path=" << (mmproj_path.empty() ? "<none>" : mmproj_path);
+               << " mmproj_path=" << (mmproj_path.empty() ? "<none>" : mmproj_path)
+               << " enable_audio=" << (enable_audio ? "true" : "false");
             log_to_file(ss.str());
         }
 
         if (!g_current_model_path.empty()
                 && g_current_model_path == model_path
                 && g_model && g_ctx
+                && (!enable_audio || g_current_audio_requested)
                 && ((mmproj_path.empty() && (g_current_mmproj_path.empty() || g_mtmd != nullptr))
                 || g_current_mmproj_path == mmproj_path)) {
             std::ostringstream ss;
             ss << "initWithMmproj: model already initialized at path=" << model_path
                << " mmproj=" << (g_current_mmproj_path.empty() ? "<none>" : g_current_mmproj_path)
+               << " audio_requested=" << (g_current_audio_requested ? "true" : "false")
                << "; skipping init";
             log_to_file(ss.str());
             return new_java_string_utf8(env, "ok");
@@ -1956,6 +1967,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
+        g_current_audio_requested = false;
         if (g_ctx) {
             log_to_file("initWithMmproj: freeing existing context before re-init");
             release_context_locked("initWithMmproj");
@@ -2076,10 +2088,12 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
                 mmproj_path,
+                enable_audio,
                 "initWithMmproj");
 
         g_current_model_path = model_path;
         g_current_mmproj_path = selected_mmproj_path;
+        g_current_audio_requested = enable_audio && !selected_mmproj_path.empty();
         log_to_file("initWithMmproj: initialization complete");
 
         return new_java_string_utf8(env, "ok");
@@ -3077,5 +3091,6 @@ JNI_OnUnload(JavaVM *, void *) {
     g_current_mmproj_path.clear();
     g_supports_vision = false;
     g_supports_audio = false;
+    g_current_audio_requested = false;
     release_backend_locked("JNI_OnUnload");
 }

@@ -2896,7 +2896,7 @@ struct clip_init_result clip_init(const char * fname, struct clip_context_params
 
     try {
         clip_model_loader loader(fname);
-        bool skip_audio = false;
+        bool skip_audio = ctx_params.skip_audio;
 
         if (loader.has_vision) {
             ctx_vision = new clip_ctx(ctx_params);
@@ -2908,7 +2908,7 @@ struct clip_init_result clip_init(const char * fname, struct clip_context_params
 
             // TODO: we don't support audio for Gemma 3N, but GGUF contains audio tensors
             // we can remove this check when we implement audio support for Gemma 3N
-            skip_audio = ctx_vision->model.proj_type == PROJECTOR_TYPE_GEMMA3NV;
+            skip_audio = skip_audio || ctx_vision->model.proj_type == PROJECTOR_TYPE_GEMMA3NV;
         }
 
         if (loader.has_audio && !skip_audio) {

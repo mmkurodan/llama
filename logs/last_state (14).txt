@@ -1,0 +1,5 @@
+2026-05-31 07:07:45.165 pid=32124 [model-load-complete] config=Gemma−4 model=gemma-4-E4B-it-Q4_K_M.gguf mmproj=mmproj-F16.gguf
+  javaUsed=2.2MB javaTotal=10.0MB javaMax=256.0MB nativeHeap=1.8GB nativeHeapFree=2.8MB nativeHeapSize=1.8GB
+  pssTotal=5.8GB privateDirty=1.1GB sharedDirty=52.5MB nativePss=1.1GB dalvikPss=841.0KB otherPss=4.6GB
+  systemAvail=15.7GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=114
+  procStatus VmRSS=6161140 kB VmHWM=6214676 kB VmSize=23527076 kB VmSwap=2692 kB Threads=17 FDSize=128

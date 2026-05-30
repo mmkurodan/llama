@@ -65,6 +65,8 @@ public class ModelManager {
     private volatile String currentModelPath = null;
     private volatile String currentConfiguredMmprojPath = null;
     private volatile String currentMmprojPath = null;
+    private volatile boolean currentSupportsVision = false;
+    private volatile boolean currentSupportsAudio = false;
     private volatile boolean modelLoaded = false;
 
     private static final class MultimodalProjectorResolution {
@@ -199,11 +201,11 @@ public class ModelManager {
     }
 
     public boolean supportsVision() {
-        return modelLoaded && llama.supportsVision();
+        return modelLoaded && currentSupportsVision;
     }
 
     public boolean supportsAudio() {
-        return modelLoaded && llama.supportsAudio();
+        return modelLoaded && currentSupportsAudio;
     }
     
     /**
@@ -365,24 +367,37 @@ public class ModelManager {
                 return false;
             }
             String mmprojPath = availableProjector.projectorPath;
-            
+            boolean enableAudioForLoad = mmprojPath != null && preferAudioProjector;
+            boolean projectorRequestedButInactive =
+                    mmprojPath != null && !currentSupportsVision && !currentSupportsAudio;
+
             // If same model is already loaded, just re-apply parameters
-            if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentConfiguredMmprojPath) && modelLoaded) {
+            if (modelPath.equals(currentModelPath)
+                    && Objects.equals(mmprojPath, currentConfiguredMmprojPath)
+                    && modelLoaded
+                    && !projectorRequestedButInactive
+                    && (!enableAudioForLoad || currentSupportsAudio)) {
                 Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
                 applyConfiguration(config);
                 currentConfigName = configName;
                 DiagnosticsLogger.logMemorySnapshot(
                         context,
                         "model-load-skip",
-                        "config=" + configName + " model already loaded");
+                        "config=" + configName
+                                + " model already loaded"
+                                + " audioRequested=" + enableAudioForLoad
+                                + " audioActive=" + currentSupportsAudio
+                                + " projectorActive=" + (currentSupportsVision || currentSupportsAudio));
                 return true;
             }
 
             final boolean requiresModelInit =
                     !modelPath.equals(currentModelPath)
                             || !Objects.equals(mmprojPath, currentConfiguredMmprojPath)
-                            || !modelLoaded;
-            
+                            || !modelLoaded
+                            || projectorRequestedButInactive
+                            || (enableAudioForLoad && !currentSupportsAudio);
+
             if (listener != null) {
                 listener.onModelLoading(configName);
             }
@@ -419,7 +434,10 @@ public class ModelManager {
 
                 prepareForLargeModelLoad(modelPath);
                 applyLoadParameters(config, config.nCtx);
-                String initResult = llama.initWithMmproj(modelPath, mmprojPath != null ? mmprojPath : "");
+                String initResult = llama.initWithMmproj(
+                        modelPath,
+                        mmprojPath != null ? mmprojPath : "",
+                        enableAudioForLoad);
                 if (!"ok".equals(initResult)) {
                     Log.e(TAG, "Model init failed: " + initResult);
                     if (listener != null) {
@@ -430,9 +448,13 @@ public class ModelManager {
 
                 currentModelPath = modelPath;
                 currentConfiguredMmprojPath = mmprojPath;
-                boolean multimodalActive = llama.supportsVision() || llama.supportsAudio();
+                currentSupportsVision = llama.supportsVision();
+                currentSupportsAudio = llama.supportsAudio();
+                boolean multimodalActive = currentSupportsVision || currentSupportsAudio;
                 if (!multimodalActive && mmprojPath != null) {
                     Log.i(TAG, "Projector request was not activated by native init; treating model as text-only");
+                } else if (mmprojPath != null && !enableAudioForLoad && currentSupportsVision && !currentSupportsAudio) {
+                    Log.i(TAG, "Projector initialized in vision-only mode; audio encoder will be loaded on demand");
                 }
                 currentMmprojPath = multimodalActive ? mmprojPath : null;
             }
@@ -721,6 +743,8 @@ public class ModelManager {
         currentModelPath = null;
         currentConfiguredMmprojPath = null;
         currentMmprojPath = null;
+        currentSupportsVision = false;
+        currentSupportsAudio = false;
         currentConfigName = null;
         modelLoaded = false;
     }

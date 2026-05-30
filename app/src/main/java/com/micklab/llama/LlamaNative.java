@@ -26,7 +26,7 @@ public class LlamaNative {
     public native String download(String url, String path);
     public native void setDownloadCaBundlePath(String path);
     public native String init(String modelPath);
-    public native String initWithMmproj(String modelPath, String mmprojPath);
+    public native String initWithMmproj(String modelPath, String mmprojPath, boolean enableAudio);
     public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
     public native String generate(String prompt);
     public native String generateWithMedia(String prompt, byte[][] mediaFiles);
