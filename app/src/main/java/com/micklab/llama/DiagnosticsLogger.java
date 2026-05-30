@@ -2,6 +2,7 @@ package com.micklab.llama;
 
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Debug;
 import android.os.Process;
 import android.util.Log;
@@ -25,6 +26,12 @@ public final class DiagnosticsLogger {
     private static final String LAST_STATE_FILENAME = "last_state.txt";
     private static final String LOGCAT_FILENAME = "recent_logcat.txt";
     private static final String INCOMPLETE_GENERATION_FILENAME = "generation_in_progress.txt";
+    private static final String OLLAMA_LOG_FILENAME = "ollama.log";
+    private static final String JAVA_CRASH_FILENAME = "last_crash.txt";
+    private static final String NATIVE_CRASH_FILENAME = "native_crash.txt";
+    private static final String PREFS_NAME = "ollama_prefs";
+    private static final String PREF_LOG_LEVEL = "log_level";
+    private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final long MAX_PROCESS_LOG_BYTES = 512L * 1024L;
     private static final Object LOCK = new Object();
 
@@ -35,6 +42,7 @@ public final class DiagnosticsLogger {
         String line = buildHeader(category) + " " + safe(message);
         synchronized (LOCK) {
             appendLine(context, PROCESS_LOG_FILENAME, line);
+            appendToOllamaLogLocked(context, line);
         }
     }
 
@@ -46,6 +54,7 @@ public final class DiagnosticsLogger {
         synchronized (LOCK) {
             appendLine(context, PROCESS_LOG_FILENAME, snapshot);
             overwriteFile(context, LAST_STATE_FILENAME, snapshot + "\n");
+            appendToOllamaLogLocked(context, snapshot);
         }
     }
 
@@ -97,6 +106,9 @@ public final class DiagnosticsLogger {
         }
         synchronized (LOCK) {
             overwriteFile(context, LOGCAT_FILENAME, output.toString());
+            if (isMaxDebugEnabled(context)) {
+                appendToOllamaLogLocked(context, output.toString());
+            }
         }
     }
 
@@ -115,6 +127,7 @@ public final class DiagnosticsLogger {
                 + " mediaCount=" + Math.max(mediaCount, 0);
         synchronized (LOCK) {
             overwriteFile(context, INCOMPLETE_GENERATION_FILENAME, line + "\n");
+            appendToOllamaLogLocked(context, line);
         }
     }
 
@@ -133,14 +146,48 @@ public final class DiagnosticsLogger {
 
             String marker = readFileContents(markerFile).trim();
             if (!marker.isEmpty()) {
-                appendLine(
-                        context,
-                        PROCESS_LOG_FILENAME,
-                        buildHeader("previous-crash")
-                                + " Detected unfinished generation from previous process: "
-                                + toSingleLine(marker));
+                String message = buildHeader("previous-crash")
+                        + " Detected unfinished generation from previous process: "
+                        + toSingleLine(marker);
+                appendLine(context, PROCESS_LOG_FILENAME, message);
+                appendToOllamaLogLocked(context, message);
             }
             deleteFile(markerFile);
+        }
+    }
+
+    public static File getAppFilesBaseDir(Context context) {
+        if (context == null) {
+            return null;
+        }
+        File externalDir = context.getExternalFilesDir(null);
+        return externalDir != null ? externalDir : context.getFilesDir();
+    }
+
+    public static File getOllamaLogFile(Context context) {
+        File baseDir = getAppFilesBaseDir(context);
+        return baseDir != null ? new File(baseDir, OLLAMA_LOG_FILENAME) : null;
+    }
+
+    public static void appendToOllamaLog(Context context, String contents) {
+        synchronized (LOCK) {
+            appendToOllamaLogLocked(context, contents);
+        }
+    }
+
+    public static void clearLogFiles(Context context) {
+        synchronized (LOCK) {
+            truncateFile(getOllamaLogFile(context));
+            deleteFile(context, PROCESS_LOG_FILENAME);
+            deleteFile(context, LAST_STATE_FILENAME);
+            deleteFile(context, LOGCAT_FILENAME);
+            deleteFile(context, INCOMPLETE_GENERATION_FILENAME);
+
+            File baseDir = getAppFilesBaseDir(context);
+            if (baseDir != null) {
+                deleteFile(new File(baseDir, JAVA_CRASH_FILENAME));
+                deleteFile(new File(baseDir, NATIVE_CRASH_FILENAME));
+            }
         }
     }
 
@@ -260,6 +307,29 @@ public final class DiagnosticsLogger {
         }
     }
 
+    private static void appendToOllamaLogLocked(Context context, String contents) {
+        if (contents == null || contents.isEmpty()) {
+            return;
+        }
+        File logFile = getOllamaLogFile(context);
+        if (logFile == null) {
+            return;
+        }
+        File parent = logFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+            Log.e(TAG, "Failed to create log directory: " + parent.getAbsolutePath());
+            return;
+        }
+        try (FileWriter writer = new FileWriter(logFile, true)) {
+            writer.write(contents);
+            if (!contents.endsWith("\n")) {
+                writer.write('\n');
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to append unified log", e);
+        }
+    }
+
     private static void overwriteFile(Context context, String filename, String contents) {
         File file = getDiagnosticsFile(context, filename);
         if (file == null) {
@@ -304,6 +374,22 @@ public final class DiagnosticsLogger {
         }
     }
 
+    private static void truncateFile(File file) {
+        if (file == null) {
+            return;
+        }
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+            Log.e(TAG, "Failed to create log directory: " + parent.getAbsolutePath());
+            return;
+        }
+        try (FileWriter writer = new FileWriter(file, false)) {
+            writer.write("");
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to truncate log file", e);
+        }
+    }
+
     private static void trimIfNeeded(File file) {
         if (file == null || !file.exists() || file.length() < MAX_PROCESS_LOG_BYTES) {
             return;
@@ -314,12 +400,9 @@ public final class DiagnosticsLogger {
     }
 
     private static File getDiagnosticsFile(Context context, String filename) {
-        if (context == null) {
-            return null;
-        }
-        File baseDir = context.getExternalFilesDir(null);
+        File baseDir = getAppFilesBaseDir(context);
         if (baseDir == null) {
-            baseDir = context.getFilesDir();
+            return null;
         }
         File diagnosticsDir = new File(baseDir, DIAGNOSTICS_DIR_NAME);
         if (!diagnosticsDir.exists() && !diagnosticsDir.mkdirs() && !diagnosticsDir.isDirectory()) {
@@ -327,6 +410,14 @@ public final class DiagnosticsLogger {
             return null;
         }
         return new File(diagnosticsDir, filename);
+    }
+
+    private static boolean isMaxDebugEnabled(Context context) {
+        if (context == null) {
+            return false;
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getInt(PREF_LOG_LEVEL, 2) == LOG_LEVEL_MAX_DEBUG;
     }
 
     private static String buildHeader(String category) {

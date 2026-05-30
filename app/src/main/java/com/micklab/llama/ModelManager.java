@@ -63,6 +63,7 @@ public class ModelManager {
     private boolean reinitializing = false;
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
+    private volatile String currentConfiguredMmprojPath = null;
     private volatile String currentMmprojPath = null;
     private volatile boolean modelLoaded = false;
 
@@ -104,9 +105,11 @@ public class ModelManager {
         this.configManager = new ConfigurationManager(this.context);
         
         // Set JNI log path
-        File logFile = new File(context.getExternalFilesDir(null), "ollama.log");
+        File logFile = DiagnosticsLogger.getOllamaLogFile(this.context);
         try {
-            llama.setLogPath(logFile.getAbsolutePath());
+            if (logFile != null) {
+                llama.setLogPath(logFile.getAbsolutePath());
+            }
         } catch (Throwable t) {
             Log.e(TAG, "Failed to set log path", t);
         }
@@ -174,6 +177,25 @@ public class ModelManager {
     
     public String getCurrentModelPath() {
         return currentModelPath;
+    }
+
+    public boolean isLoadedConfigurationMatching(ConfigurationManager.Configuration config) {
+        if (config == null) {
+            return true;
+        }
+        File configuredModelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+        if (configuredModelFile == null) {
+            return true;
+        }
+        MultimodalProjectorResolution projectorResolution = resolveMultimodalProjectorPath(config, false, false);
+        if (projectorResolution.errorMessage != null) {
+            return false;
+        }
+        synchronized (stateLock) {
+            return modelLoaded
+                    && configuredModelFile.getAbsolutePath().equals(currentModelPath)
+                    && Objects.equals(projectorResolution.projectorPath, currentConfiguredMmprojPath);
+        }
     }
 
     public boolean supportsVision() {
@@ -345,7 +367,7 @@ public class ModelManager {
             String mmprojPath = availableProjector.projectorPath;
             
             // If same model is already loaded, just re-apply parameters
-            if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentMmprojPath) && modelLoaded) {
+            if (modelPath.equals(currentModelPath) && Objects.equals(mmprojPath, currentConfiguredMmprojPath) && modelLoaded) {
                 Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
                 applyConfiguration(config);
                 currentConfigName = configName;
@@ -358,7 +380,7 @@ public class ModelManager {
 
             final boolean requiresModelInit =
                     !modelPath.equals(currentModelPath)
-                            || !Objects.equals(mmprojPath, currentMmprojPath)
+                            || !Objects.equals(mmprojPath, currentConfiguredMmprojPath)
                             || !modelLoaded;
             
             if (listener != null) {
@@ -407,6 +429,7 @@ public class ModelManager {
                 }
 
                 currentModelPath = modelPath;
+                currentConfiguredMmprojPath = mmprojPath;
                 boolean multimodalActive = llama.supportsVision() || llama.supportsAudio();
                 if (!multimodalActive && mmprojPath != null) {
                     Log.i(TAG, "Projector request was not activated by native init; treating model as text-only");
@@ -696,6 +719,7 @@ public class ModelManager {
 
     private void clearLoadedModelState() {
         currentModelPath = null;
+        currentConfiguredMmprojPath = null;
         currentMmprojPath = null;
         currentConfigName = null;
         modelLoaded = false;

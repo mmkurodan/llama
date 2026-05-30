@@ -15,7 +15,6 @@ import java.util.Locale;
 public class LlamaApplication extends Application {
 
     private static final String TAG = "LlamaApplication";
-    private static final String LOG_FILENAME = "ollama.log";
     private static final String CRASH_LOG_FILENAME = "last_crash.txt";
 
     @Override
@@ -47,6 +46,7 @@ public class LlamaApplication extends Application {
                 try (FileWriter fw = new FileWriter(crashFile, false)) {
                     fw.write(sw.toString());
                 }
+                DiagnosticsLogger.appendToOllamaLog(LlamaApplication.this, sw.toString());
                 Log.e(TAG, "Crash log written to " + crashFile.getAbsolutePath());
                 DiagnosticsLogger.logEvent(LlamaApplication.this, "java-crash", "Crash log written: " + crashFile.getAbsolutePath());
                 DiagnosticsLogger.logMemorySnapshot(LlamaApplication.this, "java-crash", e.toString());
@@ -67,7 +67,10 @@ public class LlamaApplication extends Application {
 
     private void configureNativeLogging() {
         try {
-            File logFile = new File(getAppFilesDir(), LOG_FILENAME);
+            File logFile = DiagnosticsLogger.getOllamaLogFile(this);
+            if (logFile == null) {
+                return;
+            }
             new LlamaNative().setLogPath(logFile.getAbsolutePath());
         } catch (Throwable t) {
             Log.e(TAG, "Failed to configure native logging", t);
@@ -75,12 +78,8 @@ public class LlamaApplication extends Application {
     }
 
     private File getCrashLogFile() {
-        return new File(getAppFilesDir(), CRASH_LOG_FILENAME);
-    }
-
-    private File getAppFilesDir() {
-        File externalDir = getExternalFilesDir(null);
-        return externalDir != null ? externalDir : getFilesDir();
+        File baseDir = DiagnosticsLogger.getAppFilesBaseDir(this);
+        return new File(baseDir != null ? baseDir : getFilesDir(), CRASH_LOG_FILENAME);
     }
 
     @Override

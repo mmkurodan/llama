@@ -28,7 +28,6 @@ import android.view.MotionEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -68,6 +67,7 @@ public class MainActivity extends Activity {
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final int LOG_LEVEL_INFO = 2;
     private static final int LOG_DISPLAY_MAX_LINES = 100;
+    private static final int LOG_DISPLAY_MAX_DEBUG_LINES = 1000;
     private static final int PROCESSING_LOG_MAX_CHARS = 64 * 1024;
     private static final int PROCESSING_LOG_TRIM_TARGET_CHARS = 48 * 1024;
     private static String stripResponseMarkers(String text) {
@@ -617,7 +617,7 @@ public class MainActivity extends Activity {
     private void refreshLogView() {
         File appFilesDir = getAppFilesBaseDir();
         File logFile = new File(appFilesDir, "ollama.log");
-        if (!logFile.exists() && !isMaxDebugEnabled()) {
+        if (!logFile.exists()) {
             showToast("Log file does not exist");
             return;
         }
@@ -630,7 +630,7 @@ public class MainActivity extends Activity {
                     outputView.setText(logContent);
                     scrollTextViewToBottom(outputView);
                     showToast(isMaxDebugEnabled()
-                            ? "Displaying merged MAX DEBUG logs"
+                            ? "Displaying MAX DEBUG log"
                             : "Displaying latest " + LOG_DISPLAY_MAX_LINES + " log lines");
                 });
             } catch (IOException e) {
@@ -647,40 +647,9 @@ public class MainActivity extends Activity {
 
     private String readDisplayLogContent(File appFilesDir) throws IOException {
         File logFile = new File(appFilesDir, "ollama.log");
-        if (!isMaxDebugEnabled()) {
-            return readLatestLogLines(logFile, LOG_DISPLAY_MAX_LINES);
-        }
-        return buildMergedDebugLogContent(appFilesDir);
-    }
-
-    private String buildMergedDebugLogContent(File appFilesDir) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        appendMergedLogSection(sb, "ollama.log", new File(appFilesDir, "ollama.log"));
-        appendMergedLogSection(sb, "diagnostics/process_diagnostics.log",
-                new File(new File(appFilesDir, "diagnostics"), "process_diagnostics.log"));
-        appendMergedLogSection(sb, "diagnostics/last_state.txt",
-                new File(new File(appFilesDir, "diagnostics"), "last_state.txt"));
-        appendMergedLogSection(sb, "diagnostics/recent_logcat.txt",
-                new File(new File(appFilesDir, "diagnostics"), "recent_logcat.txt"));
-        appendMergedLogSection(sb, "diagnostics/generation_in_progress.txt",
-                new File(new File(appFilesDir, "diagnostics"), "generation_in_progress.txt"));
-        appendMergedLogSection(sb, "native_crash.txt", new File(appFilesDir, "native_crash.txt"));
-        appendMergedLogSection(sb, "last_crash.txt", new File(appFilesDir, "last_crash.txt"));
-        if (sb.length() == 0) {
-            return "";
-        }
-        return sb.toString();
-    }
-
-    private void appendMergedLogSection(StringBuilder sb, String title, File file) throws IOException {
-        if (file == null || !file.exists() || !file.isFile()) {
-            return;
-        }
-        if (sb.length() > 0) {
-            sb.append('\n');
-        }
-        sb.append("===== ").append(title).append(" =====\n");
-        sb.append(readLatestLogLines(file, LOG_DISPLAY_MAX_LINES));
+        return readLatestLogLines(
+                logFile,
+                isMaxDebugEnabled() ? LOG_DISPLAY_MAX_DEBUG_LINES : LOG_DISPLAY_MAX_LINES);
     }
 
     private String readLatestLogLines(File logFile, int maxLines) throws IOException {
@@ -702,17 +671,13 @@ public class MainActivity extends Activity {
     }
     
     private void clearLogFile() {
-        File logFile = new File(getAppFilesBaseDir(), "ollama.log");
-        try (FileWriter writer = new FileWriter(logFile, false)) {
-            writer.write(""); // Clear the file
-            displayedLogContent = null;
-            appendMessage("Log file cleared.");
-            showToast("Log file cleared");
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to clear log file", e);
-            appendMessage("Failed to clear log file: " + e.getMessage());
-            showToast("Failed to clear log file");
+        DiagnosticsLogger.clearLogFiles(this);
+        displayedLogContent = null;
+        if (isViewingLog) {
+            outputView.setText("");
         }
+        appendMessage("Logs cleared.");
+        showToast("Logs cleared");
     }
 
     private String resolveDirectInputConfigName() {
@@ -758,22 +723,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean isLoadedModelMatchingCurrentConfiguration() {
-        if (currentConfig == null) {
-            return true;
-        }
-        String configuredModelPath = resolveConfiguredModelPath(currentConfig.modelUrl);
-        if (configuredModelPath == null || configuredModelPath.isEmpty()) {
-            return true;
-        }
-        return configuredModelPath.equals(modelManager.getCurrentModelPath());
-    }
-
-    private String resolveConfiguredModelPath(String modelUrl) {
-        File modelFile = ModelFileHelper.resolveStoredModelFile(this, modelUrl);
-        if (modelFile == null) {
-            return null;
-        }
-        return modelFile.getAbsolutePath();
+        return modelManager.isLoadedConfigurationMatching(currentConfig);
     }
     
     private boolean hasSharedToolConfig() {
