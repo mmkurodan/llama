@@ -98,12 +98,12 @@ public final class ModelFileHelper {
         if (!hasMeaningfulProjectorAffinity(projectorStem, modelStem, tokens, likelyMultimodalModel)) {
             return false;
         }
-        int score = scoreProjectorCandidate(
+        int score = scoreProjectorMatch(
                 projectorStem,
                 modelStem,
                 tokens,
                 false,
-                false) + scoreProjectorPrecisionCompatibility(modelStem, projectorStem);
+                false);
         return score >= 130 || likelyMultimodalModel;
     }
 
@@ -148,7 +148,7 @@ public final class ModelFileHelper {
             if (!hasMeaningfulProjectorAffinity(candidateStem, modelStem, tokens, likelyMultimodalModel)) {
                 continue;
             }
-            int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio);
+            int score = scoreProjectorMatch(candidateStem, modelStem, tokens, preferVision, preferAudio);
             if (score > bestScore) {
                 best = candidate;
                 bestScore = score;
@@ -198,7 +198,7 @@ public final class ModelFileHelper {
             if (!hasMeaningfulProjectorAffinity(candidateStem, modelStem, tokens, likelyMultimodalModel)) {
                 continue;
             }
-            int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, false, false);
+            int score = scoreProjectorMatch(candidateStem, modelStem, tokens, false, false);
             if (score < 130 && (candidateCount > 1 || !likelyMultimodalModel)) {
                 continue;
             }
@@ -248,8 +248,7 @@ public final class ModelFileHelper {
             if (!hasMeaningfulProjectorAffinity(candidateStem, modelStem, tokens, likelyMultimodalModel)) {
                 continue;
             }
-            int score = scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio)
-                    + scoreProjectorPrecisionCompatibility(modelStem, candidateStem);
+            int score = scoreProjectorMatch(candidateStem, modelStem, tokens, preferVision, preferAudio);
             if (score > bestScore) {
                 bestReference = reference;
                 bestScore = score;
@@ -381,6 +380,16 @@ public final class ModelFileHelper {
             score += 20;
         }
         return score;
+    }
+
+    private static int scoreProjectorMatch(
+            String candidateStem,
+            String modelStem,
+            List<String> tokens,
+            boolean preferVision,
+            boolean preferAudio) {
+        return scoreProjectorCandidate(candidateStem, modelStem, tokens, preferVision, preferAudio)
+                + scoreProjectorPrecisionCompatibility(modelStem, candidateStem);
     }
 
     private static int scoreProjectorPrecisionCompatibility(String modelStem, String candidateStem) {
