@@ -33,6 +33,41 @@ import java.util.regex.Pattern;
  * Provides unified access for both UI and API, with busy state tracking.
  */
 public class ModelManager {
+
+    public synchronized ModelFileHelper.ModalitySupport getAdvertisedModalities(String configName) {
+        ConfigurationManager.ModelConfig config = configManager.getModelConfig(configName);
+        if (config == null || TextUtils.isEmpty(config.modelUrl)) {
+            return new ModelFileHelper.ModalitySupport(false, false);
+        }
+
+        boolean supportsVision = false;
+        boolean supportsAudio = false;
+        String configuredProjectorPath = null;
+
+        String configuredProjectorUrl = TextUtils.isEmpty(config.multimodalProjectorUrl)
+                ? null
+                : config.multimodalProjectorUrl.trim();
+        if (!TextUtils.isEmpty(configuredProjectorUrl)) {
+            configuredProjectorPath =
+                    resolveMultimodalProjectorPath(config.modelUrl, configuredProjectorUrl, false);
+            if (configuredProjectorPath != null) {
+                ModelFileHelper.ModalitySupport inferredSupport =
+                        ModelFileHelper.inferAutoDetectedModalities(context, config.modelUrl);
+                supportsVision = inferredSupport.supportsVision();
+                supportsAudio = inferredSupport.supportsAudio();
+            }
+        }
+
+        String configuredModelPath = ModelFileHelper.getDownloadFilePath(config.modelUrl);
+        if (modelLoaded
+                && configuredModelPath.equals(currentModelPath)
+                && Objects.equals(configuredProjectorPath, currentConfiguredMmprojPath)) {
+            supportsVision |= currentSupportsVision;
+            supportsAudio |= currentSupportsAudio;
+        }
+
+        return new ModelFileHelper.ModalitySupport(supportsVision, supportsAudio);
+    }
     private static final String TAG = "ModelManager";
     private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String PREFS_NAME = "ollama_prefs";
