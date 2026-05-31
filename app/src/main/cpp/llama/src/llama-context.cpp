@@ -526,6 +526,13 @@ void llama_context::sched_reserve() {
             }
         }
 
+#if defined(__ANDROID__)
+        if (cparams.fused_gdn_ch && cparams.n_ubatch == 1 && (hparams.is_hybrid() || hparams.is_recurrent())) {
+            LLAMA_LOG_INFO("%s: fused Gated Delta Net (chunked) disabled for Android hybrid/recurrent model with n_ubatch = %u\n",
+                    __func__, cparams.n_ubatch);
+            cparams.fused_gdn_ch = false;
+        }
+#endif
         if (cparams.fused_gdn_ch) {
             // more than one token in the batch per sequence in order to take the chunked path
             // note: n_outputs must match n_tokens for embedding models with mean/rank pooling,
