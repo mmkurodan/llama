@@ -1032,7 +1032,7 @@ public class OllamaApiServer {
                 && modelName != null
                 && modelName.equals(modelManager.getCurrentConfigName());
         if (isLoadedCurrentModel) {
-            ModelFileHelper.ModalitySupport advertised =
+            ModelFileHelper.InferredModalities advertised =
                     modelManager.getAdvertisedModalities(modelName);
             modalities.put("vision", advertised.supportsVision());
             modalities.put("audio", advertised.supportsAudio());

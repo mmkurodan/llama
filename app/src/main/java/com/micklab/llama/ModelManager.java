@@ -34,39 +34,45 @@ import java.util.regex.Pattern;
  */
 public class ModelManager {
 
-    public synchronized ModelFileHelper.ModalitySupport getAdvertisedModalities(String configName) {
-        ConfigurationManager.ModelConfig config = configManager.getModelConfig(configName);
-        if (config == null || TextUtils.isEmpty(config.modelUrl)) {
-            return new ModelFileHelper.ModalitySupport(false, false);
+    public synchronized ModelFileHelper.InferredModalities getAdvertisedModalities(String configName) {
+        final String resolvedConfigName = normalizeConfigName(configName);
+        final ConfigurationManager.Configuration config;
+        try {
+            config = configManager.loadConfiguration(resolvedConfigName);
+        } catch (IOException | JSONException e) {
+            Log.w(TAG, "Failed to load configuration for modality advertisement: " + resolvedConfigName, e);
+            return new ModelFileHelper.InferredModalities(false, false);
+        }
+
+        if (config.modelUrl == null || config.modelUrl.trim().isEmpty()) {
+            return new ModelFileHelper.InferredModalities(false, false);
         }
 
         boolean supportsVision = false;
         boolean supportsAudio = false;
         String configuredProjectorPath = null;
-
-        String configuredProjectorUrl = TextUtils.isEmpty(config.multimodalProjectorUrl)
-                ? null
-                : config.multimodalProjectorUrl.trim();
-        if (!TextUtils.isEmpty(configuredProjectorUrl)) {
-            configuredProjectorPath =
-                    resolveMultimodalProjectorPath(config.modelUrl, configuredProjectorUrl, false);
-            if (configuredProjectorPath != null) {
-                ModelFileHelper.ModalitySupport inferredSupport =
+        if (config.multimodalProjectorUrl != null && !config.multimodalProjectorUrl.trim().isEmpty()) {
+            MultimodalProjectorResolution projectorResolution =
+                    resolveMultimodalProjectorPath(config, false, false);
+            if (projectorResolution.errorMessage == null && projectorResolution.projectorPath != null) {
+                configuredProjectorPath = projectorResolution.projectorPath;
+                ModelFileHelper.InferredModalities inferredSupport =
                         ModelFileHelper.inferAutoDetectedModalities(context, config.modelUrl);
                 supportsVision = inferredSupport.supportsVision();
                 supportsAudio = inferredSupport.supportsAudio();
             }
         }
 
-        String configuredModelPath = ModelFileHelper.getDownloadFilePath(config.modelUrl);
-        if (modelLoaded
-                && configuredModelPath.equals(currentModelPath)
+        File configuredModelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+        if (configuredModelFile != null
+                && modelLoaded
+                && configuredModelFile.getAbsolutePath().equals(currentModelPath)
                 && Objects.equals(configuredProjectorPath, currentConfiguredMmprojPath)) {
             supportsVision |= currentSupportsVision;
             supportsAudio |= currentSupportsAudio;
         }
 
-        return new ModelFileHelper.ModalitySupport(supportsVision, supportsAudio);
+        return new ModelFileHelper.InferredModalities(supportsVision, supportsAudio);
     }
     private static final String TAG = "ModelManager";
     private static final String DEFAULT_CONFIG_NAME = "default";
