@@ -1534,12 +1534,12 @@ static void llama_jni_free() {
     release_multimodal_locked("llama_jni_free");
     release_context_locked("llama_jni_free");
     release_model_locked("llama_jni_free");
+    release_backend_locked("llama_jni_free");
     g_current_mmproj_path.clear();
     g_supports_vision = false;
     g_supports_audio = false;
     g_current_audio_requested = false;
 
-    log_to_file("llama_jni_free: retaining process-wide backend for future reloads");
     trim_native_allocator("llama_jni_free");
 }
 
@@ -1725,6 +1725,7 @@ Java_com_micklab_llama_LlamaNative_init(
         release_multimodal_locked("init");
         release_context_locked("init");
         release_model_locked("init");
+        release_backend_locked("init");
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
@@ -1768,6 +1769,10 @@ Java_com_micklab_llama_LlamaNative_init(
         if (g_model) {
             log_to_file("init: freeing existing model before re-init");
             release_model_locked("init");
+        }
+        if (g_backend_initialized) {
+            log_to_file("init: freeing backend before re-init");
+            release_backend_locked("init");
         }
         if (!g_current_model_path.empty()) {
             log_to_file("init: clearing previous model path");
@@ -1925,6 +1930,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         release_multimodal_locked("initWithMmproj");
         release_context_locked("initWithMmproj");
         release_model_locked("initWithMmproj");
+        release_backend_locked("initWithMmproj");
         g_current_mmproj_path.clear();
         g_supports_vision = false;
         g_supports_audio = false;
@@ -1980,6 +1986,10 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         if (g_model) {
             log_to_file("initWithMmproj: freeing existing model before re-init");
             release_model_locked("initWithMmproj");
+        }
+        if (g_backend_initialized) {
+            log_to_file("initWithMmproj: freeing backend before re-init");
+            release_backend_locked("initWithMmproj");
         }
         if (!g_current_model_path.empty()) {
             log_to_file("initWithMmproj: clearing previous model path");

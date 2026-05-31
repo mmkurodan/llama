@@ -1,0 +1,5 @@
+2026-05-31 17:45:31.040 pid=31488 [runtime-memory] After model load cleanup model=Qwen3.5-2B-UD-Q8_K_XL.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=14.7MB nativeHeapFree=49.9MB nativeHeapSize=68.4MB
+  pssTotal=27.9MB privateDirty=20.1MB sharedDirty=51.3MB nativePss=14.2MB dalvikPss=1.3MB otherPss=12.5MB
+  systemAvail=14.4GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=179320 kB VmHWM=3158868 kB VmSize=17178396 kB VmSwap=3128 kB Threads=30 FDSize=256
