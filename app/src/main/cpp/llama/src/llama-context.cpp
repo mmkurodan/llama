@@ -527,7 +527,7 @@ void llama_context::sched_reserve() {
         }
 
 #if defined(__ANDROID__)
-        if (cparams.fused_gdn_ch && cparams.n_ubatch == 1 && (model.hparams.is_hybrid() || model.hparams.is_recurrent())) {
+        if (cparams.fused_gdn_ch && cparams.n_ubatch == 1 && (llm_arch_is_hybrid(model.arch) || llm_arch_is_recurrent(model.arch))) {
             LLAMA_LOG_INFO("%s: fused Gated Delta Net (chunked) disabled for Android hybrid/recurrent model with n_ubatch = %u\n",
                     __func__, cparams.n_ubatch);
             cparams.fused_gdn_ch = false;
