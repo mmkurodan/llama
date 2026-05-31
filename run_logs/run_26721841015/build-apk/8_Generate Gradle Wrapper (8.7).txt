@@ -1,0 +1,29 @@
+﻿2026-05-31T19:14:43.1507283Z ##[group]Run gradle wrapper --gradle-version 8.7
+2026-05-31T19:14:43.1507901Z [36;1mgradle wrapper --gradle-version 8.7[0m
+2026-05-31T19:14:43.1534492Z shell: /usr/bin/bash -e {0}
+2026-05-31T19:14:43.1534936Z ##[endgroup]
+2026-05-31T19:14:45.2127491Z 
+2026-05-31T19:14:45.2128804Z Welcome to Gradle 8.7!
+2026-05-31T19:14:45.2129488Z 
+2026-05-31T19:14:45.2130080Z Here are the highlights of this release:
+2026-05-31T19:14:45.2131433Z  - Compiling and testing with Java 22
+2026-05-31T19:14:45.2132600Z  - Cacheable Groovy script compilation
+2026-05-31T19:14:45.2133674Z  - New methods in lazy collection properties
+2026-05-31T19:14:45.2134471Z 
+2026-05-31T19:14:45.2135199Z For more details see https://docs.gradle.org/8.7/release-notes.html
+2026-05-31T19:14:45.2136105Z 
+2026-05-31T19:14:45.6049312Z Starting a Gradle Daemon (subsequent builds will be faster)
+2026-05-31T19:15:14.0054499Z 
+2026-05-31T19:15:14.0069850Z > Configure project :app
+2026-05-31T19:15:14.0089521Z Checking the license for package NDK (Side by side) 27.2.12479018 in /usr/local/lib/android/sdk/licenses
+2026-05-31T19:15:14.0091483Z License for package NDK (Side by side) 27.2.12479018 accepted.
+2026-05-31T19:15:14.0092968Z Preparing "Install NDK (Side by side) 27.2.12479018 v.27.2.12479018".
+2026-05-31T19:15:30.3048775Z "Install NDK (Side by side) 27.2.12479018 v.27.2.12479018" ready.
+2026-05-31T19:15:30.3050249Z Installing NDK (Side by side) 27.2.12479018 in /usr/local/lib/android/sdk/ndk/27.2.12479018
+2026-05-31T19:15:30.3051401Z "Install NDK (Side by side) 27.2.12479018 v.27.2.12479018" complete.
+2026-05-31T19:15:30.5049071Z "Install NDK (Side by side) 27.2.12479018 v.27.2.12479018" finished.
+2026-05-31T19:15:31.8050051Z 
+2026-05-31T19:15:31.8053819Z > Task :wrapper
+2026-05-31T19:15:31.8054742Z 
+2026-05-31T19:15:31.8055214Z BUILD SUCCESSFUL in 47s
+2026-05-31T19:15:31.8056141Z 1 actionable task: 1 executed

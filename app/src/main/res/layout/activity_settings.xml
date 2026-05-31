@@ -119,6 +119,12 @@
             android:inputType="text"
             android:minLines="2" />
 
+        <Button
+            android:id="@+id/loadModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Load Model" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -156,22 +162,16 @@
         </LinearLayout>
 
         <Button
-            android:id="@+id/searchGgufButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Search GGUF on Hugging Face" />
-
-        <Button
-            android:id="@+id/loadModelButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Load Model" />
-
-        <Button
             android:id="@+id/maintainModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="MAINTAIN MODEL" />
+
+        <Button
+            android:id="@+id/searchGgufButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Search GGUF on Hugging Face" />
 
         <Button
             android:id="@+id/importModelButton"

@@ -1,0 +1,72 @@
+﻿2026-05-31T18:06:52.6760555Z ##[group]Run actions/checkout@v4
+2026-05-31T18:06:52.6762662Z with:
+2026-05-31T18:06:52.6764221Z   repository: mmkurodan/llama
+2026-05-31T18:06:52.6776899Z   token: ***
+2026-05-31T18:06:52.6778709Z   ssh-strict: true
+2026-05-31T18:06:52.6780307Z   ssh-user: git
+2026-05-31T18:06:52.6781889Z   persist-credentials: true
+2026-05-31T18:06:52.6783560Z   clean: true
+2026-05-31T18:06:52.6806008Z   sparse-checkout-cone-mode: true
+2026-05-31T18:06:52.6807878Z   fetch-depth: 1
+2026-05-31T18:06:52.6809783Z   fetch-tags: false
+2026-05-31T18:06:52.6811377Z   show-progress: true
+2026-05-31T18:06:52.6812968Z   lfs: false
+2026-05-31T18:06:52.6814480Z   submodules: false
+2026-05-31T18:06:52.6816063Z   set-safe-directory: true
+2026-05-31T18:06:52.6818132Z ##[endgroup]
+2026-05-31T18:06:52.8029523Z Syncing repository: mmkurodan/llama
+2026-05-31T18:06:52.8033476Z ##[group]Getting Git version info
+2026-05-31T18:06:52.8035662Z Working directory is '/home/runner/work/llama/llama'
+2026-05-31T18:06:52.8039054Z [command]/usr/bin/git version
+2026-05-31T18:06:52.8059017Z git version 2.54.0
+2026-05-31T18:06:52.8087995Z ##[endgroup]
+2026-05-31T18:06:52.8103022Z Temporarily overriding HOME='/home/runner/work/_temp/1b5d6336-2ddf-4dec-97e2-014377ea112e' before making global git config changes
+2026-05-31T18:06:52.8106973Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-31T18:06:52.8117984Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/llama/llama
+2026-05-31T18:06:52.8164548Z Deleting the contents of '/home/runner/work/llama/llama'
+2026-05-31T18:06:52.8169840Z ##[group]Initializing the repository
+2026-05-31T18:06:52.8172759Z [command]/usr/bin/git init /home/runner/work/llama/llama
+2026-05-31T18:06:52.8280952Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-05-31T18:06:52.8284525Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-05-31T18:06:52.8288237Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-05-31T18:06:52.8291372Z hint: call:
+2026-05-31T18:06:52.8293123Z hint:
+2026-05-31T18:06:52.8295251Z hint: 	git config --global init.defaultBranch <name>
+2026-05-31T18:06:52.8297720Z hint:
+2026-05-31T18:06:52.8299985Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-05-31T18:06:52.8303162Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-05-31T18:06:52.8305704Z hint:
+2026-05-31T18:06:52.8307429Z hint: 	git branch -m <name>
+2026-05-31T18:06:52.8309488Z hint:
+2026-05-31T18:06:52.8311763Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-05-31T18:06:52.8314776Z Initialized empty Git repository in /home/runner/work/llama/llama/.git/
+2026-05-31T18:06:52.8320779Z [command]/usr/bin/git remote add origin https://github.com/mmkurodan/llama
+2026-05-31T18:06:52.8344092Z ##[endgroup]
+2026-05-31T18:06:52.8349198Z ##[group]Disabling automatic garbage collection
+2026-05-31T18:06:52.8352458Z [command]/usr/bin/git config --local gc.auto 0
+2026-05-31T18:06:52.8379402Z ##[endgroup]
+2026-05-31T18:06:52.8384216Z ##[group]Setting up auth
+2026-05-31T18:06:52.8388190Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-31T18:06:52.8421249Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-31T18:06:52.8760314Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-31T18:06:52.8794316Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-31T18:06:52.9006528Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-31T18:06:52.9035146Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-31T18:06:52.9259816Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-05-31T18:06:52.9298238Z ##[endgroup]
+2026-05-31T18:06:52.9301219Z ##[group]Fetching the repository
+2026-05-31T18:06:52.9307050Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +aca4541eb19717d627c0c8996ec2ba01bc2ddb59:refs/remotes/origin/main
+2026-05-31T18:06:57.8771555Z From https://github.com/mmkurodan/llama
+2026-05-31T18:06:57.8773763Z  * [new ref]         aca4541eb19717d627c0c8996ec2ba01bc2ddb59 -> origin/main
+2026-05-31T18:06:57.8813023Z ##[endgroup]
+2026-05-31T18:06:57.8814320Z ##[group]Determining the checkout info
+2026-05-31T18:06:57.8815763Z ##[endgroup]
+2026-05-31T18:06:57.8819750Z [command]/usr/bin/git sparse-checkout disable
+2026-05-31T18:06:57.8864978Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-05-31T18:06:57.8890412Z ##[group]Checking out the ref
+2026-05-31T18:06:57.8893700Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-05-31T18:06:58.5080199Z Switched to a new branch 'main'
+2026-05-31T18:06:58.5081766Z branch 'main' set up to track 'origin/main'.
+2026-05-31T18:06:58.5112882Z ##[endgroup]
+2026-05-31T18:06:58.5160251Z [command]/usr/bin/git log -1 --format=%H
+2026-05-31T18:06:58.5184715Z aca4541eb19717d627c0c8996ec2ba01bc2ddb59

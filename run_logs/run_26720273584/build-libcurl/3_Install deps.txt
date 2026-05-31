@@ -1,0 +1,101 @@
+﻿2026-05-31T18:05:03.0142916Z ##[group]Run sudo apt update
+2026-05-31T18:05:03.0143387Z [36;1msudo apt update[0m
+2026-05-31T18:05:03.0143823Z [36;1msudo apt install -y autoconf automake libtool pkg-config build-essential git[0m
+2026-05-31T18:05:03.0172935Z shell: /usr/bin/bash -e {0}
+2026-05-31T18:05:03.0173236Z ##[endgroup]
+2026-05-31T18:05:03.0406832Z 
+2026-05-31T18:05:03.0408719Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-31T18:05:03.1224378Z 
+2026-05-31T18:05:03.1225062Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-31T18:05:03.1591661Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-05-31T18:05:03.1609324Z Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
+2026-05-31T18:05:03.1611021Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-05-31T18:05:03.1622610Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-05-31T18:05:03.1669734Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-05-31T18:05:03.1840813Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-05-31T18:05:03.2363972Z Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+2026-05-31T18:05:03.3462195Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [134 kB]
+2026-05-31T18:05:03.3601654Z Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [163 kB]
+2026-05-31T18:05:03.3989043Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [2050 kB]
+2026-05-31T18:05:03.4098983Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [360 kB]
+2026-05-31T18:05:03.4113258Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [177 kB]
+2026-05-31T18:05:03.4148961Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1694 kB]
+2026-05-31T18:05:03.4213550Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [330 kB]
+2026-05-31T18:05:03.4238490Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [386 kB]
+2026-05-31T18:05:03.4265909Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [3278 kB]
+2026-05-31T18:05:03.4426295Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [760 kB]
+2026-05-31T18:05:03.4489697Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [11.3 kB]
+2026-05-31T18:05:03.4498190Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2026-05-31T18:05:03.5216531Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5764 B]
+2026-05-31T18:05:03.5229518Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+2026-05-31T18:05:03.5248700Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1704 kB]
+2026-05-31T18:05:03.5328476Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [268 kB]
+2026-05-31T18:05:03.5349602Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [42.5 kB]
+2026-05-31T18:05:03.5360769Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1192 kB]
+2026-05-31T18:05:03.5428157Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [230 kB]
+2026-05-31T18:05:03.5436627Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [74.2 kB]
+2026-05-31T18:05:03.5449733Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [3006 kB]
+2026-05-31T18:05:03.5604753Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [698 kB]
+2026-05-31T18:05:03.5651992Z Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [9000 B]
+2026-05-31T18:05:03.6102854Z Get:32 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1217 B]
+2026-05-31T18:05:08.4758450Z Fetched 17.0 MB in 2s (8762 kB/s)
+2026-05-31T18:05:09.3279414Z Reading package lists...
+2026-05-31T18:05:09.5580721Z Building dependency tree...
+2026-05-31T18:05:09.5587517Z Reading state information...
+2026-05-31T18:05:09.5807265Z 48 packages can be upgraded. Run 'apt list --upgradable' to see them.
+2026-05-31T18:05:09.5918599Z 
+2026-05-31T18:05:09.5919396Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-31T18:05:09.5919812Z 
+2026-05-31T18:05:09.6041449Z Reading package lists...
+2026-05-31T18:05:09.8092249Z Building dependency tree...
+2026-05-31T18:05:09.8099943Z Reading state information...
+2026-05-31T18:05:09.9940122Z autoconf is already the newest version (2.71-3).
+2026-05-31T18:05:09.9940691Z automake is already the newest version (1:1.16.5-1.3ubuntu1).
+2026-05-31T18:05:09.9941163Z libtool is already the newest version (2.4.7-7build1).
+2026-05-31T18:05:09.9941675Z pkg-config is already the newest version (1.8.1-2build1).
+2026-05-31T18:05:09.9942154Z git is already the newest version (1:2.54.0-0ppa1~ubuntu24.04.1).
+2026-05-31T18:05:09.9942577Z git set to manually installed.
+2026-05-31T18:05:10.0545739Z The following NEW packages will be installed:
+2026-05-31T18:05:10.0555722Z   build-essential
+2026-05-31T18:05:10.1054124Z 0 upgraded, 1 newly installed, 0 to remove and 48 not upgraded.
+2026-05-31T18:05:10.1584650Z Need to get 4928 B of archives.
+2026-05-31T18:05:10.1585432Z After this operation, 17.4 kB of additional disk space will be used.
+2026-05-31T18:05:10.1586579Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-31T18:05:10.2411869Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 build-essential amd64 12.10ubuntu1 [4928 B]
+2026-05-31T18:05:10.5049718Z Fetched 4928 B in 0s (52.7 kB/s)
+2026-05-31T18:05:10.5266903Z Selecting previously unselected package build-essential.
+2026-05-31T18:05:10.5585868Z (Reading database ... 
+2026-05-31T18:05:10.5586412Z (Reading database ... 5%
+2026-05-31T18:05:10.5586764Z (Reading database ... 10%
+2026-05-31T18:05:10.5587093Z (Reading database ... 15%
+2026-05-31T18:05:10.5588315Z (Reading database ... 20%
+2026-05-31T18:05:10.5589019Z (Reading database ... 25%
+2026-05-31T18:05:10.5589586Z (Reading database ... 30%
+2026-05-31T18:05:10.5589968Z (Reading database ... 35%
+2026-05-31T18:05:10.5590276Z (Reading database ... 40%
+2026-05-31T18:05:10.5590562Z (Reading database ... 45%
+2026-05-31T18:05:10.5590846Z (Reading database ... 50%
+2026-05-31T18:05:10.5641423Z (Reading database ... 55%
+2026-05-31T18:05:10.7073899Z (Reading database ... 60%
+2026-05-31T18:05:10.9085702Z (Reading database ... 65%
+2026-05-31T18:05:11.0763967Z (Reading database ... 70%
+2026-05-31T18:05:11.2113992Z (Reading database ... 75%
+2026-05-31T18:05:11.4097393Z (Reading database ... 80%
+2026-05-31T18:05:11.6012807Z (Reading database ... 85%
+2026-05-31T18:05:11.8086916Z (Reading database ... 90%
+2026-05-31T18:05:11.9717640Z (Reading database ... 95%
+2026-05-31T18:05:11.9718139Z (Reading database ... 100%
+2026-05-31T18:05:11.9718623Z (Reading database ... 202271 files and directories currently installed.)
+2026-05-31T18:05:11.9761305Z Preparing to unpack .../build-essential_12.10ubuntu1_amd64.deb ...
+2026-05-31T18:05:11.9790989Z Unpacking build-essential (12.10ubuntu1) ...
+2026-05-31T18:05:12.0183140Z Setting up build-essential (12.10ubuntu1) ...
+2026-05-31T18:05:12.6594429Z 
+2026-05-31T18:05:12.6594962Z Running kernel seems to be up-to-date.
+2026-05-31T18:05:12.6595352Z 
+2026-05-31T18:05:12.6595528Z No services need to be restarted.
+2026-05-31T18:05:12.6595833Z 
+2026-05-31T18:05:12.6596028Z No containers need to be restarted.
+2026-05-31T18:05:12.6596254Z 
+2026-05-31T18:05:12.6596407Z No user sessions are running outdated binaries.
+2026-05-31T18:05:12.6596722Z 
+2026-05-31T18:05:12.6597082Z No VM guests are running outdated hypervisor (qemu) binaries on this host.

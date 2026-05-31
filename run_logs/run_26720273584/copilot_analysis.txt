@@ -1,0 +1,42 @@
+Model: gpt-5-mini
+Timestamp: Sun May 31 06:58:39 PM UTC 2026
+---
+Warning: Ignoring invalid allowedUrls entry "https://http//127.0.0.1:11434$". Error: Invalid URL pattern: https://http//127.0.0.1:11434$
+1) 問題点の要約
+- 致命的エラー：C++ビルドが失敗（llama-context.cpp で未宣言識別子 'hparams' を参照 → コンパイルエラー → ninja/CMake ビルド中断、exit code 1）。
+- 非推奨 / 警告群：Node.js の Buffer() 非推奨、GitHub Actions で Node.js 20 の非推奨通知、Android Gradle Plugin と compileSdk=35 の不整合警告、Java の deprecated API 利用、CMake/クロスコンパイルや libcurl の設定警告、apt CLI 警告。
+
+2) 根拠となるログ行
+- C++ コンパイルエラー:
+  /root/llama/.../0_build-apk.txt:3900: /home/runner/.../llama-context.cpp:530:63: error: use of undeclared identifier 'hparams'
+  /root/llama/.../0_build-apk.txt:3903: /home/runner/.../llama-context.cpp:530:86: error: use of undeclared identifier 'hparams'
+  /root/llama/.../0_build-apk.txt:3906: 2 errors generated.
+  /root/llama/.../0_build-apk.txt:3969: ninja: build stopped: subcommand failed.
+  /root/llama/.../0_build-apk.txt:4350: ##[error]Process completed with exit code 1.
+- Node.js 非推奨:
+  /root/llama/.../0_build-apk.txt:127: (node:2290) [DEP0005] DeprecationWarning: Buffer() is deprecated ... Please use Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from()
+  /root/llama/.../0_build-apk.txt:128: (Use `node --trace-deprecation ...` to show where the warning was created)
+  /root/llama/.../0_build-apk.txt:4367: ##[warning]Node.js 20 actions are deprecated. ... Actions will be forced to run with Node.js 24 by default starting June 16th, 2026.
+- Android / Java / CMake / configure 警告:
+  /root/llama/.../0_build-apk.txt:3337: WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+  /root/llama/.../0_build-apk.txt:3838: Note: Some input files use or override a deprecated API.
+  /root/llama/.../2_build-mbedtls.txt:295: CMake Deprecation Warning at CMakeLists.txt:21 (cmake_minimum_required):
+  /root/llama/.../1_build-libcurl.txt:496: configure: WARNING: zlib disabled
+  /root/llama/.../1_build-libcurl.txt:500: configure: WARNING: Cannot find libraries for LDAP support: LDAP disabled
+  /root/llama/.../1_build-libcurl.txt:516: configure: WARNING: libpsl was not found
+  /root/llama/.../1_build-libcurl.txt:113: WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+- 変換/依存関係に「deprecated」が含まれるアーティファクト:
+  /root/llama/.../0_build-apk.txt:3182: Transforming transform-api-2.0.0-deprecated-use-gradle-api.jar ...
+
+3) 補足（優先対応案）
+- 最優先：llama-context.cpp の 530 行付近を修正（'hparams' が定義されているヘッダ/スコープをインクルードするか、正しい変数名に修正）。修正後再ビルドで C++ エラー解消を確認。
+- Node.js 警告：起点特定に --trace-deprecation を使い、該当ライブラリ/アクションを Buffer.from/alloc に置換またはアップデート。GitHub Actions の場合は actions の新バージョンへ更新か、短期的に FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 環境変数で Node24 に切替検討。
+- Android/Gradle：Android Gradle Plugin を compileSdk=35 と互換の新しいバージョンへ更新（または警告抑制の指示に従う）。
+- クロスコンパイル警告（libcurl）：必要な依存（zlib, libpsl, libgsasl, LDAP, IDN 等）を提供するか、意図的に無効にしているなら影響を評価。
+- スクリプト安定性：apt 警告は注意喚起。CI スクリプトは非対話モード・安定な apt コマンドで記述する。
+
+
+
+Changes    +0 -0
+Requests   0 Premium (41s)
+Tokens     ↑ 34.1k (2.4k cached) • ↓ 5.3k (4.2k reasoning)

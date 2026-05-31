@@ -1,0 +1,58 @@
+Model: gpt-5-mini
+Timestamp: Sun May 31 07:19:58 PM UTC 2026
+---
+Warning: Ignoring invalid allowedUrls entry "https://http//127.0.0.1:11434$". Error: Invalid URL pattern: https://http//127.0.0.1:11434$
+1) 問題点の要約
+- 致命的エラー：C++ ネイティブビルドが失敗（llama-context.cpp のコンパイルエラー → ビルド停止／Exit code 1）。
+- 非推奨／警告多数：Node の Buffer() 非推奨、GitHub Actions の Node.js 20 非推奨、Android Gradle plugin と compileSdk の不整合、CMake の deprecation 警告、Java の deprecated API 使用警告、libcurl/missing-feature の configure 警告、apt 警告等。
+- スタックトレース／プロセス例外：Gradle/ninja 実行で例外が発生している（ビルドツール側で中断）。
+
+2) 根拠となるログ行（代表抜粋）
+- ネイティブコンパイルエラーとビルド停止（致命）
+  - /root/llama/.../0_build-apk.txt:3900: ... llama-context.cpp:530:77: error: no member named 'is_hybrid' in 'llama_hparams'
+  - /root/llama/.../0_build-apk.txt:3903: ... llama-context.cpp:530:119: error: too few arguments to function call, single argument 'il' was not specified
+  - /root/llama/.../0_build-apk.txt:3909: C/C++: 2 errors generated.
+  - /root/llama/.../0_build-apk.txt:3912: FAILURE: Build failed with an exception.
+  - /root/llama/.../0_build-apk.txt:3915: > Task :app:buildCMakeDebug[arm64-v8a] FAILED
+  - /root/llama/.../0_build-apk.txt:3975: ninja: build stopped: subcommand failed.
+  - /root/llama/.../0_build-apk.txt:4301: BUILD FAILED in 1m 30s
+  - /root/llama/.../0_build-apk.txt:4302: ##[error]Process completed with exit code 1.
+- Node / GitHub Actions の非推奨警告
+  - /root/llama/.../0_build-apk.txt:127: (node:2315) [DEP0005] DeprecationWarning: Buffer() is deprecated ... Please use Buffer.alloc() / Buffer.from()
+  - /root/llama/.../0_build-apk.txt:4319: ##[warning]Node.js 20 actions are deprecated. ... Actions will be forced to run with Node.js 24 by default starting June 16th, 2026.
+- Android / Java 警告
+  - /root/llama/.../0_build-apk.txt:3337: WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+  - /root/llama/.../0_build-apk.txt:3838: Note: Some input files use or override a deprecated API.
+  - /root/llama/.../0_build-apk.txt:3182: Transforming transform-api-2.0.0-deprecated-use-gradle-api.jar ...
+- CMake / build-system 警告
+  - /root/llama/.../2_build-mbedtls.txt:295: CMake Deprecation Warning at CMakeLists.txt:21 (cmake_minimum_required):
+  - /root/llama/.../2_build-mbedtls.txt:307: CMake Deprecation Warning at /usr/local/.../flags.cmake:18 (cmake_minimum_required):
+- libcurl / configure の警告（機能無効／不足）
+  - /root/llama/.../1_build-libcurl.txt:496: configure: WARNING: zlib disabled
+  - /root/llama/.../1_build-libcurl.txt:500: configure: WARNING: Cannot find libraries for LDAP support: LDAP disabled
+  - /root/llama/.../1_build-libcurl.txt:516: configure: WARNING: libpsl was not found
+  - /root/llama/.../1_build-libcurl.txt:518: configure: WARNING: libgsasl was not found
+  - /root/llama/.../1_build-libcurl.txt:535: configure: WARNING: Cannot find libraries for IDN support: IDN disabled
+  - /root/llama/.../1_build-libcurl.txt:349: configure: WARNING: using cross tools not prefixed with host triplet
+- apt 警告
+  - /root/llama/.../1_build-libcurl.txt:113: WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+- Gradle / ninja の例外スタック（抜粋）
+  - /root/llama/.../0_build-apk.txt:3990: org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:buildCMakeDebug[arm64-v8a]'.
+  - /root/llama/.../0_build-apk.txt:4023: Caused by: org.gradle.internal.UncheckedException: com.android.ide.common.process.ProcessException: ninja: Entering directory `.../arm64-v8a'
+  - /root/llama/.../0_build-apk.txt:4290: Caused by: com.android.ide.common.process.ProcessException: Error while executing process .../cmake/3.22.1/bin/ninja ... 
+  - /root/llama/.../0_build-apk.txt:4295: Caused by: org.gradle.process.internal.ExecException: Process 'command .../ninja'' finished with non-zero exit value 1
+
+3) 補足（対応方針・優先順位）
+- 優先対応：ネイティブのコンパイルエラーを修正（llama-context.cpp の 530 行付近）。原因は型／API 不整合（llama_hparams に is_hybrid が無い、関数シグネチャ変更で引数不足）。関連ライブラリ（submodule／依存）のバージョン不一致の可能性が高い。該当ヘッダと関数宣言を確認し、コードを依存先の API に合わせるか依存を固定して再ビルド。
+- Node/Actions 周り：Buffer() 警告は当面は非致命。アクション／スクリプトを新しいバージョンへ更新（or スクリプト内で Buffer.from/alloc を使う）。GitHub Actions の Node.js 20 非推奨は近接しているので、使用中アクションを Node24 対応版へ更新するか、短期的に FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 環境変数で切替検討。
+- Android/CMake 警告：Android Gradle plugin と compileSdk の整合を取り、CMakeLists の cmake_minimum_required を推奨値まで引き上げる。Java の deprecated API は警告を精査し必要なら置換。
+- libcurl/missing-feature：必要なら zlib／LDAP／libpsl 等の cross-compiled ライブラリを提供するか、機能が不要であれば警告を許容。クロスコンパイル設定（CA path, host triplet）を見直す。
+- 再現手順：ローカルで同じ NDK/CMake バージョンを使い、まずネイティブコンパイル単体を実行してエラー箇所を調査→修正→CI 再実行。
+
+必要なら該当ソース（llama-context.cpp の該当行周辺）を提示いただければ、具体的な修正案を提示します。
+
+
+
+Changes    +0 -0
+Requests   0 Premium (1m 8s)
+Tokens     ↑ 34.2k (12.3k cached) • ↓ 9.4k (7.7k reasoning)

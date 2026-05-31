@@ -1,0 +1,640 @@
+﻿2026-05-31T19:10:37.8568223Z Current runner version: '2.334.0'
+2026-05-31T19:10:37.8597917Z ##[group]Runner Image Provisioner
+2026-05-31T19:10:37.8598875Z Hosted Compute Agent
+2026-05-31T19:10:37.8599471Z Version: 20260520.533
+2026-05-31T19:10:37.8600261Z Commit: 189110e25284a9812c124fd27b339e2fb4f2f9db
+2026-05-31T19:10:37.8601038Z Build Date: 2026-05-20T17:44:04Z
+2026-05-31T19:10:37.8601850Z Worker ID: {70963f84-9182-468f-bc24-0d151f0d2f45}
+2026-05-31T19:10:37.8602587Z Azure Region: centralus
+2026-05-31T19:10:37.8603181Z ##[endgroup]
+2026-05-31T19:10:37.8605647Z ##[group]Operating System
+2026-05-31T19:10:37.8606350Z Ubuntu
+2026-05-31T19:10:37.8606980Z 24.04.4
+2026-05-31T19:10:37.8607552Z LTS
+2026-05-31T19:10:37.8608098Z ##[endgroup]
+2026-05-31T19:10:37.8608758Z ##[group]Runner Image
+2026-05-31T19:10:37.8609399Z Image: ubuntu-24.04
+2026-05-31T19:10:37.8609975Z Version: 20260525.161.1
+2026-05-31T19:10:37.8611358Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260525.161/images/ubuntu/Ubuntu2404-Readme.md
+2026-05-31T19:10:37.8613102Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260525.161
+2026-05-31T19:10:37.8614420Z ##[endgroup]
+2026-05-31T19:10:37.8615744Z ##[group]GITHUB_TOKEN Permissions
+2026-05-31T19:10:37.8618193Z Contents: read
+2026-05-31T19:10:37.8618836Z Metadata: read
+2026-05-31T19:10:37.8619533Z Packages: read
+2026-05-31T19:10:37.8620122Z ##[endgroup]
+2026-05-31T19:10:37.8622770Z Secret source: Actions
+2026-05-31T19:10:37.8623990Z Prepare workflow directory
+2026-05-31T19:10:37.8971258Z Prepare all required actions
+2026-05-31T19:10:37.9025591Z Getting action download info
+2026-05-31T19:10:38.3519447Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-05-31T19:10:38.4587364Z Download action repository 'nttld/setup-ndk@v1' (SHA:ed92fe6cadad69be94a966a7ee3271275e62f779)
+2026-05-31T19:10:38.9308540Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-05-31T19:10:39.1516707Z Complete job name: build-mbedtls
+2026-05-31T19:10:39.2280700Z ##[group]Run actions/checkout@v4
+2026-05-31T19:10:39.2281778Z with:
+2026-05-31T19:10:39.2282279Z   repository: mmkurodan/llama
+2026-05-31T19:10:39.2288543Z   token: ***
+2026-05-31T19:10:39.2289033Z   ssh-strict: true
+2026-05-31T19:10:39.2289527Z   ssh-user: git
+2026-05-31T19:10:39.2290034Z   persist-credentials: true
+2026-05-31T19:10:39.2290597Z   clean: true
+2026-05-31T19:10:39.2291117Z   sparse-checkout-cone-mode: true
+2026-05-31T19:10:39.2291726Z   fetch-depth: 1
+2026-05-31T19:10:39.2292225Z   fetch-tags: false
+2026-05-31T19:10:39.2292736Z   show-progress: true
+2026-05-31T19:10:39.2293233Z   lfs: false
+2026-05-31T19:10:39.2293930Z   submodules: false
+2026-05-31T19:10:39.2294434Z   set-safe-directory: true
+2026-05-31T19:10:39.2295261Z ##[endgroup]
+2026-05-31T19:10:39.3447210Z Syncing repository: mmkurodan/llama
+2026-05-31T19:10:39.3449588Z ##[group]Getting Git version info
+2026-05-31T19:10:39.3450531Z Working directory is '/home/runner/work/llama/llama'
+2026-05-31T19:10:39.3451791Z [command]/usr/bin/git version
+2026-05-31T19:10:39.3496476Z git version 2.54.0
+2026-05-31T19:10:39.3522170Z ##[endgroup]
+2026-05-31T19:10:39.3547603Z Temporarily overriding HOME='/home/runner/work/_temp/fddc42d8-7264-4854-8ce9-59f823dd5173' before making global git config changes
+2026-05-31T19:10:39.3549395Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-31T19:10:39.3553470Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/llama/llama
+2026-05-31T19:10:39.3607176Z Deleting the contents of '/home/runner/work/llama/llama'
+2026-05-31T19:10:39.3611431Z ##[group]Initializing the repository
+2026-05-31T19:10:39.3615907Z [command]/usr/bin/git init /home/runner/work/llama/llama
+2026-05-31T19:10:39.3693934Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-05-31T19:10:39.3695293Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-05-31T19:10:39.3696901Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-05-31T19:10:39.3697803Z hint: call:
+2026-05-31T19:10:39.3698251Z hint:
+2026-05-31T19:10:39.3698836Z hint: 	git config --global init.defaultBranch <name>
+2026-05-31T19:10:39.3699577Z hint:
+2026-05-31T19:10:39.3700263Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-05-31T19:10:39.3701386Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-05-31T19:10:39.3702279Z hint:
+2026-05-31T19:10:39.3702782Z hint: 	git branch -m <name>
+2026-05-31T19:10:39.3703314Z hint:
+2026-05-31T19:10:39.3704288Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-05-31T19:10:39.3707636Z Initialized empty Git repository in /home/runner/work/llama/llama/.git/
+2026-05-31T19:10:39.3720588Z [command]/usr/bin/git remote add origin https://github.com/mmkurodan/llama
+2026-05-31T19:10:39.3764556Z ##[endgroup]
+2026-05-31T19:10:39.3765476Z ##[group]Disabling automatic garbage collection
+2026-05-31T19:10:39.3769012Z [command]/usr/bin/git config --local gc.auto 0
+2026-05-31T19:10:39.3803205Z ##[endgroup]
+2026-05-31T19:10:39.3804210Z ##[group]Setting up auth
+2026-05-31T19:10:39.3810911Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-31T19:10:39.3846511Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-31T19:10:39.4168232Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-31T19:10:39.4201493Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-31T19:10:39.4447636Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-31T19:10:39.4486086Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-31T19:10:39.4736562Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-05-31T19:10:39.4776872Z ##[endgroup]
+2026-05-31T19:10:39.4777932Z ##[group]Fetching the repository
+2026-05-31T19:10:39.4786194Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +79b91dd198802174ae9c37fd7692f80ccbfb6dfd:refs/remotes/origin/main
+2026-05-31T19:10:44.1773053Z From https://github.com/mmkurodan/llama
+2026-05-31T19:10:44.1775327Z  * [new ref]         79b91dd198802174ae9c37fd7692f80ccbfb6dfd -> origin/main
+2026-05-31T19:10:44.1806582Z ##[endgroup]
+2026-05-31T19:10:44.1807363Z ##[group]Determining the checkout info
+2026-05-31T19:10:44.1809167Z ##[endgroup]
+2026-05-31T19:10:44.1814642Z [command]/usr/bin/git sparse-checkout disable
+2026-05-31T19:10:44.1858855Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-05-31T19:10:44.1890497Z ##[group]Checking out the ref
+2026-05-31T19:10:44.1891056Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-05-31T19:10:44.8524649Z Switched to a new branch 'main'
+2026-05-31T19:10:44.8525364Z branch 'main' set up to track 'origin/main'.
+2026-05-31T19:10:44.8565735Z ##[endgroup]
+2026-05-31T19:10:44.8607250Z [command]/usr/bin/git log -1 --format=%H
+2026-05-31T19:10:44.8631873Z 79b91dd198802174ae9c37fd7692f80ccbfb6dfd
+2026-05-31T19:10:44.8830585Z ##[group]Run sudo apt update
+2026-05-31T19:10:44.8831002Z [36;1msudo apt update[0m
+2026-05-31T19:10:44.8831347Z [36;1msudo apt install -y cmake git build-essential[0m
+2026-05-31T19:10:44.8864357Z shell: /usr/bin/bash -e {0}
+2026-05-31T19:10:44.8864673Z ##[endgroup]
+2026-05-31T19:10:44.9111535Z 
+2026-05-31T19:10:44.9112030Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-31T19:10:44.9112830Z 
+2026-05-31T19:10:44.9763462Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-31T19:10:45.0230048Z Hit:6 https://packages.microsoft.com/repos/azure-cli noble InRelease
+2026-05-31T19:10:45.0231354Z Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+2026-05-31T19:10:45.0232483Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-05-31T19:10:45.0256663Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-05-31T19:10:45.0289767Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-05-31T19:10:45.0334252Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-05-31T19:10:45.1627581Z Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+2026-05-31T19:10:45.1945205Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [134 kB]
+2026-05-31T19:10:45.2053669Z Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [163 kB]
+2026-05-31T19:10:45.2434321Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [2050 kB]
+2026-05-31T19:10:45.2556076Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [360 kB]
+2026-05-31T19:10:45.2572555Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [177 kB]
+2026-05-31T19:10:45.2589339Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1694 kB]
+2026-05-31T19:10:45.2685147Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [330 kB]
+2026-05-31T19:10:45.2727616Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [386 kB]
+2026-05-31T19:10:45.2759038Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [3278 kB]
+2026-05-31T19:10:45.2929306Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [760 kB]
+2026-05-31T19:10:45.2981537Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [11.3 kB]
+2026-05-31T19:10:45.2989409Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+2026-05-31T19:10:45.3501629Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5764 B]
+2026-05-31T19:10:45.3537021Z Get:22 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+2026-05-31T19:10:45.3625899Z Get:23 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1704 kB]
+2026-05-31T19:10:45.3710404Z Get:24 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [268 kB]
+2026-05-31T19:10:45.3735691Z Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [42.5 kB]
+2026-05-31T19:10:45.3752581Z Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1192 kB]
+2026-05-31T19:10:45.3824882Z Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [230 kB]
+2026-05-31T19:10:45.3850116Z Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [74.2 kB]
+2026-05-31T19:10:45.3875984Z Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [3006 kB]
+2026-05-31T19:10:45.4040319Z Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [698 kB]
+2026-05-31T19:10:45.4096239Z Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/multiverse Translation-en [9000 B]
+2026-05-31T19:10:45.4813484Z Get:32 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1217 B]
+2026-05-31T19:10:50.5652682Z Fetched 17.0 MB in 2s (8272 kB/s)
+2026-05-31T19:10:51.4632976Z Reading package lists...
+2026-05-31T19:10:51.7115413Z Building dependency tree...
+2026-05-31T19:10:51.7122573Z Reading state information...
+2026-05-31T19:10:51.7339931Z 48 packages can be upgraded. Run 'apt list --upgradable' to see them.
+2026-05-31T19:10:51.7462918Z 
+2026-05-31T19:10:51.7463581Z WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+2026-05-31T19:10:51.7464616Z 
+2026-05-31T19:10:51.7584395Z Reading package lists...
+2026-05-31T19:10:51.9950210Z Building dependency tree...
+2026-05-31T19:10:51.9958031Z Reading state information...
+2026-05-31T19:10:52.2196044Z git is already the newest version (1:2.54.0-0ppa1~ubuntu24.04.1).
+2026-05-31T19:10:52.2196730Z git set to manually installed.
+2026-05-31T19:10:52.2197288Z The following additional packages will be installed:
+2026-05-31T19:10:52.2204849Z   cmake-data libjsoncpp25 librhash0
+2026-05-31T19:10:52.2211836Z Suggested packages:
+2026-05-31T19:10:52.2212226Z   cmake-doc cmake-format elpa-cmake-mode ninja-build
+2026-05-31T19:10:52.2858070Z The following NEW packages will be installed:
+2026-05-31T19:10:52.2868639Z   build-essential cmake cmake-data libjsoncpp25 librhash0
+2026-05-31T19:10:52.3370700Z 0 upgraded, 5 newly installed, 0 to remove and 48 not upgraded.
+2026-05-31T19:10:52.4026520Z Need to get 13.6 MB of archives.
+2026-05-31T19:10:52.4027341Z After this operation, 49.1 MB of additional disk space will be used.
+2026-05-31T19:10:52.4029098Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-05-31T19:10:52.4501344Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 build-essential amd64 12.10ubuntu1 [4928 B]
+2026-05-31T19:10:52.4796893Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libjsoncpp25 amd64 1.9.5-6build1 [82.8 kB]
+2026-05-31T19:10:52.5112109Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 librhash0 amd64 1.4.3-3build1 [129 kB]
+2026-05-31T19:10:52.5420675Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 cmake-data all 3.28.3-1build7 [2155 kB]
+2026-05-31T19:10:52.5901767Z Get:6 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 cmake amd64 3.28.3-1build7 [11.2 MB]
+2026-05-31T19:10:52.9792363Z Fetched 13.6 MB in 0s (45.3 MB/s)
+2026-05-31T19:10:53.0031767Z Selecting previously unselected package build-essential.
+2026-05-31T19:10:53.0264754Z (Reading database ... 
+2026-05-31T19:10:53.0265477Z (Reading database ... 5%
+2026-05-31T19:10:53.0265922Z (Reading database ... 10%
+2026-05-31T19:10:53.0337645Z (Reading database ... 15%
+2026-05-31T19:10:53.0338076Z (Reading database ... 20%
+2026-05-31T19:10:53.0338445Z (Reading database ... 25%
+2026-05-31T19:10:53.0338836Z (Reading database ... 30%
+2026-05-31T19:10:53.0339240Z (Reading database ... 35%
+2026-05-31T19:10:53.0339678Z (Reading database ... 40%
+2026-05-31T19:10:53.0340107Z (Reading database ... 45%
+2026-05-31T19:10:53.0340492Z (Reading database ... 50%
+2026-05-31T19:10:53.0340870Z (Reading database ... 55%
+2026-05-31T19:10:53.1759661Z (Reading database ... 60%
+2026-05-31T19:10:53.3804786Z (Reading database ... 65%
+2026-05-31T19:10:53.5292251Z (Reading database ... 70%
+2026-05-31T19:10:53.6777735Z (Reading database ... 75%
+2026-05-31T19:10:53.8241993Z (Reading database ... 80%
+2026-05-31T19:10:54.0724048Z (Reading database ... 85%
+2026-05-31T19:10:54.2815624Z (Reading database ... 90%
+2026-05-31T19:10:54.4321768Z (Reading database ... 95%
+2026-05-31T19:10:54.4322126Z (Reading database ... 100%
+2026-05-31T19:10:54.4322502Z (Reading database ... 202271 files and directories currently installed.)
+2026-05-31T19:10:54.4372311Z Preparing to unpack .../build-essential_12.10ubuntu1_amd64.deb ...
+2026-05-31T19:10:54.4400932Z Unpacking build-essential (12.10ubuntu1) ...
+2026-05-31T19:10:54.4630018Z Selecting previously unselected package libjsoncpp25:amd64.
+2026-05-31T19:10:54.4767523Z Preparing to unpack .../libjsoncpp25_1.9.5-6build1_amd64.deb ...
+2026-05-31T19:10:54.4785580Z Unpacking libjsoncpp25:amd64 (1.9.5-6build1) ...
+2026-05-31T19:10:54.5024462Z Selecting previously unselected package librhash0:amd64.
+2026-05-31T19:10:54.5159586Z Preparing to unpack .../librhash0_1.4.3-3build1_amd64.deb ...
+2026-05-31T19:10:54.5169738Z Unpacking librhash0:amd64 (1.4.3-3build1) ...
+2026-05-31T19:10:54.5430665Z Selecting previously unselected package cmake-data.
+2026-05-31T19:10:54.5567731Z Preparing to unpack .../cmake-data_3.28.3-1build7_all.deb ...
+2026-05-31T19:10:54.5640869Z Unpacking cmake-data (3.28.3-1build7) ...
+2026-05-31T19:10:55.1283354Z Selecting previously unselected package cmake.
+2026-05-31T19:10:55.1436325Z Preparing to unpack .../cmake_3.28.3-1build7_amd64.deb ...
+2026-05-31T19:10:55.1445614Z Unpacking cmake (3.28.3-1build7) ...
+2026-05-31T19:10:55.3369379Z Setting up libjsoncpp25:amd64 (1.9.5-6build1) ...
+2026-05-31T19:10:55.3391563Z Setting up librhash0:amd64 (1.4.3-3build1) ...
+2026-05-31T19:10:55.3413064Z Setting up build-essential (12.10ubuntu1) ...
+2026-05-31T19:10:55.3434301Z Setting up cmake-data (3.28.3-1build7) ...
+2026-05-31T19:10:55.3505095Z Setting up cmake (3.28.3-1build7) ...
+2026-05-31T19:10:55.3530861Z Processing triggers for man-db (2.12.0-4build2) ...
+2026-05-31T19:10:55.3551579Z Not building database; man-db/auto-update is not 'true'.
+2026-05-31T19:10:55.3565613Z Processing triggers for libc-bin (2.39-0ubuntu8.7) ...
+2026-05-31T19:10:55.9929716Z 
+2026-05-31T19:10:55.9930285Z Running kernel seems to be up-to-date.
+2026-05-31T19:10:55.9930670Z 
+2026-05-31T19:10:55.9930825Z No services need to be restarted.
+2026-05-31T19:10:55.9931099Z 
+2026-05-31T19:10:55.9931266Z No containers need to be restarted.
+2026-05-31T19:10:55.9931530Z 
+2026-05-31T19:10:55.9931725Z No user sessions are running outdated binaries.
+2026-05-31T19:10:55.9932108Z 
+2026-05-31T19:10:55.9932397Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026-05-31T19:10:57.2130277Z ##[group]Run nttld/setup-ndk@v1
+2026-05-31T19:10:57.2130568Z with:
+2026-05-31T19:10:57.2130782Z   ndk-version: r27
+2026-05-31T19:10:57.2131010Z   add-to-path: true
+2026-05-31T19:10:57.2131234Z   link-to-sdk: false
+2026-05-31T19:10:57.2131462Z   local-cache: false
+2026-05-31T19:10:57.2131682Z ##[endgroup]
+2026-05-31T19:10:57.3223749Z Attempting to download r27...
+2026-05-31T19:10:59.5396454Z Extracting...
+2026-05-31T19:10:59.5444609Z [command]/usr/bin/unzip -o -q /home/runner/work/_temp/a9705822-7299-46ed-82df-f9cf45213854
+2026-05-31T19:11:15.1072433Z Adding to the tool cache...
+2026-05-31T19:11:23.8307297Z Done
+2026-05-31T19:11:23.8334903Z Added to path
+2026-05-31T19:11:23.8370462Z Detecting full version...
+2026-05-31T19:11:23.8564218Z ##[group]Run set -e
+2026-05-31T19:11:23.8564639Z [36;1mset -e[0m
+2026-05-31T19:11:23.8564879Z [36;1mexport API=24[0m
+2026-05-31T19:11:23.8565145Z [36;1mexport HOST_TAG=linux-x86_64[0m
+2026-05-31T19:11:23.8565579Z [36;1mexport TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG[0m
+2026-05-31T19:11:23.8565964Z [36;1m[0m
+2026-05-31T19:11:23.8566259Z [36;1mgit clone https://github.com/Mbed-TLS/mbedtls.git[0m
+2026-05-31T19:11:23.8566614Z [36;1mcd mbedtls[0m
+2026-05-31T19:11:23.8566853Z [36;1mgit checkout v3.5.1[0m
+2026-05-31T19:11:23.8567104Z [36;1m[0m
+2026-05-31T19:11:23.8567305Z [36;1mmkdir build[0m
+2026-05-31T19:11:23.8567530Z [36;1mcd build[0m
+2026-05-31T19:11:23.8567744Z [36;1m[0m
+2026-05-31T19:11:23.8567948Z [36;1mcmake .. \[0m
+2026-05-31T19:11:23.8568257Z [36;1m  -DCMAKE_SYSTEM_NAME=Android \[0m
+2026-05-31T19:11:23.8568562Z [36;1m  -DCMAKE_SYSTEM_VERSION=$API \[0m
+2026-05-31T19:11:23.8568890Z [36;1m  -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \[0m
+2026-05-31T19:11:23.8569257Z [36;1m  -DCMAKE_ANDROID_NDK=$ANDROID_NDK \[0m
+2026-05-31T19:11:23.8569587Z [36;1m  -DCMAKE_ANDROID_STL_TYPE=c++_static \[0m
+2026-05-31T19:11:23.8570011Z [36;1m  -DCMAKE_C_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang \[0m
+2026-05-31T19:11:23.8570536Z [36;1m  -DCMAKE_CXX_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang++ \[0m
+2026-05-31T19:11:23.8570964Z [36;1m  -DENABLE_TESTING=OFF \[0m
+2026-05-31T19:11:23.8571245Z [36;1m  -DENABLE_PROGRAMS=OFF \[0m
+2026-05-31T19:11:23.8571551Z [36;1m  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \[0m
+2026-05-31T19:11:23.8571870Z [36;1m  -DCMAKE_C_FLAGS="-fPIC" \[0m
+2026-05-31T19:11:23.8572151Z [36;1m  -DCMAKE_CXX_FLAGS="-fPIC" \[0m
+2026-05-31T19:11:23.8572450Z [36;1m  -DCMAKE_INSTALL_PREFIX=$PWD/install[0m
+2026-05-31T19:11:23.8572940Z [36;1m[0m
+2026-05-31T19:11:23.8573152Z [36;1mmake -j"$(nproc)"[0m
+2026-05-31T19:11:23.8573407Z [36;1mmake install[0m
+2026-05-31T19:11:23.8604675Z shell: /usr/bin/bash -e {0}
+2026-05-31T19:11:23.8604976Z ##[endgroup]
+2026-05-31T19:11:23.8668824Z Cloning into 'mbedtls'...
+2026-05-31T19:11:40.0189975Z Note: switching to 'v3.5.1'.
+2026-05-31T19:11:40.0190234Z 
+2026-05-31T19:11:40.0190465Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-05-31T19:11:40.0190962Z changes and commit them, and you can discard any commits you make in this
+2026-05-31T19:11:40.0191464Z state without impacting any branches by switching back to a branch.
+2026-05-31T19:11:40.0191747Z 
+2026-05-31T19:11:40.0191936Z If you want to create a new branch to retain commits you create, you may
+2026-05-31T19:11:40.0192394Z do so (now or later) by using -c with the switch command. Example:
+2026-05-31T19:11:40.0192667Z 
+2026-05-31T19:11:40.0192777Z   git switch -c <new-branch-name>
+2026-05-31T19:11:40.0193004Z 
+2026-05-31T19:11:40.0193116Z Or undo this operation with:
+2026-05-31T19:11:40.0193285Z 
+2026-05-31T19:11:40.0193377Z   git switch -
+2026-05-31T19:11:40.0193517Z 
+2026-05-31T19:11:40.0193753Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-05-31T19:11:40.0194440Z 
+2026-05-31T19:11:40.0194593Z HEAD is now at edb8fec988 Add docs re Everest license
+2026-05-31T19:11:40.0451713Z CMake Deprecation Warning at CMakeLists.txt:21 (cmake_minimum_required):
+2026-05-31T19:11:40.0452305Z   Compatibility with CMake < 3.10 will be removed from a future version of
+2026-05-31T19:11:40.0452696Z   CMake.
+2026-05-31T19:11:40.0452813Z 
+2026-05-31T19:11:40.0453024Z   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+2026-05-31T19:11:40.0453534Z   to tell CMake that the project requires at least <min> but has been updated
+2026-05-31T19:11:40.0454123Z   to work with policies introduced by <max> or earlier.
+2026-05-31T19:11:40.0454359Z 
+2026-05-31T19:11:40.0454398Z 
+2026-05-31T19:11:40.1722297Z -- Android: Targeting API '24' with architecture 'arm64', ABI 'arm64-v8a', and processor 'aarch64'
+2026-05-31T19:11:40.2247569Z -- Android: Selected unified Clang toolchain
+2026-05-31T19:11:47.4570473Z -- The C compiler identification is Clang 18.0.4
+2026-05-31T19:11:47.5207364Z CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+2026-05-31T19:11:47.5208342Z   Compatibility with CMake < 3.10 will be removed from a future version of
+2026-05-31T19:11:47.5208738Z   CMake.
+2026-05-31T19:11:47.5208865Z 
+2026-05-31T19:11:47.5209081Z   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+2026-05-31T19:11:47.5209580Z   to tell CMake that the project requires at least <min> but has been updated
+2026-05-31T19:11:47.5210021Z   to work with policies introduced by <max> or earlier.
+2026-05-31T19:11:47.5210368Z Call Stack (most recent call first):
+2026-05-31T19:11:47.5210814Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+2026-05-31T19:11:47.5211341Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+2026-05-31T19:11:47.5211846Z   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+2026-05-31T19:11:47.5212237Z   CMakeLists.txt:39 (project)
+2026-05-31T19:11:47.5212408Z 
+2026-05-31T19:11:47.5212412Z 
+2026-05-31T19:11:47.5335587Z -- Detecting C compiler ABI info
+2026-05-31T19:11:47.5390610Z CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+2026-05-31T19:11:47.5391504Z   Compatibility with CMake < 3.10 will be removed from a future version of
+2026-05-31T19:11:47.5391911Z   CMake.
+2026-05-31T19:11:47.5392038Z 
+2026-05-31T19:11:47.5392261Z   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+2026-05-31T19:11:47.5392782Z   to tell CMake that the project requires at least <min> but has been updated
+2026-05-31T19:11:47.5393502Z   to work with policies introduced by <max> or earlier.
+2026-05-31T19:11:47.5394121Z Call Stack (most recent call first):
+2026-05-31T19:11:47.5394549Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+2026-05-31T19:11:47.5395074Z   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+2026-05-31T19:11:47.5395572Z   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+2026-05-31T19:11:47.5396214Z   /home/runner/work/llama/llama/mbedtls/build/CMakeFiles/CMakeScratch/TryCompile-MIH5Fu/CMakeLists.txt:4 (project)
+2026-05-31T19:11:47.5396658Z 
+2026-05-31T19:11:47.5396663Z 
+2026-05-31T19:11:48.5497221Z -- Detecting C compiler ABI info - done
+2026-05-31T19:11:48.5658089Z -- Check for working C compiler: /usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/clang - skipped
+2026-05-31T19:11:48.5663294Z -- Detecting C compile features
+2026-05-31T19:11:48.5671046Z -- Detecting C compile features - done
+2026-05-31T19:11:48.7597630Z -- Found Python3: /usr/bin/python3.12 (found version "3.12.3") found components: Interpreter
+2026-05-31T19:11:48.8600805Z -- Configuring done (8.8s)
+2026-05-31T19:11:48.8921049Z CMake Warning:
+2026-05-31T19:11:48.8921466Z   Manually-specified variables were not used by the project:
+2026-05-31T19:11:48.8921772Z 
+2026-05-31T19:11:48.8921874Z     CMAKE_CXX_COMPILER
+2026-05-31T19:11:48.8922104Z     CMAKE_CXX_FLAGS
+2026-05-31T19:11:48.8922237Z 
+2026-05-31T19:11:48.8922240Z 
+2026-05-31T19:11:48.8922347Z -- Generating done (0.0s)
+2026-05-31T19:11:48.8924423Z -- Build files have been written to: /home/runner/work/llama/llama/mbedtls/build
+2026-05-31T19:11:48.9151280Z [  0%] Building C object 3rdparty/everest/CMakeFiles/everest.dir/library/everest.c.o
+2026-05-31T19:11:48.9154113Z [  1%] Building C object 3rdparty/p256-m/CMakeFiles/p256m.dir/p256-m_driver_entrypoints.c.o
+2026-05-31T19:11:48.9155065Z [  2%] Building C object 3rdparty/everest/CMakeFiles/everest.dir/library/x25519.c.o
+2026-05-31T19:11:48.9155961Z [  3%] Building C object 3rdparty/p256-m/CMakeFiles/p256m.dir/p256-m/p256-m.c.o
+2026-05-31T19:11:50.6644091Z [  4%] Building C object 3rdparty/everest/CMakeFiles/everest.dir/library/Hacl_Curve25519_joined.c.o
+2026-05-31T19:11:50.6652817Z [  5%] Linking C static library libp256m.a
+2026-05-31T19:11:50.9050811Z [  6%] Linking C static library libeverest.a
+2026-05-31T19:11:51.5442235Z [  6%] Built target everest
+2026-05-31T19:11:51.5442728Z [  6%] Built target p256m
+2026-05-31T19:11:51.5563191Z [  8%] Building C object library/CMakeFiles/mbedcrypto.dir/aes.c.o
+2026-05-31T19:11:51.5565237Z [  8%] Building C object library/CMakeFiles/mbedcrypto.dir/aesni.c.o
+2026-05-31T19:11:51.5566349Z [  9%] Building C object library/CMakeFiles/mbedcrypto.dir/aesce.c.o
+2026-05-31T19:11:51.5570476Z [  9%] Building C object library/CMakeFiles/mbedcrypto.dir/aria.c.o
+2026-05-31T19:11:51.8773642Z [ 10%] Building C object library/CMakeFiles/mbedcrypto.dir/asn1parse.c.o
+2026-05-31T19:11:52.1019608Z [ 11%] Building C object library/CMakeFiles/mbedcrypto.dir/asn1write.c.o
+2026-05-31T19:11:52.1795091Z [ 12%] Building C object library/CMakeFiles/mbedcrypto.dir/base64.c.o
+2026-05-31T19:11:52.1983576Z [ 13%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum.c.o
+2026-05-31T19:11:52.2615314Z [ 14%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum_core.c.o
+2026-05-31T19:11:52.3335495Z [ 15%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum_mod.c.o
+2026-05-31T19:11:52.3915290Z [ 15%] Building C object library/CMakeFiles/mbedcrypto.dir/bignum_mod_raw.c.o
+2026-05-31T19:11:52.4625484Z [ 16%] Building C object library/CMakeFiles/mbedcrypto.dir/camellia.c.o
+2026-05-31T19:11:52.5295087Z [ 17%] Building C object library/CMakeFiles/mbedcrypto.dir/ccm.c.o
+2026-05-31T19:11:52.7268635Z [ 18%] Building C object library/CMakeFiles/mbedcrypto.dir/chacha20.c.o
+2026-05-31T19:11:52.7875367Z [ 19%] Building C object library/CMakeFiles/mbedcrypto.dir/chachapoly.c.o
+2026-05-31T19:11:52.8907033Z [ 20%] Building C object library/CMakeFiles/mbedcrypto.dir/cipher.c.o
+2026-05-31T19:11:52.9315386Z [ 21%] Building C object library/CMakeFiles/mbedcrypto.dir/cipher_wrap.c.o
+2026-05-31T19:11:52.9445604Z [ 21%] Building C object library/CMakeFiles/mbedcrypto.dir/constant_time.c.o
+2026-05-31T19:11:52.9574062Z [ 22%] Building C object library/CMakeFiles/mbedcrypto.dir/cmac.c.o
+2026-05-31T19:11:53.1398563Z [ 23%] Building C object library/CMakeFiles/mbedcrypto.dir/ctr_drbg.c.o
+2026-05-31T19:11:53.1665069Z [ 24%] Building C object library/CMakeFiles/mbedcrypto.dir/des.c.o
+2026-05-31T19:11:53.1694848Z [ 25%] Building C object library/CMakeFiles/mbedcrypto.dir/dhm.c.o
+2026-05-31T19:11:53.2414063Z [ 26%] Building C object library/CMakeFiles/mbedcrypto.dir/ecdh.c.o
+2026-05-31T19:11:53.3815182Z [ 27%] Building C object library/CMakeFiles/mbedcrypto.dir/ecdsa.c.o
+2026-05-31T19:11:53.4088050Z [ 28%] Building C object library/CMakeFiles/mbedcrypto.dir/ecjpake.c.o
+2026-05-31T19:11:53.4226954Z [ 28%] Building C object library/CMakeFiles/mbedcrypto.dir/ecp.c.o
+2026-05-31T19:11:53.5092452Z [ 29%] Building C object library/CMakeFiles/mbedcrypto.dir/ecp_curves.c.o
+2026-05-31T19:11:53.5875266Z [ 30%] Building C object library/CMakeFiles/mbedcrypto.dir/ecp_curves_new.c.o
+2026-05-31T19:11:53.6585397Z [ 31%] Building C object library/CMakeFiles/mbedcrypto.dir/entropy.c.o
+2026-05-31T19:11:53.7215147Z [ 32%] Building C object library/CMakeFiles/mbedcrypto.dir/entropy_poll.c.o
+2026-05-31T19:11:53.8465194Z [ 33%] Building C object library/CMakeFiles/mbedcrypto.dir/error.c.o
+2026-05-31T19:11:53.8529359Z [ 34%] Building C object library/CMakeFiles/mbedcrypto.dir/gcm.c.o
+2026-05-31T19:11:53.9655403Z [ 34%] Building C object library/CMakeFiles/mbedcrypto.dir/hkdf.c.o
+2026-05-31T19:11:54.0045813Z [ 35%] Building C object library/CMakeFiles/mbedcrypto.dir/hmac_drbg.c.o
+2026-05-31T19:11:54.0705290Z [ 36%] Building C object library/CMakeFiles/mbedcrypto.dir/lmots.c.o
+2026-05-31T19:11:54.0975354Z [ 37%] Building C object library/CMakeFiles/mbedcrypto.dir/lms.c.o
+2026-05-31T19:11:54.2005152Z [ 38%] Building C object library/CMakeFiles/mbedcrypto.dir/md.c.o
+2026-05-31T19:11:54.2375440Z [ 39%] Building C object library/CMakeFiles/mbedcrypto.dir/md5.c.o
+2026-05-31T19:11:54.2785717Z [ 40%] Building C object library/CMakeFiles/mbedcrypto.dir/memory_buffer_alloc.c.o
+2026-05-31T19:11:54.3710778Z [ 40%] Building C object library/CMakeFiles/mbedcrypto.dir/nist_kw.c.o
+2026-05-31T19:11:54.4005113Z [ 41%] Building C object library/CMakeFiles/mbedcrypto.dir/oid.c.o
+2026-05-31T19:11:54.4064864Z [ 42%] Building C object library/CMakeFiles/mbedcrypto.dir/padlock.c.o
+2026-05-31T19:11:54.4545110Z [ 43%] Building C object library/CMakeFiles/mbedcrypto.dir/pem.c.o
+2026-05-31T19:11:54.5355129Z [ 44%] Building C object library/CMakeFiles/mbedcrypto.dir/pk.c.o
+2026-05-31T19:11:54.5875209Z [ 45%] Building C object library/CMakeFiles/mbedcrypto.dir/pk_wrap.c.o
+2026-05-31T19:11:54.6505393Z [ 46%] Building C object library/CMakeFiles/mbedcrypto.dir/pkcs12.c.o
+2026-05-31T19:11:54.7044470Z [ 46%] Building C object library/CMakeFiles/mbedcrypto.dir/pkcs5.c.o
+2026-05-31T19:11:54.7445316Z [ 47%] Building C object library/CMakeFiles/mbedcrypto.dir/pkparse.c.o
+2026-05-31T19:11:54.7988296Z [ 48%] Building C object library/CMakeFiles/mbedcrypto.dir/pkwrite.c.o
+2026-05-31T19:11:54.8718641Z [ 49%] Building C object library/CMakeFiles/mbedcrypto.dir/platform.c.o
+2026-05-31T19:11:54.9415189Z [ 50%] Building C object library/CMakeFiles/mbedcrypto.dir/platform_util.c.o
+2026-05-31T19:11:55.0075601Z [ 51%] Building C object library/CMakeFiles/mbedcrypto.dir/poly1305.c.o
+2026-05-31T19:11:55.0245269Z [ 52%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto.c.o
+2026-05-31T19:11:55.0625793Z [ 53%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_aead.c.o
+2026-05-31T19:11:55.1436191Z [ 53%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_cipher.c.o
+2026-05-31T19:11:55.2336901Z [ 54%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_client.c.o
+2026-05-31T19:11:55.2425229Z [ 55%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_driver_wrappers_no_static.c.o
+2026-05-31T19:11:55.3715226Z [ 56%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_ecp.c.o
+2026-05-31T19:11:55.4016331Z [ 57%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_ffdh.c.o
+2026-05-31T19:11:55.4083558Z [ 58%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_hash.c.o
+2026-05-31T19:11:55.5817353Z [ 59%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_mac.c.o
+2026-05-31T19:11:55.5945339Z [ 59%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_pake.c.o
+2026-05-31T19:11:55.6005086Z [ 60%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_rsa.c.o
+2026-05-31T19:11:55.8015222Z [ 61%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_se.c.o
+2026-05-31T19:11:55.8065352Z [ 62%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_slot_management.c.o
+2026-05-31T19:11:55.8305703Z [ 63%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_crypto_storage.c.o
+2026-05-31T19:11:55.9214958Z [ 64%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_its_file.c.o
+2026-05-31T19:11:56.0265341Z [ 65%] Building C object library/CMakeFiles/mbedcrypto.dir/psa_util.c.o
+2026-05-31T19:11:56.0325365Z [ 65%] Building C object library/CMakeFiles/mbedcrypto.dir/ripemd160.c.o
+2026-05-31T19:11:56.0727898Z [ 66%] Building C object library/CMakeFiles/mbedcrypto.dir/rsa.c.o
+2026-05-31T19:11:56.1105488Z [ 67%] Building C object library/CMakeFiles/mbedcrypto.dir/rsa_alt_helpers.c.o
+2026-05-31T19:11:56.2075293Z [ 68%] Building C object library/CMakeFiles/mbedcrypto.dir/sha1.c.o
+2026-05-31T19:11:56.2944808Z [ 69%] Building C object library/CMakeFiles/mbedcrypto.dir/sha256.c.o
+2026-05-31T19:11:56.3845221Z [ 70%] Building C object library/CMakeFiles/mbedcrypto.dir/sha512.c.o
+2026-05-31T19:11:56.4875080Z [ 71%] Building C object library/CMakeFiles/mbedcrypto.dir/sha3.c.o
+2026-05-31T19:11:56.4954905Z [ 71%] Building C object library/CMakeFiles/mbedcrypto.dir/threading.c.o
+2026-05-31T19:11:56.5929451Z [ 72%] Building C object library/CMakeFiles/mbedcrypto.dir/timing.c.o
+2026-05-31T19:11:56.6175664Z [ 74%] Building C object library/CMakeFiles/mbedcrypto.dir/version_features.c.o
+2026-05-31T19:11:56.6184896Z [ 74%] Building C object library/CMakeFiles/mbedcrypto.dir/version.c.o
+2026-05-31T19:11:56.7615416Z [ 75%] Linking C static library libmbedcrypto.a
+2026-05-31T19:11:56.7810484Z [ 75%] Built target mbedcrypto
+2026-05-31T19:11:56.7901140Z [ 76%] Building C object library/CMakeFiles/mbedx509.dir/pkcs7.c.o
+2026-05-31T19:11:56.7902094Z [ 77%] Building C object library/CMakeFiles/mbedx509.dir/x509.c.o
+2026-05-31T19:11:56.7903107Z [ 78%] Building C object library/CMakeFiles/mbedx509.dir/x509_create.c.o
+2026-05-31T19:11:56.7904448Z [ 79%] Building C object library/CMakeFiles/mbedx509.dir/x509_crl.c.o
+2026-05-31T19:11:57.0315270Z [ 80%] Building C object library/CMakeFiles/mbedx509.dir/x509_crt.c.o
+2026-05-31T19:11:57.0365187Z [ 80%] Building C object library/CMakeFiles/mbedx509.dir/x509_csr.c.o
+2026-05-31T19:11:57.0441666Z [ 81%] Building C object library/CMakeFiles/mbedx509.dir/x509write.c.o
+2026-05-31T19:11:57.2010083Z [ 82%] Building C object library/CMakeFiles/mbedx509.dir/x509write_crt.c.o
+2026-05-31T19:11:57.2361560Z [ 83%] Building C object library/CMakeFiles/mbedx509.dir/x509write_csr.c.o
+2026-05-31T19:11:57.5569014Z [ 84%] Linking C static library libmbedx509.a
+2026-05-31T19:11:57.5704570Z [ 84%] Built target mbedx509
+2026-05-31T19:11:57.5794414Z [ 85%] Building C object library/CMakeFiles/mbedtls.dir/debug.c.o
+2026-05-31T19:11:57.5795482Z [ 86%] Building C object library/CMakeFiles/mbedtls.dir/mps_reader.c.o
+2026-05-31T19:11:57.5805379Z [ 87%] Building C object library/CMakeFiles/mbedtls.dir/mps_trace.c.o
+2026-05-31T19:11:57.5824440Z [ 87%] Building C object library/CMakeFiles/mbedtls.dir/net_sockets.c.o
+2026-05-31T19:11:57.7246318Z [ 88%] Building C object library/CMakeFiles/mbedtls.dir/ssl_cache.c.o
+2026-05-31T19:11:57.7251222Z [ 89%] Building C object library/CMakeFiles/mbedtls.dir/ssl_ciphersuites.c.o
+2026-05-31T19:11:57.8305346Z [ 90%] Building C object library/CMakeFiles/mbedtls.dir/ssl_client.c.o
+2026-05-31T19:11:57.8819752Z [ 91%] Building C object library/CMakeFiles/mbedtls.dir/ssl_cookie.c.o
+2026-05-31T19:11:57.8822499Z [ 92%] Building C object library/CMakeFiles/mbedtls.dir/ssl_debug_helpers_generated.c.o
+2026-05-31T19:11:57.9295081Z [ 93%] Building C object library/CMakeFiles/mbedtls.dir/ssl_msg.c.o
+2026-05-31T19:11:58.0804569Z [ 93%] Building C object library/CMakeFiles/mbedtls.dir/ssl_ticket.c.o
+2026-05-31T19:11:58.0875976Z [ 94%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls.c.o
+2026-05-31T19:11:58.0943324Z [ 95%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls12_client.c.o
+2026-05-31T19:11:58.2958635Z [ 96%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls12_server.c.o
+2026-05-31T19:11:58.5635178Z [ 97%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_keys.c.o
+2026-05-31T19:11:58.6669457Z [ 98%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_server.c.o
+2026-05-31T19:11:58.6905211Z [ 99%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_client.c.o
+2026-05-31T19:11:58.7945482Z [ 99%] Building C object library/CMakeFiles/mbedtls.dir/ssl_tls13_generic.c.o
+2026-05-31T19:11:58.9005656Z [100%] Linking C static library libmbedtls.a
+2026-05-31T19:11:58.9151218Z [100%] Built target mbedtls
+2026-05-31T19:11:58.9389645Z [  3%] Built target everest
+2026-05-31T19:11:58.9499114Z [  6%] Built target p256m
+2026-05-31T19:11:59.0174481Z [ 75%] Built target mbedcrypto
+2026-05-31T19:11:59.0350564Z [ 84%] Built target mbedx509
+2026-05-31T19:11:59.0588405Z [100%] Built target mbedtls
+2026-05-31T19:11:59.0666709Z Install the project...
+2026-05-31T19:11:59.0688680Z -- Install configuration: "RelWithDebInfo"
+2026-05-31T19:11:59.0784382Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSConfig.cmake
+2026-05-31T19:11:59.0788528Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSConfigVersion.cmake
+2026-05-31T19:11:59.0790674Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSTargets.cmake
+2026-05-31T19:11:59.0793628Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/cmake/MbedTLS/MbedTLSTargets-relwithdebinfo.cmake
+2026-05-31T19:11:59.0799635Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/aes.h
+2026-05-31T19:11:59.0801810Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/aria.h
+2026-05-31T19:11:59.0803551Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/asn1.h
+2026-05-31T19:11:59.0806992Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/asn1write.h
+2026-05-31T19:11:59.0808688Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/base64.h
+2026-05-31T19:11:59.0810319Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/bignum.h
+2026-05-31T19:11:59.0812935Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/build_info.h
+2026-05-31T19:11:59.0814667Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/camellia.h
+2026-05-31T19:11:59.0816417Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ccm.h
+2026-05-31T19:11:59.0818873Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/chacha20.h
+2026-05-31T19:11:59.0820375Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/chachapoly.h
+2026-05-31T19:11:59.0822197Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/check_config.h
+2026-05-31T19:11:59.0825073Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/cipher.h
+2026-05-31T19:11:59.0827595Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/cmac.h
+2026-05-31T19:11:59.0829291Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/compat-2.x.h
+2026-05-31T19:11:59.0831239Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_legacy_crypto.h
+2026-05-31T19:11:59.0832964Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_legacy_from_psa.h
+2026-05-31T19:11:59.0835239Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_psa_from_legacy.h
+2026-05-31T19:11:59.0837042Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_psa_superset_legacy.h
+2026-05-31T19:11:59.0838633Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_ssl.h
+2026-05-31T19:11:59.0840282Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_adjust_x509.h
+2026-05-31T19:11:59.0841853Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/config_psa.h
+2026-05-31T19:11:59.0843583Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/constant_time.h
+2026-05-31T19:11:59.0845423Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ctr_drbg.h
+2026-05-31T19:11:59.0847539Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/debug.h
+2026-05-31T19:11:59.0849195Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/des.h
+2026-05-31T19:11:59.0851127Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/dhm.h
+2026-05-31T19:11:59.0853750Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecdh.h
+2026-05-31T19:11:59.0855702Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecdsa.h
+2026-05-31T19:11:59.0858095Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecjpake.h
+2026-05-31T19:11:59.0859778Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ecp.h
+2026-05-31T19:11:59.0862984Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/entropy.h
+2026-05-31T19:11:59.0864471Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/error.h
+2026-05-31T19:11:59.0866336Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/gcm.h
+2026-05-31T19:11:59.0868679Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/hkdf.h
+2026-05-31T19:11:59.0870306Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/hmac_drbg.h
+2026-05-31T19:11:59.0872369Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/lms.h
+2026-05-31T19:11:59.0874870Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/mbedtls_config.h
+2026-05-31T19:11:59.0878423Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/md.h
+2026-05-31T19:11:59.0880277Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/md5.h
+2026-05-31T19:11:59.0882126Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/memory_buffer_alloc.h
+2026-05-31T19:11:59.0883999Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/net_sockets.h
+2026-05-31T19:11:59.0885956Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/nist_kw.h
+2026-05-31T19:11:59.0887629Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/oid.h
+2026-05-31T19:11:59.0890182Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pem.h
+2026-05-31T19:11:59.0891725Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pk.h
+2026-05-31T19:11:59.0894565Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pkcs12.h
+2026-05-31T19:11:59.0896204Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pkcs5.h
+2026-05-31T19:11:59.0898227Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/pkcs7.h
+2026-05-31T19:11:59.0899729Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/platform.h
+2026-05-31T19:11:59.0901626Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/platform_time.h
+2026-05-31T19:11:59.0903153Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/platform_util.h
+2026-05-31T19:11:59.0905140Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/poly1305.h
+2026-05-31T19:11:59.0906890Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/private_access.h
+2026-05-31T19:11:59.0908370Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/psa_util.h
+2026-05-31T19:11:59.0910129Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ripemd160.h
+2026-05-31T19:11:59.0911564Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/rsa.h
+2026-05-31T19:11:59.0914148Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha1.h
+2026-05-31T19:11:59.0915833Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha256.h
+2026-05-31T19:11:59.0917610Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha3.h
+2026-05-31T19:11:59.0919275Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/sha512.h
+2026-05-31T19:11:59.0920934Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl.h
+2026-05-31T19:11:59.0925809Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_cache.h
+2026-05-31T19:11:59.0927595Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_ciphersuites.h
+2026-05-31T19:11:59.0929608Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_cookie.h
+2026-05-31T19:11:59.0931554Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/ssl_ticket.h
+2026-05-31T19:11:59.0932930Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/threading.h
+2026-05-31T19:11:59.0934766Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/timing.h
+2026-05-31T19:11:59.0936413Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/version.h
+2026-05-31T19:11:59.0938056Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509.h
+2026-05-31T19:11:59.0939922Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509_crl.h
+2026-05-31T19:11:59.0941599Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509_crt.h
+2026-05-31T19:11:59.0944163Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/mbedtls/x509_csr.h
+2026-05-31T19:11:59.0947196Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/build_info.h
+2026-05-31T19:11:59.0948912Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto.h
+2026-05-31T19:11:59.0953209Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_adjust_auto_enabled.h
+2026-05-31T19:11:59.0955238Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_adjust_config_key_pair_types.h
+2026-05-31T19:11:59.0956658Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_adjust_config_synonyms.h
+2026-05-31T19:11:59.0958152Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_builtin_composites.h
+2026-05-31T19:11:59.0959858Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_builtin_key_derivation.h
+2026-05-31T19:11:59.0961330Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_builtin_primitives.h
+2026-05-31T19:11:59.0962844Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_compat.h
+2026-05-31T19:11:59.0964710Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_config.h
+2026-05-31T19:11:59.0966440Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_common.h
+2026-05-31T19:11:59.0967850Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_contexts_composites.h
+2026-05-31T19:11:59.0969439Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_contexts_key_derivation.h
+2026-05-31T19:11:59.0970939Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_driver_contexts_primitives.h
+2026-05-31T19:11:59.0972404Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_extra.h
+2026-05-31T19:11:59.0975505Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_legacy.h
+2026-05-31T19:11:59.0976959Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_platform.h
+2026-05-31T19:11:59.0978633Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_se_driver.h
+2026-05-31T19:11:59.0980899Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_sizes.h
+2026-05-31T19:11:59.0983113Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_struct.h
+2026-05-31T19:11:59.0985103Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_types.h
+2026-05-31T19:11:59.0986897Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/psa/crypto_values.h
+2026-05-31T19:11:59.0993133Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest
+2026-05-31T19:11:59.0994719Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib.h
+2026-05-31T19:11:59.0996692Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013
+2026-05-31T19:11:59.0997559Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013/stdbool.h
+2026-05-31T19:11:59.0999362Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013/Hacl_Curve25519.h
+2026-05-31T19:11:59.1000774Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/vs2013/inttypes.h
+2026-05-31T19:11:59.1002426Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/everest.h
+2026-05-31T19:11:59.1004265Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib
+2026-05-31T19:11:59.1005789Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib/FStar_UInt64_FStar_UInt32_FStar_UInt16_FStar_UInt8.h
+2026-05-31T19:11:59.1007425Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlib/FStar_UInt128.h
+2026-05-31T19:11:59.1009116Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/x25519.h
+2026-05-31T19:11:59.1010506Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin
+2026-05-31T19:11:59.1011706Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/c_endianness.h
+2026-05-31T19:11:59.1013490Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal
+2026-05-31T19:11:59.1014641Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/debug.h
+2026-05-31T19:11:59.1016514Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/wasmsupport.h
+2026-05-31T19:11:59.1017987Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/types.h
+2026-05-31T19:11:59.1019738Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/target.h
+2026-05-31T19:11:59.1021187Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/compat.h
+2026-05-31T19:11:59.1022761Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/callconv.h
+2026-05-31T19:11:59.1024417Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/kremlin/internal/builtin.h
+2026-05-31T19:11:59.1026142Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/include/everest/Hacl_Curve25519.h
+2026-05-31T19:11:59.1028220Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libeverest.a
+2026-05-31T19:11:59.1032382Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libp256m.a
+2026-05-31T19:11:59.1036542Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libmbedcrypto.a
+2026-05-31T19:11:59.1080232Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libmbedx509.a
+2026-05-31T19:11:59.1087331Z -- Installing: /home/runner/work/llama/llama/mbedtls/build/install/lib/libmbedtls.a
+2026-05-31T19:11:59.1196025Z ##[group]Run actions/upload-artifact@v4
+2026-05-31T19:11:59.1196335Z with:
+2026-05-31T19:11:59.1196553Z   name: mbedtls-arm64
+2026-05-31T19:11:59.1196801Z   path: mbedtls/build/install
+2026-05-31T19:11:59.1197067Z   if-no-files-found: warn
+2026-05-31T19:11:59.1197321Z   compression-level: 6
+2026-05-31T19:11:59.1197558Z   overwrite: false
+2026-05-31T19:11:59.1197796Z   include-hidden-files: false
+2026-05-31T19:11:59.1198055Z ##[endgroup]
+2026-05-31T19:11:59.3608895Z With the provided path, there will be 121 files uploaded
+2026-05-31T19:11:59.3614412Z Artifact name is valid!
+2026-05-31T19:11:59.3615733Z Root directory input is valid!
+2026-05-31T19:11:59.5405129Z Beginning upload of artifact content to blob storage
+2026-05-31T19:12:00.3112415Z Uploaded bytes 2047927
+2026-05-31T19:12:00.3533023Z Finished uploading artifact content to blob storage!
+2026-05-31T19:12:00.3535833Z SHA256 digest of uploaded artifact zip is 8f2c5cf3282ba4bb1775d30a8afbc78b20d1d1aa767242a477d0565d4514ee06
+2026-05-31T19:12:00.3537637Z Finalizing artifact upload
+2026-05-31T19:12:00.5387674Z Artifact mbedtls-arm64.zip successfully finalized. Artifact ID 7319346363
+2026-05-31T19:12:00.5388492Z Artifact mbedtls-arm64 has been successfully uploaded! Final size is 2047927 bytes. Artifact ID is 7319346363
+2026-05-31T19:12:00.5395552Z Artifact download URL: https://github.com/mmkurodan/llama/actions/runs/26721841015/artifacts/7319346363
+2026-05-31T19:12:00.5570395Z Post job cleanup.
+2026-05-31T19:12:00.6559287Z [command]/usr/bin/git version
+2026-05-31T19:12:00.6595835Z git version 2.54.0
+2026-05-31T19:12:00.6636331Z Temporarily overriding HOME='/home/runner/work/_temp/218e4c63-d08c-42bc-afd6-7ab985ccadd6' before making global git config changes
+2026-05-31T19:12:00.6637267Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-31T19:12:00.6651020Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/llama/llama
+2026-05-31T19:12:00.6690741Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-31T19:12:00.6724687Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-31T19:12:00.6970649Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-31T19:12:00.6995861Z http.https://github.com/.extraheader
+2026-05-31T19:12:00.7008093Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-05-31T19:12:00.7040028Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-31T19:12:00.7288381Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-31T19:12:00.7320310Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-31T19:12:00.7675594Z Cleaning up orphan processes
+2026-05-31T19:12:00.7972298Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/upload-artifact@v4. Actions will be forced to run with Node.js 24 by default starting June 16th, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
