@@ -615,7 +615,17 @@ static llama_context_params build_context_params_locked() {
     cparams.n_ctx           = g_n_ctx;
     cparams.n_threads       = g_n_threads;
     cparams.n_batch         = g_n_batch;
+    cparams.n_ubatch        = g_n_batch;
     cparams.n_threads_batch = g_n_threads;
+#if defined(__ANDROID__)
+    if (g_model_requires_fresh_context) {
+        // Qwen3.5 hybrid/recurrent models have been crashing inside prompt prefill on
+        // Android after repeated model switches. Keeping the logical batch size while
+        // forcing micro-batches of 1 avoids the unstable chunked recurrent decode path
+        // without disabling multimodal support or changing the external batching API.
+        cparams.n_ubatch = 1;
+    }
+#endif
     return cparams;
 }
 
@@ -1891,7 +1901,9 @@ Java_com_micklab_llama_LlamaNative_init(
             ss << "init: context reset policy recurrent=" << (is_recurrent ? "true" : "false")
                << " hybrid=" << (is_hybrid ? "true" : "false")
                << " fresh_context_per_generation="
-               << (g_model_requires_fresh_context ? "true" : "false");
+               << (g_model_requires_fresh_context ? "true" : "false")
+               << " n_ubatch="
+               << (g_model_requires_fresh_context ? 1 : g_n_batch);
             log_to_file(ss.str());
         }
 
@@ -2112,7 +2124,9 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                << (is_recurrent ? "true" : "false")
                << " hybrid=" << (is_hybrid ? "true" : "false")
                << " fresh_context_per_generation="
-               << (g_model_requires_fresh_context ? "true" : "false");
+               << (g_model_requires_fresh_context ? "true" : "false")
+               << " n_ubatch="
+               << (g_model_requires_fresh_context ? 1 : g_n_batch);
             log_to_file(ss.str());
         }
 

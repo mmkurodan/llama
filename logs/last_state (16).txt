@@ -1,5 +1,0 @@
-2026-05-31 20:00:45.610 pid=14578 [memory-trim] onTrimMemory level=20
-  javaUsed=6.4MB javaTotal=64.0MB javaMax=256.0MB nativeHeap=12.1MB nativeHeapFree=3.0MB nativeHeapSize=19.1MB
-  pssTotal=22.2MB privateDirty=15.5MB sharedDirty=51.4MB nativePss=9.6MB dalvikPss=2.1MB otherPss=10.4MB
-  systemAvail=15.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=400 fdCount=151
-  procStatus VmRSS=168432 kB VmHWM=168432 kB VmSize=17298892 kB VmSwap=3952 kB Threads=30 FDSize=256
