@@ -62,6 +62,7 @@ static std::atomic<bool> g_cancel_generation(false);
 static bool g_backend_initialized = false;
 static uint32_t g_generations_since_context_reinit = 0;
 static constexpr uint32_t CONTEXT_RECYCLE_INTERVAL = 8;
+static bool g_model_requires_fresh_context = false;
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -676,6 +677,7 @@ static void release_model_locked(const char * log_prefix) {
     }
     llama_model_free(g_model);
     g_model = nullptr;
+    g_model_requires_fresh_context = false;
     g_current_model_path.clear();
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": model freed");
@@ -699,16 +701,25 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         return false;
     }
 
-    if (g_generations_since_context_reinit >= CONTEXT_RECYCLE_INTERVAL) {
+    const bool recycle_for_interval = g_generations_since_context_reinit >= CONTEXT_RECYCLE_INTERVAL;
+    const bool recycle_for_model = g_model_requires_fresh_context && g_generations_since_context_reinit > 0;
+    const bool should_recycle = recycle_for_interval || recycle_for_model;
+    bool recycled_context = false;
+
+    if (should_recycle) {
         std::ostringstream recycle_reason;
         recycle_reason << log_prefix
-                       << ": recycling context after "
-                       << g_generations_since_context_reinit
+                       << ": recycling context after " << g_generations_since_context_reinit
                        << " generations";
+        if (recycle_for_model) {
+            recycle_reason << " due to recurrent/hybrid model";
+        }
         log_to_file(recycle_reason.str());
 
         release_context_locked(log_prefix);
-        trim_native_allocator(log_prefix);
+        if (recycle_for_interval) {
+            trim_native_allocator(log_prefix);
+        }
 
         llama_context_params cparams = build_context_params_locked();
         using namespace std::chrono;
@@ -729,6 +740,7 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         std::ostringstream ss;
         ss << log_prefix << ": recycled context successfully in " << ms << " ms";
         log_to_file(ss.str());
+        recycled_context = true;
     }
 
     llama_synchronize(g_ctx);
@@ -740,7 +752,9 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         return false;
     }
 
-    llama_memory_clear(memory, true);
+    if (!recycled_context) {
+        llama_memory_clear(memory, true);
+    }
     llama_perf_context_reset(g_ctx);
 
     std::ostringstream ss;
@@ -1868,6 +1882,18 @@ Java_com_micklab_llama_LlamaNative_init(
                 log_to_file(ss.str());
             }
         }
+        {
+            const bool is_recurrent = llama_model_is_recurrent(g_model);
+            const bool is_hybrid = llama_model_is_hybrid(g_model);
+            g_model_requires_fresh_context = is_recurrent || is_hybrid;
+
+            std::ostringstream ss;
+            ss << "init: context reset policy recurrent=" << (is_recurrent ? "true" : "false")
+               << " hybrid=" << (is_hybrid ? "true" : "false")
+               << " fresh_context_per_generation="
+               << (g_model_requires_fresh_context ? "true" : "false");
+            log_to_file(ss.str());
+        }
 
         llama_context_params cparams = build_context_params_locked();
 
@@ -2075,6 +2101,19 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 ss << "initWithMmproj: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
             }
+        }
+        {
+            const bool is_recurrent = llama_model_is_recurrent(g_model);
+            const bool is_hybrid = llama_model_is_hybrid(g_model);
+            g_model_requires_fresh_context = is_recurrent || is_hybrid;
+
+            std::ostringstream ss;
+            ss << "initWithMmproj: context reset policy recurrent="
+               << (is_recurrent ? "true" : "false")
+               << " hybrid=" << (is_hybrid ? "true" : "false")
+               << " fresh_context_per_generation="
+               << (g_model_requires_fresh_context ? "true" : "false");
+            log_to_file(ss.str());
         }
 
         llama_context_params cparams = build_context_params_locked();
