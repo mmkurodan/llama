@@ -408,7 +408,7 @@ public class ModelManager {
                 return false;
             }
             String mmprojPath = availableProjector.projectorPath;
-            boolean enableAudioForLoad = mmprojPath != null && preferAudioProjector;
+            boolean enableAudioForLoad = mmprojPath != null;
             boolean projectorRequestedButInactive =
                     mmprojPath != null && !currentSupportsVision && !currentSupportsAudio;
 
