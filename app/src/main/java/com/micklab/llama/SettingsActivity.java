@@ -156,6 +156,7 @@ public class SettingsActivity extends Activity {
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
     private String selectedProjectorReference = "";
+    private boolean selectedProjectorManualSelection = false;
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
     private volatile boolean huggingFaceSearchInProgress = false;
@@ -398,7 +399,7 @@ public class SettingsActivity extends Activity {
             if (isBusyActionBlocked()) {
                 return;
             }
-            loadModel();
+            startModelAction(true, null);
         });
         importModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
@@ -428,7 +429,7 @@ public class SettingsActivity extends Activity {
             if (isBusyActionBlocked()) {
                 return;
             }
-            setSelectedProjectorReference("");
+            setSelectedProjectorReference("", false);
         });
         modelUrlInput.addTextChangedListener(new TextWatcher() {
             @Override
@@ -903,6 +904,7 @@ public class SettingsActivity extends Activity {
     private void updateUIFromConfig(ConfigurationManager.Configuration config) {
         configNameInput.setText(config.name);
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
+        selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
         modelUrlInput.setText(config.modelUrl);
         nCtxInput.setText(String.valueOf(config.nCtx));
         nThreadsInput.setText(String.valueOf(config.nThreads));
@@ -1026,6 +1028,8 @@ public class SettingsActivity extends Activity {
             config.promptTemplate = currentConfig.promptTemplate;
         }
         config.multimodalProjectorUrl = normalizeReference(selectedProjectorReference);
+        config.multimodalProjectorManualSelection =
+                !config.multimodalProjectorUrl.isEmpty() && selectedProjectorManualSelection;
         
         // Penalty parameters
         try {
@@ -1689,33 +1693,29 @@ public class SettingsActivity extends Activity {
         String downloadUrl = selectedFile.getDownloadUrl();
         String previousModelReference = modelUrlInput.getText().toString().trim();
         String previousProjectorReference = selectedProjectorReference;
+        boolean previousProjectorManualSelection = selectedProjectorManualSelection;
         modelUrlInput.setText(downloadUrl);
-        setSelectedProjectorReference("");
-        currentConfig = getConfigFromUI();
-        updateAutoTemplatePreview(currentConfig);
-        List<HuggingFaceApiClient.GgufFileInfo> projectorFiles = repositoryFiles.getProjectorFiles();
         HuggingFaceApiClient.GgufFileInfo suggestedProjectorInfo =
                 repositoryFiles.findMatchingProjector(selectedFile, false, false);
-        String suggestedProjector = suggestedProjectorInfo != null
-                ? suggestedProjectorInfo.getFilename()
-                : null;
-        if (!projectorFiles.isEmpty() && (suggestedProjector != null
-                || ModelFileHelper.isLikelyMultimodalModelReference(selectedFile.getFilename()))) {
-            promptForHuggingFaceProjectorSelection(
-                    repositoryFiles,
-                    selectedFile,
-                    previousModelReference,
-                    previousProjectorReference);
-            return;
+        if (suggestedProjectorInfo != null) {
+            setSelectedProjectorReference(suggestedProjectorInfo.getDownloadUrl(), false);
+        } else {
+            setSelectedProjectorReference("", false);
         }
+        currentConfig = getConfigFromUI();
+        updateAutoTemplatePreview(currentConfig);
 
         modelFileInfo.setText(localizedText(
                 "選択したモデル: " + selectedFile.getFilename(),
                 "Selected model: " + selectedFile.getFilename()));
-        showToast(localizedText(
-                "ダウンロードを開始します: " + selectedFile.getFilename(),
-                "Starting download: " + selectedFile.getFilename()));
-        loadModel();
+        startModelAction(
+                true,
+                () -> {
+                    modelUrlInput.setText(previousModelReference);
+                    setSelectedProjectorReference(previousProjectorReference, previousProjectorManualSelection);
+                    currentConfig = getConfigFromUI();
+                    updateAutoTemplatePreview(currentConfig);
+                });
     }
 
     private void setHuggingFaceSearchBusy(boolean busy, String statusMessage) {
@@ -1857,7 +1857,7 @@ public class SettingsActivity extends Activity {
                     String modelReference = modelUrlInput.getText().toString().trim();
                     if (!modelReference.isEmpty()
                             && ModelFileHelper.canAutoApplyProjectorReference(modelReference, displayName)) {
-                        setSelectedProjectorReference(displayName);
+                        setSelectedProjectorReference(displayName, false);
                     }
                 } else {
                     modelUrlInput.setText(displayName);
@@ -1873,67 +1873,6 @@ public class SettingsActivity extends Activity {
         }).start();
     }
 
-    private void promptForHuggingFaceProjectorSelection(
-            HuggingFaceApiClient.RepositoryFiles repositoryFiles,
-            HuggingFaceApiClient.GgufFileInfo selectedFile,
-            String previousModelReference,
-            String previousProjectorReference) {
-        List<HuggingFaceApiClient.GgufFileInfo> projectorFiles = repositoryFiles.getProjectorFiles();
-        String[] labels = new String[projectorFiles.size()];
-        int recommendedIndex = -1;
-        HuggingFaceApiClient.GgufFileInfo recommendedProjector =
-                repositoryFiles.findMatchingProjector(selectedFile, false, false);
-        String recommendedReference = recommendedProjector != null
-                ? recommendedProjector.getFilename()
-                : null;
-        for (int i = 0; i < projectorFiles.size(); i++) {
-            HuggingFaceApiClient.GgufFileInfo projectorFile = projectorFiles.get(i);
-            boolean recommended = projectorFile.getFilename().equals(recommendedReference);
-            labels[i] = projectorFile.getFilename()
-                    + (recommended ? localizedText("  [推奨]", "  [Recommended]") : "");
-            if (recommended && recommendedIndex < 0) {
-                recommendedIndex = i;
-            }
-        }
-
-        final int initialSelection = recommendedIndex >= 0 ? recommendedIndex : 0;
-        showScrollableSingleChoiceDialog(
-                localizedText("mmproj を選択", "Select mmproj"),
-                labels,
-                initialSelection,
-                localizedText("選択して続行", "Continue with selection"),
-                selectedIndex -> {
-                    HuggingFaceApiClient.GgufFileInfo selectedProjector = projectorFiles.get(selectedIndex);
-                    setSelectedProjectorReference(selectedProjector.getDownloadUrl());
-                    currentConfig = getConfigFromUI();
-                    modelFileInfo.setText(localizedText(
-                            "選択したモデル: " + selectedFile.getFilename() + "\n選択した mmproj: " + selectedProjector.getFilename(),
-                            "Selected model: " + selectedFile.getFilename() + "\nSelected mmproj: " + selectedProjector.getFilename()));
-                    showToast(localizedText(
-                            "ダウンロードを開始します: " + selectedFile.getFilename(),
-                            "Starting download: " + selectedFile.getFilename()));
-                    loadModel();
-                },
-                localizedText("mmproj なしで続行", "Continue without mmproj"),
-                selectedIndex -> {
-                    setSelectedProjectorReference("");
-                    currentConfig = getConfigFromUI();
-                    modelFileInfo.setText(localizedText(
-                            "選択したモデル: " + selectedFile.getFilename(),
-                            "Selected model: " + selectedFile.getFilename()));
-                    showToast(localizedText(
-                            "ダウンロードを開始します: " + selectedFile.getFilename(),
-                            "Starting download: " + selectedFile.getFilename()));
-                    loadModel();
-                },
-                () -> {
-                    modelUrlInput.setText(previousModelReference);
-                    setSelectedProjectorReference(previousProjectorReference);
-                    currentConfig = getConfigFromUI();
-                    updateAutoTemplatePreview(currentConfig);
-                });
-    }
-
     private void showStoredProjectorSelectionDialog() {
         String modelReference = modelUrlInput.getText().toString().trim();
         if (modelReference.isEmpty()) {
@@ -1943,12 +1882,12 @@ public class SettingsActivity extends Activity {
 
         File[] projectorFiles = getDownloadedProjectorFiles();
         if (projectorFiles.length == 0) {
-            showToast(localizedText("利用可能な mmproj が見つかりません", "No stored mmproj files were found"));
+            showToast(localizedText("利用可能な GGUF ファイルが見つかりません", "No stored GGUF files were found"));
             return;
         }
 
         String[] labels = new String[projectorFiles.length];
-        String currentSelection = normalizeReference(selectedProjectorReference);
+        String currentSelection = extractFilenameFromUrl(normalizeReference(selectedProjectorReference));
         int selectedIndex = 0;
         for (int i = 0; i < projectorFiles.length; i++) {
             File projectorFile = projectorFiles[i];
@@ -1966,9 +1905,9 @@ public class SettingsActivity extends Activity {
                 labels,
                 selectedIndex,
                 localizedText("選択", "Select"),
-                index -> setSelectedProjectorReference(projectorFiles[index].getName()),
+                index -> setSelectedProjectorReference(projectorFiles[index].getName(), true),
                 localizedText("解除", "Clear"),
-                index -> setSelectedProjectorReference(""));
+                index -> setSelectedProjectorReference("", false));
     }
 
     private void showScrollableSingleChoiceDialog(
@@ -2052,13 +1991,20 @@ public class SettingsActivity extends Activity {
         if (selectedProjectorReference.isEmpty() || modelReference.isEmpty()) {
             return;
         }
-        if (!ModelFileHelper.canAutoApplyProjectorReference(modelReference, selectedProjectorReference)) {
+        if (!selectedProjectorManualSelection
+                && !ModelFileHelper.canAutoApplyProjectorReference(modelReference, selectedProjectorReference)) {
             selectedProjectorReference = "";
+            selectedProjectorManualSelection = false;
         }
     }
 
     private void setSelectedProjectorReference(String projectorReference) {
+        setSelectedProjectorReference(projectorReference, false);
+    }
+
+    private void setSelectedProjectorReference(String projectorReference, boolean manualSelection) {
         selectedProjectorReference = normalizeReference(projectorReference);
+        selectedProjectorManualSelection = !selectedProjectorReference.isEmpty() && manualSelection;
         updateMultimodalProjectorInfo();
     }
 
@@ -2066,14 +2012,23 @@ public class SettingsActivity extends Activity {
         if (multimodalProjectorInfo == null) {
             return;
         }
-        if (selectedProjectorReference.isEmpty()) {
+        String modelReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
+        boolean projectorAvailable = !selectedProjectorReference.isEmpty()
+                || findAutoDetectedProjectorFile(modelReference) != null;
+        boolean likelyMultimodalModel =
+                !modelReference.isEmpty() && ModelFileHelper.isLikelyMultimodalModelReference(modelReference);
+        if (projectorAvailable && likelyMultimodalModel) {
             multimodalProjectorInfo.setText(localizedText(
-                    "mmproj: 未選択",
-                    "mmproj: not selected"));
+                    "Projector: Available",
+                    "Projector: Available"));
+        } else if (selectedProjectorReference.isEmpty()) {
+            multimodalProjectorInfo.setText(localizedText(
+                    "Projector: 未選択",
+                    "Projector: not selected"));
         } else {
             multimodalProjectorInfo.setText(localizedText(
-                    "mmproj: " + extractFilenameFromUrl(selectedProjectorReference),
-                    "mmproj: " + extractFilenameFromUrl(selectedProjectorReference)));
+                    "Projector: " + extractFilenameFromUrl(selectedProjectorReference),
+                    "Projector: " + extractFilenameFromUrl(selectedProjectorReference)));
         }
         updateActionButtonStateForBusy();
     }
@@ -2086,7 +2041,7 @@ public class SettingsActivity extends Activity {
             for (File file : existingFiles) {
                 if (file.isFile()
                         && file.length() > 0
-                        && ModelFileHelper.isLikelyProjectorFilename(file.getName())
+                        && ModelFileHelper.isGgufFilename(file.getName())
                         && !containsFile(projectorFiles, file)) {
                     projectorFiles.add(file);
                 }
@@ -2221,32 +2176,16 @@ public class SettingsActivity extends Activity {
     }
     
     private void loadModel() {
-        // Persist current UI config so ModelManager can load by name
-        final ConfigurationManager.Configuration config = getConfigFromUI();
-        try {
-            configManager.saveConfiguration(config);
-        } catch (IOException | JSONException e) {
-            Log.e(TAG, "Failed to save configuration before loading model", e);
-            showToast("Failed to save configuration: " + e.getMessage());
+        final ConfigurationManager.Configuration config = saveConfigurationForModelAction();
+        if (config == null) {
             return;
         }
-        
-        // Show quick file info from URL (if present)
-        final String filename = extractFilenameFromUrl(config.modelUrl);
-        if (filename != null && !filename.isEmpty()) {
-            File destFile = new File(getModelStorageDir(), filename);
-            modelFileInfo.setText("Model file: " + filename + (destFile.exists() ? " (" + destFile.length() + " bytes)" : " (checking...)"));
-        } else {
-            modelFileInfo.setText("Model file: (unknown)");
-        }
-        modelProgressBar.setProgress(0);
-        lastDownloadProgress = 0;
-        
+
         if (modelManager.isBusy()) {
             showToast("Model is busy processing another request");
             return;
         }
-        
+
         new Thread(() -> {
             // Acquire busy lock for load
             if (!modelManager.tryAcquire()) {
@@ -2281,6 +2220,182 @@ public class SettingsActivity extends Activity {
                 modelManager.release();
             }
         }).start();
+    }
+
+    private void startModelAction(boolean loadAfterDownload, Runnable onCancel) {
+        ConfigurationManager.Configuration config = getConfigFromUI();
+        if (requiresRemoteDownload(config)) {
+            showRemoteDownloadDecisionDialog(loadAfterDownload, onCancel);
+            return;
+        }
+
+        if (loadAfterDownload) {
+            loadModel();
+        } else {
+            downloadModelFilesOnly();
+        }
+    }
+
+    private void showRemoteDownloadDecisionDialog(boolean loadAfterDownload, Runnable onCancel) {
+        ConfigurationManager.Configuration config = getConfigFromUI();
+        String modelFilename = extractFilenameFromUrl(config.modelUrl);
+        boolean projectorDownload = ModelFileHelper.isLikelyProjectorFilename(modelFilename);
+        boolean hasRemoteProjector = referenceNeedsRemoteDownload(config.multimodalProjectorUrl);
+
+        String title = localizedText(
+                projectorDownload ? "Projector をダウンロード" : "モデルをダウンロード",
+                projectorDownload ? "Download projector" : "Download model");
+        String message;
+        if (projectorDownload) {
+            message = localizedText(
+                    "この GGUF は mmproj / Projector の可能性があります。ダウンロードのみを推奨します。ダウンロード後にそのままロードしますか？",
+                    "This GGUF looks like an mmproj / projector. Download-only is recommended. Load it immediately after the download?");
+        } else if (hasRemoteProjector) {
+            message = localizedText(
+                    "この操作ではモデル本体と利用可能な Projector をダウンロードします。ダウンロード後にモデルをロードしますか？",
+                    "This will download the model and an available projector. Load the model immediately after the download?");
+        } else {
+            message = localizedText(
+                    "この操作では Web からモデルをダウンロードします。ダウンロード後にすぐロードしますか？",
+                    "This will download the model from the web. Load it immediately after the download?");
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), (dialog, which) -> {
+                    if (onCancel != null) {
+                        onCancel.run();
+                    }
+                });
+
+        if (projectorDownload) {
+            builder.setPositiveButton(
+                    localizedText("ダウンロードのみ（推奨）", "Download only (Recommended)"),
+                    (dialog, which) -> downloadModelFilesOnly());
+            builder.setNeutralButton(
+                    localizedText("ダウンロードしてロード", "Download and load"),
+                    (dialog, which) -> loadModel());
+        } else if (loadAfterDownload) {
+            builder.setPositiveButton(
+                    localizedText("ダウンロードしてロード", "Download and load"),
+                    (dialog, which) -> loadModel());
+            builder.setNeutralButton(
+                    localizedText("ダウンロードのみ", "Download only"),
+                    (dialog, which) -> downloadModelFilesOnly());
+        } else {
+            builder.setPositiveButton(
+                    localizedText("ダウンロードのみ", "Download only"),
+                    (dialog, which) -> downloadModelFilesOnly());
+            builder.setNeutralButton(
+                    localizedText("ダウンロードしてロード", "Download and load"),
+                    (dialog, which) -> loadModel());
+        }
+
+        AlertDialog dialog = builder.create();
+        dialog.setOnCancelListener(ignored -> {
+            if (onCancel != null) {
+                onCancel.run();
+            }
+        });
+        dialog.show();
+    }
+
+    private ConfigurationManager.Configuration saveConfigurationForModelAction() {
+        final ConfigurationManager.Configuration config = getConfigFromUI();
+        try {
+            configManager.saveConfiguration(config);
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to save configuration before model action", e);
+            showToast("Failed to save configuration: " + e.getMessage());
+            return null;
+        }
+
+        final String filename = extractFilenameFromUrl(config.modelUrl);
+        if (filename != null && !filename.isEmpty()) {
+            File destFile = new File(getModelStorageDir(), filename);
+            modelFileInfo.setText("Model file: " + filename + (destFile.exists()
+                    ? " (" + destFile.length() + " bytes)"
+                    : " (checking...)"));
+        } else {
+            modelFileInfo.setText("Model file: (unknown)");
+        }
+        modelProgressBar.setProgress(0);
+        lastDownloadProgress = 0;
+        return config;
+    }
+
+    private void downloadModelFilesOnly() {
+        final ConfigurationManager.Configuration config = saveConfigurationForModelAction();
+        if (config == null) {
+            return;
+        }
+
+        if (modelManager.isBusy()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
+
+        new Thread(() -> {
+            if (!modelManager.tryAcquire()) {
+                runOnUiThread(() -> showToast("Model is busy"));
+                return;
+            }
+
+            try {
+                boolean success = modelManager.downloadConfigurationAssets(config.name);
+                runOnUiThread(() -> {
+                    String filename = extractFilenameFromUrl(config.modelUrl);
+                    modelFileInfo.setText(success
+                            ? localizedText(
+                                    "ダウンロード完了: " + (filename == null ? config.name : filename),
+                                    "Download complete: " + (filename == null ? config.name : filename))
+                            : localizedText("ダウンロードに失敗しました", "Download failed"));
+                    modelProgressBar.setProgress(success ? 100 : 0);
+                    lastDownloadProgress = success ? 100 : 0;
+                    updateAutoTemplatePreview(config);
+                    showToast(success
+                            ? localizedText("ダウンロードが完了しました", "Download completed")
+                            : localizedText("ダウンロードに失敗しました", "Download failed"));
+                });
+            } catch (Throwable t) {
+                Log.e(TAG, "Model download error", t);
+                runOnUiThread(() -> {
+                    showToast("Model download error: " + t.getMessage());
+                    modelFileInfo.setText(localizedText("ダウンロードに失敗しました", "Download failed"));
+                    modelProgressBar.setProgress(0);
+                    lastDownloadProgress = 0;
+                });
+            } finally {
+                modelManager.release();
+            }
+        }).start();
+    }
+
+    private boolean requiresRemoteDownload(ConfigurationManager.Configuration config) {
+        return referenceNeedsRemoteDownload(config.modelUrl)
+                || referenceNeedsRemoteDownload(config.multimodalProjectorUrl);
+    }
+
+    private boolean referenceNeedsRemoteDownload(String reference) {
+        String normalizedReference = normalizeReference(reference);
+        if (normalizedReference.isEmpty() || !ModelFileHelper.isRemoteModelReference(normalizedReference)) {
+            return false;
+        }
+        File storedFile = ModelFileHelper.resolveStoredModelFile(this, normalizedReference);
+        return storedFile == null || !storedFile.isFile() || storedFile.length() <= 0;
+    }
+
+    private File findAutoDetectedProjectorFile(String modelReference) {
+        String normalizedModelReference = normalizeReference(modelReference);
+        if (normalizedModelReference.isEmpty()) {
+            return null;
+        }
+        return ModelFileHelper.findAutoDetectedMultimodalProjectorFile(
+                this,
+                normalizedModelReference,
+                false,
+                false);
     }
     
     private void initModelInBackground(final String modelPath) {

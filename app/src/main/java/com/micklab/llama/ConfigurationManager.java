@@ -40,6 +40,7 @@ public class ConfigurationManager {
         public String systemPrompt;          // 前提プロンプト (system prompt)
         public String customChatTemplate;    // カスタムプロンプトテンプレート
         public String multimodalProjectorUrl; // Optional multimodal projector (mmproj) reference
+        public boolean multimodalProjectorManualSelection; // True when the user explicitly chose a GGUF as projector
         
         // Penalty parameters
         public int penaltyLastN;
@@ -125,6 +126,7 @@ public class ConfigurationManager {
             systemPrompt = "";           // Empty by default
             customChatTemplate = "";     // Empty by default (use auto-detection)
             multimodalProjectorUrl = ""; // Empty by default (use auto-discovery)
+            multimodalProjectorManualSelection = false;
         }
         
         public Configuration(String name) {
@@ -183,6 +185,7 @@ public class ConfigurationManager {
             json.put("systemPrompt", systemPrompt);
             json.put("customChatTemplate", customChatTemplate);
             json.put("multimodalProjectorUrl", multimodalProjectorUrl);
+            json.put("multimodalProjectorManualSelection", multimodalProjectorManualSelection);
             
             return json;
         }
@@ -242,6 +245,8 @@ public class ConfigurationManager {
             config.systemPrompt = json.optString("systemPrompt", "");
             config.customChatTemplate = json.optString("customChatTemplate", "");
             config.multimodalProjectorUrl = json.optString("multimodalProjectorUrl", "");
+            config.multimodalProjectorManualSelection =
+                    json.optBoolean("multimodalProjectorManualSelection", false);
             
             return config;
         }

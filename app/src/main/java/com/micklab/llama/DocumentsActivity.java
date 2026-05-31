@@ -160,7 +160,7 @@ public class DocumentsActivity extends Activity {
         sb.append("1) 初回起動時のQuick Startで「次回以降は表示しない」をチェックすると、次回起動以降は表示されません。\n");
         sb.append("2) メイン画面で「設定」を開きます。\n");
         sb.append("   ※推論中（Busy）は設定ボタンが無効化されます。処理完了後に自動で再有効化されます。\n");
-        sb.append("3) モデルURLを入力するか、ローカル端末から .gguf ファイルを取り込み、「モデルを読み込む」を押してモデルを読み込みます。マルチモーダルモデルで mmproj が必要な場合は、その直下にある「mmprojを選択 / mmprojを解除」から切り替えます。\n");
+        sb.append("3) モデルURLを入力するか、ローカル端末から .gguf ファイルを取り込みます。Web上のURLを使う場合は、ダウンロード後にそのままロードするか確認されます。マルチモーダル対応モデルで利用可能な Projector が見つかる場合、Projector 欄は Available と表示され、通常は手動選択不要です。\n");
         sb.append("   ※ローカル取り込みのファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動して選択できます。HTTP/HTTPS URLを利用でき、HTTPSでは通常のSSL/TLS証明書検証を行います。ローカル取り込み時は設定欄にファイル名のみが保存されます。\n");
         sb.append("4) パラメータを調整する場合は各項目を編集し「設定を保存」で保存します。\n");
         sb.append("5) 「保存して閉じる」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
@@ -182,7 +182,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 設定画面: 各項目は種別ごとのセクションに分かれており、見出しをタップすると開閉できます。MCP設定セクションは初期状態で閉じています。\n");
         sb.append("- モデル管理: ダウンロード済みモデルの削除に加え、現在編集中のプロファイルを別のダウンロード済みモデルへ切り替えられます。このセクションの直下に「Hugging FaceでGGUFを検索」ボタンがあります。\n");
         sb.append("- 設定管理: 設定の保存/削除/読み込みを行います。\n");
-        sb.append("- モデル選択: モデルURLでの読み込みに加え、ローカル端末から .gguf ファイルを取り込めます。ファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動できます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。mmproj の選択/解除ボタンは「モデルを読み込む」の下にあります。\n");
+        sb.append("- モデル選択: モデルURLでの読み込みに加え、ローカル端末から .gguf ファイルを取り込めます。ファイル選択は Downloads フォルダを既定で開き、必要に応じて端末内の他の場所へ移動できます。取り込んだファイルはアプリ内モデル保存先へコピーされ、設定欄にはファイル名のみを表示します。HTTP/HTTPS URL利用時はHTTPSで通常のSSL/TLS証明書検証を行います。Webダウンロード時はロードするか確認され、mmproj / Projector とみられるGGUFではダウンロードのみが推奨されます。mmproj の選択/解除ボタンは「モデルを読み込む」の下にあります。\n");
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
         sb.append("- 出力設定: ストリーミング出力の有効/無効を切り替えます。\n");
         sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
@@ -249,8 +249,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
         sb.append("9. 🧭 GGUFファイルの探し方\n\n");
         sb.append("【9-1. GGUF対応モデルを探す】\n");
-        sb.append("- 設定画面のモデル管理セクション直下にある「Hugging FaceでGGUFを検索」ボタンから任意キーワードを部分一致で検索し、上位約30件からファイル選択後に自動ダウンロードを開始できる\n");
-        sb.append("- Gemma-4 などで同じリポジトリに対応 mmproj が含まれている場合は、自動的に対応する mmproj のみを設定して一緒にダウンロードする（テキスト専用モデルに無関係な mmproj は自動適用しない）\n");
+        sb.append("- 設定画面のモデル管理セクション直下にある「Hugging FaceでGGUFを検索」ボタンから任意キーワードを部分一致で検索し、上位約30件からファイル選択後にダウンロードできます。必要に応じてダウンロードのみ / ダウンロード後にロードを選べます\n");
+        sb.append("- Gemma-4 などで同じリポジトリに対応 mmproj / projector が含まれている場合は、自動的に対応する projector のみを設定し、Projector 欄は Available と表示されます（テキスト専用モデルに無関係な projector は自動適用しません）\n");
         sb.append("- Hugging Face のモデル検索で GGUF タグを使う\n");
         sb.append("  → https://huggingface.co/models?library=gguf\n");
         sb.append("- GGUFモデルはリポジトリ名に -GGUF が付いていることが多い\n");
@@ -290,7 +290,7 @@ public class DocumentsActivity extends Activity {
         sb.append("1) On first launch, if you check \"Don't show next time\" in Quick Start, it will not be shown on subsequent launches.\n");
         sb.append("2) Open \"Settings\" from the main screen.\n");
         sb.append("   * During inference (Busy), the Settings button is disabled and is re-enabled automatically when processing completes.\n");
-        sb.append("3) Enter the model URL or import a .gguf file from the local device, then tap \"Load Model\". If a multimodal model needs an mmproj, use the \"Select mmproj\" / \"Clear mmproj\" buttons placed directly below it.\n");
+        sb.append("3) Enter the model URL or import a .gguf file from the local device. When a web URL is used, the app asks whether to load it immediately after the download. If an available projector is found for a multimodal-capable model, the Projector field shows Available and manual mmproj selection is usually unnecessary.\n");
         sb.append("   * The local import picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Reachable HTTP/HTTPS URLs can be used. HTTPS uses normal SSL/TLS certificate verification. Imported local files are saved as filenames only in Settings.\n");
         sb.append("4) Edit parameters if needed and tap \"Save Config\".\n");
         sb.append("5) Tap \"SAVE & CLOSE\" to save settings and apply them to the model immediately.\n\n");
@@ -312,7 +312,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Settings screen: Controls are grouped into collapsible sections. Tap a section title to expand or collapse it. The MCP Settings section is collapsed by default.\n");
         sb.append("- Model Maintenance: In addition to deleting downloaded models, you can switch the profile currently being edited to another downloaded model. The \"Search GGUF on Hugging Face\" button is directly below this section.\n");
         sb.append("- Configuration Management: Save/delete/load configurations.\n");
-        sb.append("- Model Selection: Load models from a URL or import .gguf files from the local device. The picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification. The mmproj selection/clear buttons are placed below \"Load Model\".\n");
+        sb.append("- Model Selection: Load models from a URL or import .gguf files from the local device. The picker opens in Downloads by default, and you can navigate elsewhere on the device as needed. Imported files are copied into the app model storage directory and only the filename is shown in Settings. Reachable HTTP/HTTPS URLs can be used, and HTTPS uses normal SSL/TLS certificate verification. For web downloads, the app asks whether to load the file after the download, and download-only is recommended for GGUFs that look like mmproj / projector files. The mmproj selection/clear buttons are placed below \"Load Model\".\n");
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
@@ -379,8 +379,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- Android 13+ may require notification permission.\n\n");
         sb.append("9. 🧭 Finding GGUF Files\n\n");
         sb.append("[9-1. Locating GGUF-compatible models]\n");
-        sb.append("- Use the \"Search GGUF on Hugging Face\" button directly below the Model Maintenance section on the Settings screen to do a partial-match keyword search, review roughly the top 30 results, then select a file and start the download automatically\n");
-        sb.append("- When a repository also contains a matching mmproj for models such as Gemma-4, the app auto-configures only a compatible mmproj and downloads it together with the model (unrelated mmproj files are not auto-applied to text-only models)\n");
+        sb.append("- Use the \"Search GGUF on Hugging Face\" button directly below the Model Maintenance section on the Settings screen to do a partial-match keyword search, review roughly the top 30 results, then choose whether to download only or download and load\n");
+        sb.append("- When a repository also contains a matching mmproj / projector for models such as Gemma-4, the app auto-configures only a compatible projector and shows Projector as Available (unrelated projector files are not auto-applied to text-only models)\n");
         sb.append("- Use the GGUF tag on Hugging Face model search\n");
         sb.append("  → https://huggingface.co/models?library=gguf\n");
         sb.append("- GGUF models often have -GGUF in the repository name\n");

@@ -50,17 +50,16 @@ public class ModelManager {
 
         boolean supportsVision = false;
         boolean supportsAudio = false;
-        String configuredProjectorPath = null;
-        if (config.multimodalProjectorUrl != null && !config.multimodalProjectorUrl.trim().isEmpty()) {
-            MultimodalProjectorResolution projectorResolution =
-                    resolveMultimodalProjectorPath(config, false, false);
-            if (projectorResolution.errorMessage == null && projectorResolution.projectorPath != null) {
-                configuredProjectorPath = projectorResolution.projectorPath;
-                ModelFileHelper.InferredModalities inferredSupport =
-                        ModelFileHelper.inferAutoDetectedModalities(context, config.modelUrl);
-                supportsVision = inferredSupport.supportsVision();
-                supportsAudio = inferredSupport.supportsAudio();
-            }
+        MultimodalProjectorResolution projectorResolution =
+                resolveMultimodalProjectorPath(config, false, false);
+        String configuredProjectorPath = projectorResolution.errorMessage == null
+                ? projectorResolution.projectorPath
+                : null;
+        if (configuredProjectorPath != null) {
+            ModelFileHelper.InferredModalities inferredSupport =
+                    ModelFileHelper.inferAutoDetectedModalities(context, config.modelUrl);
+            supportsVision = inferredSupport.supportsVision();
+            supportsAudio = inferredSupport.supportsAudio();
         }
 
         File configuredModelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
@@ -369,6 +368,89 @@ public class ModelManager {
      */
     public boolean loadConfiguration(String configName) {
         return loadConfiguration(configName, false, false);
+    }
+
+    public boolean downloadConfigurationAssets(String configName) {
+        boolean shouldClearPendingLoad = false;
+        try {
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+            DiagnosticsLogger.logEvent(context, "model-download", "Downloading configuration assets: " + configName);
+
+            String filename = extractFilenameFromUrl(config.modelUrl);
+            if (filename == null || filename.isEmpty()) {
+                Log.e(TAG, "Cannot determine filename from model reference: " + config.modelUrl);
+                return false;
+            }
+
+            File destFile = new File(getModelStorageDir(), filename);
+            String modelPath = destFile.getAbsolutePath();
+            MultimodalProjectorResolution projectorResolution = resolveMultimodalProjectorPath(
+                    config,
+                    false,
+                    false);
+            if (projectorResolution.errorMessage != null) {
+                Log.e(TAG, projectorResolution.errorMessage);
+                if (listener != null) {
+                    listener.onError(projectorResolution.errorMessage);
+                }
+                return false;
+            }
+
+            try {
+                PendingModelLoadStore.writePendingLoad(context, configName, modelPath, config.modelUrl);
+                shouldClearPendingLoad = true;
+            } catch (IOException | JSONException e) {
+                Log.e(TAG, "Failed to persist pending model load marker", e);
+                if (listener != null) {
+                    listener.onError("Failed to persist pending model load marker: " + e.getMessage());
+                }
+                return false;
+            }
+
+            MultimodalProjectorResolution availableProjector = ensureMultimodalProjectorAvailable(
+                    config,
+                    projectorResolution.projectorPath);
+            if (availableProjector.errorMessage != null) {
+                Log.e(TAG, availableProjector.errorMessage);
+                if (listener != null) {
+                    listener.onError(availableProjector.errorMessage);
+                }
+                return false;
+            }
+
+            String fileAvailabilityError = ensureModelFilesAvailable(config, destFile);
+            if (fileAvailabilityError != null) {
+                Log.e(TAG, fileAvailabilityError);
+                if (listener != null) {
+                    listener.onError(fileAvailabilityError);
+                }
+                return false;
+            }
+
+            DiagnosticsLogger.logMemorySnapshot(
+                    context,
+                    "model-download-complete",
+                    "config=" + configName
+                            + " model=" + destFile.getName()
+                            + " mmproj=" + (availableProjector.projectorPath != null
+                            ? new File(availableProjector.projectorPath).getName()
+                            : "(none)"));
+            return true;
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Failed to download configuration assets", e);
+            if (listener != null) {
+                listener.onError("Failed to download configuration assets: " + e.getMessage());
+            }
+            return false;
+        } finally {
+            if (shouldClearPendingLoad) {
+                try {
+                    PendingModelLoadStore.deletePendingLoad(context);
+                } catch (IOException cleanupError) {
+                    Log.e(TAG, "Failed to clear pending model load marker", cleanupError);
+                }
+            }
+        }
     }
 
     public boolean loadConfiguration(String configName, boolean preferVisionProjector, boolean preferAudioProjector) {
@@ -850,10 +932,18 @@ public class ModelManager {
             boolean preferVisionProjector,
             boolean preferAudioProjector) {
         if (config.multimodalProjectorUrl == null || config.multimodalProjectorUrl.trim().isEmpty()) {
-            return new MultimodalProjectorResolution(null, null);
+            File autoDetectedProjector = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(
+                    context,
+                    config.modelUrl,
+                    preferVisionProjector,
+                    preferAudioProjector);
+            return new MultimodalProjectorResolution(
+                    autoDetectedProjector != null ? autoDetectedProjector.getAbsolutePath() : null,
+                    null);
         }
 
-        if (!ModelFileHelper.canAutoApplyProjectorReference(config.modelUrl, config.multimodalProjectorUrl)) {
+        if (!config.multimodalProjectorManualSelection
+                && !ModelFileHelper.canAutoApplyProjectorReference(config.modelUrl, config.multimodalProjectorUrl)) {
             return new MultimodalProjectorResolution(
                     null,
                     "Configured mmproj is incompatible with the selected model. Open Settings and choose a matching mmproj.");
