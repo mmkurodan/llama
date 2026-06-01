@@ -2017,10 +2017,29 @@ public class SettingsActivity extends Activity {
                 || findAutoDetectedProjectorFile(modelReference) != null;
         boolean likelyMultimodalModel =
                 !modelReference.isEmpty() && ModelFileHelper.isLikelyMultimodalModelReference(modelReference);
-        if (projectorAvailable && likelyMultimodalModel) {
-            multimodalProjectorInfo.setText(localizedText(
-                    "Projector: Available",
-                    "Projector: Available"));
+
+        if (likelyMultimodalModel) {
+            // For gguf models that can accept an mmproj, show availability and the configured mmproj model name below
+            String availableText = localizedText("利用可能", "Available");
+            String mmprojModelName = "";
+            if (!selectedProjectorReference.isEmpty()) {
+                mmprojModelName = extractFilenameFromUrl(selectedProjectorReference);
+            } else {
+                File autoDetected = findAutoDetectedProjectorFile(modelReference);
+                if (autoDetected != null) {
+                    mmprojModelName = autoDetected.getName();
+                }
+            }
+
+            if (!mmprojModelName.isEmpty()) {
+                multimodalProjectorInfo.setText(availableText + "\n" + mmprojModelName);
+            } else if (projectorAvailable) {
+                multimodalProjectorInfo.setText(availableText);
+            } else {
+                multimodalProjectorInfo.setText(localizedText(
+                        "Projector: 未選択",
+                        "Projector: not selected"));
+            }
         } else if (selectedProjectorReference.isEmpty()) {
             multimodalProjectorInfo.setText(localizedText(
                     "Projector: 未選択",
