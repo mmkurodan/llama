@@ -1,8 +1,10 @@
 package com.micklab.llama;
 
 import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Debug;
 import android.os.Process;
 import android.util.Log;
@@ -16,6 +18,7 @@ import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -109,6 +112,72 @@ public final class DiagnosticsLogger {
             if (isMaxDebugEnabled(context)) {
                 appendToOllamaLogLocked(context, output.toString());
             }
+        }
+    }
+
+    /**
+     * Records why recent previous processes of this app terminated, using
+     * {@link ActivityManager#getHistoricalProcessExitReasons} (API 30+). Unlike the
+     * logcat ring buffer this is persisted by the system and survives an arbitrary gap
+     * between the death and the next launch, so it reliably distinguishes an OS-level
+     * kill (LOW_MEMORY / SIGNALED-SIGKILL / EXCESSIVE_RESOURCE_USAGE / USER_REQUESTED)
+     * from an in-process native or Java crash (CRASH_NATIVE / CRASH / SIGNALED-SIGSEGV).
+     */
+    public static void logPreviousExitReasons(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return;
+        }
+        ActivityManager activityManager =
+                (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) {
+            return;
+        }
+        try {
+            List<ApplicationExitInfo> infos =
+                    activityManager.getHistoricalProcessExitReasons(null, 0, 8);
+            if (infos == null || infos.isEmpty()) {
+                return;
+            }
+            SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
+            for (ApplicationExitInfo info : infos) {
+                String line = buildHeader("previous-exit")
+                        + " pid=" + info.getPid()
+                        + " reason=" + exitReasonName(info.getReason()) + "(" + info.getReason() + ")"
+                        + " status=" + info.getStatus()
+                        + " importance=" + info.getImportance()
+                        + " pss=" + formatBytes(info.getPss() * 1024L)
+                        + " rss=" + formatBytes(info.getRss() * 1024L)
+                        + " time=" + fmt.format(new Date(info.getTimestamp()))
+                        + " desc=" + toSingleLine(info.getDescription());
+                synchronized (LOCK) {
+                    appendLine(context, PROCESS_LOG_FILENAME, line);
+                    appendToOllamaLogLocked(context, line);
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to read historical exit reasons", t);
+        }
+    }
+
+    private static String exitReasonName(int reason) {
+        switch (reason) {
+            case ApplicationExitInfo.REASON_EXIT_SELF: return "EXIT_SELF";
+            case ApplicationExitInfo.REASON_SIGNALED: return "SIGNALED";
+            case ApplicationExitInfo.REASON_LOW_MEMORY: return "LOW_MEMORY";
+            case ApplicationExitInfo.REASON_CRASH: return "CRASH";
+            case ApplicationExitInfo.REASON_CRASH_NATIVE: return "CRASH_NATIVE";
+            case ApplicationExitInfo.REASON_ANR: return "ANR";
+            case ApplicationExitInfo.REASON_INITIALIZATION_FAILURE: return "INITIALIZATION_FAILURE";
+            case ApplicationExitInfo.REASON_PERMISSION_CHANGE: return "PERMISSION_CHANGE";
+            case ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE: return "EXCESSIVE_RESOURCE_USAGE";
+            case ApplicationExitInfo.REASON_USER_REQUESTED: return "USER_REQUESTED";
+            case ApplicationExitInfo.REASON_USER_STOPPED: return "USER_STOPPED";
+            case ApplicationExitInfo.REASON_DEPENDENCY_DIED: return "DEPENDENCY_DIED";
+            case ApplicationExitInfo.REASON_OTHER: return "OTHER";
+            case ApplicationExitInfo.REASON_FREEZER: return "FREEZER";
+            case ApplicationExitInfo.REASON_PACKAGE_STATE_CHANGE: return "PACKAGE_STATE_CHANGE";
+            case ApplicationExitInfo.REASON_PACKAGE_UPDATED: return "PACKAGE_UPDATED";
+            default: return "UNKNOWN";
         }
     }
 

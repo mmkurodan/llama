@@ -1,0 +1,467 @@
+2026-06-04 05:41:55.383 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:41:55.386 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.9MB javaTotal=10.6MB javaMax=256.0MB nativeHeap=13.6MB nativeHeapFree=4.6MB nativeHeapSize=21.9MB
+  pssTotal=28.4MB privateDirty=19.4MB sharedDirty=45.6MB nativePss=12.0MB dalvikPss=1.5MB otherPss=14.9MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=176332 kB VmHWM=179748 kB VmSize=17118120 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:41:55.435 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=13.6MB nativeHeapFree=4.7MB nativeHeapSize=21.9MB
+  pssTotal=26.7MB privateDirty=17.8MB sharedDirty=45.6MB nativePss=12.0MB dalvikPss=1.3MB otherPss=13.4MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=174656 kB VmHWM=179748 kB VmSize=17118120 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:41:57.163 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.1MB nativeHeapFree=7.0MB nativeHeapSize=350.4MB
+  pssTotal=2.0GB privateDirty=148.7MB sharedDirty=45.6MB nativePss=142.3MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=17.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2264104 kB VmHWM=2264104 kB VmSize=19400316 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:41:57.215 pid=13656 [generation-start] id=1 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1045 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.1MB nativeHeapFree=7.0MB nativeHeapSize=350.4MB
+  pssTotal=2.0GB privateDirty=148.9MB sharedDirty=45.6MB nativePss=142.4MB dalvikPss=1.5MB otherPss=1.9GB
+  systemAvail=17.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2264360 kB VmHWM=2264360 kB VmSize=19400316 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:41:57.256 pid=13656 [generation-stage] id=1 stage=native-call-start
+2026-06-04 05:42:43.706 pid=13656 [generation-stage] id=1 stage=native-call-end resultLen=111
+2026-06-04 05:42:43.707 pid=13656 [generation-end] id=1 resultLen=111
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.5MB nativeHeapFree=7.0MB nativeHeapSize=352.7MB
+  pssTotal=2.0GB privateDirty=142.6MB sharedDirty=45.6MB nativePss=136.0MB dalvikPss=1.7MB otherPss=1.9GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2258392 kB VmHWM=2270600 kB VmSize=19388000 kB VmSwap=128 kB Threads=29 FDSize=256
+2026-06-04 05:42:43.782 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:42:43.783 pid=13656 [model-load-skip] config=Qwen3.5 model already loaded audioRequested=false audioActive=false projectorActive=false
+  javaUsed=3.4MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.5MB nativeHeapFree=7.0MB nativeHeapSize=352.7MB
+  pssTotal=2.0GB privateDirty=142.8MB sharedDirty=45.6MB nativePss=136.0MB dalvikPss=2.0MB otherPss=1.9GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2258520 kB VmHWM=2270600 kB VmSize=19388000 kB VmSwap=128 kB Threads=29 FDSize=256
+2026-06-04 05:42:43.858 pid=13656 [generation-start] id=2 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1045 mediaCount=0
+  javaUsed=3.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.5MB nativeHeapFree=7.0MB nativeHeapSize=352.7MB
+  pssTotal=2.0GB privateDirty=143.0MB sharedDirty=45.6MB nativePss=136.0MB dalvikPss=2.1MB otherPss=1.9GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2258776 kB VmHWM=2270600 kB VmSize=19388000 kB VmSwap=128 kB Threads=29 FDSize=256
+2026-06-04 05:42:43.927 pid=13656 [generation-stage] id=2 stage=native-call-start
+2026-06-04 05:43:27.852 pid=13656 [generation-stage] id=2 stage=native-call-end resultLen=31
+2026-06-04 05:43:27.853 pid=13656 [generation-end] id=2 resultLen=31
+  javaUsed=3.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.5MB nativeHeapFree=7.0MB nativeHeapSize=352.7MB
+  pssTotal=2.0GB privateDirty=152.8MB sharedDirty=45.6MB nativePss=145.6MB dalvikPss=2.3MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2268940 kB VmHWM=2270600 kB VmSize=19405472 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:43:28.420 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:43:28.619 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=4.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=33.2MB privateDirty=22.9MB sharedDirty=45.6MB nativePss=15.5MB dalvikPss=2.5MB otherPss=15.1MB
+  systemAvail=18.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181768 kB VmHWM=2270600 kB VmSize=17249156 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:43:28.682 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.9MB privateDirty=21.7MB sharedDirty=45.6MB nativePss=15.5MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180496 kB VmHWM=2270600 kB VmSize=17249156 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:43:31.667 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=223.9MB sharedDirty=45.6MB nativePss=217.6MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4879300 kB VmHWM=4879300 kB VmSize=22166388 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:43:31.737 pid=13656 [generation-start] id=3 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1042 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=224.1MB sharedDirty=45.6MB nativePss=217.6MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4879556 kB VmHWM=4879556 kB VmSize=22166388 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:43:31.804 pid=13656 [generation-stage] id=3 stage=native-call-start
+2026-06-04 05:44:56.796 pid=13656 [generation-stage] id=3 stage=native-call-end resultLen=232
+2026-06-04 05:44:56.797 pid=13656 [generation-end] id=3 resultLen=232
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.6MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=220.2MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.8MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4875412 kB VmHWM=4887720 kB VmSize=22166388 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:44:57.376 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:44:57.753 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=3.4MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.6MB privateDirty=22.4MB sharedDirty=45.6MB nativePss=15.5MB dalvikPss=2.0MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181108 kB VmHWM=4887720 kB VmSize=17279112 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:44:57.822 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.9MB privateDirty=21.7MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180592 kB VmHWM=4887720 kB VmSize=17279112 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:44:59.011 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.7MB sharedDirty=45.6MB nativePss=166.5MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289420 kB VmHWM=4887720 kB VmSize=19435428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:44:59.093 pid=13656 [generation-start] id=4 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1045 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.9MB sharedDirty=45.6MB nativePss=166.5MB dalvikPss=1.6MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289548 kB VmHWM=4887720 kB VmSize=19435428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:44:59.173 pid=13656 [generation-stage] id=4 stage=native-call-start
+2026-06-04 05:45:30.750 pid=13656 [generation-stage] id=4 stage=native-call-end resultLen=71
+2026-06-04 05:45:30.751 pid=13656 [generation-end] id=4 resultLen=71
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.6MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=144.0MB sharedDirty=45.6MB nativePss=137.4MB dalvikPss=1.7MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2260104 kB VmHWM=4887720 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:45:31.322 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:45:31.497 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.9MB privateDirty=21.7MB sharedDirty=45.6MB nativePss=15.5MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180856 kB VmHWM=4887720 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:45:31.537 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.0MB privateDirty=21.7MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180956 kB VmHWM=4887720 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:45:32.594 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=246.5MB sharedDirty=45.6MB nativePss=240.2MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4902816 kB VmHWM=4902816 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:45:32.702 pid=13656 [generation-start] id=5 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=246.7MB sharedDirty=45.6MB nativePss=240.3MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4902944 kB VmHWM=4902944 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:45:32.783 pid=13656 [generation-stage] id=5 stage=native-call-start
+2026-06-04 05:46:45.660 pid=13656 [generation-stage] id=5 stage=native-call-end resultLen=82
+2026-06-04 05:46:45.661 pid=13656 [generation-end] id=5 resultLen=82
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.6MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=220.2MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.8MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4875604 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:46:46.240 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:46:46.626 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=3.5MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.7MB privateDirty=22.4MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=2.0MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181272 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:46:46.696 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.1MB privateDirty=21.9MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180836 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:46:47.882 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.8MB sharedDirty=45.6MB nativePss=166.6MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289464 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:46:47.963 pid=13656 [generation-start] id=6 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1045 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.0MB sharedDirty=45.6MB nativePss=166.6MB dalvikPss=1.6MB otherPss=1.9GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289720 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:46:48.012 pid=13656 [generation-stage] id=6 stage=native-call-start
+2026-06-04 05:47:23.085 pid=13656 [generation-stage] id=6 stage=native-call-end resultLen=140
+2026-06-04 05:47:23.086 pid=13656 [generation-end] id=6 resultLen=140
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.5MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=143.6MB sharedDirty=45.6MB nativePss=137.4MB dalvikPss=1.3MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2259660 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:47:23.664 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:47:23.905 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.3MB privateDirty=22.0MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.6MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181016 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:47:23.975 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.1MB privateDirty=21.8MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180860 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:47:25.333 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=241.3MB sharedDirty=45.6MB nativePss=235.1MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=17.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4897340 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:47:25.418 pid=13656 [generation-start] id=7 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1054 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=241.5MB sharedDirty=45.6MB nativePss=235.1MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=17.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4897596 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:47:25.493 pid=13656 [generation-stage] id=7 stage=native-call-start
+2026-06-04 05:48:38.393 pid=13656 [generation-stage] id=7 stage=native-call-end resultLen=74
+2026-06-04 05:48:38.394 pid=13656 [generation-end] id=7 resultLen=74
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.6MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=220.2MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.7MB otherPss=4.3GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4875636 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:48:38.970 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:48:39.310 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=3.4MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.7MB privateDirty=22.4MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=2.0MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181324 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:48:39.374 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.1MB privateDirty=21.8MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180812 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:48:40.561 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.8MB sharedDirty=45.6MB nativePss=166.5MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289476 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:48:40.642 pid=13656 [generation-start] id=8 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.0MB sharedDirty=45.6MB nativePss=166.6MB dalvikPss=543.0KB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289612 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:48:40.724 pid=13656 [generation-stage] id=8 stage=native-call-start
+2026-06-04 05:49:20.794 pid=13656 [generation-stage] id=8 stage=native-call-end resultLen=270
+2026-06-04 05:49:20.795 pid=13656 [generation-end] id=8 resultLen=270
+  javaUsed=2.9MB javaTotal=10.6MB javaMax=256.0MB nativeHeap=342.6MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=143.7MB sharedDirty=45.6MB nativePss=137.4MB dalvikPss=1.5MB otherPss=1.9GB
+  systemAvail=18.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2260068 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:49:21.572 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:49:21.820 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=3.1MB javaTotal=10.6MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.4MB privateDirty=22.2MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.8MB otherPss=15.1MB
+  systemAvail=18.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181364 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:49:21.892 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.0MB privateDirty=21.8MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180924 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:49:23.233 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=241.3MB sharedDirty=45.6MB nativePss=235.1MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4897488 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:49:23.316 pid=13656 [generation-start] id=9 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1048 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=241.5MB sharedDirty=45.6MB nativePss=235.1MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4897744 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:49:23.392 pid=13656 [generation-stage] id=9 stage=native-call-start
+2026-06-04 05:50:36.698 pid=13656 [generation-stage] id=9 stage=native-call-end resultLen=95
+2026-06-04 05:50:36.699 pid=13656 [generation-end] id=9 resultLen=95
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.6MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=220.2MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.7MB otherPss=4.3GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4875852 kB VmHWM=4910936 kB VmSize=22168704 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:50:37.282 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:50:37.627 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.9MB privateDirty=21.7MB sharedDirty=45.6MB nativePss=15.5MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=180844 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:50:37.700 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.0MB privateDirty=21.8MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181004 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:50:38.891 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.7MB sharedDirty=45.6MB nativePss=166.4MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289632 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:50:38.980 pid=13656 [generation-start] id=10 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1057 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=172.9MB sharedDirty=45.6MB nativePss=166.5MB dalvikPss=1.6MB otherPss=1.9GB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2289760 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:50:39.065 pid=13656 [generation-stage] id=10 stage=native-call-start
+2026-06-04 05:51:14.680 pid=13656 [generation-stage] id=10 stage=native-call-end resultLen=61
+2026-06-04 05:51:14.681 pid=13656 [generation-end] id=10 resultLen=61
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.6MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=144.1MB sharedDirty=45.6MB nativePss=137.5MB dalvikPss=1.8MB otherPss=1.9GB
+  systemAvail=17.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2260376 kB VmHWM=4910936 kB VmSize=19437744 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:51:15.333 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:51:15.501 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=3.4MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.7MB privateDirty=22.5MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=2.0MB otherPss=15.1MB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181608 kB VmHWM=4910936 kB VmSize=17281428 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:51:15.542 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=32.3MB privateDirty=22.0MB sharedDirty=45.6MB nativePss=15.9MB dalvikPss=1.3MB otherPss=15.1MB
+  systemAvail=18.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181556 kB VmHWM=4910936 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:51:16.339 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=247.5MB sharedDirty=45.6MB nativePss=241.2MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=17.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4904236 kB VmHWM=4910936 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:51:16.390 pid=13656 [generation-start] id=11 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=247.7MB sharedDirty=45.6MB nativePss=241.3MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=17.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4904492 kB VmHWM=4910936 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:51:16.437 pid=13656 [generation-stage] id=11 stage=native-call-start
+2026-06-04 05:53:13.384 pid=13656 [generation-stage] id=11 stage=native-call-end resultLen=96
+2026-06-04 05:53:13.385 pid=13656 [generation-end] id=11 resultLen=96
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.7MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=219.8MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4875872 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:14.066 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:53:14.302 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=3.0MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.9MB privateDirty=22.1MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.6MB otherPss=14.7MB
+  systemAvail=17.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181664 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:14.343 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.5MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.7MB privateDirty=21.8MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=14.7MB
+  systemAvail=17.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181468 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:15.021 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.7MB sharedDirty=45.6MB nativePss=167.5MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=17.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2291028 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:15.075 pid=13656 [generation-start] id=12 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1048 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.9MB sharedDirty=45.6MB nativePss=167.5MB dalvikPss=1.6MB otherPss=1.9GB
+  systemAvail=17.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2291284 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:15.127 pid=13656 [generation-stage] id=12 stage=native-call-start
+2026-06-04 05:53:53.557 pid=13656 [generation-stage] id=12 stage=native-call-end resultLen=42
+2026-06-04 05:53:53.558 pid=13656 [generation-end] id=12 resultLen=42
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.6MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=144.0MB sharedDirty=45.6MB nativePss=137.4MB dalvikPss=1.7MB otherPss=1.9GB
+  systemAvail=17.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2260600 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:54.127 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:53:54.370 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=3.4MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.3MB privateDirty=22.5MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=2.0MB otherPss=14.7MB
+  systemAvail=17.3GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=182016 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:54.437 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.5MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.8MB privateDirty=21.9MB sharedDirty=45.6MB nativePss=15.8MB dalvikPss=1.3MB otherPss=14.7MB
+  systemAvail=17.3GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181560 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:55.811 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=239.8MB sharedDirty=45.6MB nativePss=233.6MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4896376 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:55.894 pid=13656 [generation-start] id=13 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=240.1MB sharedDirty=45.6MB nativePss=233.6MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4896524 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:53:55.976 pid=13656 [generation-stage] id=13 stage=native-call-start
+2026-06-04 05:55:27.145 pid=13656 [generation-stage] id=13 stage=native-call-end resultLen=60
+2026-06-04 05:55:27.146 pid=13656 [generation-end] id=13 resultLen=60
+  javaUsed=2.8MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.7MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=220.0MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.5MB otherPss=4.3GB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4876000 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:55:27.696 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:55:27.937 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.0MB privateDirty=22.3MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.8MB otherPss=14.5MB
+  systemAvail=17.3GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181768 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:55:27.977 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.6MB privateDirty=21.9MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=14.5MB
+  systemAvail=17.3GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181420 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:55:28.644 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.7MB sharedDirty=45.6MB nativePss=167.5MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=17.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2290956 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:55:28.695 pid=13656 [generation-start] id=14 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1060 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.9MB sharedDirty=45.6MB nativePss=167.5MB dalvikPss=1.6MB otherPss=1.9GB
+  systemAvail=17.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2291212 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:55:28.744 pid=13656 [generation-stage] id=14 stage=native-call-start
+2026-06-04 05:56:26.017 pid=13656 [generation-stage] id=14 stage=native-call-end resultLen=120
+2026-06-04 05:56:26.018 pid=13656 [generation-end] id=14 resultLen=120
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.6MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=144.0MB sharedDirty=45.6MB nativePss=137.4MB dalvikPss=1.8MB otherPss=1.9GB
+  systemAvail=16.7GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2260876 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:56:26.582 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:56:26.834 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.2MB privateDirty=21.7MB sharedDirty=45.6MB nativePss=15.6MB dalvikPss=1.3MB otherPss=14.3MB
+  systemAvail=16.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181572 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:56:26.890 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.3MB privateDirty=21.8MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.3MB otherPss=14.3MB
+  systemAvail=16.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181712 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:56:28.336 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=226.9MB sharedDirty=45.6MB nativePss=220.7MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=16.6GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4883584 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:56:28.416 pid=13656 [generation-start] id=15 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=227.1MB sharedDirty=45.6MB nativePss=220.7MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=16.6GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4883712 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:56:28.487 pid=13656 [generation-stage] id=15 stage=native-call-start
+2026-06-04 05:58:03.835 pid=13656 [generation-stage] id=15 stage=native-call-end resultLen=93
+2026-06-04 05:58:03.836 pid=13656 [generation-end] id=15 resultLen=93
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=496.8MB nativeHeapFree=9.6MB nativeHeapSize=509.5MB
+  pssTotal=4.5GB privateDirty=220.2MB sharedDirty=45.6MB nativePss=213.6MB dalvikPss=1.7MB otherPss=4.3GB
+  systemAvail=16.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4876532 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:04.406 pid=13656 [model-load] Loading configuration: Qwen3.5
+2026-06-04 05:58:04.640 pid=13656 [runtime-memory] Before model load model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=3.4MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=32.0MB privateDirty=22.5MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=2.0MB otherPss=14.3MB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=182416 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:04.679 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-2B-Q8_0.gguf
+  javaUsed=2.5MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.4MB privateDirty=21.9MB sharedDirty=45.6MB nativePss=15.8MB dalvikPss=1.3MB otherPss=14.3MB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181848 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:05.358 pid=13656 [model-load-complete] config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.7MB sharedDirty=45.6MB nativePss=167.5MB dalvikPss=1.4MB otherPss=1.9GB
+  systemAvail=17.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2291356 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:05.412 pid=13656 [generation-start] id=16 config=Qwen3.5 model=Qwen3.5-2B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=340.2MB nativeHeapFree=9.7MB nativeHeapSize=353.0MB
+  pssTotal=2.0GB privateDirty=173.9MB sharedDirty=45.6MB nativePss=167.5MB dalvikPss=1.6MB otherPss=1.9GB
+  systemAvail=17.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2291336 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:05.489 pid=13656 [generation-stage] id=16 stage=native-call-start
+2026-06-04 05:58:50.497 pid=13656 [generation-stage] id=16 stage=native-call-end resultLen=108
+2026-06-04 05:58:50.498 pid=13656 [generation-end] id=16 resultLen=108
+  javaUsed=2.8MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=342.6MB nativeHeapFree=9.6MB nativeHeapSize=355.2MB
+  pssTotal=2.0GB privateDirty=143.8MB sharedDirty=45.6MB nativePss=137.4MB dalvikPss=1.5MB otherPss=1.9GB
+  systemAvail=17.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=2260580 kB VmHWM=4911052 kB VmSize=19438128 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:51.195 pid=13656 [model-load] Loading configuration: Qwen3.5 MTP
+2026-06-04 05:58:51.362 pid=13656 [runtime-memory] Before model load model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=3.1MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.8MB nativeHeapFree=50.8MB nativeHeapSize=69.5MB
+  pssTotal=31.7MB privateDirty=22.2MB sharedDirty=45.6MB nativePss=15.7MB dalvikPss=1.7MB otherPss=14.3MB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=182216 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:51.402 pid=13656 [runtime-memory] After model load cleanup model=Qwen3.5-4B-Q8_0.gguf
+  javaUsed=2.6MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=15.7MB nativeHeapFree=50.9MB nativeHeapSize=69.5MB
+  pssTotal=31.4MB privateDirty=21.9MB sharedDirty=45.6MB nativePss=15.8MB dalvikPss=1.3MB otherPss=14.3MB
+  systemAvail=17.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=181924 kB VmHWM=4911052 kB VmSize=17281812 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:52.189 pid=13656 [model-load-complete] config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf mmproj=(none)
+  javaUsed=2.7MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=247.5MB sharedDirty=45.6MB nativePss=241.2MB dalvikPss=1.4MB otherPss=4.3GB
+  systemAvail=16.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4904588 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:52.292 pid=13656 [generation-start] id=17 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1051 mediaCount=0
+  javaUsed=2.9MB javaTotal=10.5MB javaMax=256.0MB nativeHeap=494.4MB nativeHeapFree=9.8MB nativeHeapSize=507.3MB
+  pssTotal=4.5GB privateDirty=247.7MB sharedDirty=45.6MB nativePss=241.3MB dalvikPss=1.6MB otherPss=4.3GB
+  systemAvail=16.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=152
+  procStatus VmRSS=4904716 kB VmHWM=4911052 kB VmSize=22169088 kB VmSwap=128 kB Threads=30 FDSize=256
+2026-06-04 05:58:52.370 pid=13656 [generation-stage] id=17 stage=native-call-start
+2026-06-04 06:30:40.566 pid=25851 [previous-crash] Detected unfinished generation from previous process: 2026-06-04 05:58:52.370 pid=13656 [generation-pending] id=17 config=Qwen3.5 MTP model=Qwen3.5-4B-Q8_0.gguf promptLen=1051 mediaCount=0
+2026-06-04 06:30:40.567 pid=25851 [app] Application created
+2026-06-04 06:30:40.567 pid=25851 [app-start] Application onCreate
+  javaUsed=3.3MB javaTotal=256.0MB javaMax=256.0MB nativeHeap=6.5MB nativeHeapFree=1.8MB nativeHeapSize=12.8MB
+  pssTotal=12.0MB privateDirty=6.4MB sharedDirty=46.6MB nativePss=2.1MB dalvikPss=854.0KB otherPss=9.0MB
+  systemAvail=16.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=113
+  procStatus VmRSS=119800 kB VmHWM=119800 kB VmSize=17012652 kB VmSwap=408 kB Threads=13 FDSize=128

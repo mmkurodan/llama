@@ -26,9 +26,15 @@ public class LlamaApplication extends Application {
         DiagnosticsLogger.logMemorySnapshot(this, "app-start", "Application onCreate");
         // If the previous process disappeared mid-generation (e.g. an uncatchable SIGKILL
         // from the low-memory killer), grab logcat as early as possible so the
-        // lowmemorykiller / tombstone lines are still in the ring buffer.
+        // lowmemorykiller / tombstone lines are still in the ring buffer. logcat alone is
+        // unreliable when the restart is delayed (the ring buffer rolls over), so we also
+        // record the system's authoritative exit reason via ApplicationExitInfo, which is
+        // persisted and survives an arbitrary gap before relaunch.
         final String logcatReason = previousCrash ? "previous-crash" : "app-start";
-        new Thread(() -> DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, logcatReason), "diag-logcat").start();
+        new Thread(() -> {
+            DiagnosticsLogger.logPreviousExitReasons(LlamaApplication.this);
+            DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, logcatReason);
+        }, "diag-logcat").start();
 
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();
