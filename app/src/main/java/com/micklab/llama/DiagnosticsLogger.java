@@ -137,11 +137,11 @@ public final class DiagnosticsLogger {
         }
     }
 
-    public static void logIncompleteGenerationIfPresent(Context context) {
+    public static boolean logIncompleteGenerationIfPresent(Context context) {
         synchronized (LOCK) {
             File markerFile = getDiagnosticsFile(context, INCOMPLETE_GENERATION_FILENAME);
             if (markerFile == null || !markerFile.exists()) {
-                return;
+                return false;
             }
 
             String marker = readFileContents(markerFile).trim();
@@ -153,6 +153,7 @@ public final class DiagnosticsLogger {
                 appendToOllamaLogLocked(context, message);
             }
             deleteFile(markerFile);
+            return true;
         }
     }
 

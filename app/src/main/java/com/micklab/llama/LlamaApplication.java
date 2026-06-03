@@ -21,10 +21,14 @@ public class LlamaApplication extends Application {
     public void onCreate() {
         super.onCreate();
         configureNativeLogging();
-        DiagnosticsLogger.logIncompleteGenerationIfPresent(this);
+        final boolean previousCrash = DiagnosticsLogger.logIncompleteGenerationIfPresent(this);
         DiagnosticsLogger.logEvent(this, "app", "Application created");
         DiagnosticsLogger.logMemorySnapshot(this, "app-start", "Application onCreate");
-        new Thread(() -> DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, "app-start"), "diag-logcat").start();
+        // If the previous process disappeared mid-generation (e.g. an uncatchable SIGKILL
+        // from the low-memory killer), grab logcat as early as possible so the
+        // lowmemorykiller / tombstone lines are still in the ring buffer.
+        final String logcatReason = previousCrash ? "previous-crash" : "app-start";
+        new Thread(() -> DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, logcatReason), "diag-logcat").start();
 
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();

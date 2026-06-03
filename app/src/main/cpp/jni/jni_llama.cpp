@@ -4,6 +4,8 @@
 #include <vector>
 #include <mutex>
 #include <atomic>
+#include <thread>
+#include <condition_variable>
 #include <fstream>
 #include <chrono>
 #include <ctime>
@@ -825,6 +827,134 @@ static void trim_native_allocator(const char * reason) {
     }
 #endif
 }
+
+// ---------------- Native memory sampler ----------------
+// Repeated model switches followed by a generation on the larger hybrid/recurrent
+// (Gated Delta Net) model have ended with the whole process disappearing mid-prefill
+// without any catchable fatal signal being recorded — i.e. an uncatchable SIGKILL,
+// most likely the Android memcg/low-memory-killer firing on a transient native spike.
+// The Java diagnostics only snapshot memory at generation boundaries, so the spike
+// that triggers the kill is invisible. This lightweight sampler logs /proc/self/status
+// RSS over the lifetime of the native call, so the last line before a kill captures how
+// close to the limit we were. It is additive and only runs while a generation is active.
+static bool read_proc_status_kb(long & vm_rss_kb, long & vm_hwm_kb,
+                                long & vm_size_kb, long & vm_swap_kb) {
+    std::ifstream status("/proc/self/status");
+    if (!status) {
+        return false;
+    }
+    vm_rss_kb = vm_hwm_kb = vm_size_kb = vm_swap_kb = -1;
+    std::string key;
+    long value = 0;
+    std::string unit;
+    std::string line;
+    while (std::getline(status, line)) {
+        std::istringstream ls(line);
+        if (!(ls >> key >> value >> unit)) {
+            continue;
+        }
+        if (key == "VmRSS:") {
+            vm_rss_kb = value;
+        } else if (key == "VmHWM:") {
+            vm_hwm_kb = value;
+        } else if (key == "VmSize:") {
+            vm_size_kb = value;
+        } else if (key == "VmSwap:") {
+            vm_swap_kb = value;
+        }
+    }
+    return vm_rss_kb >= 0;
+}
+
+static long read_mem_available_kb() {
+    std::ifstream meminfo("/proc/meminfo");
+    if (!meminfo) {
+        return -1;
+    }
+    std::string key;
+    long value = 0;
+    std::string unit;
+    std::string line;
+    while (std::getline(meminfo, line)) {
+        std::istringstream ls(line);
+        if (ls >> key >> value >> unit && key == "MemAvailable:") {
+            return value;
+        }
+    }
+    return -1;
+}
+
+// Starts a background thread on construction that appends an RSS sample line every
+// ~1s for the duration of the enclosing native generation, plus a one-line peak
+// summary on destruction. The thread is fully joined before the guard is destroyed.
+class memory_sampler_guard {
+public:
+    explicit memory_sampler_guard(std::string tag) : tag_(std::move(tag)) {
+        worker_ = std::thread([this]() { run(); });
+    }
+
+    ~memory_sampler_guard() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            stop_ = true;
+        }
+        cv_.notify_all();
+        if (worker_.joinable()) {
+            worker_.join();
+        }
+        std::ostringstream ss;
+        ss << "mem-sample: " << tag_ << " done samples=" << samples_
+           << " peakVmRSS=" << (peak_rss_kb_ / 1024.0) << "MB"
+           << " peakVmSwap=" << (peak_swap_kb_ / 1024.0) << "MB"
+           << " minMemAvail=" << (min_avail_kb_ < 0 ? -1.0 : min_avail_kb_ / 1024.0) << "MB";
+        log_to_file(ss.str());
+    }
+
+    memory_sampler_guard(const memory_sampler_guard &) = delete;
+    memory_sampler_guard & operator=(const memory_sampler_guard &) = delete;
+
+private:
+    void run() {
+        for (;;) {
+            sample();
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait_for(lock, std::chrono::seconds(1), [this]() { return stop_; });
+            if (stop_) {
+                break;
+            }
+        }
+    }
+
+    void sample() {
+        long rss = -1, hwm = -1, size = -1, swap = -1;
+        if (!read_proc_status_kb(rss, hwm, size, swap)) {
+            return;
+        }
+        const long avail = read_mem_available_kb();
+        ++samples_;
+        if (rss > peak_rss_kb_) peak_rss_kb_ = rss;
+        if (swap > peak_swap_kb_) peak_swap_kb_ = swap;
+        if (avail >= 0 && (min_avail_kb_ < 0 || avail < min_avail_kb_)) min_avail_kb_ = avail;
+        std::ostringstream ss;
+        ss << "mem-sample: " << tag_
+           << " VmRSS=" << (rss / 1024.0) << "MB"
+           << " VmHWM=" << (hwm / 1024.0) << "MB"
+           << " VmSize=" << (size / 1024.0) << "MB"
+           << " VmSwap=" << (swap / 1024.0) << "MB"
+           << " MemAvailable=" << (avail < 0 ? -1.0 : avail / 1024.0) << "MB";
+        log_to_file(ss.str());
+    }
+
+    std::string tag_;
+    std::thread worker_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    bool stop_ = false;
+    long samples_ = 0;
+    long peak_rss_kb_ = 0;
+    long peak_swap_kb_ = 0;
+    long min_avail_kb_ = -1;
+};
 
 static void ensure_backend_initialized_locked(const char * log_prefix) {
     if (g_backend_initialized) {
@@ -2559,6 +2689,7 @@ static jstring generate_locked(
     }
 
     g_cancel_generation.store(false);
+    memory_sampler_guard mem_guard("generate");
 
     {
         std::ostringstream ss;
@@ -2813,6 +2944,7 @@ static jstring generate_openai_chat_completion_locked(
     }
 
     g_cancel_generation.store(false);
+    memory_sampler_guard mem_guard("generateOpenAiChatCompletion");
 
     try {
         json messages_json = json::parse(messages_json_text.empty() ? "[]" : messages_json_text);
