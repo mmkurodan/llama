@@ -25,7 +25,14 @@ public class ConfigurationManager {
     public static class Configuration {
         // Default constant for DRY sequence breakers (must match C++ DEFAULT_DRY_SEQUENCE_BREAKERS)
         public static final String DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
-        
+
+        // Prefill batch size. The previous default of 16 throttled prompt processing badly;
+        // 256 restores reasonable prefill speed while keeping the transient compute buffer small.
+        public static final int DEFAULT_N_BATCH = 256;
+        // Stored batch sizes at or below this legacy ceiling are treated as the old throttled
+        // default and migrated up to DEFAULT_N_BATCH on load.
+        private static final int LEGACY_N_BATCH_CEILING = 16;
+
         public String name;
         public String modelUrl;
         public int nCtx;
@@ -82,7 +89,7 @@ public class ConfigurationManager {
             modelUrl = "https://huggingface.co/vinhnx90/gemma-3-1b-thinking-v2-Q4_K_M-GGUF/resolve/main/gemma-3-1b-thinking-v2-q4_k_m.gguf?download=true";
             nCtx = 2048;
             nThreads = 4;
-            nBatch = 16;
+            nBatch = DEFAULT_N_BATCH;
             temp = 0.7;
             topP = 0.9;
             topK = 40;
@@ -197,6 +204,11 @@ public class ConfigurationManager {
             config.nCtx = json.optInt("nCtx", config.nCtx);
             config.nThreads = json.optInt("nThreads", config.nThreads);
             config.nBatch = json.optInt("nBatch", config.nBatch);
+            // Migrate legacy throttled batch sizes (the old default was 16) up to the current
+            // default so existing configs benefit from the restored prefill speed.
+            if (config.nBatch > 0 && config.nBatch <= LEGACY_N_BATCH_CEILING) {
+                config.nBatch = DEFAULT_N_BATCH;
+            }
             config.temp = json.optDouble("temp", config.temp);
             config.topP = json.optDouble("topP", config.topP);
             config.topK = json.optInt("topK", config.topK);

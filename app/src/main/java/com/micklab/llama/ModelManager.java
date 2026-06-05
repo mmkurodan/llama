@@ -80,7 +80,7 @@ public class ModelManager {
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
     private static final int DEFAULT_N_CTX = 2048;
     private static final int DEFAULT_N_THREADS = 2;
-    private static final int DEFAULT_N_BATCH = 16;
+    private static final int DEFAULT_N_BATCH = ConfigurationManager.Configuration.DEFAULT_N_BATCH;
     private static final float DEFAULT_TEMP = 0.7f;
     private static final float DEFAULT_TOP_P = 0.9f;
     private static final int DEFAULT_TOP_K = 40;

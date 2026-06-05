@@ -21,19 +21,23 @@ public class LlamaApplication extends Application {
     public void onCreate() {
         super.onCreate();
         configureNativeLogging();
-        final boolean previousCrash = DiagnosticsLogger.logIncompleteGenerationIfPresent(this);
+        // Determine the authoritative reason the previous process died (ApplicationExitInfo,
+        // API 30+) BEFORE classifying any leftover generation marker. A surviving marker only
+        // means the process died inside a long native generate() call; the dominant cause is a
+        // routine external kill (dev re-install / Settings force-stop / user "Exit"), which must
+        // not be reported as a crash. Only genuine in-process failures (or platforms where the
+        // reason is unavailable) warrant the subprocess-spawning logcat capture; ApplicationExitInfo
+        // itself is persisted and always recorded below regardless.
+        final int lastExitReason = DiagnosticsLogger.getLastExitReason(this);
+        final boolean captureCrashDiagnostics =
+                DiagnosticsLogger.logIncompleteGenerationIfPresent(this, lastExitReason);
         DiagnosticsLogger.logEvent(this, "app", "Application created");
         DiagnosticsLogger.logMemorySnapshot(this, "app-start", "Application onCreate");
-        // If the previous process disappeared mid-generation (e.g. an uncatchable SIGKILL
-        // from the low-memory killer), grab logcat as early as possible so the
-        // lowmemorykiller / tombstone lines are still in the ring buffer. logcat alone is
-        // unreliable when the restart is delayed (the ring buffer rolls over), so we also
-        // record the system's authoritative exit reason via ApplicationExitInfo, which is
-        // persisted and survives an arbitrary gap before relaunch.
-        final String logcatReason = previousCrash ? "previous-crash" : "app-start";
         new Thread(() -> {
             DiagnosticsLogger.logPreviousExitReasons(LlamaApplication.this);
-            DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, logcatReason);
+            if (captureCrashDiagnostics) {
+                DiagnosticsLogger.captureRecentLogcat(LlamaApplication.this, "previous-crash");
+            }
         }, "diag-logcat").start();
 
         final Thread.UncaughtExceptionHandler defaultHandler =
@@ -101,6 +105,13 @@ public class LlamaApplication extends Application {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        DiagnosticsLogger.logMemorySnapshot(this, "memory-trim", "onTrimMemory level=" + level);
+        // onTrimMemory fires routinely (e.g. UI_HIDDEN every time the app is backgrounded).
+        // The full snapshot runs a slow Debug.getMemoryInfo() + /proc scan, so reserve it for
+        // genuinely critical levels and emit a cheap one-line event otherwise.
+        if (level == TRIM_MEMORY_RUNNING_CRITICAL || level == TRIM_MEMORY_COMPLETE) {
+            DiagnosticsLogger.logMemorySnapshot(this, "memory-trim", "onTrimMemory level=" + level);
+        } else {
+            DiagnosticsLogger.logEvent(this, "memory-trim", "onTrimMemory level=" + level);
+        }
     }
 }

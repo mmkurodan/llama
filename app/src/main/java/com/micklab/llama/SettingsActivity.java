@@ -1003,7 +1003,7 @@ public class SettingsActivity extends Activity {
         try {
             config.nBatch = Integer.parseInt(nBatchInput.getText().toString());
         } catch (NumberFormatException e) {
-            config.nBatch = 16;
+            config.nBatch = ConfigurationManager.Configuration.DEFAULT_N_BATCH;
         }
         
         try {

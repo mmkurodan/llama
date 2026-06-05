@@ -62,9 +62,6 @@ static jmethodID g_token_onComplete = nullptr;
 static jmethodID g_token_onError = nullptr;
 static std::atomic<bool> g_cancel_generation(false);
 static bool g_backend_initialized = false;
-static uint32_t g_generations_since_context_reinit = 0;
-static constexpr uint32_t CONTEXT_RECYCLE_INTERVAL = 8;
-static bool g_model_requires_fresh_context = false;
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -619,15 +616,6 @@ static llama_context_params build_context_params_locked() {
     cparams.n_batch         = g_n_batch;
     cparams.n_ubatch        = g_n_batch;
     cparams.n_threads_batch = g_n_threads;
-#if defined(__ANDROID__)
-    if (g_model_requires_fresh_context) {
-        // Qwen3.5 hybrid/recurrent models have been crashing inside prompt prefill on
-        // Android after repeated model switches. Keeping the logical batch size while
-        // forcing micro-batches of 1 avoids the unstable chunked recurrent decode path
-        // without disabling multimodal support or changing the external batching API.
-        cparams.n_ubatch = 1;
-    }
-#endif
     return cparams;
 }
 
@@ -677,7 +665,6 @@ static void release_context_locked(const char * log_prefix) {
     llama_synchronize(g_ctx);
     llama_free(g_ctx);
     g_ctx = nullptr;
-    g_generations_since_context_reinit = 0;
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": context freed");
     }
@@ -689,7 +676,6 @@ static void release_model_locked(const char * log_prefix) {
     }
     llama_model_free(g_model);
     g_model = nullptr;
-    g_model_requires_fresh_context = false;
     g_current_model_path.clear();
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": model freed");
@@ -713,48 +699,10 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         return false;
     }
 
-    const bool recycle_for_interval = g_generations_since_context_reinit >= CONTEXT_RECYCLE_INTERVAL;
-    const bool recycle_for_model = g_model_requires_fresh_context && g_generations_since_context_reinit > 0;
-    const bool should_recycle = recycle_for_interval || recycle_for_model;
-    bool recycled_context = false;
-
-    if (should_recycle) {
-        std::ostringstream recycle_reason;
-        recycle_reason << log_prefix
-                       << ": recycling context after " << g_generations_since_context_reinit
-                       << " generations";
-        if (recycle_for_model) {
-            recycle_reason << " due to recurrent/hybrid model";
-        }
-        log_to_file(recycle_reason.str());
-
-        release_context_locked(log_prefix);
-        if (recycle_for_interval) {
-            trim_native_allocator(log_prefix);
-        }
-
-        llama_context_params cparams = build_context_params_locked();
-        using namespace std::chrono;
-        auto t0 = high_resolution_clock::now();
-        g_ctx = llama_init_from_model(g_model, cparams);
-        auto t1 = high_resolution_clock::now();
-        auto ms = duration_cast<milliseconds>(t1 - t0).count();
-        if (!g_ctx) {
-            std::ostringstream ss;
-            ss << build_context_load_failure_message(log_prefix)
-               << " after recycle in "
-               << ms << " ms";
-            error_message = ss.str();
-            log_to_file(error_message, GGML_LOG_LEVEL_ERROR);
-            return false;
-        }
-
-        std::ostringstream ss;
-        ss << log_prefix << ": recycled context successfully in " << ms << " ms";
-        log_to_file(ss.str());
-        recycled_context = true;
-    }
-
+    // Each generation rebuilds the full prompt and is independent, so the persistent context
+    // is simply reset to a clean state between calls. Clearing the memory resets the KV cache
+    // and any recurrent/hybrid (SSM) state, which is sufficient and far cheaper than the
+    // previous per-generation context teardown/recreate workaround.
     llama_synchronize(g_ctx);
 
     llama_memory_t memory = llama_get_memory(g_ctx);
@@ -763,20 +711,15 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         log_to_file(std::string(log_prefix) + ": " + error_message, GGML_LOG_LEVEL_ERROR);
         return false;
     }
-
-    if (!recycled_context) {
-        llama_memory_clear(memory, true);
-    }
+    llama_memory_clear(memory, true);
     llama_perf_context_reset(g_ctx);
 
     std::ostringstream ss;
     ss << log_prefix << ": generation context reset"
        << " n_ctx=" << g_n_ctx
        << " n_batch=" << g_n_batch
-       << " n_threads=" << g_n_threads
-       << " generation_index=" << (g_generations_since_context_reinit + 1);
+       << " n_threads=" << g_n_threads;
     log_to_file(ss.str());
-    ++g_generations_since_context_reinit;
     return true;
 }
 
@@ -828,133 +771,10 @@ static void trim_native_allocator(const char * reason) {
 #endif
 }
 
-// ---------------- Native memory sampler ----------------
-// Repeated model switches followed by a generation on the larger hybrid/recurrent
-// (Gated Delta Net) model have ended with the whole process disappearing mid-prefill
-// without any catchable fatal signal being recorded — i.e. an uncatchable SIGKILL,
-// most likely the Android memcg/low-memory-killer firing on a transient native spike.
-// The Java diagnostics only snapshot memory at generation boundaries, so the spike
-// that triggers the kill is invisible. This lightweight sampler logs /proc/self/status
-// RSS over the lifetime of the native call, so the last line before a kill captures how
-// close to the limit we were. It is additive and only runs while a generation is active.
-static bool read_proc_status_kb(long & vm_rss_kb, long & vm_hwm_kb,
-                                long & vm_size_kb, long & vm_swap_kb) {
-    std::ifstream status("/proc/self/status");
-    if (!status) {
-        return false;
-    }
-    vm_rss_kb = vm_hwm_kb = vm_size_kb = vm_swap_kb = -1;
-    std::string key;
-    long value = 0;
-    std::string unit;
-    std::string line;
-    while (std::getline(status, line)) {
-        std::istringstream ls(line);
-        if (!(ls >> key >> value >> unit)) {
-            continue;
-        }
-        if (key == "VmRSS:") {
-            vm_rss_kb = value;
-        } else if (key == "VmHWM:") {
-            vm_hwm_kb = value;
-        } else if (key == "VmSize:") {
-            vm_size_kb = value;
-        } else if (key == "VmSwap:") {
-            vm_swap_kb = value;
-        }
-    }
-    return vm_rss_kb >= 0;
-}
-
-static long read_mem_available_kb() {
-    std::ifstream meminfo("/proc/meminfo");
-    if (!meminfo) {
-        return -1;
-    }
-    std::string key;
-    long value = 0;
-    std::string unit;
-    std::string line;
-    while (std::getline(meminfo, line)) {
-        std::istringstream ls(line);
-        if (ls >> key >> value >> unit && key == "MemAvailable:") {
-            return value;
-        }
-    }
-    return -1;
-}
-
-// Starts a background thread on construction that appends an RSS sample line every
-// ~1s for the duration of the enclosing native generation, plus a one-line peak
-// summary on destruction. The thread is fully joined before the guard is destroyed.
-class memory_sampler_guard {
-public:
-    explicit memory_sampler_guard(std::string tag) : tag_(std::move(tag)) {
-        worker_ = std::thread([this]() { run(); });
-    }
-
-    ~memory_sampler_guard() {
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            stop_ = true;
-        }
-        cv_.notify_all();
-        if (worker_.joinable()) {
-            worker_.join();
-        }
-        std::ostringstream ss;
-        ss << "mem-sample: " << tag_ << " done samples=" << samples_
-           << " peakVmRSS=" << (peak_rss_kb_ / 1024.0) << "MB"
-           << " peakVmSwap=" << (peak_swap_kb_ / 1024.0) << "MB"
-           << " minMemAvail=" << (min_avail_kb_ < 0 ? -1.0 : min_avail_kb_ / 1024.0) << "MB";
-        log_to_file(ss.str());
-    }
-
-    memory_sampler_guard(const memory_sampler_guard &) = delete;
-    memory_sampler_guard & operator=(const memory_sampler_guard &) = delete;
-
-private:
-    void run() {
-        for (;;) {
-            sample();
-            std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait_for(lock, std::chrono::seconds(1), [this]() { return stop_; });
-            if (stop_) {
-                break;
-            }
-        }
-    }
-
-    void sample() {
-        long rss = -1, hwm = -1, size = -1, swap = -1;
-        if (!read_proc_status_kb(rss, hwm, size, swap)) {
-            return;
-        }
-        const long avail = read_mem_available_kb();
-        ++samples_;
-        if (rss > peak_rss_kb_) peak_rss_kb_ = rss;
-        if (swap > peak_swap_kb_) peak_swap_kb_ = swap;
-        if (avail >= 0 && (min_avail_kb_ < 0 || avail < min_avail_kb_)) min_avail_kb_ = avail;
-        std::ostringstream ss;
-        ss << "mem-sample: " << tag_
-           << " VmRSS=" << (rss / 1024.0) << "MB"
-           << " VmHWM=" << (hwm / 1024.0) << "MB"
-           << " VmSize=" << (size / 1024.0) << "MB"
-           << " VmSwap=" << (swap / 1024.0) << "MB"
-           << " MemAvailable=" << (avail < 0 ? -1.0 : avail / 1024.0) << "MB";
-        log_to_file(ss.str());
-    }
-
-    std::string tag_;
-    std::thread worker_;
-    std::mutex mutex_;
-    std::condition_variable cv_;
-    bool stop_ = false;
-    long samples_ = 0;
-    long peak_rss_kb_ = 0;
-    long peak_swap_kb_ = 0;
-    long min_avail_kb_ = -1;
-};
+// The per-second native memory sampler was removed: memory is snapshotted at every
+// generation boundary by the Java diagnostics (ModelManager generation-start/end), and the
+// authoritative cause of any real process death is captured by ApplicationExitInfo plus the
+// fatal-signal handler. An always-on sampling thread per generation was pure overhead.
 
 static void ensure_backend_initialized_locked(const char * log_prefix) {
     if (g_backend_initialized) {
@@ -1924,10 +1744,8 @@ Java_com_micklab_llama_LlamaNative_init(
             log_to_file("init: freeing existing model before re-init");
             release_model_locked("init");
         }
-        if (g_backend_initialized) {
-            log_to_file("init: freeing backend before re-init");
-            release_backend_locked("init");
-        }
+        // The ggml backend is process-wide; keep it initialized across model switches
+        // (ensure_backend_initialized_locked is idempotent) instead of churning it each time.
         if (!g_current_model_path.empty()) {
             log_to_file("init: clearing previous model path");
             g_current_model_path.clear();
@@ -2025,15 +1843,11 @@ Java_com_micklab_llama_LlamaNative_init(
         {
             const bool is_recurrent = llama_model_is_recurrent(g_model);
             const bool is_hybrid = llama_model_is_hybrid(g_model);
-            g_model_requires_fresh_context = is_recurrent || is_hybrid;
-
             std::ostringstream ss;
-            ss << "init: context reset policy recurrent=" << (is_recurrent ? "true" : "false")
+            ss << "init: model arch recurrent=" << (is_recurrent ? "true" : "false")
                << " hybrid=" << (is_hybrid ? "true" : "false")
-               << " fresh_context_per_generation="
-               << (g_model_requires_fresh_context ? "true" : "false")
-               << " n_ubatch="
-               << (g_model_requires_fresh_context ? 1 : g_n_batch);
+               << " n_batch=" << g_n_batch
+               << " n_ubatch=" << g_n_batch;
             log_to_file(ss.str());
         }
 
@@ -2058,8 +1872,6 @@ Java_com_micklab_llama_LlamaNative_init(
                 log_to_file(ss.str());
             }
         }
-        g_generations_since_context_reinit = 0;
-
         g_current_model_path = model_path;
         g_current_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
@@ -2155,10 +1967,8 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             log_to_file("initWithMmproj: freeing existing model before re-init");
             release_model_locked("initWithMmproj");
         }
-        if (g_backend_initialized) {
-            log_to_file("initWithMmproj: freeing backend before re-init");
-            release_backend_locked("initWithMmproj");
-        }
+        // The ggml backend is process-wide; keep it initialized across model switches
+        // (ensure_backend_initialized_locked is idempotent) instead of churning it each time.
         if (!g_current_model_path.empty()) {
             log_to_file("initWithMmproj: clearing previous model path");
             g_current_model_path.clear();
@@ -2247,16 +2057,11 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         {
             const bool is_recurrent = llama_model_is_recurrent(g_model);
             const bool is_hybrid = llama_model_is_hybrid(g_model);
-            g_model_requires_fresh_context = is_recurrent || is_hybrid;
-
             std::ostringstream ss;
-            ss << "initWithMmproj: context reset policy recurrent="
-               << (is_recurrent ? "true" : "false")
+            ss << "initWithMmproj: model arch recurrent=" << (is_recurrent ? "true" : "false")
                << " hybrid=" << (is_hybrid ? "true" : "false")
-               << " fresh_context_per_generation="
-               << (g_model_requires_fresh_context ? "true" : "false")
-               << " n_ubatch="
-               << (g_model_requires_fresh_context ? 1 : g_n_batch);
+               << " n_batch=" << g_n_batch
+               << " n_ubatch=" << g_n_batch;
             log_to_file(ss.str());
         }
 
@@ -2281,8 +2086,6 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 log_to_file(ss.str());
             }
         }
-        g_generations_since_context_reinit = 0;
-
         const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
                 mmproj_path,
@@ -2689,7 +2492,6 @@ static jstring generate_locked(
     }
 
     g_cancel_generation.store(false);
-    memory_sampler_guard mem_guard("generate");
 
     {
         std::ostringstream ss;
@@ -2944,7 +2746,6 @@ static jstring generate_openai_chat_completion_locked(
     }
 
     g_cancel_generation.store(false);
-    memory_sampler_guard mem_guard("generateOpenAiChatCompletion");
 
     try {
         json messages_json = json::parse(messages_json_text.empty() ? "[]" : messages_json_text);

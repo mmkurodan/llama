@@ -1,2 +1,0 @@
-2026-06-04 06:30:40.582 pid=25851 [logcat] reason=previous-crash
-exitCode=0

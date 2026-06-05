@@ -36,6 +36,8 @@ public final class DiagnosticsLogger {
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final long MAX_PROCESS_LOG_BYTES = 512L * 1024L;
+    /** Sentinel returned by {@link #getLastExitReason} when the reason cannot be determined. */
+    public static final int EXIT_REASON_UNAVAILABLE = -1;
     private static final Object LOCK = new Object();
 
     private DiagnosticsLogger() {
@@ -181,6 +183,58 @@ public final class DiagnosticsLogger {
         }
     }
 
+    /**
+     * Returns the reason code of the most recent recorded process exit
+     * ({@link ApplicationExitInfo}, API 30+), or {@link #EXIT_REASON_UNAVAILABLE} when it
+     * cannot be determined (older platforms, no service, or no recorded history). This is
+     * the authoritative source that distinguishes a real in-process crash from an orderly
+     * external termination such as a dev re-install or a Settings "Force stop".
+     */
+    public static int getLastExitReason(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return EXIT_REASON_UNAVAILABLE;
+        }
+        ActivityManager activityManager =
+                (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) {
+            return EXIT_REASON_UNAVAILABLE;
+        }
+        try {
+            List<ApplicationExitInfo> infos =
+                    activityManager.getHistoricalProcessExitReasons(null, 0, 1);
+            if (infos == null || infos.isEmpty()) {
+                return EXIT_REASON_UNAVAILABLE;
+            }
+            return infos.get(0).getReason();
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to read last exit reason", t);
+            return EXIT_REASON_UNAVAILABLE;
+        }
+    }
+
+    /**
+     * Classifies whether an {@link ApplicationExitInfo} reason represents a genuine
+     * in-process failure (native/Java crash, kernel signal, OOM/LMK kill, excessive
+     * resource kill) rather than an orderly external termination (re-install, force-stop,
+     * user-requested exit, package state change). Used to avoid reporting routine external
+     * kills as "crashes".
+     */
+    public static boolean isGenuineCrashReason(int reason) {
+        if (reason == EXIT_REASON_UNAVAILABLE || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return false;
+        }
+        switch (reason) {
+            case ApplicationExitInfo.REASON_CRASH:
+            case ApplicationExitInfo.REASON_CRASH_NATIVE:
+            case ApplicationExitInfo.REASON_SIGNALED:
+            case ApplicationExitInfo.REASON_LOW_MEMORY:
+            case ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public static void markGenerationInProgress(
             Context context,
             int generationId,
@@ -206,23 +260,59 @@ public final class DiagnosticsLogger {
         }
     }
 
-    public static boolean logIncompleteGenerationIfPresent(Context context) {
+    /**
+     * If the previous process left a generation marker behind, records why and returns
+     * whether crash diagnostics (logcat) are worth capturing. The marker alone only means
+     * "the process died during a native generate call"; the most common cause is a routine
+     * external kill (dev re-install, Settings force-stop, user exit) which must NOT be
+     * reported as a crash. We therefore cross-reference {@code lastExitReason} (from
+     * {@link #getLastExitReason}) and only classify as a crash when the OS attributes the
+     * death to a real in-process failure. When the reason is unavailable (API &lt; 30) we
+     * stay conservative and still capture logcat without asserting a crash.
+     *
+     * @param lastExitReason authoritative reason of the previous exit, or
+     *                       {@link #EXIT_REASON_UNAVAILABLE}
+     * @return true if logcat crash diagnostics should be captured
+     */
+    public static boolean logIncompleteGenerationIfPresent(Context context, int lastExitReason) {
         synchronized (LOCK) {
             File markerFile = getDiagnosticsFile(context, INCOMPLETE_GENERATION_FILENAME);
             if (markerFile == null || !markerFile.exists()) {
                 return false;
             }
 
+            final boolean reasonKnown = lastExitReason != EXIT_REASON_UNAVAILABLE
+                    && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R;
+            final boolean genuineCrash = isGenuineCrashReason(lastExitReason);
+            final String category;
+            final String classification;
+            final boolean captureDiagnostics;
+            if (genuineCrash) {
+                category = "previous-crash";
+                classification = "reason=" + exitReasonName(lastExitReason) + "(" + lastExitReason + ")";
+                captureDiagnostics = true;
+            } else if (reasonKnown) {
+                // Orderly external termination (re-install / force-stop / user exit): not a crash.
+                category = "previous-exit-during-generation";
+                classification = "benign reason=" + exitReasonName(lastExitReason) + "(" + lastExitReason + ")";
+                captureDiagnostics = false;
+            } else {
+                // No authoritative reason on this platform; flag as unclean but do not assert a crash.
+                category = "previous-unclean-exit";
+                classification = "reason=unavailable";
+                captureDiagnostics = true;
+            }
+
             String marker = readFileContents(markerFile).trim();
             if (!marker.isEmpty()) {
-                String message = buildHeader("previous-crash")
-                        + " Detected unfinished generation from previous process: "
+                String message = buildHeader(category)
+                        + " Detected unfinished generation from previous process (" + classification + "): "
                         + toSingleLine(marker);
                 appendLine(context, PROCESS_LOG_FILENAME, message);
                 appendToOllamaLogLocked(context, message);
             }
             deleteFile(markerFile);
-            return true;
+            return captureDiagnostics;
         }
     }
 

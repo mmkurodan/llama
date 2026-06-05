@@ -59,6 +59,10 @@ public class OllamaForegroundService extends Service {
                 Log.i(TAG, "Exit action received - terminating app");
                 stopApiServer();
                 stopSelf();
+                // This is a deliberate user-requested termination. Clear any in-progress
+                // generation marker first so the next launch does not misreport this orderly
+                // exit (which kills the process mid-native-call) as a previous crash.
+                DiagnosticsLogger.clearGenerationInProgress(this);
                 // Terminate the entire application
                 android.os.Process.killProcess(android.os.Process.myPid());
                 return START_NOT_STICKY;
