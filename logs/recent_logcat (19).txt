@@ -1,2 +1,0 @@
-2026-06-05 08:37:21.481 pid=30854 [logcat] reason=previous-crash
-exitCode=0
