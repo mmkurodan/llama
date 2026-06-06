@@ -631,6 +631,7 @@ static llama_context_params build_context_params_locked() {
     cparams.n_batch         = g_n_batch;
     cparams.n_ubatch        = g_n_batch;
     cparams.n_threads_batch = g_n_threads;
+    cparams.no_perf         = false;  // 計測を有効化 (既定 true だと t_eval=0 で tok/s 不能)
     return cparams;
 }
 
