@@ -17,8 +17,8 @@ permissions:
 # に展開 + skel を jniLibs/arm64-v8a/ に配置します。これにより CMakeLists.txt が
 # Mode B (artifacts 自動検出) で GGML_HEXAGON=ON にしてビルドします。
 #
-# Release が存在しない場合 (まだ artifacts を発行していない等) は
-# GGML_HEXAGON=OFF (NPU なし) でフォールバックビルドします。
+# Release が無い/取得失敗の場合はコミット済みバンドル vendor/hexagon/*.tar.gz に
+# フォールバックします。それも無ければ GGML_HEXAGON=OFF (NPU なし) でビルドします。
 #
 # NPU 成果物の生成方法は build-hexagon-artifacts.yml / scripts/hexagon-files.md 参照。
 # ──────────────────────────────────────────────────────────────────────────────
@@ -171,21 +171,29 @@ jobs:
           set -euo pipefail
           DEST="app/src/main/cpp/hexagon-artifacts"
           JNI="app/src/main/jniLibs/arm64-v8a"
+          VENDOR="vendor/hexagon"
+          mkdir -p /tmp/hexdl "${DEST}" "${JNI}"
+          TARBALL=""
+          # 1) 最新 Release を優先取得
           TAG=$(gh release list --repo "${{ github.repository }}" --limit 50 \
                   --json tagName \
                   --jq '[.[].tagName | select(startswith("hexagon-artifacts-"))] | sort | last' \
                 2>/dev/null || true)
-          if [[ -z "${TAG}" || "${TAG}" == "null" ]]; then
-            echo "ℹ️  hexagon-artifacts-* Release が無いため NPU 無しでビルドします。"
-            exit 0
+          if [[ -n "${TAG}" && "${TAG}" != "null" ]]; then
+            echo "📥 Hexagon artifacts release: ${TAG}"
+            if gh release download "${TAG}" --repo "${{ github.repository }}" \
+                 --pattern '*.tar.gz' --dir /tmp/hexdl --clobber 2>/dev/null; then
+              TARBALL=$(ls /tmp/hexdl/*.tar.gz 2>/dev/null | head -1 || true)
+            fi
           fi
-          echo "📥 Hexagon artifacts release: ${TAG}"
-          mkdir -p /tmp/hexdl "${DEST}" "${JNI}"
-          gh release download "${TAG}" --repo "${{ github.repository }}" \
-            --pattern '*.tar.gz' --dir /tmp/hexdl --clobber
-          TARBALL=$(ls /tmp/hexdl/*.tar.gz 2>/dev/null | head -1 || true)
+          # 2) Release が無い/取得失敗ならコミット済みバンドル (vendor/hexagon) にフォールバック
           if [[ -z "${TARBALL}" ]]; then
-            echo "::warning::Release ${TAG} に tar.gz アセットがありません。NPU 無しで継続。"
+            TARBALL=$(ls "${VENDOR}"/*.tar.gz 2>/dev/null | head -1 || true)
+            [[ -n "${TARBALL}" ]] && echo "📦 Release 無し → コミット済みバンドルを使用: ${TARBALL}"
+          fi
+          # 3) どちらも無ければ NPU 無しで継続
+          if [[ -z "${TARBALL}" ]]; then
+            echo "ℹ️  Hexagon 成果物が見つからないため NPU 無しでビルドします。"
             exit 0
           fi
           # トップの hexagon-artifacts-vX.Y.Z/ を剥がし stub/ sdk-incs/ skel/ を直下へ
