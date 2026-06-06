@@ -692,8 +692,8 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
                 log_to_file(std::string("build_model_params: NPU/HTP device added: ") +
                             ggml_backend_dev_name(npu));
             } else {
-                log_to_file("build_model_params: NPU requested but no Hexagon device found — "
-                            "falling back", GGML_LOG_LEVEL_WARN);
+                log_to_file("build_model_params: NPU/HTP requested but this chip has no "
+                            "supported Hexagon device", GGML_LOG_LEVEL_WARN);
             }
         }
 
@@ -713,6 +713,12 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
 
         if (slot > 0) {
             mparams.devices = g_accel_devices;
+        } else {
+            // 要求したアクセラレータ (NPU/GPU) がこのチップで利用不可 → CPU にフォールバック。
+            // n_gpu_layers=0 で全レイヤを CPU に載せる (ログに明記)。
+            mparams.n_gpu_layers = 0;
+            log_to_file("build_model_params: requested accelerator unavailable on this chip "
+                        "— falling back to CPU (n_gpu_layers=0)", GGML_LOG_LEVEL_WARN);
         }
     }
     // CPU only (backendType=0): mparams.devices stays NULL; n_gpu_layers=0 forces CPU path.
@@ -2472,6 +2478,10 @@ static void notify_token_complete() {
     }
 }
 
+// Last generation decode throughput (tok/s), published for the UI via
+// getLastGenerationSpeed(). Atomic so the JNI thread can read it without the mutex.
+static std::atomic<double> g_last_gen_tps{0.0};
+
 // Log generation / prompt throughput (tok/s) from the per-generation perf
 // counters (reset at the start of each generation). Surfaces in the diagnostics
 // log so users can see decode speed per request.
@@ -2481,6 +2491,7 @@ static void log_generation_perf(const char * log_prefix) {
     }
     const llama_perf_context_data p = llama_perf_context(g_ctx);
     const double gen_tps = (p.t_eval_ms   > 0.0) ? (1.0e3 * p.n_eval   / p.t_eval_ms)   : 0.0;
+    g_last_gen_tps.store(gen_tps, std::memory_order_relaxed);
     const double pp_tps  = (p.t_p_eval_ms > 0.0) ? (1.0e3 * p.n_p_eval / p.t_p_eval_ms) : 0.0;
     std::ostringstream ss;
     ss << log_prefix << ": speed: gen " << std::fixed << std::setprecision(2) << gen_tps
@@ -3233,6 +3244,15 @@ Java_com_micklab_llama_LlamaNative_supportsAudio(
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_supports_audio ? JNI_TRUE : JNI_FALSE;
+}
+
+// 直近の生成のデコード速度 (tok/s) を返す。UI のステータス表示用。
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_micklab_llama_LlamaNative_getLastGenerationSpeed(
+        JNIEnv *, jobject /*thiz*/
+) {
+    return (jdouble) g_last_gen_tps.load(std::memory_order_relaxed);
 }
 
 // ---------------- JNI: setBackendConfig ----------------
