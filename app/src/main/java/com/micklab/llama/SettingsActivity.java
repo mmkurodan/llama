@@ -313,8 +313,13 @@ public class SettingsActivity extends Activity {
         // backendType はこの 2 つから導出する (スピナー廃止)。
         gpuEnabledSwitch = findViewById(R.id.gpuEnabledSwitch);
         npuEnabledSwitch = findViewById(R.id.npuEnabledSwitch);
-        CompoundButton.OnCheckedChangeListener backendToggleListener =
-                (button, checked) -> updateBackendDependentUi();
+        CompoundButton.OnCheckedChangeListener backendToggleListener = (button, checked) -> {
+            // GPU/NPU を有効化したとき、オフロード未設定(0)なら ALL(-1) を既定値にする
+            if (checked && gpuLayersSeekBar != null && gpuLayersSeekBar.getProgress() == 0) {
+                gpuLayersSeekBar.setProgress(40); // 40 = ALL (= -1)
+            }
+            updateBackendDependentUi();
+        };
         if (gpuEnabledSwitch != null) gpuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
         if (npuEnabledSwitch != null) npuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
 
@@ -323,7 +328,7 @@ public class SettingsActivity extends Activity {
         gpuLayersSeekBar.setMax(40);
         gpuLayersSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                gpuLayersValue.setText(String.valueOf(progress > 39 ? -1 : progress));
+                gpuLayersValue.setText(progress > 39 ? "ALL" : String.valueOf(progress));
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -973,7 +978,7 @@ public class SettingsActivity extends Activity {
         int layers = config.gpuOffloadLayers;
         int displayLayers = (layers < 0) ? 40 : layers;
         gpuLayersSeekBar.setProgress(displayLayers);
-        gpuLayersValue.setText(String.valueOf(displayLayers > 39 ? -1 : displayLayers));
+        gpuLayersValue.setText(displayLayers > 39 ? "ALL" : String.valueOf(displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
 
         // Compute backend: backendType (0-3) を GPU/NPU トグルへ分解
