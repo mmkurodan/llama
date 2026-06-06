@@ -173,6 +173,7 @@ jobs:
                   -DHEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT}" \
                   -DHEXAGON_TOOLS_ROOT="${HEXAGON_TOOLS_ROOT}" \
                   -DPREBUILT_LIB_DIR="toolv19_${VER}" \
+                  -DGGML_HEXAGON_FP32_QUANTIZE_GROUP_SIZE=128 \
                   -DCMAKE_BUILD_TYPE=Release \
                   -DCMAKE_INSTALL_LIBDIR="${BUILD_DIR}" 2>&1 | tail -25 \
                && cmake --build "${BUILD_DIR}" --parallel 2>&1 | tail -25 \

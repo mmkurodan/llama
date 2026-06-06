@@ -145,6 +145,7 @@ for VER in ${DSP_VERSIONS}; do
         -DCMAKE_TOOLCHAIN_FILE="${HTP_SRC}/cmake-toolchain.cmake"
         -DDSP_VERSION="${VER}"
         -DHEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT}"
+        -DGGML_HEXAGON_FP32_QUANTIZE_GROUP_SIZE=128
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_INSTALL_LIBDIR="${BUILD_DIR}"
     )

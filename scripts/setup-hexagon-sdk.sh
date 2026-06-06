@@ -106,6 +106,7 @@ print('${HEXAGON_SDK_ROOT}/' + path)
           -DHEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT}" \
           -DHEXAGON_TOOLS_ROOT="${tools_root}" \
           -DPREBUILT_LIB_DIR="toolv19_${version}" \
+          -DGGML_HEXAGON_FP32_QUANTIZE_GROUP_SIZE=128 \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_LIBDIR="${build_dir}"
 
