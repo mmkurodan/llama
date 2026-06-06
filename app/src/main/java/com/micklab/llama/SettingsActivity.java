@@ -125,7 +125,10 @@ public class SettingsActivity extends Activity {
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
     private Switch enableThinkingSwitch;
-    
+    // Compute backend
+    private Spinner backendTypeSpinner;
+    private Switch  npuEnabledSwitch;
+
     // New prompt settings
     private EditText systemPromptInput;
     private EditText customChatTemplateInput;
@@ -304,6 +307,33 @@ public class SettingsActivity extends Activity {
         
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
+
+        // Compute backend spinner
+        backendTypeSpinner = findViewById(R.id.backendTypeSpinner);
+        if (backendTypeSpinner != null) {
+            String[] backendLabels = {
+                localizedText("CPU (推論専用)", "CPU (Inference only)"),
+                localizedText("GPU (OpenCL/Vulkan)", "GPU (OpenCL/Vulkan)"),
+                localizedText("NPU / Hexagon HTP", "NPU / Hexagon HTP"),
+                localizedText("GPU + NPU (ハイブリッド)", "GPU + NPU (Hybrid)")
+            };
+            ArrayAdapter<String> backendAdapter = new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_item, backendLabels);
+            backendAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            backendTypeSpinner.setAdapter(backendAdapter);
+            backendTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, android.view.View view,
+                                           int position, long id) {
+                    updateBackendDependentUi(position);
+                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+        }
+
+        // NPU quick-toggle switch
+        npuEnabledSwitch = findViewById(R.id.npuEnabledSwitch);
+
         gpuLayersSeekBar = findViewById(R.id.gpuLayersSeekBar);
         gpuLayersValue = findViewById(R.id.gpuLayersValue);
         gpuLayersSeekBar.setMax(40);
@@ -458,6 +488,26 @@ public class SettingsActivity extends Activity {
         updateActionButtonStateForBusy();
     }
 
+    /** バックエンド選択に応じて GPU Layers / NPU switch の有効・無効を切り替える */
+    private void updateBackendDependentUi(int backendPosition) {
+        // 0=CPU: GPU layers 無効、NPU switch 無効
+        // 1=GPU: GPU layers 有効、NPU switch 無効
+        // 2=NPU: GPU layers 有効 (オフロード率として使用)、NPU switch 有効
+        // 3=GPU+NPU: GPU layers 有効、NPU switch 有効
+        final boolean gpuActive = (backendPosition != ConfigurationManager.Configuration.BACKEND_CPU);
+        final boolean npuActive = (backendPosition == ConfigurationManager.Configuration.BACKEND_NPU_HTP
+                                || backendPosition == ConfigurationManager.Configuration.BACKEND_GPU_NPU);
+
+        if (gpuLayersSeekBar != null) gpuLayersSeekBar.setEnabled(gpuActive);
+        if (gpuLayersValue   != null) gpuLayersValue.setEnabled(gpuActive);
+        if (npuEnabledSwitch != null) {
+            npuEnabledSwitch.setEnabled(npuActive);
+            if (!npuActive) {
+                npuEnabledSwitch.setChecked(false);
+            }
+        }
+    }
+
     private void openDocuments() {
         Intent intent = new Intent(this, DocumentsActivity.class);
         startActivity(intent);
@@ -586,6 +636,8 @@ public class SettingsActivity extends Activity {
                 case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
                 case "Threads (n_threads):": return "スレッド数 (n_threads):";
                 case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
+                case "Compute Backend:": return "計算バックエンド:";
+                case "NPU (Hexagon HTP) Enabled:": return "NPU (Hexagon HTP) 有効:";
                 case "GPU Offload Layers:": return "GPUオフロード層:";
                 case "Temperature (temp):": return "温度 (temp):";
                 case "Penalty Parameters": return "ペナルティ設定";
@@ -947,6 +999,16 @@ public class SettingsActivity extends Activity {
         gpuLayersSeekBar.setProgress(displayLayers);
         gpuLayersValue.setText(String.valueOf(displayLayers > 39 ? -1 : displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
+
+        // Compute backend
+        if (backendTypeSpinner != null) {
+            int sel = Math.max(0, Math.min(3, config.backendType));
+            backendTypeSpinner.setSelection(sel, false);
+            updateBackendDependentUi(sel);
+        }
+        if (npuEnabledSwitch != null) {
+            npuEnabledSwitch.setChecked(config.npuEnabled);
+        }
         
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
@@ -1153,7 +1215,13 @@ public class SettingsActivity extends Activity {
         int progress = gpuLayersSeekBar.getProgress();
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
-        
+
+        // Compute backend
+        config.backendType = (backendTypeSpinner != null)
+                ? Math.max(0, Math.min(3, backendTypeSpinner.getSelectedItemPosition()))
+                : ConfigurationManager.Configuration.BACKEND_CPU;
+        config.npuEnabled = (npuEnabledSwitch != null) && npuEnabledSwitch.isChecked();
+
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();
         config.customChatTemplate = customChatTemplateInput.getText().toString();

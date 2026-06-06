@@ -131,6 +131,76 @@ set(GGML_SOURCES
 )
 
 # ---------------------------------------------------------
+# Optional: Hexagon / HTP NPU backend
+#
+# ビルド有効化:
+#   cmake -DGGML_HEXAGON=ON \
+#         -DHEXAGON_SDK_ROOT=/opt/hexagon-sdk-5.x \
+#         ...
+#
+# 事前準備 (Hexagon SDK 必須):
+#   1. qaic で htp_iface_stub.c を生成 (自動)
+#   2. HTP skel は SDK 付属 DSP toolchain でビルドし
+#      app/src/main/jniLibs/arm64-v8a/ に手動配置
+# ---------------------------------------------------------
+option(GGML_HEXAGON "Enable Hexagon/HTP NPU backend" OFF)
+set(HEXAGON_SDK_ROOT "" CACHE PATH "Hexagon SDK root (e.g. /opt/hexagon-sdk-5.4.0)")
+
+set(GGML_HEXAGON_SOURCES "")
+
+if(GGML_HEXAGON)
+    if(NOT IS_DIRECTORY "${HEXAGON_SDK_ROOT}")
+        message(FATAL_ERROR
+            "[GGML_HEXAGON] HEXAGON_SDK_ROOT が設定されていません。\n"
+            "  -DHEXAGON_SDK_ROOT=/path/to/hexagon-sdk を指定してください。\n"
+            "  SDK は https://developer.qualcomm.com/software/hexagon-dsp-sdk から取得できます。")
+    endif()
+
+    # qaic (IDL -> ARM stub C) の検索
+    find_program(QAIC_EXE qaic
+        PATHS
+            "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu22"
+            "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu20"
+            "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Linux"
+            "${HEXAGON_SDK_ROOT}/tools/utils/qaic"
+        NO_DEFAULT_PATH
+    )
+    if(NOT QAIC_EXE)
+        message(FATAL_ERROR
+            "[GGML_HEXAGON] qaic が見つかりません。\n"
+            "  HEXAGON_SDK_ROOT=${HEXAGON_SDK_ROOT}/tools/utils/qaic を確認してください。")
+    endif()
+    message(STATUS "hexagon: qaic=${QAIC_EXE}")
+    message(STATUS "hexagon: SDK=${HEXAGON_SDK_ROOT}")
+
+    # IDL -> ARM側 RPC stub C の生成
+    set(HTP_IDL_FILE    "${GGML_ROOT_DIR}/src/ggml-hexagon/htp/htp_iface.idl")
+    set(HTP_STUB_C      "${CMAKE_BINARY_DIR}/htp_iface_stub.c")
+    set(HTP_STUB_HEADER "${CMAKE_BINARY_DIR}/htp_iface.h")
+
+    add_custom_command(
+        OUTPUT  "${HTP_STUB_C}" "${HTP_STUB_HEADER}"
+        COMMAND "${QAIC_EXE}"
+                -mdll
+                -o "${CMAKE_BINARY_DIR}"
+                "-I${HEXAGON_SDK_ROOT}/incs/stddef"
+                "${HTP_IDL_FILE}"
+        DEPENDS "${HTP_IDL_FILE}"
+        COMMENT "Generating HTP RPC ARM-side stub from htp_iface.idl"
+        VERBATIM
+    )
+    add_custom_target(htp_idl_gen DEPENDS "${HTP_STUB_C}" "${HTP_STUB_HEADER}")
+
+    set(GGML_HEXAGON_SOURCES
+        "${GGML_ROOT_DIR}/src/ggml-hexagon/ggml-hexagon.cpp"
+        "${GGML_ROOT_DIR}/src/ggml-hexagon/htp-drv.cpp"
+        "${HTP_STUB_C}"
+    )
+
+    message(STATUS "hexagon: Hexagon/HTP sources will be compiled into llama_jni")
+endif()
+
+# ---------------------------------------------------------
 # JNI shared library
 # ---------------------------------------------------------
 add_library(
@@ -141,9 +211,14 @@ add_library(
 
     ${LLAMA_SOURCES}
     ${GGML_SOURCES}
+    ${GGML_HEXAGON_SOURCES}
 )
 
 license_generate(llama_jni)
+
+if(GGML_HEXAGON)
+    add_dependencies(llama_jni htp_idl_gen)
+endif()
 
 # ---------------------------------------------------------
 # compile definitions
@@ -157,6 +232,9 @@ target_compile_definitions(
     GGML_VERSION="${GGML_VERSION}"
     GGML_COMMIT="${GGML_BUILD_COMMIT}"
 )
+if(GGML_HEXAGON)
+    target_compile_definitions(llama_jni PRIVATE GGML_USE_HEXAGON)
+endif()
 
 # ---------------------------------------------------------
 # include directories
@@ -178,6 +256,16 @@ target_include_directories(
     ${CMAKE_SOURCE_DIR}/third_party/libcurl/include
     ${CMAKE_SOURCE_DIR}/third_party/mbedtls/include
 )
+if(GGML_HEXAGON)
+    target_include_directories(llama_jni PRIVATE
+        "${GGML_ROOT_DIR}/src/ggml-hexagon"
+        "${GGML_ROOT_DIR}/src/ggml-hexagon/htp"
+        "${CMAKE_BINARY_DIR}"
+        "${HEXAGON_SDK_ROOT}/incs"
+        "${HEXAGON_SDK_ROOT}/incs/stddef"
+        "${HEXAGON_SDK_ROOT}/utils/examples"
+    )
+endif()
 
 # ---------------------------------------------------------
 # third-party libraries

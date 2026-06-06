@@ -41,6 +41,9 @@
 #include "ggml-backend.h"
 #include "ggml-backend-impl.h"   // ★ これが必要
 #include "ggml-cpu.h"
+#if defined(GGML_USE_HEXAGON)
+#include "ggml-hexagon.h"
+#endif
 #include "chat.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
@@ -62,6 +65,18 @@ static jmethodID g_token_onComplete = nullptr;
 static jmethodID g_token_onError = nullptr;
 static std::atomic<bool> g_cancel_generation(false);
 static bool g_backend_initialized = false;
+
+// ---- Compute backend configuration ----
+// backendType: 0=CPU, 1=GPU, 2=NPU/HTP, 3=GPU+NPU
+static int         g_backend_type          = 0;
+static bool        g_npu_enabled           = false;
+static std::string g_native_lib_dir;
+// Version counter — bumped in setBackendConfig to trigger re-init on next model load
+static int         g_backend_config_version      = 0;
+static int         g_backend_initialized_version = -1;
+// Persistent NULL-terminated device list for llama_model_params.devices
+static ggml_backend_dev_t g_accel_devices[4] = {nullptr, nullptr, nullptr, nullptr};
+
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -619,28 +634,104 @@ static llama_context_params build_context_params_locked() {
     return cparams;
 }
 
+// Return the first registered Hexagon/HTP device, or nullptr if none found.
+static ggml_backend_dev_t find_hexagon_device_locked() {
+#if defined(GGML_USE_HEXAGON)
+    const size_t count = ggml_backend_dev_count();
+    for (size_t i = 0; i < count; ++i) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        if (!dev) { continue; }
+        const char * name = ggml_backend_dev_name(dev);
+        if (!name) { continue; }
+        const std::string n(name);
+        if (n.find("Hexagon") != std::string::npos || n.find("HTP") != std::string::npos) {
+            return dev;
+        }
+    }
+#endif
+    return nullptr;
+}
+
+// Return the first registered GPU device, or nullptr if none found.
+static ggml_backend_dev_t find_gpu_device_locked() {
+    const size_t count = ggml_backend_dev_count();
+    for (size_t i = 0; i < count; ++i) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        if (!dev) { continue; }
+        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU) {
+            return dev;
+        }
+    }
+    return nullptr;
+}
+
 static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = g_n_gpu_layers;
 #if defined(__ANDROID__)
-    // Keep Android model weights mmap-backed. The JNI free path now tears down the
-    // backend between model switches, so avoiding giant heap-backed GGUF loads is
-    // more important than the earlier mmap-churn workaround.
     (void) has_explicit_mmproj;
     mparams.use_mmap = true;
 #else
     mparams.use_mmap = true;
 #endif
     mparams.use_mlock = false;
+
+    // ---- Backend device list ----
+    // backendType: 0=CPU  1=GPU  2=NPU/HTP  3=GPU+NPU
+    // npuEnabled : quick toggle; when false, NPU portion is skipped.
+    const bool want_npu = g_npu_enabled && (g_backend_type == 2 || g_backend_type == 3);
+    const bool want_gpu = (g_backend_type == 1 || g_backend_type == 3);
+
+    if (want_npu || want_gpu) {
+        size_t slot = 0;
+
+        if (want_npu) {
+            ggml_backend_dev_t npu = find_hexagon_device_locked();
+            if (npu) {
+                g_accel_devices[slot++] = npu;
+                log_to_file(std::string("build_model_params: NPU/HTP device added: ") +
+                            ggml_backend_dev_name(npu));
+            } else {
+                log_to_file("build_model_params: NPU requested but no Hexagon device found — "
+                            "falling back", GGML_LOG_LEVEL_WARN);
+            }
+        }
+
+        if (want_gpu) {
+            ggml_backend_dev_t gpu = find_gpu_device_locked();
+            if (gpu) {
+                g_accel_devices[slot++] = gpu;
+                log_to_file(std::string("build_model_params: GPU device added: ") +
+                            ggml_backend_dev_name(gpu));
+            } else {
+                log_to_file("build_model_params: GPU requested but no GPU device found — "
+                            "falling back", GGML_LOG_LEVEL_WARN);
+            }
+        }
+
+        g_accel_devices[slot] = nullptr;  // NULL terminator
+
+        if (slot > 0) {
+            mparams.devices = g_accel_devices;
+        }
+    }
+    // CPU only (backendType=0): mparams.devices stays NULL; n_gpu_layers=0 forces CPU path.
+
     return mparams;
 }
 
 static void log_model_params(const char * log_prefix, const llama_model_params & mparams) {
+    static const char * const BACKEND_NAMES[] = {"CPU", "GPU", "NPU/HTP", "GPU+NPU"};
+    const char * type_name = (g_backend_type >= 0 && g_backend_type < 4)
+                           ? BACKEND_NAMES[g_backend_type] : "UNKNOWN";
     std::ostringstream ss;
     ss << log_prefix
        << ": model params n_gpu_layers=" << mparams.n_gpu_layers
        << " use_mmap=" << (mparams.use_mmap ? "true" : "false")
-       << " use_mlock=" << (mparams.use_mlock ? "true" : "false");
+       << " use_mlock=" << (mparams.use_mlock ? "true" : "false")
+       << " backend=" << type_name
+       << " npuEnabled=" << (g_npu_enabled ? "true" : "false")
+       << " devices=" << (mparams.devices ? "custom" : "default(NULL)");
     log_to_file(ss.str());
 }
 
@@ -777,18 +868,60 @@ static void trim_native_allocator(const char * reason) {
 // fatal-signal handler. An always-on sampling thread per generation was pure overhead.
 
 static void ensure_backend_initialized_locked(const char * log_prefix) {
-    if (g_backend_initialized) {
+    // Re-initialize if config changed since last init (e.g. NPU toggled)
+    if (g_backend_initialized && g_backend_initialized_version == g_backend_config_version) {
         std::ostringstream ss;
-        ss << log_prefix << ": backend already initialized, reusing process-wide backend";
+        ss << log_prefix << ": backend already initialized (version=" << g_backend_config_version
+           << "), reusing";
         log_to_file(ss.str());
         return;
     }
 
+    if (g_backend_initialized) {
+        std::ostringstream ss;
+        ss << log_prefix << ": backend config changed (version "
+           << g_backend_initialized_version << " -> " << g_backend_config_version
+           << "), re-initializing";
+        log_to_file(ss.str());
+        release_backend_locked(log_prefix);
+    }
+
+#if defined(GGML_USE_HEXAGON)
+    // When NPU is active: set ADSP_LIBRARY_PATH so HTP skel .so files are found by the DSP loader.
+    const bool npu_active = g_npu_enabled && (g_backend_type == 2 || g_backend_type == 3);
+    if (npu_active && !g_native_lib_dir.empty()) {
+        if (setenv("ADSP_LIBRARY_PATH", g_native_lib_dir.c_str(), 1) == 0) {
+            std::ostringstream ss;
+            ss << log_prefix << ": set ADSP_LIBRARY_PATH=" << g_native_lib_dir;
+            log_to_file(ss.str());
+        } else {
+            log_to_file(std::string(log_prefix) + ": setenv(ADSP_LIBRARY_PATH) failed",
+                        GGML_LOG_LEVEL_WARN);
+        }
+    }
+#endif
+
     llama_backend_init();
     g_backend_initialized = true;
 
+#if defined(GGML_USE_HEXAGON)
+    if (g_npu_enabled && (g_backend_type == 2 || g_backend_type == 3)) {
+        ggml_backend_reg_t hex_reg = ggml_backend_hexagon_reg();
+        if (hex_reg) {
+            ggml_backend_register(hex_reg);
+            log_to_file(std::string(log_prefix) + ": ggml: Hexagon/HTP backend registered");
+        } else {
+            log_to_file(std::string(log_prefix) + ": ggml: Hexagon backend unavailable on this device",
+                        GGML_LOG_LEVEL_WARN);
+        }
+    }
+#endif
+
+    g_backend_initialized_version = g_backend_config_version;
+
     std::ostringstream ss;
-    ss << log_prefix << ": backend init complete, " << summarize_registered_backends();
+    ss << log_prefix << ": backend init complete (version=" << g_backend_config_version << "), "
+       << summarize_registered_backends();
     const size_t backend_count = ggml_backend_reg_count();
     log_to_file(ss.str(), backend_count == 0 ? GGML_LOG_LEVEL_ERROR : GGML_LOG_LEVEL_INFO);
 }
@@ -3079,6 +3212,48 @@ Java_com_micklab_llama_LlamaNative_supportsAudio(
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_supports_audio ? JNI_TRUE : JNI_FALSE;
+}
+
+// ---------------- JNI: setBackendConfig ----------------
+// backendType: 0=CPU  1=GPU  2=NPU/HTP  3=GPU+NPU
+// npuEnabled : false = NPU を無効化 (quick toggle; backendType は保持)
+// nativeLibDir: context.getApplicationInfo().nativeLibraryDir
+//               HTP skel .so の ADSP_LIBRARY_PATH として使用
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setBackendConfig(
+        JNIEnv * env, jobject,
+        jint backendType, jboolean npuEnabled, jstring jNativeLibDir) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    const int  new_type    = static_cast<int>(backendType);
+    const bool new_npu     = static_cast<bool>(npuEnabled);
+    const std::string new_dir = jstring_to_std(env, jNativeLibDir);
+
+    const bool changed = (new_type != g_backend_type)
+                      || (new_npu  != g_npu_enabled)
+                      || (new_dir  != g_native_lib_dir);
+
+    g_backend_type    = new_type;
+    g_npu_enabled     = new_npu;
+    g_native_lib_dir  = new_dir;
+
+    if (changed) {
+        // Bump version so ensure_backend_initialized_locked re-initializes on next model load
+        ++g_backend_config_version;
+    }
+
+    static const char * const BACKEND_NAMES[] = {"CPU", "GPU", "NPU/HTP", "GPU+NPU"};
+    const char * type_name = (new_type >= 0 && new_type < 4) ? BACKEND_NAMES[new_type] : "UNKNOWN";
+
+    std::ostringstream ss;
+    ss << "setBackendConfig: type=" << new_type
+       << " (" << type_name << ")"
+       << " npuEnabled=" << (new_npu ? "true" : "false")
+       << " nativeLibDir=" << new_dir
+       << " configVersion=" << g_backend_config_version
+       << (changed ? " [config changed]" : " [no change]");
+    log_to_file(ss.str());
 }
 
 extern "C"

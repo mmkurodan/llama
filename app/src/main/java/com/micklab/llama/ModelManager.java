@@ -671,8 +671,21 @@ public class ModelManager {
         float temp = safeFinite((float) config.temp, DEFAULT_TEMP);
         float topP = safeFinite((float) config.topP, DEFAULT_TOP_P);
         int topK = safePositive(config.topK, DEFAULT_TOP_K);
-        int nGpuLayers = (config.gpuOffloadLayers < 0 || config.gpuOffloadLayers > 39) ? GPU_LAYERS_ENABLED_ALL : Math.max(0, config.gpuOffloadLayers);
+        // GPU/NPU backend を選択した場合は n_gpu_layers を有効化。
+        // CPU のみ (backendType=0) の場合は強制 0。
+        int nGpuLayers;
+        if (config.backendType == ConfigurationManager.Configuration.BACKEND_CPU) {
+            nGpuLayers = 0;
+        } else {
+            nGpuLayers = (config.gpuOffloadLayers < 0 || config.gpuOffloadLayers > 39)
+                       ? GPU_LAYERS_ENABLED_ALL
+                       : Math.max(0, config.gpuOffloadLayers);
+        }
         llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK, nGpuLayers);
+
+        // Compute backend を JNI へ通知 (ADSP_LIBRARY_PATH 設定含む)
+        String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;
+        llama.setBackendConfig(config.backendType, config.npuEnabled, nativeLibDir);
     }
 
     private int safePositive(int value, int fallback) {

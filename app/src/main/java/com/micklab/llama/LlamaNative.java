@@ -48,6 +48,16 @@ public class LlamaNative {
     // 新しく追加したネイティブ: JNI 側のログファイルパスを設定する
     public native void setLogPath(String path);
     public native void setLogLevel(int level);
+
+    /**
+     * Compute backend を設定する。
+     *
+     * @param backendType  0=CPU, 1=GPU, 2=NPU/HTP, 3=GPU+NPU
+     * @param npuEnabled   false にすると NPU を即座に無効化 (backendType は保持)
+     * @param nativeLibDir context.getApplicationInfo().nativeLibraryDir
+     *                     (HTP skel .so の ADSP_LIBRARY_PATH に使用)
+     */
+    public native void setBackendConfig(int backendType, boolean npuEnabled, String nativeLibDir);
     
     // Set sampling parameters
     public native void setParameters(

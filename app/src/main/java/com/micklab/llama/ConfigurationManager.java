@@ -82,6 +82,15 @@ public class ConfigurationManager {
         // Runtime behavior switches
         public int gpuOffloadLayers;
         public boolean enableThinking;
+
+        // Compute backend
+        // 0=CPU  1=GPU  2=NPU/HTP  3=GPU+NPU
+        public static final int BACKEND_CPU     = 0;
+        public static final int BACKEND_GPU     = 1;
+        public static final int BACKEND_NPU_HTP = 2;
+        public static final int BACKEND_GPU_NPU = 3;
+        public int  backendType;
+        public boolean npuEnabled;
         
         public Configuration() {
             // Default values - Gemma 1B assistant
@@ -128,6 +137,10 @@ public class ConfigurationManager {
             // Runtime behavior defaults
             gpuOffloadLayers = 0;
             enableThinking = true;
+
+            // Backend defaults
+            backendType = BACKEND_CPU;
+            npuEnabled  = false;
             
             // New prompt settings defaults
             systemPrompt = "";           // Empty by default
@@ -187,7 +200,11 @@ public class ConfigurationManager {
             json.put("gpuOffloadLayers", gpuOffloadLayers);
             json.put("gpuOffloadEnabled", gpuOffloadLayers != 0);
             json.put("enableThinking", enableThinking);
-            
+
+            // Compute backend
+            json.put("backendType", backendType);
+            json.put("npuEnabled",  npuEnabled);
+
             // New prompt settings
             json.put("systemPrompt", systemPrompt);
             json.put("customChatTemplate", customChatTemplate);
@@ -252,7 +269,14 @@ public class ConfigurationManager {
                 config.gpuOffloadLayers = enabled ? -1 : 0;
             }
             config.enableThinking = json.optBoolean("enableThinking", true);
-            
+
+            // Compute backend (backward compat: default CPU)
+            config.backendType = json.optInt("backendType", Configuration.BACKEND_CPU);
+            if (config.backendType < BACKEND_CPU || config.backendType > BACKEND_GPU_NPU) {
+                config.backendType = BACKEND_CPU;
+            }
+            config.npuEnabled = json.optBoolean("npuEnabled", false);
+
             // New prompt settings (with defaults for backward compatibility)
             config.systemPrompt = json.optString("systemPrompt", "");
             config.customChatTemplate = json.optString("customChatTemplate", "");
