@@ -6,7 +6,55 @@ on:
   pull_request:
   workflow_dispatch:
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Hexagon NPU 対応ビルドフロー概要
+#
+#   1. probe-hexagon  : 最新の hexagon-artifacts-* リリースが存在するか確認
+#   2. build-mbedtls  : mbedTLS ARM64 ビルド（既存）
+#   3. build-libcurl  : libcurl ARM64 ビルド（既存）
+#   4. build-apk      : APK ビルド
+#       - probe-hexagon が available=true なら:
+#           → Release から hexagon-artifacts バンドルをダウンロード
+#           → app/src/main/cpp/hexagon-artifacts/ に展開 (CMakeLists が自動検出)
+#           → skel/*.so を jniLibs/arm64-v8a/ にコピー
+#           → GGML_HEXAGON=ON で APK をビルド
+#       - available=false なら: GGML_HEXAGON=OFF (NPU なし) でビルド
+# ──────────────────────────────────────────────────────────────────────────────
+
 jobs:
+
+  # ── Job 0: Hexagon artifacts の存在チェック ─────────────────────────────────
+  probe-hexagon:
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.probe.outputs.available }}
+      tag:       ${{ steps.probe.outputs.tag }}
+    steps:
+      - name: Check for Hexagon artifacts release
+        id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # hexagon-artifacts-* という prefix を持つ最新リリースタグを検索
+          TAG=$(gh release list \
+            --repo "${{ github.repository }}" \
+            --json tagName,isDraft,isPrerelease \
+            --jq '.[] | select(.isDraft==false) | .tagName' \
+            2>/dev/null \
+            | grep '^hexagon-artifacts-' \
+            | sort -V | tail -1 || true)
+
+          if [[ -n "${TAG}" ]]; then
+            echo "available=true"  >> "$GITHUB_OUTPUT"
+            echo "tag=${TAG}"      >> "$GITHUB_OUTPUT"
+            echo "✅ Hexagon artifacts found: ${TAG}"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "tag="            >> "$GITHUB_OUTPUT"
+            echo "⚠️  No hexagon-artifacts release found — building without NPU support"
+          fi
+
+  # ── Job 1: mbedTLS ──────────────────────────────────────────────────────────
   build-mbedtls:
     runs-on: ubuntu-latest
     steps:
@@ -14,8 +62,8 @@ jobs:
 
       - name: Install deps
         run: |
-          sudo apt update
-          sudo apt install -y cmake git build-essential
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake git build-essential
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -29,12 +77,9 @@ jobs:
           export HOST_TAG=linux-x86_64
           export TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG
 
-          git clone https://github.com/Mbed-TLS/mbedtls.git
+          git clone --depth 1 --branch v3.5.1 https://github.com/Mbed-TLS/mbedtls.git
           cd mbedtls
-          git checkout v3.5.1
-
-          mkdir build
-          cd build
+          mkdir build && cd build
 
           cmake .. \
             -DCMAKE_SYSTEM_NAME=Android \
@@ -42,8 +87,8 @@ jobs:
             -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
             -DCMAKE_ANDROID_NDK=$ANDROID_NDK \
             -DCMAKE_ANDROID_STL_TYPE=c++_static \
-            -DCMAKE_C_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang \
-            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android$API-clang++ \
+            -DCMAKE_C_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang \
+            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/bin/aarch64-linux-android${API}-clang++ \
             -DENABLE_TESTING=OFF \
             -DENABLE_PROGRAMS=OFF \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
@@ -60,6 +105,7 @@ jobs:
           name: mbedtls-arm64
           path: mbedtls/build/install
 
+  # ── Job 2: libcurl ──────────────────────────────────────────────────────────
   build-libcurl:
     runs-on: ubuntu-latest
     needs: build-mbedtls
@@ -68,8 +114,8 @@ jobs:
 
       - name: Install deps
         run: |
-          sudo apt update
-          sudo apt install -y autoconf automake libtool pkg-config build-essential git
+          sudo apt-get update -qq
+          sudo apt-get install -y autoconf automake libtool pkg-config build-essential git
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -85,10 +131,8 @@ jobs:
       - name: Build libcurl for arm64 (mbedTLS, no zlib)
         run: |
           set -e
-          git clone https://github.com/curl/curl.git
+          git clone --depth 1 --branch curl-8_5_0 https://github.com/curl/curl.git
           cd curl
-          git checkout curl-8_5_0
-
           autoreconf -fi
 
           export API=24
@@ -102,11 +146,8 @@ jobs:
           ./configure \
             --host=aarch64-linux-android \
             --with-mbedtls=$GITHUB_WORKSPACE/mbedtls-arm64 \
-            --disable-shared \
-            --enable-static \
-            --without-zlib \
-            --without-zstd \
-            --without-brotli \
+            --disable-shared --enable-static \
+            --without-zlib --without-zstd --without-brotli \
             --prefix=$PWD/build/arm64
 
           make -j"$(nproc)"
@@ -118,13 +159,18 @@ jobs:
           name: libcurl-arm64
           path: curl/build/arm64
 
+  # ── Job 3: APK ビルド ───────────────────────────────────────────────────────
   build-apk:
     runs-on: ubuntu-latest
-    needs: build-libcurl
+    needs: [build-libcurl, probe-hexagon]
+    env:
+      HEXAGON_AVAILABLE: ${{ needs.probe-hexagon.outputs.available }}
+      HEXAGON_TAG:       ${{ needs.probe-hexagon.outputs.tag }}
+
     steps:
       - uses: actions/checkout@v4
 
-      # ★ keystore を app/ に復元
+      # ── keystore 復元 ───────────────────────────────────────────────────────
       - name: Restore keystore
         run: |
           mkdir -p app
@@ -132,6 +178,7 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
+      # ── サードパーティ libs ─────────────────────────────────────────────────
       - name: Download mbedTLS artifact
         uses: actions/download-artifact@v4
         with:
@@ -144,70 +191,141 @@ jobs:
           name: libcurl-arm64
           path: app/src/main/cpp/third_party/libcurl
 
+      # ── NDK ─────────────────────────────────────────────────────────────────
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27
 
+      # ── Hexagon artifacts (利用可能な場合) ──────────────────────────────────
+      - name: Download Hexagon artifacts from Release
+        if: env.HEXAGON_AVAILABLE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "📥 Downloading Hexagon artifacts: ${{ env.HEXAGON_TAG }}"
+
+          mkdir -p /tmp/hexagon-dl
+          gh release download "${{ env.HEXAGON_TAG }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "hexagon-artifacts-*.tar.gz" \
+            --dir /tmp/hexagon-dl
+
+          # CMakeLists.txt が自動検出するパスに展開
+          ARTIFACTS_DST="${GITHUB_WORKSPACE}/app/src/main/cpp/hexagon-artifacts"
+          mkdir -p "${ARTIFACTS_DST}"
+          tar -xf /tmp/hexagon-dl/hexagon-artifacts-*.tar.gz \
+            -C "${ARTIFACTS_DST}" --strip-components=1
+
+          echo "📂 Artifacts extracted:"
+          find "${ARTIFACTS_DST}" -maxdepth 3 | head -30
+
+          # HTP skel .so を jniLibs に配置
+          JNILIBS="${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "${JNILIBS}"
+          if ls "${ARTIFACTS_DST}/skel/"libggml-htp-*.so 2>/dev/null; then
+            cp "${ARTIFACTS_DST}/skel/"libggml-htp-*.so "${JNILIBS}/"
+            echo "✅ HTP skel files copied to jniLibs:"
+            ls -la "${JNILIBS}/"libggml-htp-*.so
+          else
+            echo "⚠️  No skel/*.so found in artifacts (compile-time only, no NPU at runtime)"
+          fi
+
+      - name: Show Hexagon build status
+        run: |
+          if [[ "${{ env.HEXAGON_AVAILABLE }}" == "true" ]]; then
+            echo "🔧 Hexagon NPU: ENABLED (artifacts: ${{ env.HEXAGON_TAG }})"
+            ARTIFACTS="${GITHUB_WORKSPACE}/app/src/main/cpp/hexagon-artifacts"
+            [[ -f "${ARTIFACTS}/stub/htp_iface_stub.c" ]] && echo "   ✅ htp_iface_stub.c" || echo "   ❌ htp_iface_stub.c NOT FOUND"
+            [[ -d "${ARTIFACTS}/sdk-incs" ]]              && echo "   ✅ sdk-incs/"         || echo "   ❌ sdk-incs/ NOT FOUND"
+          else
+            echo "⚠️  Hexagon NPU: DISABLED (no artifacts release found)"
+            echo "   To enable: run build-hexagon-artifacts.yml workflow"
+          fi
+
+      # ── Gradle セットアップ ──────────────────────────────────────────────────
       - name: Download Gradle 8.7
         run: |
-          wget https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip gradle-8.7-bin.zip
-          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
+          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle-8.7-bin.zip
+          echo "$PWD/gradle-8.7/bin" >> "$GITHUB_PATH"
 
       - name: Generate Gradle Wrapper (8.7)
         run: gradle wrapper --gradle-version 8.7
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ── APK ビルド ──────────────────────────────────────────────────────────
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace --info
+          ./gradlew assembleDebug --stacktrace
 
       - name: Build release APK
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --stacktrace --info
+          ./gradlew assembleRelease --stacktrace
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Verify .so 16KB compatibility with ApkAnalyzer
+      # ── 16KB page-size 検証 ─────────────────────────────────────────────────
+      - name: Verify .so 16KB alignment
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
           READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
 
           mapfile -t SO_FILES < <(unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true)
-          if [ ${#SO_FILES[@]} -eq 0 ]; then
-            echo "No native .so files found in $APK"
+          if [[ ${#SO_FILES[@]} -eq 0 ]]; then
+            echo "No native .so files found"
             exit 0
           fi
-
+          FAIL=0
           for so in "${SO_FILES[@]}"; do
             tmp_so="$(mktemp)"
             unzip -p "$APK" "$so" > "$tmp_so"
-
-            if ! "$READELF" -l "$tmp_so" | awk '/LOAD/ { if ($0 !~ /0x4000[[:space:]]*$/) bad=1 } END { exit bad }'; then
-              echo "❌ $so has a LOAD segment without 0x4000 alignment"
-              "$READELF" -l "$tmp_so" | grep LOAD
-              rm -f "$tmp_so"
-              exit 1
+            if ! "$READELF" -l "$tmp_so" \
+              | awk '/LOAD/ { if ($0 !~ /0x4000[[:space:]]*$/) bad=1 } END { exit bad }'; then
+              echo "❌ $so: LOAD segment not 0x4000 aligned"
+              FAIL=1
+            else
+              echo "✅ $so"
             fi
-
-            echo "✅ $so has 16KB (0x4000) LOAD alignment"
             rm -f "$tmp_so"
           done
+          exit $FAIL
 
-      - name: Build AAB (bundleRelease)
+      # ── AAB ─────────────────────────────────────────────────────────────────
+      - name: Build AAB
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease --stacktrace --info
+          ./gradlew bundleRelease --stacktrace
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
+      # ── ビルドサマリー ───────────────────────────────────────────────────────
+      - name: Show APK info
+        run: |
+          echo "=== Build Summary ==="
+          echo "Hexagon NPU: ${{ env.HEXAGON_AVAILABLE == 'true' && 'ENABLED' || 'DISABLED' }}"
+          if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
+            SIZE=$(du -sh app/build/outputs/apk/release/app-release.apk | cut -f1)
+            echo "Release APK: ${SIZE}"
+          fi
+          # APK 内の .so ファイル一覧
+          echo "--- Native libs in APK ---"
+          unzip -Z1 app/build/outputs/apk/release/app-release.apk | grep '\.so$' || true
+
+      # ── アーティファクトアップロード ─────────────────────────────────────────
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -217,11 +335,11 @@ jobs:
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release${{ env.HEXAGON_AVAILABLE == 'true' && '-npu' || '' }}
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab
+          name: app-release-aab${{ env.HEXAGON_AVAILABLE == 'true' && '-npu' || '' }}
           path: app/build/outputs/bundle/release/app-release.aab

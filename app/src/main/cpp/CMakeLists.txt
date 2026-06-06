@@ -143,61 +143,109 @@ set(GGML_SOURCES
 #   2. HTP skel は SDK 付属 DSP toolchain でビルドし
 #      app/src/main/jniLibs/arm64-v8a/ に手動配置
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# Hexagon / HTP NPU backend — 2 つのビルドモード
+#
+# [モード A] フル SDK ビルド (HEXAGON_SDK_ROOT が必要)
+#   cmake -DGGML_HEXAGON=ON -DHEXAGON_SDK_ROOT=/opt/hexagon-sdk-5.4.0 ...
+#   → qaic で htp_iface_stub.c を自動生成し、SDK ヘッダを使用
+#
+# [モード B] 事前ビルド成果物 (CI / SDK なし環境向け)
+#   app/src/main/cpp/hexagon-artifacts/ に以下を配置するだけで自動有効化:
+#     stub/htp_iface_stub.c
+#     stub/htp_iface.h
+#     sdk-incs/AEEStdErr.h  (他 Hexagon SDK ヘッダ群)
+#     skel/libggml-htp-v73.so  (他 DSP skel)
+#   成果物は build-hexagon-artifacts.yml ワークフローが GitHub Release に発行する
+# ---------------------------------------------------------
 option(GGML_HEXAGON "Enable Hexagon/HTP NPU backend" OFF)
-set(HEXAGON_SDK_ROOT "" CACHE PATH "Hexagon SDK root (e.g. /opt/hexagon-sdk-5.4.0)")
+set(HEXAGON_SDK_ROOT        "" CACHE PATH "Hexagon SDK root [mode A]")
+set(GGML_HEXAGON_ARTIFACTS_DIR "" CACHE PATH "Pre-built artifacts dir [mode B]")
+
+# ----- Auto-detect mode B artifacts -----
+# CI が hexagon-artifacts/ を配置するだけで自動有効化される
+set(_HEXAGON_AUTO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/hexagon-artifacts")
+if(NOT GGML_HEXAGON AND IS_DIRECTORY "${_HEXAGON_AUTO_DIR}/stub"
+                     AND EXISTS "${_HEXAGON_AUTO_DIR}/stub/htp_iface_stub.c")
+    set(GGML_HEXAGON             ON  CACHE BOOL "" FORCE)
+    set(GGML_HEXAGON_ARTIFACTS_DIR "${_HEXAGON_AUTO_DIR}" CACHE PATH "" FORCE)
+    message(STATUS "hexagon: auto-detected artifacts at ${_HEXAGON_AUTO_DIR}")
+endif()
 
 set(GGML_HEXAGON_SOURCES "")
 
 if(GGML_HEXAGON)
-    if(NOT IS_DIRECTORY "${HEXAGON_SDK_ROOT}")
+    # ---- モード判定 ----
+    if(IS_DIRECTORY "${HEXAGON_SDK_ROOT}")
+        set(_HEX_MODE "sdk")
+    elseif(IS_DIRECTORY "${GGML_HEXAGON_ARTIFACTS_DIR}/stub"
+           AND EXISTS    "${GGML_HEXAGON_ARTIFACTS_DIR}/stub/htp_iface_stub.c")
+        set(_HEX_MODE "artifacts")
+    else()
         message(FATAL_ERROR
-            "[GGML_HEXAGON] HEXAGON_SDK_ROOT が設定されていません。\n"
-            "  -DHEXAGON_SDK_ROOT=/path/to/hexagon-sdk を指定してください。\n"
-            "  SDK は https://developer.qualcomm.com/software/hexagon-dsp-sdk から取得できます。")
+            "[GGML_HEXAGON] ビルドに必要な依存物が見つかりません。\n"
+            "  [モード A] -DHEXAGON_SDK_ROOT=/path/to/sdk  (Hexagon SDK 5.x)\n"
+            "  [モード B] app/src/main/cpp/hexagon-artifacts/ に成果物を配置\n"
+            "    (GitHub Actions: build-hexagon-artifacts.yml を実行して Release から取得)")
     endif()
+    message(STATUS "hexagon: build mode=${_HEX_MODE}")
 
-    # qaic (IDL -> ARM stub C) の検索
-    find_program(QAIC_EXE qaic
-        PATHS
-            "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu22"
-            "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu20"
-            "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Linux"
-            "${HEXAGON_SDK_ROOT}/tools/utils/qaic"
-        NO_DEFAULT_PATH
-    )
-    if(NOT QAIC_EXE)
-        message(FATAL_ERROR
-            "[GGML_HEXAGON] qaic が見つかりません。\n"
-            "  HEXAGON_SDK_ROOT=${HEXAGON_SDK_ROOT}/tools/utils/qaic を確認してください。")
+    if(_HEX_MODE STREQUAL "sdk")
+        # ---- モード A: SDK から qaic でスタブを生成 ----
+        find_program(QAIC_EXE qaic
+            PATHS
+                "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu22"
+                "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu20"
+                "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Linux"
+                "${HEXAGON_SDK_ROOT}/tools/utils/qaic"
+            NO_DEFAULT_PATH
+        )
+        if(NOT QAIC_EXE)
+            message(FATAL_ERROR "[GGML_HEXAGON] qaic が見つかりません: ${HEXAGON_SDK_ROOT}/tools/utils/qaic")
+        endif()
+        message(STATUS "hexagon: qaic=${QAIC_EXE}  sdk=${HEXAGON_SDK_ROOT}")
+
+        set(HTP_IDL_FILE    "${GGML_ROOT_DIR}/src/ggml-hexagon/htp/htp_iface.idl")
+        set(HTP_STUB_C      "${CMAKE_BINARY_DIR}/htp_iface_stub.c")
+        set(HTP_STUB_H_DIR  "${CMAKE_BINARY_DIR}")
+
+        add_custom_command(
+            OUTPUT  "${HTP_STUB_C}" "${CMAKE_BINARY_DIR}/htp_iface.h"
+            COMMAND "${QAIC_EXE}" -mdll -o "${CMAKE_BINARY_DIR}"
+                    "-I${HEXAGON_SDK_ROOT}/incs/stddef"
+                    "${HTP_IDL_FILE}"
+            DEPENDS "${HTP_IDL_FILE}"
+            COMMENT "Generating HTP RPC ARM-side stub from htp_iface.idl (SDK mode)"
+            VERBATIM
+        )
+        add_custom_target(htp_idl_gen DEPENDS "${HTP_STUB_C}")
+
+        set(_HEX_EXTRA_INCS
+            "${HEXAGON_SDK_ROOT}/incs"
+            "${HEXAGON_SDK_ROOT}/incs/stddef"
+            "${HEXAGON_SDK_ROOT}/utils/examples"
+        )
+
+    else()
+        # ---- モード B: 事前ビルド成果物を使用 ----
+        set(HTP_STUB_C     "${GGML_HEXAGON_ARTIFACTS_DIR}/stub/htp_iface_stub.c")
+        set(HTP_STUB_H_DIR "${GGML_HEXAGON_ARTIFACTS_DIR}/stub")
+
+        add_custom_target(htp_idl_gen)   # no-op (already generated)
+
+        set(_HEX_EXTRA_INCS
+            "${GGML_HEXAGON_ARTIFACTS_DIR}/sdk-incs"
+            "${GGML_HEXAGON_ARTIFACTS_DIR}/sdk-incs/stddef"
+        )
+        message(STATUS "hexagon: using pre-built stub=${HTP_STUB_C}")
     endif()
-    message(STATUS "hexagon: qaic=${QAIC_EXE}")
-    message(STATUS "hexagon: SDK=${HEXAGON_SDK_ROOT}")
-
-    # IDL -> ARM側 RPC stub C の生成
-    set(HTP_IDL_FILE    "${GGML_ROOT_DIR}/src/ggml-hexagon/htp/htp_iface.idl")
-    set(HTP_STUB_C      "${CMAKE_BINARY_DIR}/htp_iface_stub.c")
-    set(HTP_STUB_HEADER "${CMAKE_BINARY_DIR}/htp_iface.h")
-
-    add_custom_command(
-        OUTPUT  "${HTP_STUB_C}" "${HTP_STUB_HEADER}"
-        COMMAND "${QAIC_EXE}"
-                -mdll
-                -o "${CMAKE_BINARY_DIR}"
-                "-I${HEXAGON_SDK_ROOT}/incs/stddef"
-                "${HTP_IDL_FILE}"
-        DEPENDS "${HTP_IDL_FILE}"
-        COMMENT "Generating HTP RPC ARM-side stub from htp_iface.idl"
-        VERBATIM
-    )
-    add_custom_target(htp_idl_gen DEPENDS "${HTP_STUB_C}" "${HTP_STUB_HEADER}")
 
     set(GGML_HEXAGON_SOURCES
         "${GGML_ROOT_DIR}/src/ggml-hexagon/ggml-hexagon.cpp"
         "${GGML_ROOT_DIR}/src/ggml-hexagon/htp-drv.cpp"
         "${HTP_STUB_C}"
     )
-
-    message(STATUS "hexagon: Hexagon/HTP sources will be compiled into llama_jni")
+    message(STATUS "hexagon: Hexagon/HTP sources added to llama_jni")
 endif()
 
 # ---------------------------------------------------------
@@ -260,10 +308,8 @@ if(GGML_HEXAGON)
     target_include_directories(llama_jni PRIVATE
         "${GGML_ROOT_DIR}/src/ggml-hexagon"
         "${GGML_ROOT_DIR}/src/ggml-hexagon/htp"
-        "${CMAKE_BINARY_DIR}"
-        "${HEXAGON_SDK_ROOT}/incs"
-        "${HEXAGON_SDK_ROOT}/incs/stddef"
-        "${HEXAGON_SDK_ROOT}/utils/examples"
+        "${HTP_STUB_H_DIR}"     # htp_iface.h (SDK 生成 or 事前ビルド)
+        ${_HEX_EXTRA_INCS}      # AEEStdErr.h 他 SDK ヘッダ群
     )
 endif()
 
