@@ -112,17 +112,13 @@ jobs:
           echo "HEXAGON_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
           echo "✅ HEXAGON_SDK_ROOT=${SDK_ROOT}"
 
-          # Tools root: hexagon-clang (.../HEXAGON_Tools/<ver>/Tools/bin/hexagon-clang) を
-          # 実探索して <ver> ディレクトリを HEXAGON_TOOLS_ROOT とする (バージョン非依存)。
-          CLANG=$(find "${SDK_ROOT}/tools/HEXAGON_Tools" -type f -name hexagon-clang 2>/dev/null | head -1 || true)
-          TOOLS_ROOT=""
-          if [[ -n "${CLANG}" ]]; then
-            # bin -> Tools -> <ver>
-            TOOLS_ROOT=$(dirname "$(dirname "$(dirname "${CLANG}")")")
-          fi
-          if [[ -z "${TOOLS_ROOT}" || ! -x "${TOOLS_ROOT}/Tools/bin/hexagon-clang" ]]; then
+          # Tools root: tools/HEXAGON_Tools/<ver>/ を直接特定する。
+          # hexagon-clang はシンボリックリンクのことがあり find -type f に当たらないため、
+          # バージョンディレクトリを列挙し <ver>/Tools/bin/hexagon-clang の存在(-e)で検証する。
+          TOOLS_ROOT=$(find "${SDK_ROOT}/tools/HEXAGON_Tools" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "${TOOLS_ROOT}" || ! -e "${TOOLS_ROOT}/Tools/bin/hexagon-clang" ]]; then
             echo "::error::HEXAGON_TOOLS_ROOT (hexagon-clang) を特定できませんでした。"
-            find "${SDK_ROOT}/tools/HEXAGON_Tools" -maxdepth 2 -type d 2>/dev/null | head -20
+            find "${SDK_ROOT}/tools/HEXAGON_Tools" -maxdepth 3 2>/dev/null | head -40
             exit 1
           fi
           echo "HEXAGON_TOOLS_ROOT=${TOOLS_ROOT}" >> "$GITHUB_ENV"
@@ -130,7 +126,7 @@ jobs:
 
           # qaic (IDL コンパイラ)。SDK 6.x は ipc/fastrpc/qaic/bin/qaic、
           # 5.x は tools/utils/qaic/<os>/qaic。レイアウト差を吸収するため SDK 全体を検索。
-          QAIC=$(find "${SDK_ROOT}" -type f -name qaic 2>/dev/null | head -1 || true)
+          QAIC=$(find "${SDK_ROOT}" \( -type f -o -type l \) -name qaic 2>/dev/null | head -1 || true)
           if [[ -z "${QAIC}" ]]; then
             echo "::error::qaic が見つかりません (探索: ${SDK_ROOT})"
             exit 1

@@ -51,7 +51,7 @@ fi
 info "SDK: ${HEXAGON_SDK_ROOT}"
 
 # qaic 検索 (6.x: ipc/fastrpc/qaic/bin, 5.x: tools/utils/qaic — SDK 全体を検索)
-QAIC=$(find "${HEXAGON_SDK_ROOT}" -type f -name "qaic" 2>/dev/null | head -1 || true)
+QAIC=$(find "${HEXAGON_SDK_ROOT}" \( -type f -o -type l \) -name "qaic" 2>/dev/null | head -1 || true)
 if [[ -z "${QAIC}" ]]; then
     error "qaic が見つかりません (探索: ${HEXAGON_SDK_ROOT})"
     exit 1

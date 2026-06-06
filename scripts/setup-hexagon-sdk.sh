@@ -51,7 +51,7 @@ check_prerequisites() {
 
     # qaic の存在確認 (6.x: ipc/fastrpc/qaic/bin, 5.x: tools/utils/qaic)
     local qaic
-    qaic="$(find "${HEXAGON_SDK_ROOT}" -type f -name "qaic" 2>/dev/null | head -1)"
+    qaic="$(find "${HEXAGON_SDK_ROOT}" \( -type f -o -type l \) -name "qaic" 2>/dev/null | head -1)"
     if [[ -z "${qaic}" ]]; then
         error "qaic が見つかりません (探索: ${HEXAGON_SDK_ROOT})"
         exit 1
