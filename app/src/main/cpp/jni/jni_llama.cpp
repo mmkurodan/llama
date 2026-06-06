@@ -2472,6 +2472,23 @@ static void notify_token_complete() {
     }
 }
 
+// Log generation / prompt throughput (tok/s) from the per-generation perf
+// counters (reset at the start of each generation). Surfaces in the diagnostics
+// log so users can see decode speed per request.
+static void log_generation_perf(const char * log_prefix) {
+    if (!g_ctx) {
+        return;
+    }
+    const llama_perf_context_data p = llama_perf_context(g_ctx);
+    const double gen_tps = (p.t_eval_ms   > 0.0) ? (1.0e3 * p.n_eval   / p.t_eval_ms)   : 0.0;
+    const double pp_tps  = (p.t_p_eval_ms > 0.0) ? (1.0e3 * p.n_p_eval / p.t_p_eval_ms) : 0.0;
+    std::ostringstream ss;
+    ss << log_prefix << ": speed: gen " << std::fixed << std::setprecision(2) << gen_tps
+       << " tok/s (" << p.n_eval << " tok / " << (p.t_eval_ms / 1.0e3) << " s)"
+       << ", prompt " << pp_tps << " tok/s (" << p.n_p_eval << " tok / " << (p.t_p_eval_ms / 1.0e3) << " s)";
+    log_to_file(ss.str());
+}
+
 static bool prefill_text_prompt_locked(
         const llama_vocab * vocab,
         const std::string & prompt,
@@ -2836,6 +2853,8 @@ static jstring generate_locked(
         }
     }
 
+    log_generation_perf("generate");
+
     const bool was_cancelled = g_cancel_generation.load();
     if (!was_cancelled) {
         notify_token_complete();
@@ -3034,6 +3053,8 @@ static jstring generate_openai_chat_completion_locked(
                 return build_error("decode failed (generation)");
             }
         }
+
+        log_generation_perf("generateOpenAiChatCompletion");
 
         size_t safe_len = validate_utf8(output);
         if (safe_len < output.size()) {
