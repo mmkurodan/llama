@@ -1,0 +1,294 @@
+name: Build & Publish Hexagon Artifacts
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Hexagon NPU 成果物 (HTP skel + qaic stub + SDK ヘッダ subset) を生成する
+# ワークフロー。
+#
+# 方針:
+#   - Hexagon SDK は snapdragon-toolchain が公開している CI 用トリム版
+#     (amd64-lnx, 約 694MB) を runner 上で直接ダウンロードする。
+#     → Qualcomm アカウント / ログイン不要。Secret 不要。
+#   - DSP スケル .so は SDK 同梱の Hexagon クロスコンパイラ (hexagon-clang) で
+#     ビルドするため Linux x86_64 runner (ubuntu) で完結する。
+#       ※ GitHub 標準の windows-latest は x64 で arm64-wos ツールチェーンが
+#         動かず、x64-Windows 用トリム版も無いため、Windows runner は使わない。
+#
+# 生成物 hexagon-artifacts-v{SDK_VERSION}.tar.gz:
+#   ├── stub/
+#   │   ├── htp_iface_stub.c   (qaic 生成 ARM-side RPC stub)
+#   │   └── htp_iface.h
+#   ├── sdk-incs/              (コンパイルに必要な Hexagon SDK ヘッダ subset)
+#   └── skel/
+#       └── libggml-htp-v{68,69,73,75,79,81}.so
+#
+# これを APK ビルド (android.yml) が Mode B (hexagon-artifacts/ 自動検出) で
+# 消費する。配置方法はワークフロー末尾サマリと scripts/hexagon-files.md を参照。
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_version:
+        description: 'Hexagon SDK version (snapdragon-toolchain release tag, without leading v)'
+        required: true
+        default: '6.6.0.0'
+      dsp_versions:
+        description: 'DSP versions to build (space-separated). 1 機種に絞ると高速 (例 v75)'
+        required: false
+        default: 'v68 v69 v73 v75 v79 v81'
+      publish_release:
+        description: 'Create/update GitHub Release'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write          # GitHub Release 発行に必要
+
+env:
+  SDK_VERSION:     ${{ github.event.inputs.sdk_version  || '6.6.0.0' }}
+  DSP_VERSIONS:    ${{ github.event.inputs.dsp_versions || 'v68 v69 v73 v75 v79 v81' }}
+  SDK_PARENT_DIR:  /opt/hexagon
+  ARTIFACTS_OUT:   /tmp/hexagon-artifacts-out
+
+jobs:
+  build-hexagon-artifacts:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. 依存パッケージ ──────────────────────────────────────────────────
+      # NDK は不要 (skel は hexagon-clang、stub は qaic で生成するため)。
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            cmake ninja-build python3 xz-utils curl file \
+            libncurses5 libstdc++6
+
+      # ── 2. SDK URL を決定 ──────────────────────────────────────────────────
+      - name: Resolve SDK download URL
+        run: |
+          set -euo pipefail
+          URL="https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v${SDK_VERSION}/hexagon-sdk-v${SDK_VERSION}-amd64-lnx.tar.xz"
+          echo "HEXAGON_SDK_URL=${URL}" >> "$GITHUB_ENV"
+          echo "📥 SDK URL: ${URL}"
+
+      # ── 3. SDK キャッシュ (展開済みを再利用) ───────────────────────────────
+      - name: Cache Hexagon SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SDK_PARENT_DIR }}
+          key: hexagon-sdk-${{ env.SDK_VERSION }}-amd64-lnx-v1
+
+      # ── 4. SDK ダウンロード & 展開 (公開トリム版・ログイン不要) ────────────
+      - name: Download & extract Hexagon SDK (community trimmed, no login)
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "${SDK_PARENT_DIR}"
+          echo "📥 Downloading ${HEXAGON_SDK_URL}"
+          curl -fSL --retry 3 --progress-bar "${HEXAGON_SDK_URL}" -o /tmp/hexagon-sdk.tar.xz
+          echo "📦 Extracting..."
+          tar -xJf /tmp/hexagon-sdk.tar.xz -C "${SDK_PARENT_DIR}"
+          rm -f /tmp/hexagon-sdk.tar.xz
+          echo "--- ${SDK_PARENT_DIR} ---"
+          ls -la "${SDK_PARENT_DIR}"
+
+      # ── 5. SDK root / Tools root / qaic を特定 ─────────────────────────────
+      - name: Locate SDK root, tools root, and qaic
+        run: |
+          set -euo pipefail
+
+          # hexagon_sdk.json を含むディレクトリを SDK root とする (展開構造に非依存)
+          SDK_JSON=$(find "${SDK_PARENT_DIR}" -maxdepth 3 -name hexagon_sdk.json | head -1 || true)
+          if [[ -z "${SDK_JSON}" ]]; then
+            echo "::error::hexagon_sdk.json が見つかりません。SDK 展開に失敗した可能性があります。"
+            find "${SDK_PARENT_DIR}" -maxdepth 3 -type d | head -40
+            exit 1
+          fi
+          SDK_ROOT=$(dirname "${SDK_JSON}")
+          echo "HEXAGON_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "✅ HEXAGON_SDK_ROOT=${SDK_ROOT}"
+
+          # Tools root: hexagon-clang (.../HEXAGON_Tools/<ver>/Tools/bin/hexagon-clang) を
+          # 実探索して <ver> ディレクトリを HEXAGON_TOOLS_ROOT とする (バージョン非依存)。
+          CLANG=$(find "${SDK_ROOT}/tools/HEXAGON_Tools" -type f -name hexagon-clang 2>/dev/null | head -1 || true)
+          TOOLS_ROOT=""
+          if [[ -n "${CLANG}" ]]; then
+            # bin -> Tools -> <ver>
+            TOOLS_ROOT=$(dirname "$(dirname "$(dirname "${CLANG}")")")
+          fi
+          if [[ -z "${TOOLS_ROOT}" || ! -x "${TOOLS_ROOT}/Tools/bin/hexagon-clang" ]]; then
+            echo "::error::HEXAGON_TOOLS_ROOT (hexagon-clang) を特定できませんでした。"
+            find "${SDK_ROOT}/tools/HEXAGON_Tools" -maxdepth 2 -type d 2>/dev/null | head -20
+            exit 1
+          fi
+          echo "HEXAGON_TOOLS_ROOT=${TOOLS_ROOT}" >> "$GITHUB_ENV"
+          echo "✅ HEXAGON_TOOLS_ROOT=${TOOLS_ROOT}"
+
+          # qaic (IDL コンパイラ)。SDK 6.x は ipc/fastrpc/qaic/bin/qaic、
+          # 5.x は tools/utils/qaic/<os>/qaic。レイアウト差を吸収するため SDK 全体を検索。
+          QAIC=$(find "${SDK_ROOT}" -type f -name qaic 2>/dev/null | head -1 || true)
+          if [[ -z "${QAIC}" ]]; then
+            echo "::error::qaic が見つかりません (探索: ${SDK_ROOT})"
+            exit 1
+          fi
+          chmod +x "${QAIC}"
+          echo "QAIC=${QAIC}" >> "$GITHUB_ENV"
+          echo "✅ qaic=${QAIC}"
+
+      # ── 6. ARM-side RPC stub を qaic で生成 (host ビルドが消費) ────────────
+      - name: Generate htp_iface_stub.c (qaic)
+        run: |
+          set -euo pipefail
+          IDL="app/src/main/cpp/llama/ggml/src/ggml-hexagon/htp/htp_iface.idl"
+          STUB_OUT="/tmp/htp_stub_gen"
+          mkdir -p "${STUB_OUT}"
+          # remote.idl は incs/、AEEStdDef.idl は incs/stddef/ にあるため両方を -I 指定
+          "${QAIC}" -mdll -o "${STUB_OUT}" \
+            "-I${HEXAGON_SDK_ROOT}/incs" \
+            "-I${HEXAGON_SDK_ROOT}/incs/stddef" \
+            "${IDL}"
+          ls -la "${STUB_OUT}/"
+          test -f "${STUB_OUT}/htp_iface_stub.c"
+          test -f "${STUB_OUT}/htp_iface.h"
+          echo "HTP_STUB_DIR=${STUB_OUT}" >> "$GITHUB_ENV"
+          echo "✅ stub generated"
+
+      # ── 7. HTP skel (DSP 側) を hexagon-clang でビルド ─────────────────────
+      - name: Build HTP skel libraries
+        run: |
+          set -euo pipefail
+          HTP_SRC="app/src/main/cpp/llama/ggml/src/ggml-hexagon/htp"
+          mkdir -p /tmp/htp-skel-build
+          FAILED=""
+          for VER in ${DSP_VERSIONS}; do
+            echo "────────────────────────── ${VER} ──────────────────────────"
+            BUILD_DIR="/tmp/htp-skel-build/${VER}"
+            mkdir -p "${BUILD_DIR}"
+
+            # CMAKE_TOOLCHAIN_FILE を必ず指定 (Hexagon クロスコンパイルに必須)
+            if cmake -S "${HTP_SRC}" -B "${BUILD_DIR}" \
+                  -G Ninja \
+                  -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/${HTP_SRC}/cmake-toolchain.cmake" \
+                  -DDSP_VERSION="${VER}" \
+                  -DHEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT}" \
+                  -DHEXAGON_TOOLS_ROOT="${HEXAGON_TOOLS_ROOT}" \
+                  -DPREBUILT_LIB_DIR="toolv19_${VER}" \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_LIBDIR="${BUILD_DIR}" 2>&1 | tail -25 \
+               && cmake --build "${BUILD_DIR}" --parallel 2>&1 | tail -25 \
+               && [[ -f "${BUILD_DIR}/libggml-htp-${VER}.so" ]]; then
+              SIZE=$(du -h "${BUILD_DIR}/libggml-htp-${VER}.so" | cut -f1)
+              echo "✅ libggml-htp-${VER}.so (${SIZE})"
+            else
+              echo "::warning::build failed for ${VER}"
+              FAILED="${FAILED} ${VER}"
+            fi
+          done
+          [[ -n "${FAILED}" ]] && echo "::warning::failed DSP versions:${FAILED}" || true
+          echo "SKEL_FAILED=${FAILED}" >> "$GITHUB_ENV"
+
+      # ── 8. SDK ヘッダ subset を収集 (host ビルドが消費) ────────────────────
+      - name: Collect SDK headers subset
+        run: |
+          set -euo pipefail
+          OUT="/tmp/hexagon-sdk-incs"
+          mkdir -p "${OUT}/stddef"
+          cp -r "${HEXAGON_SDK_ROOT}/incs/."        "${OUT}/"        2>/dev/null || true
+          cp -r "${HEXAGON_SDK_ROOT}/incs/stddef/." "${OUT}/stddef/" 2>/dev/null || true
+          [[ -d "${HEXAGON_SDK_ROOT}/utils/examples" ]] && \
+            cp -r "${HEXAGON_SDK_ROOT}/utils/examples/." "${OUT}/" 2>/dev/null || true
+          echo "✅ headers: $(find "${OUT}" -name '*.h' | wc -l)"
+          echo "SDK_INCS_OUT=${OUT}" >> "$GITHUB_ENV"
+
+      # ── 9. バンドル作成 ────────────────────────────────────────────────────
+      - name: Bundle artifacts
+        run: |
+          set -euo pipefail
+          BUNDLE="hexagon-artifacts-v${SDK_VERSION}"
+          DIR="${ARTIFACTS_OUT}/${BUNDLE}"
+          mkdir -p "${DIR}/stub" "${DIR}/sdk-incs" "${DIR}/skel"
+
+          cp "${HTP_STUB_DIR}/htp_iface_stub.c" "${DIR}/stub/"
+          cp "${HTP_STUB_DIR}/htp_iface.h"       "${DIR}/stub/"
+          cp -r "${SDK_INCS_OUT}/." "${DIR}/sdk-incs/"
+
+          SKEL_COUNT=0
+          for VER in ${DSP_VERSIONS}; do
+            SO="/tmp/htp-skel-build/${VER}/libggml-htp-${VER}.so"
+            [[ -f "${SO}" ]] && { cp "${SO}" "${DIR}/skel/"; SKEL_COUNT=$((SKEL_COUNT+1)); }
+          done
+
+          cat > "${DIR}/VERSION" <<EOF
+          hexagon_sdk_version=${SDK_VERSION}
+          dsp_versions=${DSP_VERSIONS}
+          built_skels=${SKEL_COUNT}
+          build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          build_commit=${{ github.sha }}
+          source=snapdragon-toolchain/hexagon-sdk (amd64-lnx, community trimmed)
+          EOF
+
+          TARBALL="${ARTIFACTS_OUT}/${BUNDLE}.tar.gz"
+          tar -C "${ARTIFACTS_OUT}" -czf "${TARBALL}" "${BUNDLE}/"
+          echo "BUNDLE_TARBALL=${TARBALL}" >> "$GITHUB_ENV"
+          echo "📦 $(du -h "${TARBALL}" | cut -f1)  ${TARBALL}"
+          tar -tzf "${TARBALL}"
+
+          if [[ "${SKEL_COUNT}" -eq 0 ]]; then
+            echo "::error::HTP skel が 1 つもビルドできませんでした"
+            exit 1
+          fi
+
+      # ── 10. ワークフロー artifact としてアップロード ───────────────────────
+      - name: Upload bundle as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hexagon-artifacts-v${{ env.SDK_VERSION }}
+          path: ${{ env.ARTIFACTS_OUT }}/hexagon-artifacts-v${{ env.SDK_VERSION }}.tar.gz
+          retention-days: 30
+
+      # ── 11. GitHub Release に発行 (配布可能な .so の取得用) ────────────────
+      - name: Publish to GitHub Release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="hexagon-artifacts-v${SDK_VERSION}"
+          if gh release view "${TAG}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "♻️  update ${TAG}"
+            gh release upload "${TAG}" "${BUNDLE_TARBALL}" --repo "${{ github.repository }}" --clobber
+          else
+            echo "🆕 create ${TAG}"
+            gh release create "${TAG}" "${BUNDLE_TARBALL}" \
+              --repo "${{ github.repository }}" \
+              --title "Hexagon Artifacts v${SDK_VERSION}" \
+              --notes "Hexagon SDK ${SDK_VERSION} (community trimmed, amd64-lnx) で生成した HTP skel + qaic stub + SDK ヘッダ subset。app/src/main/cpp/hexagon-artifacts/ に展開すると CMakeLists が自動検出し GGML_HEXAGON=ON。配置手順は scripts/hexagon-files.md 参照。" \
+              --latest=false
+          fi
+
+      # ── 12. サマリー ───────────────────────────────────────────────────────
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Hexagon Artifacts Build Summary"
+            echo "| Item | Value |"
+            echo "|------|-------|"
+            echo "| SDK Version | ${SDK_VERSION} (community trimmed, amd64-lnx, no login) |"
+            echo "| DSP Versions | ${DSP_VERSIONS} |"
+            echo "| Release Tag | hexagon-artifacts-v${SDK_VERSION} |"
+            echo ""
+            echo "### HTP skel results"
+            for VER in ${DSP_VERSIONS}; do
+              SO="/tmp/htp-skel-build/${VER}/libggml-htp-${VER}.so"
+              if [[ -f "${SO}" ]]; then
+                echo "- ✅ libggml-htp-${VER}.so ($(du -h "${SO}" | cut -f1))"
+              else
+                echo "- ❌ libggml-htp-${VER}.so (failed)"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

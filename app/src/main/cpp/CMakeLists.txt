@@ -135,7 +135,7 @@ set(GGML_SOURCES
 #
 # ビルド有効化:
 #   cmake -DGGML_HEXAGON=ON \
-#         -DHEXAGON_SDK_ROOT=/opt/hexagon-sdk-5.x \
+#         -DHEXAGON_SDK_ROOT=/opt/hexagon/6.6.0.0 \
 #         ...
 #
 # 事前準備 (Hexagon SDK 必須):
@@ -147,7 +147,7 @@ set(GGML_SOURCES
 # Hexagon / HTP NPU backend — 2 つのビルドモード
 #
 # [モード A] フル SDK ビルド (HEXAGON_SDK_ROOT が必要)
-#   cmake -DGGML_HEXAGON=ON -DHEXAGON_SDK_ROOT=/opt/hexagon-sdk-5.4.0 ...
+#   cmake -DGGML_HEXAGON=ON -DHEXAGON_SDK_ROOT=/opt/hexagon/6.6.0.0 ...
 #   → qaic で htp_iface_stub.c を自動生成し、SDK ヘッダを使用
 #
 # [モード B] 事前ビルド成果物 (CI / SDK なし環境向け)
@@ -184,7 +184,7 @@ if(GGML_HEXAGON)
     else()
         message(FATAL_ERROR
             "[GGML_HEXAGON] ビルドに必要な依存物が見つかりません。\n"
-            "  [モード A] -DHEXAGON_SDK_ROOT=/path/to/sdk  (Hexagon SDK 5.x)\n"
+            "  [モード A] -DHEXAGON_SDK_ROOT=/path/to/sdk  (Hexagon SDK 6.6.0.0)\n"
             "  [モード B] app/src/main/cpp/hexagon-artifacts/ に成果物を配置\n"
             "    (GitHub Actions: build-hexagon-artifacts.yml を実行して Release から取得)")
     endif()
@@ -194,14 +194,15 @@ if(GGML_HEXAGON)
         # ---- モード A: SDK から qaic でスタブを生成 ----
         find_program(QAIC_EXE qaic
             PATHS
-                "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu22"
+                "${HEXAGON_SDK_ROOT}/ipc/fastrpc/qaic/bin"            # SDK 6.x
+                "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu22"       # SDK 5.x
                 "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu20"
                 "${HEXAGON_SDK_ROOT}/tools/utils/qaic/Linux"
                 "${HEXAGON_SDK_ROOT}/tools/utils/qaic"
             NO_DEFAULT_PATH
         )
         if(NOT QAIC_EXE)
-            message(FATAL_ERROR "[GGML_HEXAGON] qaic が見つかりません: ${HEXAGON_SDK_ROOT}/tools/utils/qaic")
+            message(FATAL_ERROR "[GGML_HEXAGON] qaic が見つかりません (SDK 6.x: ipc/fastrpc/qaic/bin, 5.x: tools/utils/qaic) under ${HEXAGON_SDK_ROOT}")
         endif()
         message(STATUS "hexagon: qaic=${QAIC_EXE}  sdk=${HEXAGON_SDK_ROOT}")
 
@@ -212,6 +213,7 @@ if(GGML_HEXAGON)
         add_custom_command(
             OUTPUT  "${HTP_STUB_C}" "${CMAKE_BINARY_DIR}/htp_iface.h"
             COMMAND "${QAIC_EXE}" -mdll -o "${CMAKE_BINARY_DIR}"
+                    "-I${HEXAGON_SDK_ROOT}/incs"
                     "-I${HEXAGON_SDK_ROOT}/incs/stddef"
                     "${HTP_IDL_FILE}"
             DEPENDS "${HTP_IDL_FILE}"

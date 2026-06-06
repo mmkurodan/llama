@@ -3,15 +3,17 @@
 # Hexagon SDK セットアップ & HTP skel ビルド支援スクリプト
 # =============================================================================
 # 使用前に以下の変数を自環境に合わせて変更してください。
-# Hexagon SDK は https://developer.qualcomm.com/software/hexagon-dsp-sdk
-# からダウンロードします（要 Qualcomm アカウント）。
+# Hexagon SDK の入手 (いずれか):
+#   - 公式 (要 Qualcomm アカウント): https://softwarecenter.qualcomm.com/catalog/item/Hexagon_SDK?version=6.6.0.0
+#   - コミュニティ CI 版 (ログイン不要・推奨):
+#       https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v6.6.0.0/hexagon-sdk-v6.6.0.0-amd64-lnx.tar.xz
 #
-# 動作確認済み SDK バージョン: 5.4.x, 5.5.x
+# 必要 SDK バージョン: 6.6.0.0 (HEXAGON_Tools 19.0.07 / toolv19)
 # =============================================================================
 set -euo pipefail
 
 # ---- 設定項目 (環境に合わせて変更) ----------------------------------------
-HEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT:-/opt/hexagon-sdk-5.4.0}"
+HEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT:-/opt/hexagon/6.6.0.0}"
 ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-/opt/android-sdk/ndk/27.2.12479018}"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 JNILIBS="${PROJECT_ROOT}/app/src/main/jniLibs/arm64-v8a"
@@ -47,11 +49,11 @@ check_prerequisites() {
     fi
     info "Android NDK: ${ANDROID_NDK_ROOT}"
 
-    # qaic の存在確認
+    # qaic の存在確認 (6.x: ipc/fastrpc/qaic/bin, 5.x: tools/utils/qaic)
     local qaic
-    qaic="$(find "${HEXAGON_SDK_ROOT}/tools/utils/qaic" -name "qaic" -type f 2>/dev/null | head -1)"
+    qaic="$(find "${HEXAGON_SDK_ROOT}" -type f -name "qaic" 2>/dev/null | head -1)"
     if [[ -z "${qaic}" ]]; then
-        error "qaic が見つかりません: ${HEXAGON_SDK_ROOT}/tools/utils/qaic"
+        error "qaic が見つかりません (探索: ${HEXAGON_SDK_ROOT})"
         exit 1
     fi
     info "qaic: ${qaic}"
@@ -99,6 +101,7 @@ print('${HEXAGON_SDK_ROOT}/' + path)
 
     cmake -S "${htp_src}" \
           -B "${build_dir}" \
+          -DCMAKE_TOOLCHAIN_FILE="${htp_src}/cmake-toolchain.cmake" \
           -DDSP_VERSION="${version}" \
           -DHEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT}" \
           -DHEXAGON_TOOLS_ROOT="${tools_root}" \

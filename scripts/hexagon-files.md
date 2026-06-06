@@ -48,12 +48,13 @@ NPU/HTP バックエンドを有効にするには、以下のファイルを He
 
 生成コマンド:
 ```bash
-# HEXAGON_SDK_ROOT = Hexagon SDK のインストールパス
-QAIC="${HEXAGON_SDK_ROOT}/tools/utils/qaic/Ubuntu22/qaic"
+# HEXAGON_SDK_ROOT = Hexagon SDK のインストールパス (例 /opt/hexagon/6.6.0.0)
+QAIC="${HEXAGON_SDK_ROOT}/ipc/fastrpc/qaic/bin/qaic"   # SDK 6.x の qaic パス
 IDL="app/src/main/cpp/llama/ggml/src/ggml-hexagon/htp/htp_iface.idl"
 OUT="app/src/main/cpp/hexagon-artifacts/stub"
 mkdir -p "${OUT}"
-"${QAIC}" -mdll -o "${OUT}" "-I${HEXAGON_SDK_ROOT}/incs/stddef" "${IDL}"
+# remote.idl は incs/、AEEStdDef.idl は incs/stddef/ にあるため両方を -I 指定
+"${QAIC}" -mdll -o "${OUT}" "-I${HEXAGON_SDK_ROOT}/incs" "-I${HEXAGON_SDK_ROOT}/incs/stddef" "${IDL}"
 ```
 
 #### A-2. Hexagon SDK ヘッダ群 (`sdk-incs/`)
@@ -62,7 +63,7 @@ mkdir -p "${OUT}"
 
 | ファイル | SDK パス | 備考 |
 |---|---|---|
-| `AEEStdErr.h`  | `${SDK}/incs/AEEStdErr.h`  | Qualcomm エラーコード定義 |
+| `AEEStdErr.h`  | `${SDK}/incs/stddef/AEEStdErr.h`  | Qualcomm エラーコード定義 (6.x は stddef/) |
 | `dspqueue.h`   | `${SDK}/incs/dspqueue.h`   | DSP キュー管理 API |
 | `rpcmem.h`     | `${SDK}/incs/rpcmem.h`     | リモートメモリ割り当て API |
 | `domain.h`     | `${SDK}/incs/domain.h`     | FastRPC ドメイン定義 |
@@ -72,7 +73,7 @@ mkdir -p "${OUT}"
 
 | ファイル | SDK パス |
 |---|---|
-| `AEEStdDef.h`  | `${SDK}/incs/AEEStdDef.h`  |
+| `AEEStdDef.h`  | `${SDK}/incs/stddef/AEEStdDef.h`  |
 | `AEEBufBound.h`| `${SDK}/incs/AEEBufBound.h`|
 | `HAP_farf.h`   | `${SDK}/utils/examples/HAP_farf.h` または `${SDK}/incs/HAP_farf.h` |
 | `incs/stddef/` 以下の全ファイル | `${SDK}/incs/stddef/*.h` |
@@ -131,24 +132,40 @@ cp /tmp/hexagon-bundle/hexagon-artifacts-v*/skel/libggml-htp-*.so \
 
 ## Hexagon SDK の取得
 
+**必要バージョン: 6.6.0.0 (HEXAGON_Tools 19.0.07 / toolv19)**
+
+入手は以下のいずれか。CI/自動化では (1) を推奨。
+
 ```
-ダウンロード: https://developer.qualcomm.com/software/hexagon-dsp-sdk
-要: Qualcomm アカウント (無料登録)
-バージョン: 5.4.x または 5.5.x を推奨 (toolv19 対応)
-OS: Ubuntu 20.04 / 22.04 (Linux 版)
-容量: 約 1.5〜2 GB
+(1) コミュニティ CI 版 — ★推奨・Qualcomm ログイン不要・公開ダウンロード
+    Linux x86_64 (ubuntu runner / 本リポジトリ向け, 約 694MB):
+      https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v6.6.0.0/hexagon-sdk-v6.6.0.0-amd64-lnx.tar.xz
+    Windows on Snapdragon arm64 (約 858MB):
+      https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v6.6.0.0/hexagon-sdk-v6.6.0.0-arm64-wos.tar.xz
+    ※ Windows x64 用トリム版は存在しない (x64 Windows runner では使えない)
+
+(2) 公式版 — 要 Qualcomm アカウント・約 5GB
+    https://softwarecenter.qualcomm.com/catalog/item/Hexagon_SDK?version=6.6.0.0
 ```
+
+`build-hexagon-artifacts.yml` ワークフローは (1) の amd64-lnx を runner 上で
+直接ダウンロードして skel + stub を生成するため、手元での SDK 取得は不要。
 
 SDK を展開後に確認すべきパス:
 ```bash
-${HEXAGON_SDK_ROOT}/
+${HEXAGON_SDK_ROOT}/                # 例: /opt/hexagon/6.6.0.0
 ├── incs/                       # ヘッダ群 (A-2 で使用)
 ├── incs/stddef/                # stddef ヘッダ群
-├── utils/examples/             # HAP_farf.h 等
+├── ipc/fastrpc/incs/           # FastRPC ヘッダ
+├── ipc/fastrpc/qaic/bin/qaic   # IDL コンパイラ (A-1 で使用) ※6.x はこの場所
+├── build/cmake/                # hexagon_fun.cmake / hexagon_arch.cmake (skel ビルドで使用)
+├── rtos/qurt/computev{68,69,73,75,79,81}*/   # 各 arch の QURT (skel リンクで使用)
 ├── tools/
-│   ├── utils/qaic/Ubuntu22/qaic  # IDL コンパイラ (A-1 で使用)
-│   └── HEXAGON_Tools/X.Y.Z/Tools/  # DSP クロスコンパイラ (skel ビルドで使用)
+│   └── HEXAGON_Tools/19.0.07/Tools/    # DSP クロスコンパイラ (skel ビルドで使用)
 └── hexagon_sdk.json            # SDK バージョン情報
+
+# 注: HAP_farf.h / rpcmem.h / dspqueue.h は incs/ 直下、
+#     AEEStdErr.h / AEEStdDef.h は incs/stddef/ にある (6.x)
 ```
 
 ---
@@ -157,13 +174,13 @@ ${HEXAGON_SDK_ROOT}/
 
 上記の手順をすべて実行する場合:
 ```bash
-export HEXAGON_SDK_ROOT=/path/to/hexagon-sdk-5.4.0
+export HEXAGON_SDK_ROOT=/opt/hexagon/6.6.0.0
 bash scripts/bundle-hexagon-artifacts.sh
 ```
 
 個別に操作する場合:
 ```bash
-export HEXAGON_SDK_ROOT=/path/to/hexagon-sdk-5.4.0
+export HEXAGON_SDK_ROOT=/opt/hexagon/6.6.0.0
 
 # Step 1: stub 生成
 bash scripts/setup-hexagon-sdk.sh check  # 前提確認
@@ -179,11 +196,11 @@ cp -r "${SDK}/incs/."        "${DST}/"
 [[ -d "${SDK}/utils/examples" ]] && cp -r "${SDK}/utils/examples/." "${DST}/"
 
 # Step 4: stub 生成
-QAIC=$(find "${SDK}/tools/utils/qaic" -name qaic -type f | head -1)
+QAIC=$(find "${SDK}" -type f -name qaic | head -1)   # 6.x: ipc/fastrpc/qaic/bin/qaic
 IDL="app/src/main/cpp/llama/ggml/src/ggml-hexagon/htp/htp_iface.idl"
 OUT="app/src/main/cpp/hexagon-artifacts/stub"
 mkdir -p "${OUT}"
-"${QAIC}" -mdll -o "${OUT}" "-I${SDK}/incs/stddef" "${IDL}"
+"${QAIC}" -mdll -o "${OUT}" "-I${SDK}/incs" "-I${SDK}/incs/stddef" "${IDL}"
 
 # Step 5: APK ビルド (Hexagon が自動検出される)
 ./gradlew assembleRelease

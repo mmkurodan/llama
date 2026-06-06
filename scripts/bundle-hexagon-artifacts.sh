@@ -9,8 +9,11 @@
 # gh release create で発行してください。
 #
 # 使用方法:
-#   export HEXAGON_SDK_ROOT=/opt/hexagon-sdk-5.4.0
+#   export HEXAGON_SDK_ROOT=/opt/hexagon/6.6.0.0
 #   bash scripts/bundle-hexagon-artifacts.sh
+#
+# SDK 入手 (ログイン不要のコミュニティ CI 版・推奨):
+#   https://github.com/snapdragon-toolchain/hexagon-sdk/releases/download/v6.6.0.0/hexagon-sdk-v6.6.0.0-amd64-lnx.tar.xz
 #
 # 環境変数:
 #   HEXAGON_SDK_ROOT    Hexagon SDK のインストールパス
@@ -47,10 +50,10 @@ if [[ -z "${HEXAGON_SDK_ROOT}" || ! -d "${HEXAGON_SDK_ROOT}" ]]; then
 fi
 info "SDK: ${HEXAGON_SDK_ROOT}"
 
-# qaic 検索
-QAIC=$(find "${HEXAGON_SDK_ROOT}/tools/utils/qaic" -name "qaic" -type f 2>/dev/null | head -1 || true)
+# qaic 検索 (6.x: ipc/fastrpc/qaic/bin, 5.x: tools/utils/qaic — SDK 全体を検索)
+QAIC=$(find "${HEXAGON_SDK_ROOT}" -type f -name "qaic" 2>/dev/null | head -1 || true)
 if [[ -z "${QAIC}" ]]; then
-    error "qaic が見つかりません: ${HEXAGON_SDK_ROOT}/tools/utils/qaic"
+    error "qaic が見つかりません (探索: ${HEXAGON_SDK_ROOT})"
     exit 1
 fi
 chmod +x "${QAIC}"
@@ -100,6 +103,7 @@ mkdir -p "${STUB_TMP}"
 
 "${QAIC}" -mdll \
     -o "${STUB_TMP}" \
+    "-I${HEXAGON_SDK_ROOT}/incs" \
     "-I${HEXAGON_SDK_ROOT}/incs/stddef" \
     "${IDL}"
 
@@ -138,6 +142,7 @@ for VER in ${DSP_VERSIONS}; do
     CMAKE_ARGS=(
         -S "${HTP_SRC}"
         -B "${BUILD_DIR}"
+        -DCMAKE_TOOLCHAIN_FILE="${HTP_SRC}/cmake-toolchain.cmake"
         -DDSP_VERSION="${VER}"
         -DHEXAGON_SDK_ROOT="${HEXAGON_SDK_ROOT}"
         -DCMAKE_BUILD_TYPE=Release
