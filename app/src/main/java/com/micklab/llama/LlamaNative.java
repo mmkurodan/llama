@@ -76,6 +76,9 @@ public class LlamaNative {
     public native boolean supportsVision();
     public native boolean supportsAudio();
 
+    /** Decode throughput (tokens/sec) of the most recent generation, 0 if none yet. */
+    public native double getLastGenerationSpeed();
+
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;
     }

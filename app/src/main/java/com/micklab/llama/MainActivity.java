@@ -13,6 +13,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -77,6 +78,7 @@ public class MainActivity extends Activity {
     private TextView logView;           // log view (append-only)
     private ScrollView mainScrollView;
     private TextView outputView;
+    private TextView statsView;         // generation speed (tok/s) + device temperature
     private TextView promptLabel;
     private TextView outputSectionLabel;
     private TextView processingSectionLabel;
@@ -214,6 +216,7 @@ public class MainActivity extends Activity {
         mainScrollView = findViewById(R.id.mainScrollView);
         logView = findViewById(R.id.logView);
         outputView = findViewById(R.id.outputView);
+        statsView = findViewById(R.id.statsView);
         promptLabel = findViewById(R.id.promptLabel);
         outputSectionLabel = findViewById(R.id.outputSectionLabel);
         processingSectionLabel = findViewById(R.id.processingSectionLabel);
@@ -431,6 +434,7 @@ public class MainActivity extends Activity {
                                 outputView.append(tail);
                                 scrollTextViewToBottom(outputView);
                             }
+                            updateStatsView();
                             appendMessage("streaming complete");
                         });
                     }
@@ -831,6 +835,41 @@ public class MainActivity extends Activity {
             int scrollAmount = textView.getLayout().getLineTop(textView.getLineCount()) - textView.getHeight();
             textView.scrollTo(0, Math.max(scrollAmount, 0));
         });
+    }
+
+    /** Update the stats line with the last generation speed (tok/s) and device temperature. */
+    private void updateStatsView() {
+        if (statsView == null) {
+            return;
+        }
+        double tps = 0.0;
+        try {
+            if (modelManager != null && modelManager.getLlama() != null) {
+                tps = modelManager.getLlama().getLastGenerationSpeed();
+            }
+        } catch (Throwable t) {
+            // native getter unavailable (e.g. NPU/CPU build mismatch) — leave tps=0
+        }
+        float tempC = readBatteryTempC();
+        String speedStr = (tps > 0.0) ? String.format(Locale.US, "%.1f tok/s", tps) : "-- tok/s";
+        String tempStr  = (!Float.isNaN(tempC)) ? String.format(Locale.US, "%.1f°C", tempC) : "--°C";
+        statsView.setText("⚡ " + speedStr + "    🌡 " + tempStr);
+    }
+
+    /** Battery temperature in degrees Celsius (proxy for device temperature), NaN if unavailable. */
+    private float readBatteryTempC() {
+        try {
+            Intent batteryStatus = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (batteryStatus != null) {
+                int tenthsC = batteryStatus.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
+                if (tenthsC != Integer.MIN_VALUE) {
+                    return tenthsC / 10.0f;
+                }
+            }
+        } catch (Throwable t) {
+            // ignore — temperature is best-effort
+        }
+        return Float.NaN;
     }
 
     private void appendMessage(final String msg) {

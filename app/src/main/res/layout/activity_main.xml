@@ -187,6 +187,18 @@
             android:text="Output will appear here"
             android:textSize="14sp" />
 
+        <!-- Generation speed (tok/s) + device temperature -->
+        <TextView
+            android:id="@+id/statsView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:gravity="end"
+            android:text="⚡ -- tok/s    🌡 --°C"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
         <!-- Divider -->
         <View
             android:layout_width="match_parent"
