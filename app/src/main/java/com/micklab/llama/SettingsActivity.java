@@ -34,6 +34,7 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.Switch;
+import android.widget.CompoundButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -125,8 +126,8 @@ public class SettingsActivity extends Activity {
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
     private Switch enableThinkingSwitch;
-    // Compute backend
-    private Spinner backendTypeSpinner;
+    // Compute backend (backendType is derived from these two switches; both off = CPU)
+    private Switch  gpuEnabledSwitch;
     private Switch  npuEnabledSwitch;
 
     // New prompt settings
@@ -308,31 +309,14 @@ public class SettingsActivity extends Activity {
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
 
-        // Compute backend spinner
-        backendTypeSpinner = findViewById(R.id.backendTypeSpinner);
-        if (backendTypeSpinner != null) {
-            String[] backendLabels = {
-                localizedText("CPU (推論専用)", "CPU (Inference only)"),
-                localizedText("GPU (OpenCL/Vulkan)", "GPU (OpenCL/Vulkan)"),
-                localizedText("NPU / Hexagon HTP", "NPU / Hexagon HTP"),
-                localizedText("GPU + NPU (ハイブリッド)", "GPU + NPU (Hybrid)")
-            };
-            ArrayAdapter<String> backendAdapter = new ArrayAdapter<>(
-                    this, android.R.layout.simple_spinner_item, backendLabels);
-            backendAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            backendTypeSpinner.setAdapter(backendAdapter);
-            backendTypeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, android.view.View view,
-                                           int position, long id) {
-                    updateBackendDependentUi(position);
-                }
-                @Override public void onNothingSelected(AdapterView<?> parent) {}
-            });
-        }
-
-        // NPU quick-toggle switch
+        // Compute backend: GPU / NPU 独立トグル (両方 OFF = CPU)。
+        // backendType はこの 2 つから導出する (スピナー廃止)。
+        gpuEnabledSwitch = findViewById(R.id.gpuEnabledSwitch);
         npuEnabledSwitch = findViewById(R.id.npuEnabledSwitch);
+        CompoundButton.OnCheckedChangeListener backendToggleListener =
+                (button, checked) -> updateBackendDependentUi();
+        if (gpuEnabledSwitch != null) gpuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
+        if (npuEnabledSwitch != null) npuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
 
         gpuLayersSeekBar = findViewById(R.id.gpuLayersSeekBar);
         gpuLayersValue = findViewById(R.id.gpuLayersValue);
@@ -488,24 +472,16 @@ public class SettingsActivity extends Activity {
         updateActionButtonStateForBusy();
     }
 
-    /** バックエンド選択に応じて GPU Layers / NPU switch の有効・無効を切り替える */
-    private void updateBackendDependentUi(int backendPosition) {
-        // 0=CPU: GPU layers 無効、NPU switch 無効
-        // 1=GPU: GPU layers 有効、NPU switch 無効
-        // 2=NPU: GPU layers 有効 (オフロード率として使用)、NPU switch 有効
-        // 3=GPU+NPU: GPU layers 有効、NPU switch 有効
-        final boolean gpuActive = (backendPosition != ConfigurationManager.Configuration.BACKEND_CPU);
-        final boolean npuActive = (backendPosition == ConfigurationManager.Configuration.BACKEND_NPU_HTP
-                                || backendPosition == ConfigurationManager.Configuration.BACKEND_GPU_NPU);
+    /** GPU/NPU トグルに応じてオフロード Layers スライダーの有効・無効を切り替える。
+     *  オフロード (n_gpu_layers) は GPU・NPU いずれかが有効なら適用されるため、
+     *  どちらか ON でスライダーを活性化する (両方 OFF = CPU はスライダー無効)。 */
+    private void updateBackendDependentUi() {
+        final boolean gpu = (gpuEnabledSwitch != null) && gpuEnabledSwitch.isChecked();
+        final boolean npu = (npuEnabledSwitch != null) && npuEnabledSwitch.isChecked();
+        final boolean offloadActive = gpu || npu;
 
-        if (gpuLayersSeekBar != null) gpuLayersSeekBar.setEnabled(gpuActive);
-        if (gpuLayersValue   != null) gpuLayersValue.setEnabled(gpuActive);
-        if (npuEnabledSwitch != null) {
-            npuEnabledSwitch.setEnabled(npuActive);
-            if (!npuActive) {
-                npuEnabledSwitch.setChecked(false);
-            }
-        }
+        if (gpuLayersSeekBar != null) gpuLayersSeekBar.setEnabled(offloadActive);
+        if (gpuLayersValue   != null) gpuLayersValue.setEnabled(offloadActive);
     }
 
     private void openDocuments() {
@@ -1000,15 +976,15 @@ public class SettingsActivity extends Activity {
         gpuLayersValue.setText(String.valueOf(displayLayers > 39 ? -1 : displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
 
-        // Compute backend
-        if (backendTypeSpinner != null) {
-            int sel = Math.max(0, Math.min(3, config.backendType));
-            backendTypeSpinner.setSelection(sel, false);
-            updateBackendDependentUi(sel);
-        }
-        if (npuEnabledSwitch != null) {
-            npuEnabledSwitch.setChecked(config.npuEnabled);
-        }
+        // Compute backend: backendType (0-3) を GPU/NPU トグルへ分解
+        int bt = Math.max(0, Math.min(3, config.backendType));
+        boolean gpuOn = (bt == ConfigurationManager.Configuration.BACKEND_GPU
+                      || bt == ConfigurationManager.Configuration.BACKEND_GPU_NPU);
+        boolean npuOn = (bt == ConfigurationManager.Configuration.BACKEND_NPU_HTP
+                      || bt == ConfigurationManager.Configuration.BACKEND_GPU_NPU);
+        if (gpuEnabledSwitch != null) gpuEnabledSwitch.setChecked(gpuOn);
+        if (npuEnabledSwitch != null) npuEnabledSwitch.setChecked(npuOn);
+        updateBackendDependentUi();
         
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
@@ -1216,11 +1192,15 @@ public class SettingsActivity extends Activity {
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
 
-        // Compute backend
-        config.backendType = (backendTypeSpinner != null)
-                ? Math.max(0, Math.min(3, backendTypeSpinner.getSelectedItemPosition()))
-                : ConfigurationManager.Configuration.BACKEND_CPU;
-        config.npuEnabled = (npuEnabledSwitch != null) && npuEnabledSwitch.isChecked();
+        // Compute backend: GPU/NPU トグルから backendType を導出 (両方 OFF = CPU)
+        boolean gpuOn = (gpuEnabledSwitch != null) && gpuEnabledSwitch.isChecked();
+        boolean npuOn = (npuEnabledSwitch != null) && npuEnabledSwitch.isChecked();
+        config.backendType = gpuOn
+                ? (npuOn ? ConfigurationManager.Configuration.BACKEND_GPU_NPU
+                         : ConfigurationManager.Configuration.BACKEND_GPU)
+                : (npuOn ? ConfigurationManager.Configuration.BACKEND_NPU_HTP
+                         : ConfigurationManager.Configuration.BACKEND_CPU);
+        config.npuEnabled = npuOn;
 
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();

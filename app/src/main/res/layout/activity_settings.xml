@@ -253,19 +253,35 @@
             android:inputType="number"
             android:text="16" />
 
-        <!-- Compute Backend Selection -->
+        <!-- Compute Backend Selection: CPU is the base; toggle GPU and/or NPU.
+             backendType is derived from these two switches (both off = CPU). -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Compute Backend:"
+            android:text="Compute Backend (both off = CPU):"
             android:paddingTop="8dp" />
 
-        <Spinner
-            android:id="@+id/backendTypeSpinner"
+        <!-- GPU Enable/Disable toggle -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="GPU (OpenCL/Adreno) Enabled:" />
+
+            <Switch
+                android:id="@+id/gpuEnabledSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+        </LinearLayout>
 
         <!-- NPU Enable/Disable quick toggle -->
         <LinearLayout
