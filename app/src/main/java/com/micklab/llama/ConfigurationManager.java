@@ -26,9 +26,9 @@ public class ConfigurationManager {
         // Default constant for DRY sequence breakers (must match C++ DEFAULT_DRY_SEQUENCE_BREAKERS)
         public static final String DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
 
-        // Prefill batch size. The previous default of 16 throttled prompt processing badly;
-        // 256 restores reasonable prefill speed while keeping the transient compute buffer small.
-        public static final int DEFAULT_N_BATCH = 256;
+        // Prefill batch size (n_batch; JNI also uses it for n_ubatch). 128 balances prompt
+        // processing speed against the transient compute buffer size on mobile.
+        public static final int DEFAULT_N_BATCH = 128;
         // Stored batch sizes at or below this legacy ceiling are treated as the old throttled
         // default and migrated up to DEFAULT_N_BATCH on load.
         private static final int LEGACY_N_BATCH_CEILING = 16;
