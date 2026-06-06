@@ -7,52 +7,19 @@ on:
   workflow_dispatch:
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Hexagon NPU 対応ビルドフロー概要
+# Hexagon NPU サポートについて
 #
-#   1. probe-hexagon  : 最新の hexagon-artifacts-* リリースが存在するか確認
-#   2. build-mbedtls  : mbedTLS ARM64 ビルド（既存）
-#   3. build-libcurl  : libcurl ARM64 ビルド（既存）
-#   4. build-apk      : APK ビルド
-#       - probe-hexagon が available=true なら:
-#           → Release から hexagon-artifacts バンドルをダウンロード
-#           → app/src/main/cpp/hexagon-artifacts/ に展開 (CMakeLists が自動検出)
-#           → skel/*.so を jniLibs/arm64-v8a/ にコピー
-#           → GGML_HEXAGON=ON で APK をビルド
-#       - available=false なら: GGML_HEXAGON=OFF (NPU なし) でビルド
+# このワークフローは hexagon-artifacts/ ディレクトリが checkout に含まれる場合、
+# CMakeLists.txt が自動検出して GGML_HEXAGON=ON でビルドします。
+#
+# hexagon-artifacts/ が存在しない場合は GGML_HEXAGON=OFF (NPU なし) でビルドします。
+# NPU 対応 APK を CI で作成するには、Hexagon SDK で生成したファイルを
+# リポジトリにコミットするか、セルフホスト runner で事前配置してください。
+#
+# 必要なファイルの取得方法と配置パスは scripts/hexagon-files.md を参照してください。
 # ──────────────────────────────────────────────────────────────────────────────
 
 jobs:
-
-  # ── Job 0: Hexagon artifacts の存在チェック ─────────────────────────────────
-  probe-hexagon:
-    runs-on: ubuntu-latest
-    outputs:
-      available: ${{ steps.probe.outputs.available }}
-      tag:       ${{ steps.probe.outputs.tag }}
-    steps:
-      - name: Check for Hexagon artifacts release
-        id: probe
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # hexagon-artifacts-* という prefix を持つ最新リリースタグを検索
-          TAG=$(gh release list \
-            --repo "${{ github.repository }}" \
-            --json tagName,isDraft,isPrerelease \
-            --jq '.[] | select(.isDraft==false) | .tagName' \
-            2>/dev/null \
-            | grep '^hexagon-artifacts-' \
-            | sort -V | tail -1 || true)
-
-          if [[ -n "${TAG}" ]]; then
-            echo "available=true"  >> "$GITHUB_OUTPUT"
-            echo "tag=${TAG}"      >> "$GITHUB_OUTPUT"
-            echo "✅ Hexagon artifacts found: ${TAG}"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "tag="            >> "$GITHUB_OUTPUT"
-            echo "⚠️  No hexagon-artifacts release found — building without NPU support"
-          fi
 
   # ── Job 1: mbedTLS ──────────────────────────────────────────────────────────
   build-mbedtls:
@@ -78,8 +45,7 @@ jobs:
           export TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/$HOST_TAG
 
           git clone --depth 1 --branch v3.5.1 https://github.com/Mbed-TLS/mbedtls.git
-          cd mbedtls
-          mkdir build && cd build
+          cd mbedtls && mkdir build && cd build
 
           cmake .. \
             -DCMAKE_SYSTEM_NAME=Android \
@@ -96,8 +62,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-fPIC" \
             -DCMAKE_INSTALL_PREFIX=$PWD/install
 
-          make -j"$(nproc)"
-          make install
+          make -j"$(nproc)" && make install
 
       - name: Upload mbedTLS artifact
         uses: actions/upload-artifact@v4
@@ -132,8 +97,7 @@ jobs:
         run: |
           set -e
           git clone --depth 1 --branch curl-8_5_0 https://github.com/curl/curl.git
-          cd curl
-          autoreconf -fi
+          cd curl && autoreconf -fi
 
           export API=24
           export HOST_TAG=linux-x86_64
@@ -150,8 +114,7 @@ jobs:
             --without-zlib --without-zstd --without-brotli \
             --prefix=$PWD/build/arm64
 
-          make -j"$(nproc)"
-          make install
+          make -j"$(nproc)" && make install
 
       - name: Upload libcurl artifact
         uses: actions/upload-artifact@v4
@@ -159,14 +122,10 @@ jobs:
           name: libcurl-arm64
           path: curl/build/arm64
 
-  # ── Job 3: APK ビルド ───────────────────────────────────────────────────────
+  # ── Job 3: APK ──────────────────────────────────────────────────────────────
   build-apk:
     runs-on: ubuntu-latest
-    needs: [build-libcurl, probe-hexagon]
-    env:
-      HEXAGON_AVAILABLE: ${{ needs.probe-hexagon.outputs.available }}
-      HEXAGON_TAG:       ${{ needs.probe-hexagon.outputs.tag }}
-
+    needs: build-libcurl
     steps:
       - uses: actions/checkout@v4
 
@@ -197,54 +156,31 @@ jobs:
         with:
           ndk-version: r27
 
-      # ── Hexagon artifacts (利用可能な場合) ──────────────────────────────────
-      - name: Download Hexagon artifacts from Release
-        if: env.HEXAGON_AVAILABLE == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # ── Hexagon NPU サポート確認 (ファイルが checkout に存在する場合のみ有効) ──
+      - name: Check Hexagon NPU availability
+        id: hexagon
         run: |
-          set -euo pipefail
-          echo "📥 Downloading Hexagon artifacts: ${{ env.HEXAGON_TAG }}"
-
-          mkdir -p /tmp/hexagon-dl
-          gh release download "${{ env.HEXAGON_TAG }}" \
-            --repo "${{ github.repository }}" \
-            --pattern "hexagon-artifacts-*.tar.gz" \
-            --dir /tmp/hexagon-dl
-
-          # CMakeLists.txt が自動検出するパスに展開
-          ARTIFACTS_DST="${GITHUB_WORKSPACE}/app/src/main/cpp/hexagon-artifacts"
-          mkdir -p "${ARTIFACTS_DST}"
-          tar -xf /tmp/hexagon-dl/hexagon-artifacts-*.tar.gz \
-            -C "${ARTIFACTS_DST}" --strip-components=1
-
-          echo "📂 Artifacts extracted:"
-          find "${ARTIFACTS_DST}" -maxdepth 3 | head -30
-
-          # HTP skel .so を jniLibs に配置
-          JNILIBS="${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a"
-          mkdir -p "${JNILIBS}"
-          if ls "${ARTIFACTS_DST}/skel/"libggml-htp-*.so 2>/dev/null; then
-            cp "${ARTIFACTS_DST}/skel/"libggml-htp-*.so "${JNILIBS}/"
-            echo "✅ HTP skel files copied to jniLibs:"
-            ls -la "${JNILIBS}/"libggml-htp-*.so
+          ARTIFACTS_DIR="app/src/main/cpp/hexagon-artifacts"
+          STUB="${ARTIFACTS_DIR}/stub/htp_iface_stub.c"
+          if [[ -f "${STUB}" ]]; then
+            echo "enabled=true"  >> "$GITHUB_OUTPUT"
+            echo "✅ Hexagon NPU: ENABLED (artifacts found at ${ARTIFACTS_DIR})"
+            find "${ARTIFACTS_DIR}" -maxdepth 3 -name "*.c" -o -name "*.h" -o -name "*.so" \
+              | head -20
           else
-            echo "⚠️  No skel/*.so found in artifacts (compile-time only, no NPU at runtime)"
-          fi
-
-      - name: Show Hexagon build status
-        run: |
-          if [[ "${{ env.HEXAGON_AVAILABLE }}" == "true" ]]; then
-            echo "🔧 Hexagon NPU: ENABLED (artifacts: ${{ env.HEXAGON_TAG }})"
-            ARTIFACTS="${GITHUB_WORKSPACE}/app/src/main/cpp/hexagon-artifacts"
-            [[ -f "${ARTIFACTS}/stub/htp_iface_stub.c" ]] && echo "   ✅ htp_iface_stub.c" || echo "   ❌ htp_iface_stub.c NOT FOUND"
-            [[ -d "${ARTIFACTS}/sdk-incs" ]]              && echo "   ✅ sdk-incs/"         || echo "   ❌ sdk-incs/ NOT FOUND"
-          else
-            echo "⚠️  Hexagon NPU: DISABLED (no artifacts release found)"
-            echo "   To enable: run build-hexagon-artifacts.yml workflow"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️  Hexagon NPU: DISABLED"
+            echo "   hexagon-artifacts/stub/htp_iface_stub.c が見つかりません"
+            echo "   NPU 対応ビルドには scripts/hexagon-files.md を参照してください"
           fi
 
       # ── Gradle セットアップ ──────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - name: Download Gradle 8.7
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
@@ -253,12 +189,6 @@ jobs:
 
       - name: Generate Gradle Wrapper (8.7)
         run: gradle wrapper --gradle-version 8.7
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
 
       # ── APK ビルド ──────────────────────────────────────────────────────────
       - name: Build debug APK
@@ -283,17 +213,14 @@ jobs:
           READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
 
           mapfile -t SO_FILES < <(unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true)
-          if [[ ${#SO_FILES[@]} -eq 0 ]]; then
-            echo "No native .so files found"
-            exit 0
-          fi
+          [[ ${#SO_FILES[@]} -eq 0 ]] && { echo "No .so files"; exit 0; }
           FAIL=0
           for so in "${SO_FILES[@]}"; do
             tmp_so="$(mktemp)"
             unzip -p "$APK" "$so" > "$tmp_so"
             if ! "$READELF" -l "$tmp_so" \
               | awk '/LOAD/ { if ($0 !~ /0x4000[[:space:]]*$/) bad=1 } END { exit bad }'; then
-              echo "❌ $so: LOAD segment not 0x4000 aligned"
+              echo "❌ $so: 0x4000 alignment NG"
               FAIL=1
             else
               echo "✅ $so"
@@ -313,15 +240,17 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       # ── ビルドサマリー ───────────────────────────────────────────────────────
-      - name: Show APK info
+      - name: Build summary
         run: |
-          echo "=== Build Summary ==="
-          echo "Hexagon NPU: ${{ env.HEXAGON_AVAILABLE == 'true' && 'ENABLED' || 'DISABLED' }}"
+          NPU_STATUS="${{ steps.hexagon.outputs.enabled == 'true' && 'ENABLED' || 'DISABLED' }}"
+          echo "## Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Hexagon NPU | ${NPU_STATUS} |" >> "$GITHUB_STEP_SUMMARY"
           if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
             SIZE=$(du -sh app/build/outputs/apk/release/app-release.apk | cut -f1)
-            echo "Release APK: ${SIZE}"
+            echo "| Release APK | ${SIZE} |" >> "$GITHUB_STEP_SUMMARY"
           fi
-          # APK 内の .so ファイル一覧
           echo "--- Native libs in APK ---"
           unzip -Z1 app/build/outputs/apk/release/app-release.apk | grep '\.so$' || true
 
@@ -335,11 +264,11 @@ jobs:
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release${{ env.HEXAGON_AVAILABLE == 'true' && '-npu' || '' }}
+          name: app-release${{ steps.hexagon.outputs.enabled == 'true' && '-npu' || '' }}
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab${{ env.HEXAGON_AVAILABLE == 'true' && '-npu' || '' }}
+          name: app-release-aab${{ steps.hexagon.outputs.enabled == 'true' && '-npu' || '' }}
           path: app/build/outputs/bundle/release/app-release.aab

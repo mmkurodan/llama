@@ -1,4 +1,10 @@
 app/src/main/assets/*.gguf
+
+# Hexagon NPU artifacts (manually placed — NOT committed to public repos)
+# 取得・配置方法: scripts/hexagon-files.md を参照
+app/src/main/cpp/hexagon-artifacts/
+app/src/main/jniLibs/arm64-v8a/libggml-htp-*.so
+
 .gradle/
 gradle/
 gradlew
