@@ -6,17 +6,21 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read           # gh release list/download (Hexagon 成果物取得) に必要
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Hexagon NPU サポートについて
 #
-# このワークフローは hexagon-artifacts/ ディレクトリが checkout に含まれる場合、
-# CMakeLists.txt が自動検出して GGML_HEXAGON=ON でビルドします。
+# build-apk ジョブは build-hexagon-artifacts.yml が発行した最新の
+# hexagon-artifacts-* Release を自動取得し、app/src/main/cpp/hexagon-artifacts/
+# に展開 + skel を jniLibs/arm64-v8a/ に配置します。これにより CMakeLists.txt が
+# Mode B (artifacts 自動検出) で GGML_HEXAGON=ON にしてビルドします。
 #
-# hexagon-artifacts/ が存在しない場合は GGML_HEXAGON=OFF (NPU なし) でビルドします。
-# NPU 対応 APK を CI で作成するには、Hexagon SDK で生成したファイルを
-# リポジトリにコミットするか、セルフホスト runner で事前配置してください。
+# Release が存在しない場合 (まだ artifacts を発行していない等) は
+# GGML_HEXAGON=OFF (NPU なし) でフォールバックビルドします。
 #
-# 必要なファイルの取得方法と配置パスは scripts/hexagon-files.md を参照してください。
+# NPU 成果物の生成方法は build-hexagon-artifacts.yml / scripts/hexagon-files.md 参照。
 # ──────────────────────────────────────────────────────────────────────────────
 
 jobs:
@@ -156,7 +160,45 @@ jobs:
         with:
           ndk-version: r27
 
-      # ── Hexagon NPU サポート確認 (ファイルが checkout に存在する場合のみ有効) ──
+      # ── Hexagon NPU 成果物を最新 Release から自動取得 ───────────────────────
+      # build-hexagon-artifacts.yml が発行した hexagon-artifacts-* Release を取得し
+      # app/src/main/cpp/hexagon-artifacts/ に展開、skel を jniLibs へ配置する。
+      # Release が無ければ NPU 無しでビルド続行 (フォールバック)。
+      - name: Fetch Hexagon artifacts from latest Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DEST="app/src/main/cpp/hexagon-artifacts"
+          JNI="app/src/main/jniLibs/arm64-v8a"
+          TAG=$(gh release list --repo "${{ github.repository }}" --limit 50 \
+                  --json tagName \
+                  --jq '[.[].tagName | select(startswith("hexagon-artifacts-"))] | sort | last' \
+                2>/dev/null || true)
+          if [[ -z "${TAG}" || "${TAG}" == "null" ]]; then
+            echo "ℹ️  hexagon-artifacts-* Release が無いため NPU 無しでビルドします。"
+            exit 0
+          fi
+          echo "📥 Hexagon artifacts release: ${TAG}"
+          mkdir -p /tmp/hexdl "${DEST}" "${JNI}"
+          gh release download "${TAG}" --repo "${{ github.repository }}" \
+            --pattern '*.tar.gz' --dir /tmp/hexdl --clobber
+          TARBALL=$(ls /tmp/hexdl/*.tar.gz 2>/dev/null | head -1 || true)
+          if [[ -z "${TARBALL}" ]]; then
+            echo "::warning::Release ${TAG} に tar.gz アセットがありません。NPU 無しで継続。"
+            exit 0
+          fi
+          # トップの hexagon-artifacts-vX.Y.Z/ を剥がし stub/ sdk-incs/ skel/ を直下へ
+          tar -xzf "${TARBALL}" -C "${DEST}" --strip-components=1
+          # DSP skel を jniLibs/arm64-v8a/ へ (APK 同梱、実行時に DSP ローダーが検出)
+          if compgen -G "${DEST}/skel/*.so" > /dev/null; then
+            cp "${DEST}/skel/"*.so "${JNI}/"
+          fi
+          echo "✅ placed under ${DEST}:"
+          ( find "${DEST}" -maxdepth 2 \( -name '*.c' -o -name '*.so' \) | head -20 ) || true
+          ls -la "${JNI}"/libggml-htp-*.so 2>/dev/null || true
+
+      # ── Hexagon NPU サポート確認 (上記で取得できた場合のみ有効) ──────────────
       - name: Check Hexagon NPU availability
         id: hexagon
         run: |
@@ -212,7 +254,9 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
 
-          mapfile -t SO_FILES < <(unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true)
+          # libggml-htp-*.so は Hexagon DSP バイナリで Android リンカがロードせず
+          # 16KB ページ要件の対象外のため除外する
+          mapfile -t SO_FILES < <(unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' | grep -v '/libggml-htp-' || true)
           [[ ${#SO_FILES[@]} -eq 0 ]] && { echo "No .so files"; exit 0; }
           FAIL=0
           for so in "${SO_FILES[@]}"; do
