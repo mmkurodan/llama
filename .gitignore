@@ -5,6 +5,9 @@ app/src/main/assets/*.gguf
 app/src/main/cpp/hexagon-artifacts/
 app/src/main/jniLibs/arm64-v8a/libggml-htp-*.so
 
+# ローカル専用ツール (PAT 等の機密を含むためコミットしない)
+gha_log_analyzer.sh
+
 .gradle/
 gradle/
 gradlew
