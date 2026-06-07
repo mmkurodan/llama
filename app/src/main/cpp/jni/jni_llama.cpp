@@ -919,6 +919,21 @@ static void ensure_backend_initialized_locked(const char * log_prefix) {
             log_to_file(std::string(log_prefix) + ": setenv(ADSP_LIBRARY_PATH) failed",
                         GGML_LOG_LEVEL_WARN);
         }
+        // 診断: HTP skel が nativeLibraryDir に「ファイルとして」存在するか確認する。
+        // 1 つも無ければ extractNativeLibs/useLegacyPackaging が効いておらず NPU は必ず失敗する。
+        int skel_found = 0;
+        for (const char * v : {"v68", "v69", "v73", "v75", "v79", "v81"}) {
+            const std::string p = g_native_lib_dir + "/libggml-htp-" + v + ".so";
+            if (access(p.c_str(), R_OK) == 0) {
+                ++skel_found;
+                log_to_file(std::string(log_prefix) + ": HTP skel present: " + p);
+            }
+        }
+        if (skel_found == 0) {
+            log_to_file(std::string(log_prefix) + ": no HTP skel files found under " +
+                        g_native_lib_dir + " — NPU cannot initialize (check extractNativeLibs)",
+                        GGML_LOG_LEVEL_ERROR);
+        }
     }
 #endif
 
@@ -3303,6 +3318,18 @@ Java_com_micklab_llama_LlamaNative_setBackendConfig(
     g_backend_type    = new_type;
     g_npu_enabled     = new_npu;
     g_native_lib_dir  = new_dir;
+
+    // 設定された (要求) バックエンドを表示用に即反映する。
+    // 実効値 (フォールバック含む) は次回モデル構築時に build_model_params が精緻化する。
+    // これをしないと、前回 NPU で "CPU (fallback)" になった表示が CPU/GPU に切り替えても固着する。
+    {
+        const bool want_npu = new_npu && (new_type == 2 || new_type == 3);
+        const bool want_gpu = (new_type == 1 || new_type == 3);
+        g_active_backend = (want_npu && want_gpu) ? "GPU+NPU"
+                         : want_npu ? "NPU/HTP"
+                         : want_gpu ? "GPU"
+                         : "CPU";
+    }
 
     if (changed) {
         // Bump version so ensure_backend_initialized_locked re-initializes on next model load
