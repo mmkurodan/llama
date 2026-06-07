@@ -104,6 +104,11 @@ public class ModelManager {
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
     private volatile String currentConfiguredMmprojPath = null;
+    // Backend config the currently-loaded model was built with. A change here must
+    // force a model reload (tensors are placed on the accelerator at load time).
+    private volatile int currentBackendType = -1;
+    private volatile boolean currentNpuEnabled = false;
+    private volatile int currentGpuOffloadLayers = Integer.MIN_VALUE;
     private volatile String currentMmprojPath = null;
     private volatile boolean currentSupportsVision = false;
     private volatile boolean currentSupportsAudio = false;
@@ -236,7 +241,11 @@ public class ModelManager {
         synchronized (stateLock) {
             return modelLoaded
                     && configuredModelFile.getAbsolutePath().equals(currentModelPath)
-                    && Objects.equals(projectorResolution.projectorPath, currentConfiguredMmprojPath);
+                    && Objects.equals(projectorResolution.projectorPath, currentConfiguredMmprojPath)
+                    // バックエンド設定が変わったら別物として再ロードさせる (NPU/GPU はロード時にしか効かない)
+                    && config.backendType == currentBackendType
+                    && config.npuEnabled == currentNpuEnabled
+                    && config.gpuOffloadLayers == currentGpuOffloadLayers;
         }
     }
 
@@ -587,6 +596,10 @@ public class ModelManager {
 
             currentConfigName = configName;
             modelLoaded = true;
+            // この設定でモデルを構築したことを記録 (再ロード判定に使用)
+            currentBackendType = config.backendType;
+            currentNpuEnabled = config.npuEnabled;
+            currentGpuOffloadLayers = config.gpuOffloadLayers;
 
             if (listener != null) {
                 listener.onModelLoaded(configName);
@@ -882,6 +895,9 @@ public class ModelManager {
         currentSupportsVision = false;
         currentSupportsAudio = false;
         currentConfigName = null;
+        currentBackendType = -1;
+        currentNpuEnabled = false;
+        currentGpuOffloadLayers = Integer.MIN_VALUE;
         modelLoaded = false;
     }
 
