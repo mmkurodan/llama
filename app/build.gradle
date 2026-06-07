@@ -69,6 +69,10 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // libOpenCL.so is only linked against (the real driver is provided by the
+            // device and declared via <uses-native-library>). Do not ship the link stub;
+            // it would also fail the 16KB-alignment check.
+            excludes += ["**/libOpenCL.so"]
         }
     }
 }
