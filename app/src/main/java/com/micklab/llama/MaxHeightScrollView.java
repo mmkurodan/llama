@@ -2,6 +2,7 @@ package com.micklab.llama;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.widget.ScrollView;
 
 /**
@@ -38,5 +39,26 @@ public class MaxHeightScrollView extends ScrollView {
             heightMeasureSpec = MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST);
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        // When nested inside another ScrollView (the page), the outer one would steal
+        // vertical drags and this bounded area could never scroll. If our content is
+        // actually taller than us, ask the parent not to intercept so we scroll instead.
+        if (ev.getActionMasked() == MotionEvent.ACTION_DOWN && canScrollOwnContent()) {
+            if (getParent() != null) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+        }
+        return super.onInterceptTouchEvent(ev);
+    }
+
+    private boolean canScrollOwnContent() {
+        if (getChildCount() == 0) {
+            return false;
+        }
+        final int visible = getHeight() - getPaddingTop() - getPaddingBottom();
+        return getChildAt(0).getHeight() > visible;
     }
 }
