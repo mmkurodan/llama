@@ -139,17 +139,26 @@
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
-            <!-- Response area: selectable/copyable (long-press to copy) -->
-            <TextView
-                android:id="@+id/outputView"
+            <!-- Response area: bounded to <=50% screen (set in code), scrolls beyond.
+                 Selectable/copyable (long-press to copy). -->
+            <com.micklab.llama.MaxHeightScrollView
+                android:id="@+id/outputScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="160dp"
                 android:background="#F5F5F5"
-                android:padding="12dp"
-                android:textIsSelectable="true"
-                android:text="Output will appear here"
-                android:textSize="14sp" />
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/outputView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="80dp"
+                    android:padding="12dp"
+                    android:textIsSelectable="true"
+                    android:text="Output will appear here"
+                    android:textSize="14sp" />
+
+            </com.micklab.llama.MaxHeightScrollView>
 
             <!-- Generation speed (tok/s) + device temperature (also in the top header) -->
             <TextView
@@ -226,17 +235,26 @@
 
         </LinearLayout>
 
-        <!-- Processing status / log: selectable/copyable (long-press to copy) -->
-        <TextView
-            android:id="@+id/logView"
+        <!-- Processing status / log: bounded to <=50% screen (set in code), scrolls beyond.
+             Selectable/copyable (long-press to copy). -->
+        <com.micklab.llama.MaxHeightScrollView
+            android:id="@+id/logScroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="160dp"
             android:background="#F0F0F0"
-            android:padding="12dp"
-            android:textIsSelectable="true"
-            android:text="Starting...\n"
-            android:textSize="12sp" />
+            android:scrollbars="vertical">
+
+            <TextView
+                android:id="@+id/logView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="80dp"
+                android:padding="12dp"
+                android:textIsSelectable="true"
+                android:text="Starting...\n"
+                android:textSize="12sp" />
+
+        </com.micklab.llama.MaxHeightScrollView>
 
     </LinearLayout>
 </ScrollView>

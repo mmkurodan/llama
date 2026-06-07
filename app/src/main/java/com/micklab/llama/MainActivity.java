@@ -82,6 +82,8 @@ public class MainActivity extends Activity {
     private TextView logView;           // log view (append-only)
     private ScrollView mainScrollView;
     private TextView outputView;
+    private MaxHeightScrollView outputScroll;   // bounds outputView to <=50% screen
+    private MaxHeightScrollView logScroll;       // bounds logView to <=50% screen
     private TextView statsView;         // generation speed (tok/s) + device temperature (under output)
     private TextView headerStatsView;   // top header: speed + temp + active backend
     private Spinner  profileSpinner;    // profile (configuration) selector in the direct section
@@ -222,6 +224,12 @@ public class MainActivity extends Activity {
         mainScrollView = findViewById(R.id.mainScrollView);
         logView = findViewById(R.id.logView);
         outputView = findViewById(R.id.outputView);
+        // Bound the output/log text areas to at most 50% of the screen height; scroll beyond.
+        outputScroll = findViewById(R.id.outputScroll);
+        logScroll = findViewById(R.id.logScroll);
+        final int halfScreenPx = getResources().getDisplayMetrics().heightPixels / 2;
+        if (outputScroll != null) outputScroll.setMaxHeightPx(halfScreenPx);
+        if (logScroll != null) logScroll.setMaxHeightPx(halfScreenPx);
         statsView = findViewById(R.id.statsView);
         headerStatsView = findViewById(R.id.headerStatsView);
         profileSpinner = findViewById(R.id.profileSpinner);
@@ -833,11 +841,23 @@ public class MainActivity extends Activity {
         if (textView == null) {
             return;
         }
+        final android.view.ViewParent parent = textView.getParent();
+        if (parent instanceof ScrollView) {
+            final ScrollView sv = (ScrollView) parent;
+            sv.post(() -> sv.smoothScrollTo(0, 0));
+            return;
+        }
         textView.post(() -> textView.scrollTo(0, 0));
     }
 
     private void scrollTextViewToBottom(TextView textView) {
         if (textView == null) {
+            return;
+        }
+        final android.view.ViewParent parent = textView.getParent();
+        if (parent instanceof ScrollView) {
+            final ScrollView sv = (ScrollView) parent;
+            sv.post(() -> sv.fullScroll(View.FOCUS_DOWN));
             return;
         }
         textView.post(() -> {
