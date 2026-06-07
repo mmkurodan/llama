@@ -98,12 +98,10 @@ public class MainActivity extends Activity {
     private Button viewLogButton;
     private Button clearLogButton;
     private Button apiServerButton;
-    private Button copyOutputButton;
     private Button downloadLogButton;
     private Button updateLogButton;
-    private Button copyLogButton;
     private boolean isViewingLog = false;
-    private String savedOutputText = null;
+    private String savedProcessingText = null;   // live processing-status text saved while viewing the log file
     private String displayedLogContent = null;
     private String pendingLogDownloadContent = null;
     private TextView apiServerStatusMain;
@@ -242,14 +240,13 @@ public class MainActivity extends Activity {
         viewLogButton = findViewById(R.id.viewLogButton);
         clearLogButton = findViewById(R.id.clearLogButton);
         apiServerButton = findViewById(R.id.apiServerButton);
-        copyOutputButton = findViewById(R.id.copyOutputButton);
         downloadLogButton = findViewById(R.id.downloadLogButton);
         updateLogButton = findViewById(R.id.updateLogButton);
-        copyLogButton = findViewById(R.id.copyLogButton);
         apiServerStatusMain = findViewById(R.id.apiServerStatusMain);
         applyLocalizedUiText();
-        configureScrollableTextView(outputView);
-        configureScrollableTextView(logView);
+        // outputView/logView は textIsSelectable=true で選択コピー可能。
+        // ScrollingMovementMethod を設定すると選択が無効になるため設定しない
+        // (長文はページ全体の ScrollView でスクロールする)。
 
         appendMessage("UI ready.");
 
@@ -266,10 +263,8 @@ public class MainActivity extends Activity {
         viewLogButton.setOnClickListener(v -> toggleViewLog());
         clearLogButton.setOnClickListener(v -> clearLogFile());
         apiServerButton.setOnClickListener(v -> toggleApiServer());
-        copyOutputButton.setOnClickListener(v -> copyToClipboard("Output", outputView.getText().toString()));
         downloadLogButton.setOnClickListener(v -> downloadDisplayedLog());
         updateLogButton.setOnClickListener(v -> { if (isViewingLog) { refreshLogView(); } });
-        copyLogButton.setOnClickListener(v -> copyToClipboard("Log", logView.getText().toString()));
         updateLogButton.setVisibility(Button.GONE);
         downloadLogButton.setEnabled(true);
         
@@ -288,12 +283,7 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            if (isViewingLog) {
-                isViewingLog = false;
-                viewLogButton.setText(localizedText("ログ表示", "View Log"));
-                updateLogButton.setEnabled(false);
-                updateLogButton.setVisibility(Button.GONE);
-            }
+            exitLogViewToStatus();
             
             // Check if busy
             if (!modelManager.tryAcquire()) {
@@ -351,12 +341,7 @@ public class MainActivity extends Activity {
             if (!isDirectGenerationSessionActive(generationSessionId)) {
                 return;
             }
-            if (isViewingLog) {
-                isViewingLog = false;
-                viewLogButton.setText(localizedText("ログ表示", "View Log"));
-                updateLogButton.setEnabled(false);
-                updateLogButton.setVisibility(Button.GONE);
-            }
+            exitLogViewToStatus();
             appendMessage("Running generate...");
             outputView.setText("");
             scrollTextViewToTop(outputView);
@@ -615,25 +600,32 @@ public class MainActivity extends Activity {
 
     private void toggleViewLog() {
         if (!isViewingLog) {
-            // Save current output and display logs
-            savedOutputText = outputView.getText().toString();
+            // 処理状況エリア(logView)を、保存しておいて全ログファイル表示に切り替える
+            savedProcessingText = logView.getText() != null ? logView.getText().toString() : "";
             isViewingLog = true;
-            viewLogButton.setText(localizedText("ログを隠す", "Hide Log"));
+            viewLogButton.setText(localizedText("状況に戻る", "Show Status"));
             updateLogButton.setEnabled(true);
             updateLogButton.setVisibility(Button.VISIBLE);
             downloadLogButton.setEnabled(true);
             refreshLogView();
         } else {
-            // Restore output view
-            isViewingLog = false;
-            displayedLogContent = null;
-            viewLogButton.setText(localizedText("ログ表示", "View Log"));
-            updateLogButton.setEnabled(false);
-            updateLogButton.setVisibility(Button.GONE);
-            if (savedOutputText != null) {
-                outputView.setText(savedOutputText);
-                scrollTextViewToTop(outputView);
-            }
+            exitLogViewToStatus();
+        }
+    }
+
+    /** Switch the processing area (logView) back from the log file to the live status text. */
+    private void exitLogViewToStatus() {
+        if (!isViewingLog) {
+            return;
+        }
+        isViewingLog = false;
+        displayedLogContent = null;
+        viewLogButton.setText(localizedText("ログ表示", "View Log"));
+        updateLogButton.setEnabled(false);
+        updateLogButton.setVisibility(Button.GONE);
+        if (logView != null && savedProcessingText != null) {
+            logView.setText(savedProcessingText);
+            scrollTextViewToBottom(logView);
         }
     }
 
@@ -650,8 +642,8 @@ public class MainActivity extends Activity {
                 final String logContent = readDisplayLogContent(appFilesDir);
                 runOnUiThread(() -> {
                     displayedLogContent = logContent;
-                    outputView.setText(logContent);
-                    scrollTextViewToBottom(outputView);
+                    logView.setText(logContent);
+                    scrollTextViewToBottom(logView);
                     showToast(isMaxDebugEnabled()
                             ? "Displaying MAX DEBUG log"
                             : "Displaying latest " + LOG_DISPLAY_MAX_LINES + " log lines");
@@ -697,7 +689,8 @@ public class MainActivity extends Activity {
         DiagnosticsLogger.clearLogFiles(this);
         displayedLogContent = null;
         if (isViewingLog) {
-            outputView.setText("");
+            logView.setText("");
+            savedProcessingText = "";
         }
         appendMessage("Logs cleared.");
         showToast("Logs cleared");
@@ -963,6 +956,11 @@ public class MainActivity extends Activity {
             }
             String timestamp = timestampFormat.format(new Date());
             String nextLine = "[" + timestamp + "] " + msg + "\n";
+            if (isViewingLog) {
+                // ログファイル表示中は live ステータスをバッファに溜めて表示は触らない
+                savedProcessingText = appendAndTrimProcessingLog(savedProcessingText, nextLine);
+                return;
+            }
             String currentText = logView.getText() != null ? logView.getText().toString() : "";
             logView.setText(appendAndTrimProcessingLog(currentText, nextLine));
             scrollTextViewToBottom(logView);
@@ -1038,17 +1036,18 @@ public class MainActivity extends Activity {
         if (clearLogButton != null) {
             clearLogButton.setText(localizedText("ログ消去", "Clear Log"));
         }
-        if (copyOutputButton != null) {
-            copyOutputButton.setText(localizedText("コピー", "Copy"));
-        }
         if (downloadLogButton != null) {
             downloadLogButton.setText(localizedText("保存", "Download"));
         }
         if (updateLogButton != null) {
             updateLogButton.setText(localizedText("更新", "Update"));
         }
-        if (copyLogButton != null) {
-            copyLogButton.setText(localizedText("コピー", "Copy"));
+        // Direct Run セクションヘッダ (現在の開閉状態に合わせてローカライズ表示)
+        if (directSectionHeader != null && directSectionContent != null) {
+            boolean expanded = directSectionContent.getVisibility() == View.VISIBLE;
+            directSectionHeader.setText(expanded
+                    ? localizedText("▼ ダイレクト実行", "▼ Direct Run")
+                    : localizedText("▶ ダイレクト実行（タップで展開）", "▶ Direct Run (tap to expand)"));
         }
         if (outputView != null) {
             String currentText = outputView.getText() != null ? outputView.getText().toString() : "";
