@@ -925,11 +925,15 @@ public class MainActivity extends Activity {
                 if (name == null || (currentConfig != null && name.equals(currentConfig.name))) {
                     return;  // programmatic / no-op selection
                 }
-                ConfigurationManager.Configuration loaded = configManager.loadConfiguration(name);
-                if (loaded != null) {
-                    currentConfig = loaded;
-                    appendMessage(localizedText("プロファイル選択: ", "Profile selected: ") + name
-                            + localizedText("（次回プロンプトで適用）", " (applied on next prompt)"));
+                try {
+                    ConfigurationManager.Configuration loaded = configManager.loadConfiguration(name);
+                    if (loaded != null) {
+                        currentConfig = loaded;
+                        appendMessage(localizedText("プロファイル選択: ", "Profile selected: ") + name
+                                + localizedText("（次回プロンプトで適用）", " (applied on next prompt)"));
+                    }
+                } catch (Exception e) {
+                    appendMessage(localizedText("プロファイル読込失敗: ", "Failed to load profile: ") + name);
                 }
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
