@@ -175,19 +175,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/ocl-icd/build
           LIB="$(find /tmp/ocl-icd/build -name 'libOpenCL.so' | head -1)"
-          echo "Built: $LIB"; ls -l "$LIB"
-          INJECTED=0
-          for ndk in "${ANDROID_NDK:-}" "${ANDROID_NDK_HOME:-}" "${ANDROID_NDK_ROOT:-}" "${ANDROID_SDK_ROOT:-}/ndk/27.2.12479018"; do
-            [ -n "$ndk" ] || continue
-            base="$ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr"
-            if [ -d "$base/lib/aarch64-linux-android" ]; then
-              cp "$LIB" "$base/lib/aarch64-linux-android/"
-              cp -r "$GITHUB_WORKSPACE/app/src/main/cpp/third_party/opencl/CL" "$base/include/" 2>/dev/null || true
-              echo "✅ injected libOpenCL.so into $ndk"
-              INJECTED=$((INJECTED+1))
-            fi
-          done
-          [ "$INJECTED" -gt 0 ] || { echo "::error::no NDK sysroot found to inject libOpenCL.so"; exit 1; }
+          [ -f "$LIB" ] || { echo "::error::libOpenCL.so not built"; exit 1; }
+          ls -l "$LIB"
+          # Pass the lib path to the gradle CMake build (NDK-agnostic; only used for linking,
+          # the runtime driver comes from the device's libOpenCL.so).
+          echo "OPENCL_STUB_LIB=$LIB" >> "$GITHUB_ENV"
 
       # ── Hexagon NPU 成果物を最新 Release から自動取得 ───────────────────────
       # build-hexagon-artifacts.yml が発行した hexagon-artifacts-* Release を取得し

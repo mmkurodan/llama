@@ -386,7 +386,13 @@ endif()
 # and still runs on devices without an OpenCL driver (GPU just stays unavailable).
 # llama_jni provides the ggml-base symbols (linked as a NEEDED dependency).
 # ---------------------------------------------------------
-find_library(OPENCL_LIB OpenCL)
+# libOpenCL.so to link against: prefer the CI-provided path (NDK-agnostic),
+# otherwise fall back to the NDK sysroot. Runtime uses the device's libOpenCL.so.
+if(DEFINED OPENCL_STUB_LIB AND EXISTS "${OPENCL_STUB_LIB}")
+    set(OPENCL_LIB "${OPENCL_STUB_LIB}")
+else()
+    find_library(OPENCL_LIB OpenCL)
+endif()
 set(_OPENCL_CL_INC "${CMAKE_SOURCE_DIR}/third_party/opencl")
 if(OPENCL_LIB AND EXISTS "${_OPENCL_CL_INC}/CL/cl.h")
     message(STATUS "opencl: building libggml-opencl.so DL plugin (lib=${OPENCL_LIB})")

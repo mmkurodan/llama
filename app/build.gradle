@@ -29,6 +29,12 @@ android {
             cmake {
                 cppFlags "-std=c++17"
                 arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                // GPU(OpenCL) backend: CI passes the libOpenCL.so to link against
+                // (NDK-agnostic). When unset, the OpenCL plugin is simply not built.
+                def openclStubLib = System.getenv("OPENCL_STUB_LIB")
+                if (openclStubLib) {
+                    arguments "-DOPENCL_STUB_LIB=${openclStubLib}"
+                }
             }
         }
     }
