@@ -12,6 +12,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -36,6 +41,8 @@ import java.io.FileReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -89,6 +96,8 @@ public class MainActivity extends Activity {
     private Spinner  profileSpinner;    // profile (configuration) selector in the direct section
     private TextView directSectionHeader;   // collapsible header for the direct-run section
     private View     directSectionContent;  // collapsible body of the direct-run section
+    private TextView webUiUrlView;          // Web UI URL (tap to open, long-press to copy)
+    private ConnectivityManager connectivityManager;
     private TextView promptLabel;
     private TextView outputSectionLabel;
     private TextView processingSectionLabel;
@@ -131,6 +140,14 @@ public class MainActivity extends Activity {
         public void run() {
             updateSettingsButtonForBusyState();
             busyStateHandler.postDelayed(this, 200);
+        }
+    };
+    // Periodically refresh the top header so it reflects the latest run (direct OR API).
+    private final Runnable statsUpdater = new Runnable() {
+        @Override
+        public void run() {
+            updateStatsView();
+            busyStateHandler.postDelayed(this, 2000);
         }
     };
 
@@ -235,6 +252,9 @@ public class MainActivity extends Activity {
         profileSpinner = findViewById(R.id.profileSpinner);
         directSectionHeader = findViewById(R.id.directSectionHeader);
         directSectionContent = findViewById(R.id.directSectionContent);
+        webUiUrlView = findViewById(R.id.webUiUrlView);
+        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        setupWebUiUrl();
         setupDirectSectionToggle();
         setupProfileSpinner();
         updateStatsView();   // 起動時に温度を表示 (速度は生成完了後に更新)
@@ -891,10 +911,86 @@ public class MainActivity extends Activity {
         if (statsView != null) {
             statsView.setText("⚡ " + speedStr + "    🌡 " + tempStr);
         }
-        // 最上部ヘッダの表示 (速度+温度+実行中バックエンド) — ダイレクト/API 問わず最新値
+        // 最上部ヘッダ — ダイレクト/API 問わず「最後に実行された」モデル/速度/温度/バックエンド。
+        // 定期更新 (statsUpdater) で API 実行時も自動反映される。
         if (headerStatsView != null) {
-            headerStatsView.setText("⚡ " + speedStr + "    🌡 " + tempStr + "    🧠 " + backend);
+            String model = "—";
+            try {
+                if (modelManager != null) {
+                    String mp = modelManager.getCurrentModelPath();
+                    if (mp != null && !mp.isEmpty()) {
+                        model = new File(mp).getName().replaceFirst("(?i)\\.gguf$", "");
+                    }
+                }
+            } catch (Throwable t) {
+                // ignore
+            }
+            headerStatsView.setText("📦 " + model
+                    + "\n⚡ " + speedStr + "   🌡 " + tempStr + "   🧠 " + backend);
         }
+    }
+
+    // ---- Web UI URL (tap to open in browser, long-press to copy) ----
+    private void setupWebUiUrl() {
+        if (webUiUrlView == null) {
+            return;
+        }
+        webUiUrlView.setOnClickListener(v -> {
+            final String url = buildWebUiUrl();
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            } catch (Exception e) {
+                showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+            }
+        });
+        webUiUrlView.setOnLongClickListener(v -> {
+            copyToClipboard("Web UI URL", buildWebUiUrl());
+            return true;
+        });
+        updateWebUiUrl();
+    }
+
+    private void updateWebUiUrl() {
+        if (webUiUrlView == null) {
+            return;
+        }
+        webUiUrlView.setText(localizedText("Web UI（タップで起動・長押しでコピー）: ",
+                "Web UI (tap to open / long-press to copy): ") + buildWebUiUrl());
+    }
+
+    private String buildWebUiUrl() {
+        final String ip = getActiveWifiIpv4Address();
+        final String host = (ip != null && !ip.isEmpty()) ? ip : "localhost";
+        return "http://" + host + ":" + apiPort + "/";
+    }
+
+    private String getActiveWifiIpv4Address() {
+        if (connectivityManager == null) {
+            return null;
+        }
+        try {
+            Network active = connectivityManager.getActiveNetwork();
+            if (active == null) {
+                return null;
+            }
+            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(active);
+            if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                return null;
+            }
+            LinkProperties lp = connectivityManager.getLinkProperties(active);
+            if (lp == null) {
+                return null;
+            }
+            for (LinkAddress la : lp.getLinkAddresses()) {
+                InetAddress a = la.getAddress();
+                if (a instanceof Inet4Address && !a.isLoopbackAddress()) {
+                    return a.getHostAddress();
+                }
+            }
+        } catch (SecurityException ignored) {
+            // best-effort
+        }
+        return null;
     }
 
     /** Collapsible direct-run section header toggle. */
@@ -1400,6 +1496,7 @@ public class MainActivity extends Activity {
             apiServerButton.setText(localizedText("API/WebUI開始", "Start API/WebUI"));
             apiServerStatusMain.setText(localizedText("API/WebUI: 停止中", "API/WebUI: Stopped"));
         }
+        updateWebUiUrl();
     }
 
     private void updateSettingsButtonForBusyState() {
@@ -1521,8 +1618,10 @@ public class MainActivity extends Activity {
         // Update service status when returning to the activity
         isServiceRunning = isServiceRunning(OllamaForegroundService.class);
         updateApiServerUI();
+        updateWebUiUrl();
         updateSettingsButtonForBusyState();
         busyStateHandler.post(busyStateUpdater);
+        busyStateHandler.post(statsUpdater);
     }
     
     @Override
@@ -1535,6 +1634,7 @@ public class MainActivity extends Activity {
             // Receiver not registered
         }
         busyStateHandler.removeCallbacks(busyStateUpdater);
+        busyStateHandler.removeCallbacks(statsUpdater);
     }
     
     @Override

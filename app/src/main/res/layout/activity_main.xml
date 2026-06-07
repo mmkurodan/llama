@@ -75,14 +75,26 @@
             android:layout_marginBottom="4dp"
             android:background="#CCCCCC" />
 
-        <!-- ③ DIRECT RUN SECTION (expanded by default, above the status/log area) -->
+        <!-- Web UI URL: tap to open in browser, long-press to copy -->
+        <TextView
+            android:id="@+id/webUiUrlView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="Web UI: (start API/WebUI)"
+            android:textColor="#1565C0"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- ③ DIRECT RUN SECTION (collapsed by default, above the status/log area) -->
         <TextView
             android:id="@+id/directSectionHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="10dp"
             android:background="#E0E0E0"
-            android:text="▼ Direct Run"
+            android:text="▶ Direct Run (tap to expand)"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -92,7 +104,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingTop="6dp"
-            android:visibility="visible">
+            android:visibility="gone">
 
             <TextView
                 android:layout_width="match_parent"
