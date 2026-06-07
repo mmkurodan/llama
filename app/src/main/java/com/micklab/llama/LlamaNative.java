@@ -79,6 +79,9 @@ public class LlamaNative {
     /** Decode throughput (tokens/sec) of the most recent generation, 0 if none yet. */
     public native double getLastGenerationSpeed();
 
+    /** Effective compute backend after the last model load (CPU/GPU/NPU/HTP/GPU+NPU/CPU (fallback)). */
+    public native String getActiveBackend();
+
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;
     }

@@ -77,6 +77,10 @@ static int         g_backend_initialized_version = -1;
 // Persistent NULL-terminated device list for llama_model_params.devices
 static ggml_backend_dev_t g_accel_devices[4] = {nullptr, nullptr, nullptr, nullptr};
 
+// Effective compute backend after the last model build (for UI display).
+// One of: "CPU", "GPU", "NPU/HTP", "GPU+NPU", "CPU (fallback)".
+static std::string g_active_backend = "CPU";
+
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -685,11 +689,14 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
 
     if (want_npu || want_gpu) {
         size_t slot = 0;
+        bool npu_added = false;
+        bool gpu_added = false;
 
         if (want_npu) {
             ggml_backend_dev_t npu = find_hexagon_device_locked();
             if (npu) {
                 g_accel_devices[slot++] = npu;
+                npu_added = true;
                 log_to_file(std::string("build_model_params: NPU/HTP device added: ") +
                             ggml_backend_dev_name(npu));
             } else {
@@ -702,6 +709,7 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
             ggml_backend_dev_t gpu = find_gpu_device_locked();
             if (gpu) {
                 g_accel_devices[slot++] = gpu;
+                gpu_added = true;
                 log_to_file(std::string("build_model_params: GPU device added: ") +
                             ggml_backend_dev_name(gpu));
             } else {
@@ -714,13 +722,19 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
 
         if (slot > 0) {
             mparams.devices = g_accel_devices;
+            g_active_backend = (npu_added && gpu_added) ? "GPU+NPU"
+                             : npu_added ? "NPU/HTP"
+                             : "GPU";
         } else {
             // 要求したアクセラレータ (NPU/GPU) がこのチップで利用不可 → CPU にフォールバック。
             // n_gpu_layers=0 で全レイヤを CPU に載せる (ログに明記)。
             mparams.n_gpu_layers = 0;
+            g_active_backend = "CPU (fallback)";
             log_to_file("build_model_params: requested accelerator unavailable on this chip "
                         "— falling back to CPU (n_gpu_layers=0)", GGML_LOG_LEVEL_WARN);
         }
+    } else {
+        g_active_backend = "CPU";
     }
     // CPU only (backendType=0): mparams.devices stays NULL; n_gpu_layers=0 forces CPU path.
 
@@ -3254,6 +3268,16 @@ Java_com_micklab_llama_LlamaNative_getLastGenerationSpeed(
         JNIEnv *, jobject /*thiz*/
 ) {
     return (jdouble) g_last_gen_tps.load(std::memory_order_relaxed);
+}
+
+// 実効的な計算バックエンド名 ("CPU"/"GPU"/"NPU/HTP"/"GPU+NPU"/"CPU (fallback)") を返す。
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_getActiveBackend(
+        JNIEnv * env, jobject /*thiz*/
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return env->NewStringUTF(g_active_backend.c_str());
 }
 
 // ---------------- JNI: setBackendConfig ----------------
