@@ -217,6 +217,7 @@ public class MainActivity extends Activity {
         logView = findViewById(R.id.logView);
         outputView = findViewById(R.id.outputView);
         statsView = findViewById(R.id.statsView);
+        updateStatsView();   // 起動時に温度を表示 (速度は生成完了後に更新)
         promptLabel = findViewById(R.id.promptLabel);
         outputSectionLabel = findViewById(R.id.outputSectionLabel);
         processingSectionLabel = findViewById(R.id.processingSectionLabel);
@@ -434,7 +435,6 @@ public class MainActivity extends Activity {
                                 outputView.append(tail);
                                 scrollTextViewToBottom(outputView);
                             }
-                            updateStatsView();
                             appendMessage("streaming complete");
                         });
                     }
@@ -475,7 +475,11 @@ public class MainActivity extends Activity {
         } finally {
             modelManager.getLlama().setTokenListener(null);
             modelManager.release();
-            runOnUiThread(this::updateSettingsButtonForBusyState);
+            runOnUiThread(() -> {
+                updateSettingsButtonForBusyState();
+                // 速度・温度の更新を全経路 (streaming / 非streaming / MCP) で実施
+                updateStatsView();
+            });
         }
     }
 
