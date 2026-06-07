@@ -20,7 +20,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.view.Gravity;
@@ -78,7 +82,11 @@ public class MainActivity extends Activity {
     private TextView logView;           // log view (append-only)
     private ScrollView mainScrollView;
     private TextView outputView;
-    private TextView statsView;         // generation speed (tok/s) + device temperature
+    private TextView statsView;         // generation speed (tok/s) + device temperature (under output)
+    private TextView headerStatsView;   // top header: speed + temp + active backend
+    private Spinner  profileSpinner;    // profile (configuration) selector in the direct section
+    private TextView directSectionHeader;   // collapsible header for the direct-run section
+    private View     directSectionContent;  // collapsible body of the direct-run section
     private TextView promptLabel;
     private TextView outputSectionLabel;
     private TextView processingSectionLabel;
@@ -217,6 +225,12 @@ public class MainActivity extends Activity {
         logView = findViewById(R.id.logView);
         outputView = findViewById(R.id.outputView);
         statsView = findViewById(R.id.statsView);
+        headerStatsView = findViewById(R.id.headerStatsView);
+        profileSpinner = findViewById(R.id.profileSpinner);
+        directSectionHeader = findViewById(R.id.directSectionHeader);
+        directSectionContent = findViewById(R.id.directSectionContent);
+        setupDirectSectionToggle();
+        setupProfileSpinner();
         updateStatsView();   // 起動時に温度を表示 (速度は生成完了後に更新)
         promptLabel = findViewById(R.id.promptLabel);
         outputSectionLabel = findViewById(R.id.outputSectionLabel);
@@ -517,6 +531,7 @@ public class MainActivity extends Activity {
                 try {
                     currentConfig = configManager.loadConfiguration(configName);
                     appendMessage("Loaded configuration: " + configName);
+                    setupProfileSpinner();   // 設定画面での追加/改名/選択を反映
                     
                     // Apply configuration immediately only when selected model already matches.
                     if (modelManager.isModelLoaded()) {
@@ -843,21 +858,82 @@ public class MainActivity extends Activity {
 
     /** Update the stats line with the last generation speed (tok/s) and device temperature. */
     private void updateStatsView() {
-        if (statsView == null) {
-            return;
-        }
         double tps = 0.0;
+        String backend = "--";
         try {
             if (modelManager != null && modelManager.getLlama() != null) {
                 tps = modelManager.getLlama().getLastGenerationSpeed();
+                String b = modelManager.getLlama().getActiveBackend();
+                if (b != null && !b.isEmpty()) {
+                    backend = b;
+                }
             }
         } catch (Throwable t) {
-            // native getter unavailable (e.g. NPU/CPU build mismatch) — leave tps=0
+            // native getters unavailable — keep defaults
         }
         float tempC = readBatteryTempC();
         String speedStr = (tps > 0.0) ? String.format(Locale.US, "%.1f tok/s", tps) : "-- tok/s";
         String tempStr  = (!Float.isNaN(tempC)) ? String.format(Locale.US, "%.1f°C", tempC) : "--°C";
-        statsView.setText("⚡ " + speedStr + "    🌡 " + tempStr);
+        // 結果エリア下の表示 (速度+温度)
+        if (statsView != null) {
+            statsView.setText("⚡ " + speedStr + "    🌡 " + tempStr);
+        }
+        // 最上部ヘッダの表示 (速度+温度+実行中バックエンド) — ダイレクト/API 問わず最新値
+        if (headerStatsView != null) {
+            headerStatsView.setText("⚡ " + speedStr + "    🌡 " + tempStr + "    🧠 " + backend);
+        }
+    }
+
+    /** Collapsible direct-run section header toggle. */
+    private void setupDirectSectionToggle() {
+        if (directSectionHeader == null || directSectionContent == null) {
+            return;
+        }
+        directSectionHeader.setOnClickListener(v -> {
+            boolean expanded = directSectionContent.getVisibility() == View.VISIBLE;
+            directSectionContent.setVisibility(expanded ? View.GONE : View.VISIBLE);
+            directSectionHeader.setText(expanded
+                    ? localizedText("▶ ダイレクト実行（タップで展開）", "▶ Direct Run (tap to expand)")
+                    : localizedText("▼ ダイレクト実行", "▼ Direct Run"));
+        });
+    }
+
+    /** Populate the profile (configuration) selector and switch currentConfig on selection. */
+    private void setupProfileSpinner() {
+        if (profileSpinner == null) {
+            return;
+        }
+        java.util.List<String> names = configManager.listConfigurations();
+        if (names == null || names.isEmpty()) {
+            names = new java.util.ArrayList<>();
+            names.add("default");
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        profileSpinner.setAdapter(adapter);
+        if (currentConfig != null && currentConfig.name != null) {
+            int idx = names.indexOf(currentConfig.name);
+            if (idx >= 0) {
+                profileSpinner.setSelection(idx, false);
+            }
+        }
+        profileSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String name = (String) parent.getItemAtPosition(position);
+                if (name == null || (currentConfig != null && name.equals(currentConfig.name))) {
+                    return;  // programmatic / no-op selection
+                }
+                ConfigurationManager.Configuration loaded = configManager.loadConfiguration(name);
+                if (loaded != null) {
+                    currentConfig = loaded;
+                    appendMessage(localizedText("プロファイル選択: ", "Profile selected: ") + name
+                            + localizedText("（次回プロンプトで適用）", " (applied on next prompt)"));
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
 
     /** Battery temperature in degrees Celsius (proxy for device temperature), NaN if unavailable. */
@@ -950,7 +1026,7 @@ public class MainActivity extends Activity {
             settingsButton.setText(localizedText("設定", "Settings"));
         }
         if (initModelButton != null) {
-            initModelButton.setText(localizedText("モデル再初期化", "Re-init Model"));
+            initModelButton.setText(localizedText("リセット", "Reset"));
         }
         if (viewLogButton != null) {
             viewLogButton.setText(localizedText(isViewingLog ? "ログを隠す" : "ログ表示", isViewingLog ? "Hide Log" : "View Log"));

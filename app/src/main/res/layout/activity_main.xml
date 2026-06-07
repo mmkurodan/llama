@@ -12,62 +12,38 @@
         android:orientation="vertical"
         android:padding="8dp">
 
-        <!-- Top Buttons Row -->
+        <!-- ① TOP STATUS HEADER: API status / speed / temp / active backend -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:background="#ECEFF1"
+            android:padding="10dp">
 
-            <Button
-                android:id="@+id/settingsButton"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/apiServerStatusMain"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="Settings" />
+                android:text="API/WebUI: Stopped"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
-            <Button
-                android:id="@+id/initModelButton"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/headerStatsView"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:text="Re-init Model" />
+                android:paddingTop="4dp"
+                android:text="⚡ -- tok/s    🌡 --°C    🧠 --"
+                android:textSize="13sp" />
 
         </LinearLayout>
 
-        <!-- Second Button Row -->
+        <!-- ② PRIMARY ACTION ROW: API on/off | Reset | Settings -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingTop="4dp">
-
-            <Button
-                android:id="@+id/viewLogButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="View Log" />
-
-            <Button
-                android:id="@+id/clearLogButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="Clear Log" />
-
-        </LinearLayout>
-
-        <!-- API Server Row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingTop="4dp">
+            android:paddingTop="6dp">
 
             <Button
                 android:id="@+id/apiServerButton"
@@ -75,129 +51,24 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="Start API Server" />
-
-            <TextView
-                android:id="@+id/apiServerStatusMain"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:gravity="center_vertical"
-                android:text="API: Stopped"
-                android:textSize="12sp" />
-
-        </LinearLayout>
-
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
-            android:background="#CCCCCC" />
-
-        <!-- Prompt Input -->
-        <TextView
-            android:id="@+id/promptLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Enter Prompt:"
-            android:textSize="14sp" />
-
-        <EditText
-            android:id="@+id/promptInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="top|start"
-            android:hint="Enter your prompt here"
-            android:inputType="textMultiLine"
-            android:maxLines="4"
-            android:minLines="2" />
-
-        <Button
-            android:id="@+id/sendButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:enabled="false"
-            android:text="Send" />
-
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
-            android:background="#CCCCCC" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/outputSectionLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center_vertical"
-                android:text="Model Output:"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:text="Start API/WebUI" />
 
             <Button
-                android:id="@+id/updateLogButton"
-                android:layout_width="wrap_content"
+                android:id="@+id/initModelButton"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:minWidth="60dp"
-                android:minHeight="32dp"
-                android:text="Update"
-                android:textSize="12sp" />
+                android:text="Reset" />
 
             <Button
-                android:id="@+id/copyOutputButton"
-                android:layout_width="wrap_content"
+                android:id="@+id/settingsButton"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:minWidth="60dp"
-                android:minHeight="32dp"
-                android:text="Copy"
-                android:textSize="12sp" />
-
-            <Button
-                android:id="@+id/downloadLogButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:minWidth="60dp"
-                android:minHeight="32dp"
-                android:text="Download"
-                android:textSize="12sp" />
+                android:layout_weight="1"
+                android:text="Settings" />
 
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/outputView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="180dp"
-            android:background="#F5F5F5"
-            android:padding="12dp"
-            android:scrollbars="vertical"
-            android:text="Output will appear here"
-            android:textSize="14sp" />
-
-        <!-- Generation speed (tok/s) + device temperature -->
-        <TextView
-            android:id="@+id/statsView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:gravity="end"
-            android:text="⚡ -- tok/s    🌡 --°C"
-            android:textSize="12sp"
-            android:textStyle="bold" />
 
         <!-- Divider -->
         <View
@@ -207,6 +78,7 @@
             android:layout_marginBottom="8dp"
             android:background="#CCCCCC" />
 
+        <!-- ③ PROCESSING STATUS / LOG AREA -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -226,9 +98,53 @@
                 android:id="@+id/copyLogButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="60dp"
+                android:minWidth="56dp"
                 android:minHeight="32dp"
                 android:text="Copy"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
+
+            <Button
+                android:id="@+id/viewLogButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:text="View Log"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/updateLogButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:text="Update"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/clearLogButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="3dp"
+                android:text="Clear"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/downloadLogButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Download"
                 android:textSize="12sp" />
 
         </LinearLayout>
@@ -237,12 +153,128 @@
             android:id="@+id/logView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="140dp"
+            android:minHeight="160dp"
             android:background="#F0F0F0"
             android:padding="12dp"
             android:scrollbars="vertical"
             android:text="Starting...\n"
             android:textSize="12sp" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:background="#CCCCCC" />
+
+        <!-- ④ COLLAPSIBLE DIRECT RUN SECTION (collapsed by default) -->
+        <TextView
+            android:id="@+id/directSectionHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:background="#E0E0E0"
+            android:text="▶ Direct Run (tap to expand)"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/directSectionContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="6dp"
+            android:visibility="gone">
+
+            <!-- Profile (configuration) selector -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Profile:"
+                android:textSize="13sp" />
+
+            <Spinner
+                android:id="@+id/profileSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/promptLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enter Prompt:"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/promptInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="top|start"
+                android:hint="Enter your prompt here"
+                android:inputType="textMultiLine"
+                android:maxLines="4"
+                android:minLines="2" />
+
+            <Button
+                android:id="@+id/sendButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:enabled="false"
+                android:text="Send" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="6dp">
+
+                <TextView
+                    android:id="@+id/outputSectionLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:text="Model Output:"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/copyOutputButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="56dp"
+                    android:minHeight="32dp"
+                    android:text="Copy"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/outputView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="160dp"
+                android:background="#F5F5F5"
+                android:padding="12dp"
+                android:scrollbars="vertical"
+                android:text="Output will appear here"
+                android:textSize="14sp" />
+
+            <!-- Generation speed (tok/s) + device temperature (also shown in the top header) -->
+            <TextView
+                android:id="@+id/statsView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:gravity="end"
+                android:text="⚡ -- tok/s    🌡 --°C"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
