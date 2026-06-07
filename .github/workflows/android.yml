@@ -160,6 +160,35 @@ jobs:
         with:
           ndk-version: r27
 
+      # ── OpenCL ICD loader: GPU(OpenCL/Adreno) backend のリンク用 libOpenCL.so ──
+      # libggml-opencl.so (DLプラグイン) のリンクに必要。実行時は端末側 libOpenCL.so を使う。
+      # gradle が使う NDK は ndkVersion 由来のため、候補 NDK の sysroot 全てに配置する。
+      - name: Build OpenCL ICD loader (libOpenCL.so for linking)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y ninja-build
+          git clone --depth 1 https://github.com/KhronosGroup/OpenCL-ICD-Loader /tmp/ocl-icd
+          cmake -S /tmp/ocl-icd -B /tmp/ocl-icd/build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+            -DOPENCL_ICD_LOADER_HEADERS_DIR="$GITHUB_WORKSPACE/app/src/main/cpp/third_party/opencl" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=24 -DANDROID_STL=c++_shared \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/ocl-icd/build
+          LIB="$(find /tmp/ocl-icd/build -name 'libOpenCL.so' | head -1)"
+          echo "Built: $LIB"; ls -l "$LIB"
+          INJECTED=0
+          for ndk in "${ANDROID_NDK:-}" "${ANDROID_NDK_HOME:-}" "${ANDROID_NDK_ROOT:-}" "${ANDROID_SDK_ROOT:-}/ndk/27.2.12479018"; do
+            [ -n "$ndk" ] || continue
+            base="$ndk/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr"
+            if [ -d "$base/lib/aarch64-linux-android" ]; then
+              cp "$LIB" "$base/lib/aarch64-linux-android/"
+              cp -r "$GITHUB_WORKSPACE/app/src/main/cpp/third_party/opencl/CL" "$base/include/" 2>/dev/null || true
+              echo "✅ injected libOpenCL.so into $ndk"
+              INJECTED=$((INJECTED+1))
+            fi
+          done
+          [ "$INJECTED" -gt 0 ] || { echo "::error::no NDK sysroot found to inject libOpenCL.so"; exit 1; }
+
       # ── Hexagon NPU 成果物を最新 Release から自動取得 ───────────────────────
       # build-hexagon-artifacts.yml が発行した hexagon-artifacts-* Release を取得し
       # app/src/main/cpp/hexagon-artifacts/ に展開、skel を jniLibs へ配置する。

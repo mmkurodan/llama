@@ -51,6 +51,13 @@
             android:name="libcdsprpc.so"
             android:required="false" />
 
+        <!-- Adreno GPU: allow loading the Qualcomm OpenCL driver (vendor lib).
+             Used by the libggml-opencl.so DL plugin; required=false so non-OpenCL
+             devices still run (GPU just unavailable). -->
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+
     </application>
 
 </manifest>

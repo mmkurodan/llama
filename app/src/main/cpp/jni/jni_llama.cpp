@@ -660,12 +660,18 @@ static ggml_backend_dev_t find_hexagon_device_locked() {
 // Return the first registered GPU device, or nullptr if none found.
 static ggml_backend_dev_t find_gpu_device_locked() {
     const size_t count = ggml_backend_dev_count();
+    // Prefer a real GPU (OpenCL/Adreno). The Hexagon device also reports type GPU,
+    // so exclude it here — NPU is selected separately via find_hexagon_device_locked.
     for (size_t i = 0; i < count; ++i) {
         ggml_backend_dev_t dev = ggml_backend_dev_get(i);
         if (!dev) { continue; }
-        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU) {
-            return dev;
+        if (ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_GPU) { continue; }
+        const char * name = ggml_backend_dev_name(dev);
+        const std::string n = name ? name : "";
+        if (n.find("Hexagon") != std::string::npos || n.find("HTP") != std::string::npos) {
+            continue;
         }
+        return dev;
     }
     return nullptr;
 }
@@ -952,6 +958,39 @@ static void ensure_backend_initialized_locked(const char * log_prefix) {
         }
     }
 #endif
+
+    // OpenCL (Adreno GPU) backend is shipped as a DL plugin (libggml-opencl.so) so the
+    // app does not hard-depend on libOpenCL.so. Load + register it on demand when GPU is
+    // selected. Registered once per process; a missing OpenCL driver fails gracefully.
+    if (g_backend_type == 1 || g_backend_type == 3) {
+        static bool g_opencl_registered = false;
+        if (!g_opencl_registered && !g_native_lib_dir.empty()) {
+            const std::string ocl_path = g_native_lib_dir + "/libggml-opencl.so";
+            void * h = dlopen(ocl_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+            if (!h) {
+                const char * e = dlerror();
+                log_to_file(std::string(log_prefix) + ": OpenCL plugin load failed: " +
+                            (e ? e : "unknown"), GGML_LOG_LEVEL_WARN);
+            } else {
+                using ocl_reg_fn = ggml_backend_reg_t (*)(void);
+                ocl_reg_fn init_fn = reinterpret_cast<ocl_reg_fn>(dlsym(h, "ggml_backend_init"));
+                if (init_fn) {
+                    ggml_backend_reg_t reg = init_fn();
+                    if (reg) {
+                        ggml_backend_register(reg);
+                        g_opencl_registered = true;
+                        log_to_file(std::string(log_prefix) + ": ggml: OpenCL/GPU backend registered");
+                    } else {
+                        log_to_file(std::string(log_prefix) + ": OpenCL plugin returned null reg",
+                                    GGML_LOG_LEVEL_WARN);
+                    }
+                } else {
+                    log_to_file(std::string(log_prefix) + ": OpenCL plugin missing ggml_backend_init",
+                                GGML_LOG_LEVEL_WARN);
+                }
+            }
+        }
+    }
 
     g_backend_initialized_version = g_backend_config_version;
 
