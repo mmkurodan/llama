@@ -701,6 +701,16 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     const bool want_npu = g_npu_enabled && (g_backend_type == 2 || g_backend_type == 3);
     const bool want_gpu = (g_backend_type == 1 || g_backend_type == 3);
 
+    // GPU+NPU hybrid deadlocks in ggml's heterogeneous scheduler (Hexagon NPU + Adreno
+    // OpenCL): cross-device tensor placement (e.g. a layer on GPU but its Flash-Attention
+    // tensor on the NPU, or HTP-unsupported ops) stalls the very first decode. Run on a
+    // SINGLE accelerator instead — prefer NPU, fall back to GPU if NPU is unavailable.
+    const bool hybrid_requested = want_npu && want_gpu;
+    if (hybrid_requested) {
+        log_to_file("build_model_params: GPU+NPU hybrid is unstable (heterogeneous scheduler can "
+                    "hang) — using a single accelerator (NPU preferred)", GGML_LOG_LEVEL_WARN);
+    }
+
     if (want_npu || want_gpu) {
         size_t slot = 0;
         bool npu_added = false;
@@ -719,7 +729,8 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
             }
         }
 
-        if (want_gpu) {
+        // In hybrid mode use exactly one accelerator: only add the GPU if the NPU was not added.
+        if (want_gpu && !(hybrid_requested && npu_added)) {
             ggml_backend_dev_t gpu = find_gpu_device_locked();
             if (gpu) {
                 g_accel_devices[slot++] = gpu;
