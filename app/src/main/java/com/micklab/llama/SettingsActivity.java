@@ -314,9 +314,18 @@ public class SettingsActivity extends Activity {
         gpuEnabledSwitch = findViewById(R.id.gpuEnabledSwitch);
         npuEnabledSwitch = findViewById(R.id.npuEnabledSwitch);
         CompoundButton.OnCheckedChangeListener backendToggleListener = (button, checked) -> {
-            // GPU/NPU を有効化したとき、オフロード未設定(0)なら ALL(-1) を既定値にする
-            if (checked && gpuLayersSeekBar != null && gpuLayersSeekBar.getProgress() == 0) {
-                gpuLayersSeekBar.setProgress(40); // 40 = ALL (= -1)
+            if (checked) {
+                // NPU と GPU は排他: 真のハイブリッドは ggml 側未対応で単一へ縮退するため、
+                // 片方を有効化したらもう片方を自動的に無効化する。
+                if (button == gpuEnabledSwitch && npuEnabledSwitch != null && npuEnabledSwitch.isChecked()) {
+                    npuEnabledSwitch.setChecked(false);
+                } else if (button == npuEnabledSwitch && gpuEnabledSwitch != null && gpuEnabledSwitch.isChecked()) {
+                    gpuEnabledSwitch.setChecked(false);
+                }
+                // GPU/NPU を有効化したとき、オフロード未設定(0)なら ALL(-1) を既定値にする
+                if (gpuLayersSeekBar != null && gpuLayersSeekBar.getProgress() == 0) {
+                    gpuLayersSeekBar.setProgress(40); // 40 = ALL (= -1)
+                }
             }
             updateBackendDependentUi();
         };
