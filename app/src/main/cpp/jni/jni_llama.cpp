@@ -2607,12 +2607,20 @@ static bool prefill_text_prompt_locked(
             true
     );
 
-    if (n_tokens <= 0) {
-        error_message = "tokenize failed";
+    if (n_tokens < 0) {
+        // llama_tokenize returns the negated required count when the buffer (n_ctx) is too small
+        error_message = "prompt too long for context: needs " + std::to_string(-n_tokens)
+                      + " tokens but n_ctx=" + std::to_string(g_n_ctx)
+                      + " (increase Context Size in Settings, or shorten the input / reduce MCP tools+history)";
+        return false;
+    }
+    if (n_tokens == 0) {
+        error_message = "tokenize produced no tokens (empty prompt)";
         return false;
     }
     if (n_tokens >= g_n_ctx) {
-        error_message = "token count exceeds context";
+        error_message = "prompt (" + std::to_string(n_tokens) + " tokens) leaves no room in context n_ctx="
+                      + std::to_string(g_n_ctx) + " — increase Context Size in Settings";
         return false;
     }
 
@@ -2672,8 +2680,18 @@ static bool prefill_text_prompt_cached_locked(
     int32_t n_tokens = llama_tokenize(
             vocab, prompt.c_str(), static_cast<int>(prompt.size()),
             tokens.data(), static_cast<int>(tokens.size()), false, true);
-    if (n_tokens <= 0)        { error_message = "tokenize failed"; return false; }
-    if (n_tokens >= g_n_ctx)  { error_message = "token count exceeds context"; return false; }
+    if (n_tokens < 0) {
+        error_message = "prompt too long for context: needs " + std::to_string(-n_tokens)
+                      + " tokens but n_ctx=" + std::to_string(g_n_ctx)
+                      + " (increase Context Size in Settings, or shorten the input / reduce MCP tools+history)";
+        return false;
+    }
+    if (n_tokens == 0)        { error_message = "tokenize produced no tokens (empty prompt)"; return false; }
+    if (n_tokens >= g_n_ctx)  {
+        error_message = "prompt (" + std::to_string(n_tokens) + " tokens) leaves no room in context n_ctx="
+                      + std::to_string(g_n_ctx) + " — increase Context Size in Settings";
+        return false;
+    }
     tokens.resize(n_tokens);
 
     llama_memory_t memory = llama_get_memory(g_ctx);
