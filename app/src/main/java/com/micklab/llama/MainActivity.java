@@ -255,6 +255,7 @@ public class MainActivity extends Activity {
         directSectionContent = findViewById(R.id.directSectionContent);
         webUiUrlView = findViewById(R.id.webUiUrlView);
         processingSectionContent = findViewById(R.id.processingSectionContent);
+        processingSectionLabel = findViewById(R.id.processingSectionLabel);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         setupWebUiUrl();
         setupDirectSectionToggle();
@@ -263,7 +264,6 @@ public class MainActivity extends Activity {
         updateStatsView();   // 起動時に温度を表示 (速度は生成完了後に更新)
         promptLabel = findViewById(R.id.promptLabel);
         outputSectionLabel = findViewById(R.id.outputSectionLabel);
-        processingSectionLabel = findViewById(R.id.processingSectionLabel);
         promptInput = findViewById(R.id.promptInput);
         sendButton = findViewById(R.id.sendButton);
         settingsButton = findViewById(R.id.settingsButton);

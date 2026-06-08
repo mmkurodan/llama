@@ -514,10 +514,19 @@ public class ModelManager {
             boolean projectorRequestedButInactive =
                     mmprojPath != null && !currentSupportsVision && !currentSupportsAudio;
 
-            // If same model is already loaded, just re-apply parameters
+            // A backend/offload change (or a settings save) requires a FULL reload, because
+            // tensor placement and the accelerator are decided at model-build time —
+            // re-applying parameters alone does not move the model onto the new backend.
+            boolean backendMatches = currentBackendType == config.backendType
+                    && currentNpuEnabled == config.npuEnabled
+                    && currentGpuOffloadLayers == config.gpuOffloadLayers
+                    && !reloadRequested;
+
+            // If same model is already loaded AND the backend is unchanged, just re-apply parameters
             if (modelPath.equals(currentModelPath)
                     && Objects.equals(mmprojPath, currentConfiguredMmprojPath)
                     && modelLoaded
+                    && backendMatches
                     && !projectorRequestedButInactive
                     && (!enableAudioForLoad || currentSupportsAudio)) {
                 Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
@@ -538,6 +547,7 @@ public class ModelManager {
                     !modelPath.equals(currentModelPath)
                             || !Objects.equals(mmprojPath, currentConfiguredMmprojPath)
                             || !modelLoaded
+                            || !backendMatches
                             || projectorRequestedButInactive
                             || (enableAudioForLoad && !currentSupportsAudio);
 
