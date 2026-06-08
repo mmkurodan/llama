@@ -79,7 +79,10 @@ static ggml_backend_dev_t g_accel_devices[4] = {nullptr, nullptr, nullptr, nullp
 
 // Effective compute backend after the last model build (for UI display).
 // One of: "CPU", "GPU", "NPU/HTP", "GPU+NPU", "CPU (fallback)".
-static std::string g_active_backend = "CPU";
+// Atomic (lock-free) so the UI thread can read it via getActiveBackend() WITHOUT taking
+// g_mutex — generate*() hold g_mutex for the whole inference, and blocking the UI poller on
+// it caused freezes/ANR during long (VL/MCP) runs. Values are static string literals.
+static std::atomic<const char *> g_active_backend{"CPU"};
 
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
@@ -3330,8 +3333,8 @@ JNIEXPORT jstring JNICALL
 Java_com_micklab_llama_LlamaNative_getActiveBackend(
         JNIEnv * env, jobject /*thiz*/
 ) {
-    std::lock_guard<std::mutex> lock(g_mutex);
-    return env->NewStringUTF(g_active_backend.c_str());
+    // No g_mutex: lock-free read so the UI poller never blocks on an in-flight generation.
+    return env->NewStringUTF(g_active_backend.load(std::memory_order_relaxed));
 }
 
 // ---------------- JNI: setBackendConfig ----------------

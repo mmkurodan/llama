@@ -96,6 +96,7 @@ public class MainActivity extends Activity {
     private Spinner  profileSpinner;    // profile (configuration) selector in the direct section
     private TextView directSectionHeader;   // collapsible header for the direct-run section
     private View     directSectionContent;  // collapsible body of the direct-run section
+    private View     processingSectionContent;  // collapsible body of the processing/log section
     private TextView webUiUrlView;          // Web UI URL (tap to open, long-press to copy)
     private ConnectivityManager connectivityManager;
     private TextView promptLabel;
@@ -253,9 +254,11 @@ public class MainActivity extends Activity {
         directSectionHeader = findViewById(R.id.directSectionHeader);
         directSectionContent = findViewById(R.id.directSectionContent);
         webUiUrlView = findViewById(R.id.webUiUrlView);
+        processingSectionContent = findViewById(R.id.processingSectionContent);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         setupWebUiUrl();
         setupDirectSectionToggle();
+        setupProcessingSectionToggle();
         setupProfileSpinner();
         updateStatsView();   // 起動時に温度を表示 (速度は生成完了後に更新)
         promptLabel = findViewById(R.id.promptLabel);
@@ -545,6 +548,8 @@ public class MainActivity extends Activity {
                     currentConfig = configManager.loadConfiguration(configName);
                     appendMessage("Loaded configuration: " + configName);
                     setupProfileSpinner();   // 設定画面での追加/改名/選択を反映
+                    // 設定保存後は次回実行(直接/API)で必ずモデルを再ロードして反映する
+                    modelManager.requestReloadOnNextLoad();
                     
                     // Apply configuration immediately only when selected model already matches.
                     if (modelManager.isModelLoaded()) {
@@ -1007,6 +1012,20 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** Collapsible processing-status/log section header toggle (expanded by default). */
+    private void setupProcessingSectionToggle() {
+        if (processingSectionLabel == null || processingSectionContent == null) {
+            return;
+        }
+        processingSectionLabel.setOnClickListener(v -> {
+            boolean expanded = processingSectionContent.getVisibility() == View.VISIBLE;
+            processingSectionContent.setVisibility(expanded ? View.GONE : View.VISIBLE);
+            processingSectionLabel.setText(expanded
+                    ? localizedText("▶ 処理状況/ログ", "▶ Processing Status/Logs")
+                    : localizedText("▼ 処理状況/ログ", "▼ Processing Status/Logs"));
+        });
+    }
+
     /** Populate the profile (configuration) selector and switch currentConfig on selection. */
     private void setupProfileSpinner() {
         if (profileSpinner == null) {
@@ -1131,7 +1150,11 @@ public class MainActivity extends Activity {
             outputSectionLabel.setText(localizedText("モデル出力:", "Model Output:"));
         }
         if (processingSectionLabel != null) {
-            processingSectionLabel.setText(localizedText("処理状況/ログ:", "Processing Status/Logs:"));
+            boolean procExpanded = processingSectionContent == null
+                    || processingSectionContent.getVisibility() == View.VISIBLE;
+            processingSectionLabel.setText(procExpanded
+                    ? localizedText("▼ 処理状況/ログ", "▼ Processing Status/Logs")
+                    : localizedText("▶ 処理状況/ログ", "▶ Processing Status/Logs"));
         }
 
         if (promptInput != null) {

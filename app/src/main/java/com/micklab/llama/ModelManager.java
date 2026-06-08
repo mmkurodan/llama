@@ -109,6 +109,9 @@ public class ModelManager {
     private volatile int currentBackendType = -1;
     private volatile boolean currentNpuEnabled = false;
     private volatile int currentGpuOffloadLayers = Integer.MIN_VALUE;
+    // Set when settings are saved: force a model reload on the next load so any config
+    // change (incl. GPU/NPU backend) takes effect for both direct and API runs.
+    private volatile boolean reloadRequested = false;
     private volatile String currentMmprojPath = null;
     private volatile boolean currentSupportsVision = false;
     private volatile boolean currentSupportsAudio = false;
@@ -226,7 +229,15 @@ public class ModelManager {
         return currentModelPath;
     }
 
+    /** Force the next load() to actually reload (e.g. after settings are saved). */
+    public void requestReloadOnNextLoad() {
+        reloadRequested = true;
+    }
+
     public boolean isLoadedConfigurationMatching(ConfigurationManager.Configuration config) {
+        if (reloadRequested) {
+            return false;   // settings changed -> reload to apply (backend, params, etc.)
+        }
         if (config == null) {
             return true;
         }
@@ -600,6 +611,7 @@ public class ModelManager {
             currentBackendType = config.backendType;
             currentNpuEnabled = config.npuEnabled;
             currentGpuOffloadLayers = config.gpuOffloadLayers;
+            reloadRequested = false;   // 反映済み
 
             if (listener != null) {
                 listener.onModelLoaded(configName);

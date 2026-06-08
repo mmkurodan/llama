@@ -194,14 +194,24 @@
             android:layout_marginBottom="8dp"
             android:background="#CCCCCC" />
 
-        <!-- ④ PROCESSING STATUS / LOG AREA (log shown here as a toggle) -->
+        <!-- ④ PROCESSING STATUS / LOG (collapsible section, expanded by default) -->
         <TextView
             android:id="@+id/processingSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Processing Status/Logs:"
+            android:padding="10dp"
+            android:background="#E0E0E0"
+            android:text="▼ Processing Status/Logs"
             android:textSize="14sp"
             android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/processingSectionContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="4dp"
+            android:visibility="visible">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -267,6 +277,8 @@
                 android:textSize="12sp" />
 
         </com.micklab.llama.MaxHeightScrollView>
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
