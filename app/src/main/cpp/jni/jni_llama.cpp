@@ -110,6 +110,11 @@ static std::string initialize_optional_multimodal_support_locked(
         bool enable_audio,
         const char * log_prefix);
 
+// Prefix KV-cache reuse (MCP / multi-turn): the exact tokens currently held in the KV
+// cache (seq 0). Reused across OpenAI-path text generations so the shared conversation
+// prefix is not re-prefilled every tool turn. Cleared whenever the KV is reset/freed.
+static std::vector<llama_token> g_kv_cached_tokens;
+
 // 設定
 static int   g_n_ctx      = 2048;
 static int   g_n_threads  = 2;
@@ -786,6 +791,7 @@ static void release_context_locked(const char * log_prefix) {
     llama_synchronize(g_ctx);
     llama_free(g_ctx);
     g_ctx = nullptr;
+    g_kv_cached_tokens.clear();   // context (and its KV) gone -> prefix cache invalid
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": context freed");
     }
@@ -833,6 +839,7 @@ static bool reset_generation_context_locked(const char * log_prefix, std::string
         return false;
     }
     llama_memory_clear(memory, true);
+    g_kv_cached_tokens.clear();   // KV is now empty -> prefix cache invalid
     llama_perf_context_reset(g_ctx);
 
     std::ostringstream ss;
@@ -2634,6 +2641,83 @@ static bool prefill_text_prompt_locked(
     return true;
 }
 
+// Prefix KV-cache reuse is enabled only for the text path on CPU/GPU. The Hexagon (NPU)
+// KV path is newer/less-tested, so we keep the full-reset behavior there.
+static bool kv_prefix_cache_allowed_locked() {
+    const bool npu_active = g_npu_enabled && (g_backend_type == 2 || g_backend_type == 3);
+    return !npu_active;
+}
+
+// Cache-aware text prefill: keep the KV for the longest common prefix with the previous
+// prompt and decode only the new suffix (big win for multi-turn MCP). On any mismatch it
+// clears the KV and prefills from scratch. Maintains g_kv_cached_tokens == KV contents.
+static bool prefill_text_prompt_cached_locked(
+        const llama_vocab * vocab,
+        const std::string & prompt,
+        size_t & n_prompt_tokens,
+        llama_pos & n_past,
+        std::string & error_message) {
+    std::vector<llama_token> tokens(g_n_ctx);
+    int32_t n_tokens = llama_tokenize(
+            vocab, prompt.c_str(), static_cast<int>(prompt.size()),
+            tokens.data(), static_cast<int>(tokens.size()), false, true);
+    if (n_tokens <= 0)        { error_message = "tokenize failed"; return false; }
+    if (n_tokens >= g_n_ctx)  { error_message = "token count exceeds context"; return false; }
+    tokens.resize(n_tokens);
+
+    llama_memory_t memory = llama_get_memory(g_ctx);
+    if (!memory) { error_message = "generation memory unavailable"; return false; }
+
+    // longest common prefix between the cached tokens (already in KV) and the new prompt
+    size_t n_match = 0;
+    const size_t max_match = std::min(g_kv_cached_tokens.size(), static_cast<size_t>(n_tokens));
+    while (n_match < max_match && g_kv_cached_tokens[n_match] == tokens[n_match]) {
+        ++n_match;
+    }
+    // always re-decode at least the final token so fresh logits are available for sampling
+    if (n_match > static_cast<size_t>(n_tokens - 1)) {
+        n_match = static_cast<size_t>(n_tokens - 1);
+    }
+
+    if (n_match == 0) {
+        llama_memory_clear(memory, true);
+    } else if (!llama_memory_seq_rm(memory, 0, static_cast<llama_pos>(n_match), -1)) {
+        // couldn't trim the KV cleanly -> reset and re-prefill the whole prompt
+        llama_memory_clear(memory, true);
+        n_match = 0;
+    }
+    llama_perf_context_reset(g_ctx);
+
+    log_to_file("generateOpenAiChatCompletion: prefill (cached) n_tokens=" + std::to_string(n_tokens)
+                + " reused=" + std::to_string(n_match));
+
+    reusable_token_batch prompt_batch(std::min(g_n_batch, n_tokens));
+    if (!prompt_batch.valid()) { error_message = "failed to allocate prompt batch"; return false; }
+
+    for (int i = static_cast<int>(n_match); i < n_tokens; i += g_n_batch) {
+        if (g_cancel_generation.load()) {
+            g_kv_cached_tokens.clear();
+            error_message = "generation cancelled";
+            return false;
+        }
+        const int batch_size = std::min(g_n_batch, n_tokens - i);
+        prompt_batch.batch.n_tokens = batch_size;
+        for (int j = 0; j < batch_size; ++j) {
+            prompt_batch.set_token(j, tokens[i + j], i + j, i + j == n_tokens - 1);
+        }
+        if (llama_decode(g_ctx, prompt_batch.batch) != 0) {
+            g_kv_cached_tokens.clear();
+            error_message = "decode failed (prompt)";
+            return false;
+        }
+    }
+
+    n_prompt_tokens = static_cast<size_t>(n_tokens);
+    n_past = n_tokens;
+    g_kv_cached_tokens.assign(tokens.begin(), tokens.end());
+    return true;
+}
+
 static bool prefill_multimodal_prompt_locked(
         const std::string & prompt,
         const std::vector<std::vector<uint8_t>> & media_files,
@@ -3044,11 +3128,6 @@ static jstring generate_openai_chat_completion_locked(
             log_to_file(std::string("generateOpenAiChatCompletion: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
         }
 
-        std::string context_error;
-        if (!reset_generation_context_locked("generateOpenAiChatCompletion", context_error)) {
-            return build_error(context_error);
-        }
-
         const llama_vocab * vocab = llama_model_get_vocab(g_model);
         size_t n_prompt_tokens = 0;
         llama_pos n_past = 0;
@@ -3059,9 +3138,20 @@ static jstring generate_openai_chat_completion_locked(
         }
 
         const bool has_media = media_files != nullptr && !media_files->empty();
-        const bool prefill_ok = has_media
-                ? prefill_multimodal_prompt_locked(prompt, *media_files, n_prompt_tokens, n_past, prefill_error)
-                : prefill_text_prompt_locked(vocab, prompt, n_prompt_tokens, n_past, prefill_error);
+        // Reuse the KV cache across turns (MCP) for the text path on CPU/GPU; otherwise full reset.
+        const bool use_kv_cache = !has_media && kv_prefix_cache_allowed_locked();
+        bool prefill_ok;
+        if (use_kv_cache) {
+            prefill_ok = prefill_text_prompt_cached_locked(vocab, prompt, n_prompt_tokens, n_past, prefill_error);
+        } else {
+            std::string context_error;
+            if (!reset_generation_context_locked("generateOpenAiChatCompletion", context_error)) {
+                return build_error(context_error);
+            }
+            prefill_ok = has_media
+                    ? prefill_multimodal_prompt_locked(prompt, *media_files, n_prompt_tokens, n_past, prefill_error)
+                    : prefill_text_prompt_locked(vocab, prompt, n_prompt_tokens, n_past, prefill_error);
+        }
 
         if (!prefill_ok) {
             return build_error(prefill_error);
@@ -3133,7 +3223,11 @@ static jstring generate_openai_chat_completion_locked(
 
             const int rc_step = llama_decode(g_ctx, generation_batch.batch);
             if (rc_step != 0) {
+                g_kv_cached_tokens.clear();
                 return build_error("decode failed (generation)");
+            }
+            if (use_kv_cache) {
+                g_kv_cached_tokens.push_back(id);   // keep the prefix cache in sync with the KV
             }
         }
 
