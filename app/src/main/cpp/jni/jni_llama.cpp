@@ -752,16 +752,27 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
                              : "GPU";
         } else {
             // 要求したアクセラレータ (NPU/GPU) がこのチップで利用不可 → CPU にフォールバック。
-            // n_gpu_layers=0 で全レイヤを CPU に載せる (ログに明記)。
+            // g_accel_devices[0] は既に nullptr。空の (NULL終端) デバイスリストを明示し全レイヤ
+            // を CPU に載せる。devices=NULL のままだと llama が自動登録された全デバイス
+            // (GGML_USE_HEXAGON では常に自動登録される HTP を含む) を使おうとし、DSP セッション
+            // が異常 (例: 0x80000406) のとき load_tensors 中に SIGABRT する。
+            mparams.devices = g_accel_devices;  // empty list → pure CPU, never touches HTP
             mparams.n_gpu_layers = 0;
             g_active_backend = "CPU (fallback)";
             log_to_file("build_model_params: requested accelerator unavailable on this chip "
                         "— falling back to CPU (n_gpu_layers=0)", GGML_LOG_LEVEL_WARN);
         }
     } else {
+        // CPU only (backendType=0)。空の (NULL終端) デバイスリストを明示する。
+        // GGML_USE_HEXAGON ビルドでは Hexagon/HTP バックエンドが ggml レジストリ初期化時に常に
+        // 自動登録される。devices=NULL のままだと llama がその HTP デバイスも使おうとし、直前の
+        // クラッシュ等で DSP セッションが異常 (0x80000406) になっていると load_tensors 中に
+        // SIGABRT する。空リストにすれば CPU モードは純 CPU で動き DSP 状態に影響されない。
+        g_accel_devices[0] = nullptr;
+        mparams.devices = g_accel_devices;
+        mparams.n_gpu_layers = 0;
         g_active_backend = "CPU";
     }
-    // CPU only (backendType=0): mparams.devices stays NULL; n_gpu_layers=0 forces CPU path.
 
     return mparams;
 }
@@ -777,7 +788,8 @@ static void log_model_params(const char * log_prefix, const llama_model_params &
        << " use_mlock=" << (mparams.use_mlock ? "true" : "false")
        << " backend=" << type_name
        << " npuEnabled=" << (g_npu_enabled ? "true" : "false")
-       << " devices=" << (mparams.devices ? "custom" : "default(NULL)");
+       << " devices=" << (!mparams.devices ? "default(NULL)"
+                          : mparams.devices[0] ? "custom" : "none(CPU-only,HTP excluded)");
     log_to_file(ss.str());
 }
 
