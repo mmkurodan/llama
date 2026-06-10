@@ -637,6 +637,7 @@ public class MainActivity extends Activity {
             savedProcessingText = logView.getText() != null ? logView.getText().toString() : "";
             isViewingLog = true;
             viewLogButton.setText(localizedText("状況に戻る", "Show Status"));
+            if (clearLogButton != null) clearLogButton.setText(localizedText("ログ消去", "Clear Log"));
             updateLogButton.setEnabled(true);
             updateLogButton.setVisibility(Button.VISIBLE);
             downloadLogButton.setEnabled(true);
@@ -654,6 +655,7 @@ public class MainActivity extends Activity {
         isViewingLog = false;
         displayedLogContent = null;
         viewLogButton.setText(localizedText("ログ表示", "View Log"));
+        if (clearLogButton != null) clearLogButton.setText(localizedText("消去", "Clear"));
         updateLogButton.setEnabled(false);
         updateLogButton.setVisibility(Button.GONE);
         if (logView != null && savedProcessingText != null) {
@@ -719,14 +721,16 @@ public class MainActivity extends Activity {
     }
     
     private void clearLogFile() {
-        DiagnosticsLogger.clearLogFiles(this);
-        displayedLogContent = null;
         if (isViewingLog) {
+            DiagnosticsLogger.clearLogFiles(this);
+            displayedLogContent = null;
+            logView.setText("");
+            savedProcessingText = "";
+            showToast(localizedText("ログを消去しました", "Logs cleared"));
+        } else {
             logView.setText("");
             savedProcessingText = "";
         }
-        appendMessage("Logs cleared.");
-        showToast("Logs cleared");
     }
 
     private String resolveDirectInputConfigName() {
@@ -1173,7 +1177,9 @@ public class MainActivity extends Activity {
             viewLogButton.setText(localizedText(isViewingLog ? "ログを隠す" : "ログ表示", isViewingLog ? "Hide Log" : "View Log"));
         }
         if (clearLogButton != null) {
-            clearLogButton.setText(localizedText("ログ消去", "Clear Log"));
+            clearLogButton.setText(isViewingLog
+                    ? localizedText("ログ消去", "Clear Log")
+                    : localizedText("消去", "Clear"));
         }
         if (downloadLogButton != null) {
             downloadLogButton.setText(localizedText("保存", "Download"));
