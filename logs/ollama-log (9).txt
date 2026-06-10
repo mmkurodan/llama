@@ -1,0 +1,506 @@
+2026-06-09 07:57:14 [JNI] log level set to 2
+2026-06-09 07:57:14 [JNI] log level set to 2
+2026-06-09 07:57:16.112 pid=32576 [model-load] Loading configuration: default
+2026-06-09 07:57:16 [JNI] setTokenListener: JavaVM stored
+2026-06-09 07:57:16 [JNI] setTokenListener: cleared listener
+2026-06-09 07:57:16.115 pid=32576 [runtime-memory] Before model load model=gemma-3-1b-thinking-v2-q4_k_m.gguf
+  javaUsed=13.6MB javaTotal=64.0MB javaMax=256.0MB nativeHeap=20.5MB nativeHeapFree=2.3MB nativeHeapSize=25.9MB
+  pssTotal=60.6MB privateDirty=53.2MB sharedDirty=44.3MB nativePss=17.1MB dalvikPss=4.6MB otherPss=38.8MB
+  systemAvail=13.7GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=190
+  procStatus VmRSS=179496 kB VmHWM=179496 kB VmSize=17635304 kB VmSwap=2640 kB Threads=30 FDSize=256
+2026-06-09 07:57:16.197 pid=32576 [runtime-memory] After model load cleanup model=gemma-3-1b-thinking-v2-q4_k_m.gguf
+  javaUsed=3.5MB javaTotal=27.4MB javaMax=256.0MB nativeHeap=19.6MB nativeHeapFree=3.1MB nativeHeapSize=25.9MB
+  pssTotal=56.4MB privateDirty=49.3MB sharedDirty=44.2MB nativePss=17.1MB dalvikPss=2.2MB otherPss=37.1MB
+  systemAvail=13.7GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=188
+  procStatus VmRSS=175740 kB VmHWM=180320 kB VmSize=17366240 kB VmSwap=1544 kB Threads=30 FDSize=256
+2026-06-09 07:57:16 [JNI] setLoadParameters: n_ctx=2048 n_threads=4 n_batch=256 temp=0.7 top_p=0.9 top_k=40 n_gpu_layers=0
+2026-06-09 07:57:16 [JNI] setBackendConfig: type=0 (CPU) npuEnabled=false nativeLibDir=/data/app/~~FrAAm1f5ZtDrdselnuBtug==/com.micklab.llama-ARlr6kLS3qSJyRmDoxj-qQ==/lib/arm64 configVersion=1 [config changed]
+2026-06-09 07:57:16 [JNI] initWithMmproj: start
+2026-06-09 07:57:16 [JNI] initWithMmproj: llama/mtmd log callbacks registered
+2026-06-09 07:57:16 [JNI] initWithMmproj: model_path=/storage/emulated/0/Android/data/com.micklab.llama/files/gemma-3-1b-thinking-v2-q4_k_m.gguf mmproj_path=<none> enable_audio=false
+2026-06-09 07:57:16 [JNI] initWithMmproj: model file exists, size=806058656 bytes
+2026-06-09 07:57:16 [JNI] initWithMmproj: JavaVM stored
+2026-06-09 07:57:16 [JNI] llama.cpp: ggml-hex: Loading driver libcdsprpc.so
+
+2026-06-09 07:57:16 [JNI] llama.cpp: ggml-hex: Hexagon backend (experimental) : allocating new registry : ndev 1
+
+2026-06-09 07:57:16 [JNI] llama.cpp: ggml-hex: Hexagon Arch version v81
+
+2026-06-09 07:57:16 [JNI] llama.cpp: ggml-hex: failed to open session 0 : error 0x80000406
+
+2026-06-09 07:57:16 [JNI] llama.cpp: ggml-hex: releasing session: HTP0
+
+2026-06-09 07:57:16 [JNI] llama.cpp: ggml-hex: failed to create device/session 0
+
+2026-06-09 07:57:16 [JNI] initWithMmproj: backend init complete (version=1), registered backends=2 [HTP, CPU]
+2026-06-09 07:57:16 [JNI] initWithMmproj: requested load params n_ctx=2048 n_threads=4 n_batch=256 n_gpu_layers=0 temp=0.7 top_p=0.9 top_k=40
+2026-06-09 07:57:16 [JNI] initWithMmproj: model params n_gpu_layers=0 use_mmap=true use_mlock=false backend=CPU npuEnabled=false devices=default(NULL)
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: loaded meta data with 44 key-value pairs and 340 tensors from /storage/emulated/0/Android/data/com.micklab.llama/files/gemma-3-1b-thinking-v2-q4_k_m.gguf (version GGUF V3 (latest))
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   0:                       general.architecture str              = gemma3
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   1:                               general.type str              = model
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   2:                               general.name str              = Gemma 3 1b Thinking v2
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   3:                            general.version str              = v2
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   4:                           general.finetune str              = thinking
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   5:                           general.basename str              = gemma-3
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   6:                         general.size_label str              = 1B
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   7:                            general.license str              = apache-2.0
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   8:                   general.base_model.count u32              = 1
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv   9:                  general.base_model.0.name str              = Gemma 3 1b It
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  10:          general.base_model.0.organization str              = Unsloth
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  11:              general.base_model.0.repo_url str              = https://huggingface.co/unsloth/gemma-...
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  12:                      general.dataset.count u32              = 1
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  13:                     general.dataset.0.name str              = Gsm8K
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  14:             general.dataset.0.organization str              = Openai
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  15:                 general.dataset.0.repo_url str              = https://huggingface.co/openai/gsm8k
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  16:                               general.tags arr[str,6]       = ["text-generation-inference", "transf...
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  17:                          general.languages arr[str,1]       = ["en"]
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  18:                      gemma3.context_length u32              = 32768
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  19:                    gemma3.embedding_length u32              = 1152
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  20:                         gemma3.block_count u32              = 26
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  21:                 gemma3.feed_forward_length u32              = 6912
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  22:                gemma3.attention.head_count u32              = 4
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  23:    gemma3.attention.layer_norm_rms_epsilon f32              = 0.000001
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  24:                gemma3.attention.key_length u32              = 256
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  25:              gemma3.attention.value_length u32              = 256
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  26:                      gemma3.rope.freq_base f32              = 1000000.000000
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  27:            gemma3.attention.sliding_window u32              = 512
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  28:             gemma3.attention.head_count_kv u32              = 1
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  29:                       tokenizer.ggml.model str              = llama
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  30:                         tokenizer.ggml.pre str              = default
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  31:                      tokenizer.ggml.tokens arr[str,262144]  = ["<pad>", "<eos>", "<bos>", "<unk>", ...
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  32:                      tokenizer.ggml.scores arr[f32,262144]  = [-1000.000000, -1000.000000, -1000.00...
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  33:                  tokenizer.ggml.token_type arr[i32,262144]  = [3, 3, 3, 3, 3, 4, 3, 3, 3, 3, 3, 3, ...
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  34:                tokenizer.ggml.bos_token_id u32              = 2
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  35:                tokenizer.ggml.eos_token_id u32              = 106
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  36:            tokenizer.ggml.unknown_token_id u32              = 3
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  37:            tokenizer.ggml.padding_token_id u32              = 0
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  38:               tokenizer.ggml.add_bos_token bool             = true
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  39:               tokenizer.ggml.add_eos_token bool             = false
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  40:                    tokenizer.chat_template str              = {{ bos_token }}\n{%- if messages[0]['r...
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  41:            tokenizer.ggml.add_space_prefix bool             = false
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  42:               general.quantization_version u32              = 2
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - kv  43:                          general.file_type u32              = 15
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - type  f32:  157 tensors
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - type q5_0:  117 tensors
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - type q8_0:   14 tensors
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - type q4_K:   39 tensors
+
+2026-06-09 07:57:16 [JNI] llama.cpp: llama_model_loader: - type q6_K:   13 tensors
+
+2026-06-09 07:57:16 [JNI] llama.cpp: print_info: file format = GGUF V3 (latest)
+
+2026-06-09 07:57:16 [JNI] llama.cpp: print_info: file type   = Q4_K - Medium
+
+2026-06-09 07:57:16 [JNI] llama.cpp: print_info: file size   = 762.49 MiB (6.40 BPW) 
+
+
+=== Native fatal signal ===
+Signal: SIGABRT (6)
+The process aborted before Java crash handlers could run.
+See ollama.log for the preceding JNI/llama.cpp lines.
+2026-06-09 07:57:16 [JNI] Log opened: /storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log
+2026-06-09 07:57:16 [JNI] Native crash log path: /storage/emulated/0/Android/data/com.micklab.llama/files/native_crash.txt
+2026-06-09 07:57:16 [JNI] Signal crash capture ready: signal_log_fd=open signal_crash_fd=open
+2026-06-09 07:57:16.601 pid=32713 [app] Application created
+2026-06-09 07:57:16.602 pid=32713 [app-start] Application onCreate
+  javaUsed=9.1MB javaTotal=256.0MB javaMax=256.0MB nativeHeap=6.6MB nativeHeapFree=1.8MB nativeHeapSize=12.8MB
+  pssTotal=11.9MB privateDirty=6.4MB sharedDirty=45.3MB nativePss=2.1MB dalvikPss=795.0KB otherPss=8.8MB
+  systemAvail=13.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=112
+  procStatus VmRSS=113148 kB VmHWM=113148 kB VmSize=17237244 kB VmSwap=2708 kB Threads=14 FDSize=128
+2026-06-09 07:57:16.620 pid=32713 [previous-exit] pid=32576 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:16.557 desc=
+2026-06-09 07:57:16.621 pid=32713 [previous-exit] pid=32468 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:06.597 desc=
+2026-06-09 07:57:16.621 pid=32713 [previous-exit] pid=32204 reason=SIGNALED(2) status=9 importance=125 pss=0.0B rss=165.0MB time=2026-06-09 07:57:00.549 desc=
+2026-06-09 07:57:16.621 pid=32713 [previous-exit] pid=31984 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:56:43.861 desc=
+2026-06-09 07:57:16.621 pid=32713 [previous-exit] pid=31872 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:56:26.277 desc=
+2026-06-09 07:57:16.621 pid=32713 [previous-exit] pid=31519 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=191.7MB time=2026-06-09 07:56:19.825 desc=
+2026-06-09 07:57:16.621 pid=32713 [previous-exit] pid=31214 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:55:52.423 desc=
+2026-06-09 07:57:16.622 pid=32713 [previous-exit] pid=31102 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:55:37.412 desc=
+2026-06-09 07:57:16 [JNI] log level set to 2
+2026-06-09 07:57:19 [JNI] setTokenListener: JavaVM stored
+2026-06-09 07:57:19 [JNI] setTokenListener: cleared listener
+2026-06-09 07:57:19.732 pid=32713 [model-load] Loading configuration: default
+2026-06-09 07:57:19 [JNI] setTokenListener: cleared listener
+2026-06-09 07:57:19.734 pid=32713 [runtime-memory] Before model load model=gemma-3-1b-thinking-v2-q4_k_m.gguf
+  javaUsed=11.0MB javaTotal=64.0MB javaMax=256.0MB nativeHeap=14.6MB nativeHeapFree=2.4MB nativeHeapSize=20.9MB
+  pssTotal=52.3MB privateDirty=45.1MB sharedDirty=44.3MB nativePss=11.4MB dalvikPss=2.5MB otherPss=38.3MB
+  systemAvail=13.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=185
+  procStatus VmRSS=167644 kB VmHWM=167900 kB VmSize=17593472 kB VmSwap=2708 kB Threads=29 FDSize=256
+2026-06-09 07:57:19.801 pid=32713 [runtime-memory] After model load cleanup model=gemma-3-1b-thinking-v2-q4_k_m.gguf
+  javaUsed=2.6MB javaTotal=26.5MB javaMax=256.0MB nativeHeap=14.2MB nativeHeapFree=2.9MB nativeHeapSize=20.9MB
+  pssTotal=49.1MB privateDirty=42.0MB sharedDirty=44.2MB nativePss=11.3MB dalvikPss=1.2MB otherPss=36.6MB
+  systemAvail=13.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=182
+  procStatus VmRSS=165252 kB VmHWM=168724 kB VmSize=17324408 kB VmSwap=1584 kB Threads=29 FDSize=256
+2026-06-09 07:57:19 [JNI] setLoadParameters: n_ctx=2048 n_threads=4 n_batch=256 temp=0.7 top_p=0.9 top_k=40 n_gpu_layers=0
+2026-06-09 07:57:19 [JNI] setBackendConfig: type=0 (CPU) npuEnabled=false nativeLibDir=/data/app/~~FrAAm1f5ZtDrdselnuBtug==/com.micklab.llama-ARlr6kLS3qSJyRmDoxj-qQ==/lib/arm64 configVersion=1 [config changed]
+2026-06-09 07:57:19 [JNI] initWithMmproj: start
+2026-06-09 07:57:19 [JNI] initWithMmproj: llama/mtmd log callbacks registered
+2026-06-09 07:57:19 [JNI] initWithMmproj: model_path=/storage/emulated/0/Android/data/com.micklab.llama/files/gemma-3-1b-thinking-v2-q4_k_m.gguf mmproj_path=<none> enable_audio=false
+2026-06-09 07:57:19 [JNI] initWithMmproj: model file exists, size=806058656 bytes
+2026-06-09 07:57:19 [JNI] initWithMmproj: JavaVM stored
+2026-06-09 07:57:19 [JNI] llama.cpp: ggml-hex: Loading driver libcdsprpc.so
+
+2026-06-09 07:57:19 [JNI] llama.cpp: ggml-hex: Hexagon backend (experimental) : allocating new registry : ndev 1
+
+2026-06-09 07:57:19 [JNI] llama.cpp: ggml-hex: Hexagon Arch version v81
+
+2026-06-09 07:57:19 [JNI] llama.cpp: ggml-hex: failed to open session 0 : error 0x80000406
+
+2026-06-09 07:57:19 [JNI] llama.cpp: ggml-hex: releasing session: HTP0
+
+2026-06-09 07:57:19 [JNI] llama.cpp: ggml-hex: failed to create device/session 0
+
+2026-06-09 07:57:19 [JNI] initWithMmproj: backend init complete (version=1), registered backends=2 [HTP, CPU]
+2026-06-09 07:57:19 [JNI] initWithMmproj: requested load params n_ctx=2048 n_threads=4 n_batch=256 n_gpu_layers=0 temp=0.7 top_p=0.9 top_k=40
+2026-06-09 07:57:19 [JNI] initWithMmproj: model params n_gpu_layers=0 use_mmap=true use_mlock=false backend=CPU npuEnabled=false devices=default(NULL)
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: loaded meta data with 44 key-value pairs and 340 tensors from /storage/emulated/0/Android/data/com.micklab.llama/files/gemma-3-1b-thinking-v2-q4_k_m.gguf (version GGUF V3 (latest))
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   0:                       general.architecture str              = gemma3
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   1:                               general.type str              = model
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   2:                               general.name str              = Gemma 3 1b Thinking v2
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   3:                            general.version str              = v2
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   4:                           general.finetune str              = thinking
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   5:                           general.basename str              = gemma-3
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   6:                         general.size_label str              = 1B
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   7:                            general.license str              = apache-2.0
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   8:                   general.base_model.count u32              = 1
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv   9:                  general.base_model.0.name str              = Gemma 3 1b It
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  10:          general.base_model.0.organization str              = Unsloth
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  11:              general.base_model.0.repo_url str              = https://huggingface.co/unsloth/gemma-...
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  12:                      general.dataset.count u32              = 1
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  13:                     general.dataset.0.name str              = Gsm8K
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  14:             general.dataset.0.organization str              = Openai
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  15:                 general.dataset.0.repo_url str              = https://huggingface.co/openai/gsm8k
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  16:                               general.tags arr[str,6]       = ["text-generation-inference", "transf...
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  17:                          general.languages arr[str,1]       = ["en"]
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  18:                      gemma3.context_length u32              = 32768
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  19:                    gemma3.embedding_length u32              = 1152
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  20:                         gemma3.block_count u32              = 26
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  21:                 gemma3.feed_forward_length u32              = 6912
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  22:                gemma3.attention.head_count u32              = 4
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  23:    gemma3.attention.layer_norm_rms_epsilon f32              = 0.000001
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  24:                gemma3.attention.key_length u32              = 256
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  25:              gemma3.attention.value_length u32              = 256
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  26:                      gemma3.rope.freq_base f32              = 1000000.000000
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  27:            gemma3.attention.sliding_window u32              = 512
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  28:             gemma3.attention.head_count_kv u32              = 1
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  29:                       tokenizer.ggml.model str              = llama
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  30:                         tokenizer.ggml.pre str              = default
+
+2026-06-09 07:57:19 [JNI] llama.cpp: llama_model_loader: - kv  31:                      tokenizer.ggml.tokens arr[str,262144]  = ["<pad>", "<eos>", "<bos>", "<unk>", ...
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  32:                      tokenizer.ggml.scores arr[f32,262144]  = [-1000.000000, -1000.000000, -1000.00...
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  33:                  tokenizer.ggml.token_type arr[i32,262144]  = [3, 3, 3, 3, 3, 4, 3, 3, 3, 3, 3, 3, ...
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  34:                tokenizer.ggml.bos_token_id u32              = 2
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  35:                tokenizer.ggml.eos_token_id u32              = 106
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  36:            tokenizer.ggml.unknown_token_id u32              = 3
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  37:            tokenizer.ggml.padding_token_id u32              = 0
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  38:               tokenizer.ggml.add_bos_token bool             = true
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  39:               tokenizer.ggml.add_eos_token bool             = false
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  40:                    tokenizer.chat_template str              = {{ bos_token }}\n{%- if messages[0]['r...
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  41:            tokenizer.ggml.add_space_prefix bool             = false
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  42:               general.quantization_version u32              = 2
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - kv  43:                          general.file_type u32              = 15
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - type  f32:  157 tensors
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - type q5_0:  117 tensors
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - type q8_0:   14 tensors
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - type q4_K:   39 tensors
+
+2026-06-09 07:57:20 [JNI] llama.cpp: llama_model_loader: - type q6_K:   13 tensors
+
+2026-06-09 07:57:20 [JNI] llama.cpp: print_info: file format = GGUF V3 (latest)
+
+2026-06-09 07:57:20 [JNI] llama.cpp: print_info: file type   = Q4_K - Medium
+
+2026-06-09 07:57:20 [JNI] llama.cpp: print_info: file size   = 762.49 MiB (6.40 BPW) 
+
+
+=== Native fatal signal ===
+Signal: SIGABRT (6)
+The process aborted before Java crash handlers could run.
+See ollama.log for the preceding JNI/llama.cpp lines.
+2026-06-09 07:57:21 [JNI] Log opened: /storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log
+2026-06-09 07:57:21 [JNI] Native crash log path: /storage/emulated/0/Android/data/com.micklab.llama/files/native_crash.txt
+2026-06-09 07:57:21 [JNI] Signal crash capture ready: signal_log_fd=open signal_crash_fd=open
+2026-06-09 07:57:21.428 pid=378 [app] Application created
+2026-06-09 07:57:21.429 pid=378 [app-start] Application onCreate
+  javaUsed=9.1MB javaTotal=256.0MB javaMax=256.0MB nativeHeap=6.5MB nativeHeapFree=1.8MB nativeHeapSize=12.8MB
+  pssTotal=12.0MB privateDirty=6.4MB sharedDirty=45.3MB nativePss=2.1MB dalvikPss=791.0KB otherPss=8.9MB
+  systemAvail=13.7GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=112
+  procStatus VmRSS=112884 kB VmHWM=112884 kB VmSize=17258680 kB VmSwap=2576 kB Threads=13 FDSize=128
+2026-06-09 07:57:21.448 pid=378 [previous-exit] pid=32713 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:20.149 desc=
+2026-06-09 07:57:21.450 pid=378 [previous-exit] pid=32576 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:16.557 desc=
+2026-06-09 07:57:21.450 pid=378 [previous-exit] pid=32468 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:06.597 desc=
+2026-06-09 07:57:21.450 pid=378 [previous-exit] pid=32204 reason=SIGNALED(2) status=9 importance=125 pss=0.0B rss=165.0MB time=2026-06-09 07:57:00.549 desc=
+2026-06-09 07:57:21.451 pid=378 [previous-exit] pid=31984 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:56:43.861 desc=
+2026-06-09 07:57:21.451 pid=378 [previous-exit] pid=31872 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:56:26.277 desc=
+2026-06-09 07:57:21.451 pid=378 [previous-exit] pid=31519 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=191.7MB time=2026-06-09 07:56:19.825 desc=
+2026-06-09 07:57:21.452 pid=378 [previous-exit] pid=31214 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:55:52.423 desc=
+2026-06-09 07:57:21 [JNI] log level set to 2
+2026-06-09 07:57:24 [JNI] log level set to 2
+2026-06-09 07:57:24 [JNI] log level set to 2
+2026-06-09 07:57:35 [JNI] log level set to 0
+2026-06-09 07:57:39.696 pid=378 [model-load] Loading configuration: default
+2026-06-09 07:57:39 [JNI] setTokenListener: JavaVM stored
+2026-06-09 07:57:39 [JNI] setTokenListener: cleared listener
+2026-06-09 07:57:39.698 pid=378 [runtime-memory] Before model load model=gemma-3-1b-thinking-v2-q4_k_m.gguf
+  javaUsed=6.9MB javaTotal=27.7MB javaMax=256.0MB nativeHeap=22.2MB nativeHeapFree=2.7MB nativeHeapSize=28.0MB
+  pssTotal=63.6MB privateDirty=56.1MB sharedDirty=44.2MB nativePss=19.3MB dalvikPss=5.3MB otherPss=39.0MB
+  systemAvail=13.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=192
+  procStatus VmRSS=184956 kB VmHWM=185388 kB VmSize=17429656 kB VmSwap=1520 kB Threads=29 FDSize=256
+2026-06-09 07:57:39.781 pid=378 [runtime-memory] After model load cleanup model=gemma-3-1b-thinking-v2-q4_k_m.gguf
+  javaUsed=3.6MB javaTotal=27.5MB javaMax=256.0MB nativeHeap=21.8MB nativeHeapFree=3.1MB nativeHeapSize=28.0MB
+  pssTotal=59.2MB privateDirty=51.7MB sharedDirty=44.2MB nativePss=19.3MB dalvikPss=2.3MB otherPss=37.6MB
+  systemAvail=13.8GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=191
+  procStatus VmRSS=180540 kB VmHWM=185388 kB VmSize=17429656 kB VmSwap=1520 kB Threads=29 FDSize=256
+2026-06-09 07:57:39 [JNI] setLoadParameters: n_ctx=2048 n_threads=4 n_batch=256 temp=0.7 top_p=0.9 top_k=40 n_gpu_layers=0
+2026-06-09 07:57:39 [JNI] setBackendConfig: type=0 (CPU) npuEnabled=false nativeLibDir=/data/app/~~FrAAm1f5ZtDrdselnuBtug==/com.micklab.llama-ARlr6kLS3qSJyRmDoxj-qQ==/lib/arm64 configVersion=1 [config changed]
+2026-06-09 07:57:39 [JNI] initWithMmproj: start
+2026-06-09 07:57:39 [JNI] initWithMmproj: llama/mtmd log callbacks registered
+2026-06-09 07:57:39 [JNI] initWithMmproj: model_path=/storage/emulated/0/Android/data/com.micklab.llama/files/gemma-3-1b-thinking-v2-q4_k_m.gguf mmproj_path=<none> enable_audio=false
+2026-06-09 07:57:39 [JNI] initWithMmproj: model file exists, size=806058656 bytes
+2026-06-09 07:57:39 [JNI] initWithMmproj: JavaVM stored
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: Loading driver libcdsprpc.so
+
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: Hexagon backend (experimental) : allocating new registry : ndev 1
+
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: Hexagon Arch version v81
+
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: HTP0 allocating new session
+
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: failed to open session 0 : error 0x80000406
+
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: releasing session: HTP0
+
+2026-06-09 07:57:39 [JNI] llama.cpp: ggml-hex: failed to create device/session 0
+
+2026-06-09 07:57:39 [JNI] initWithMmproj: backend init complete (version=1), registered backends=2 [HTP, CPU]
+2026-06-09 07:57:39 [JNI] initWithMmproj: requested load params n_ctx=2048 n_threads=4 n_batch=256 n_gpu_layers=0 temp=0.7 top_p=0.9 top_k=40
+2026-06-09 07:57:39 [JNI] initWithMmproj: model params n_gpu_layers=0 use_mmap=true use_mlock=false backend=CPU npuEnabled=false devices=default(NULL)
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: loaded meta data with 44 key-value pairs and 340 tensors from /storage/emulated/0/Android/data/com.micklab.llama/files/gemma-3-1b-thinking-v2-q4_k_m.gguf (version GGUF V3 (latest))
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   0:                       general.architecture str              = gemma3
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   1:                               general.type str              = model
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   2:                               general.name str              = Gemma 3 1b Thinking v2
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   3:                            general.version str              = v2
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   4:                           general.finetune str              = thinking
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   5:                           general.basename str              = gemma-3
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   6:                         general.size_label str              = 1B
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   7:                            general.license str              = apache-2.0
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   8:                   general.base_model.count u32              = 1
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv   9:                  general.base_model.0.name str              = Gemma 3 1b It
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  10:          general.base_model.0.organization str              = Unsloth
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  11:              general.base_model.0.repo_url str              = https://huggingface.co/unsloth/gemma-...
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  12:                      general.dataset.count u32              = 1
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  13:                     general.dataset.0.name str              = Gsm8K
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  14:             general.dataset.0.organization str              = Openai
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  15:                 general.dataset.0.repo_url str              = https://huggingface.co/openai/gsm8k
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  16:                               general.tags arr[str,6]       = ["text-generation-inference", "transf...
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  17:                          general.languages arr[str,1]       = ["en"]
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  18:                      gemma3.context_length u32              = 32768
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  19:                    gemma3.embedding_length u32              = 1152
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  20:                         gemma3.block_count u32              = 26
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  21:                 gemma3.feed_forward_length u32              = 6912
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  22:                gemma3.attention.head_count u32              = 4
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  23:    gemma3.attention.layer_norm_rms_epsilon f32              = 0.000001
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  24:                gemma3.attention.key_length u32              = 256
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  25:              gemma3.attention.value_length u32              = 256
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  26:                      gemma3.rope.freq_base f32              = 1000000.000000
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  27:            gemma3.attention.sliding_window u32              = 512
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  28:             gemma3.attention.head_count_kv u32              = 1
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  29:                       tokenizer.ggml.model str              = llama
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  30:                         tokenizer.ggml.pre str              = default
+
+2026-06-09 07:57:39 [JNI] llama.cpp: llama_model_loader: - kv  31:                      tokenizer.ggml.tokens arr[str,262144]  = ["<pad>", "<eos>", "<bos>", "<unk>", ...
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  32:                      tokenizer.ggml.scores arr[f32,262144]  = [-1000.000000, -1000.000000, -1000.00...
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  33:                  tokenizer.ggml.token_type arr[i32,262144]  = [3, 3, 3, 3, 3, 4, 3, 3, 3, 3, 3, 3, ...
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  34:                tokenizer.ggml.bos_token_id u32              = 2
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  35:                tokenizer.ggml.eos_token_id u32              = 106
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  36:            tokenizer.ggml.unknown_token_id u32              = 3
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  37:            tokenizer.ggml.padding_token_id u32              = 0
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  38:               tokenizer.ggml.add_bos_token bool             = true
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  39:               tokenizer.ggml.add_eos_token bool             = false
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  40:                    tokenizer.chat_template str              = {{ bos_token }}\n{%- if messages[0]['r...
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  41:            tokenizer.ggml.add_space_prefix bool             = false
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  42:               general.quantization_version u32              = 2
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - kv  43:                          general.file_type u32              = 15
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - type  f32:  157 tensors
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - type q5_0:  117 tensors
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - type q8_0:   14 tensors
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - type q4_K:   39 tensors
+
+2026-06-09 07:57:40 [JNI] llama.cpp: llama_model_loader: - type q6_K:   13 tensors
+
+2026-06-09 07:57:40 [JNI] llama.cpp: print_info: file format = GGUF V3 (latest)
+
+2026-06-09 07:57:40 [JNI] llama.cpp: print_info: file type   = Q4_K - Medium
+
+2026-06-09 07:57:40 [JNI] llama.cpp: print_info: file size   = 762.49 MiB (6.40 BPW) 
+
+
+=== Native fatal signal ===
+Signal: SIGABRT (6)
+The process aborted before Java crash handlers could run.
+See ollama.log for the preceding JNI/llama.cpp lines.
+2026-06-09 07:57:40 [JNI] Log opened: /storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log
+2026-06-09 07:57:40 [JNI] Native crash log path: /storage/emulated/0/Android/data/com.micklab.llama/files/native_crash.txt
+2026-06-09 07:57:40 [JNI] Signal crash capture ready: signal_log_fd=open signal_crash_fd=open
+2026-06-09 07:57:40.178 pid=551 [app] Application created
+2026-06-09 07:57:40.178 pid=551 [app-start] Application onCreate
+  javaUsed=9.1MB javaTotal=256.0MB javaMax=256.0MB nativeHeap=6.5MB nativeHeapFree=1.8MB nativeHeapSize=12.8MB
+  pssTotal=11.9MB privateDirty=6.4MB sharedDirty=45.3MB nativePss=2.1MB dalvikPss=794.0KB otherPss=8.8MB
+  systemAvail=13.9GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=112
+  procStatus VmRSS=113088 kB VmHWM=113088 kB VmSize=17254584 kB VmSwap=2700 kB Threads=13 FDSize=128
+2026-06-09 07:57:40.198 pid=551 [previous-exit] pid=378 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:40.127 desc=
+2026-06-09 07:57:40.198 pid=551 [previous-exit] pid=32713 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:20.149 desc=
+2026-06-09 07:57:40.198 pid=551 [previous-exit] pid=32576 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:16.557 desc=
+2026-06-09 07:57:40.198 pid=551 [previous-exit] pid=32468 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:57:06.597 desc=
+2026-06-09 07:57:40.198 pid=551 [previous-exit] pid=32204 reason=SIGNALED(2) status=9 importance=125 pss=0.0B rss=165.0MB time=2026-06-09 07:57:00.549 desc=
+2026-06-09 07:57:40.198 pid=551 [previous-exit] pid=31984 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:56:43.861 desc=
+2026-06-09 07:57:40.199 pid=551 [previous-exit] pid=31872 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=0.0B time=2026-06-09 07:56:26.277 desc=
+2026-06-09 07:57:40.199 pid=551 [previous-exit] pid=31519 reason=EXIT_SELF(1) status=134 importance=100 pss=0.0B rss=191.7MB time=2026-06-09 07:56:19.825 desc=
+2026-06-09 07:57:40 [JNI] log level set to 0
