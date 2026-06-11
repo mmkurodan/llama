@@ -123,6 +123,7 @@ public class SettingsActivity extends Activity {
     
     // Runtime switches
     private Switch streamingSwitch;
+    private Switch showPerfMetricsSwitch;
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
     private Switch enableThinkingSwitch;
@@ -308,6 +309,7 @@ public class SettingsActivity extends Activity {
         
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
+        showPerfMetricsSwitch = findViewById(R.id.showPerfMetricsSwitch);
 
         // Compute backend: GPU / NPU 独立トグル (両方 OFF = CPU)。
         // backendType はこの 2 つから導出する (スピナー廃止)。
@@ -658,6 +660,7 @@ public class SettingsActivity extends Activity {
                 case "DRY Sequence Breakers:": return "DRY シーケンス区切り:";
                 case "Output Settings": return "出力設定";
                 case "Enable Streaming:": return "ストリーミングを有効化:";
+                case "Show Performance Metrics:": return "性能指標を表示:";
                 case "Prompt Template": return "プロンプトテンプレート";
                 case "System Prompt:": return "システムプロンプト:";
                 case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
@@ -995,8 +998,9 @@ public class SettingsActivity extends Activity {
         dryPenaltyLastNInput.setText(String.valueOf(config.dryPenaltyLastN));
         drySequenceBreakersInput.setText(config.drySequenceBreakers);
         
-        // Streaming
+        // Streaming / metrics
         streamingSwitch.setChecked(config.streaming);
+        if (showPerfMetricsSwitch != null) showPerfMetricsSwitch.setChecked(config.showPerfMetrics);
         int layers = config.gpuOffloadLayers;
         int displayLayers = (layers < 0) ? 40 : layers;
         gpuLayersSeekBar.setProgress(displayLayers);
@@ -1213,8 +1217,9 @@ public class SettingsActivity extends Activity {
             config.drySequenceBreakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
         }
         
-        // Streaming
+        // Streaming / metrics
         config.streaming = streamingSwitch.isChecked();
+        config.showPerfMetrics = (showPerfMetricsSwitch != null) && showPerfMetricsSwitch.isChecked();
         int progress = gpuLayersSeekBar.getProgress();
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();

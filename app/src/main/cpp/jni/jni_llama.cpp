@@ -2582,7 +2582,11 @@ static void notify_token_complete() {
 
 // Last generation decode throughput (tok/s), published for the UI via
 // getLastGenerationSpeed(). Atomic so the JNI thread can read it without the mutex.
-static std::atomic<double> g_last_gen_tps{0.0};
+static std::atomic<double>  g_last_gen_tps{0.0};
+// Performance metrics from the most recent generation, exposed via getLastGenerationMetrics().
+static std::atomic<int32_t> g_last_n_prompt{0};
+static std::atomic<int32_t> g_last_n_eval{0};
+static std::atomic<double>  g_last_t_total_ms{0.0};
 
 // Log generation / prompt throughput (tok/s) from the per-generation perf
 // counters (reset at the start of each generation). Surfaces in the diagnostics
@@ -2594,6 +2598,9 @@ static void log_generation_perf(const char * log_prefix) {
     const llama_perf_context_data p = llama_perf_context(g_ctx);
     const double gen_tps = (p.t_eval_ms   > 0.0) ? (1.0e3 * p.n_eval   / p.t_eval_ms)   : 0.0;
     g_last_gen_tps.store(gen_tps, std::memory_order_relaxed);
+    g_last_n_prompt.store(static_cast<int32_t>(p.n_p_eval), std::memory_order_relaxed);
+    g_last_n_eval.store(static_cast<int32_t>(p.n_eval),     std::memory_order_relaxed);
+    g_last_t_total_ms.store(p.t_p_eval_ms + p.t_eval_ms,    std::memory_order_relaxed);
     const double pp_tps  = (p.t_p_eval_ms > 0.0) ? (1.0e3 * p.n_p_eval / p.t_p_eval_ms) : 0.0;
     std::ostringstream ss;
     ss << log_prefix << ": speed: gen " << std::fixed << std::setprecision(2) << gen_tps
@@ -3460,6 +3467,33 @@ Java_com_micklab_llama_LlamaNative_getLastGenerationSpeed(
         JNIEnv *, jobject /*thiz*/
 ) {
     return (jdouble) g_last_gen_tps.load(std::memory_order_relaxed);
+}
+
+// 直近の生成の入力トークン数を返す。
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_micklab_llama_LlamaNative_getLastNPromptTokens(
+        JNIEnv *, jobject /*thiz*/
+) {
+    return (jint) g_last_n_prompt.load(std::memory_order_relaxed);
+}
+
+// 直近の生成の出力トークン数を返す。
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_micklab_llama_LlamaNative_getLastNEvalTokens(
+        JNIEnv *, jobject /*thiz*/
+) {
+    return (jint) g_last_n_eval.load(std::memory_order_relaxed);
+}
+
+// 直近の生成の合計時間 (ms) を返す。プロンプト処理 + デコード。
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_micklab_llama_LlamaNative_getLastTotalTimeMs(
+        JNIEnv *, jobject /*thiz*/
+) {
+    return (jdouble) g_last_t_total_ms.load(std::memory_order_relaxed);
 }
 
 // 実効的な計算バックエンド名 ("CPU"/"GPU"/"NPU/HTP"/"GPU+NPU"/"CPU (fallback)") を返す。

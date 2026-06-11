@@ -79,6 +79,15 @@ public class LlamaNative {
     /** Decode throughput (tokens/sec) of the most recent generation, 0 if none yet. */
     public native double getLastGenerationSpeed();
 
+    /** Input (prompt) token count of the most recent generation. */
+    public native int getLastNPromptTokens();
+
+    /** Output (eval) token count of the most recent generation. */
+    public native int getLastNEvalTokens();
+
+    /** Total generation time (prompt + decode) in milliseconds of the most recent generation. */
+    public native double getLastTotalTimeMs();
+
     /** Effective compute backend after the last model load (CPU/GPU/NPU/HTP/GPU+NPU/CPU (fallback)). */
     public native String getActiveBackend();
 

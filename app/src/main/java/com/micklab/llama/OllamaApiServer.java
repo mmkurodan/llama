@@ -2,7 +2,9 @@ package com.micklab.llama;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.BatteryManager;
 import android.content.res.AssetManager;
 import android.util.Base64;
 import android.util.Log;
@@ -626,6 +628,42 @@ public class OllamaApiServer {
     
     public void setListener(ServerListener listener) {
         this.listener = listener;
+    }
+
+    /** Returns "\n(in:N  out:M  Xs  temp:T°C)" if showPerfMetrics is enabled, else "". */
+    private String buildPerfMetricsSuffix() {
+        ConfigurationManager.Configuration cfg = modelManager.getCurrentConfig();
+        if (cfg == null || !cfg.showPerfMetrics) return "";
+        LlamaNative llama = modelManager.getLlama();
+        if (llama == null) return "";
+        int nIn  = llama.getLastNPromptTokens();
+        int nOut = llama.getLastNEvalTokens();
+        double sec = llama.getLastTotalTimeMs() / 1000.0;
+        String timeStr = (sec < 60.0)
+                ? String.format(Locale.US, "%.1fs", sec)
+                : String.format(Locale.US, "%dm%.1fs", (int)(sec / 60), sec % 60);
+        String tempStr = getDeviceTempString();
+        return String.format(Locale.US,
+                "\n(in: %d  out: %d  %s  temp: %s)", nIn, nOut, timeStr, tempStr);
+    }
+
+    private String getDeviceTempString() {
+        try {
+            Intent intent = context.registerReceiver(null,
+                    new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (intent == null) return "?°C";
+            int tenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
+            if (tenths == Integer.MIN_VALUE) return "?°C";
+            return String.format(Locale.US, "%.1f°C", tenths / 10.0f);
+        } catch (Exception e) {
+            return "?°C";
+        }
+    }
+
+    /** Appends the perf metrics suffix to content if showPerfMetrics is enabled. */
+    private String appendPerfMetrics(String content) {
+        String suffix = buildPerfMetricsSuffix();
+        return suffix.isEmpty() ? content : content + suffix;
     }
     
     public void setPort(int port) {
@@ -1532,6 +1570,20 @@ public class OllamaApiServer {
                                         break;
                                     }
                                     try {
+                                        String metricsSuffix = buildPerfMetricsSuffix();
+                                        if (!metricsSuffix.isEmpty()) {
+                                            JSONObject metricsChunk = new JSONObject();
+                                            metricsChunk.put("model", model);
+                                            metricsChunk.put("created_at", getTimestamp());
+                                            metricsChunk.put("response", metricsSuffix);
+                                            metricsChunk.put("done", false);
+                                            byte[] mBytes = (metricsChunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                            synchronized (writeLock) {
+                                                outputStream.write((Integer.toHexString(mBytes.length) + "\r\n").getBytes(StandardCharsets.UTF_8));
+                                                outputStream.write(mBytes);
+                                                outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            }
+                                        }
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
@@ -1658,7 +1710,7 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse);
                     logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
-                    String response = stripResponseMarkers(rawResponse);
+                    String response = appendPerfMetrics(stripResponseMarkers(rawResponse));
                     logMaxDebugPayload("api.generate.nonstream.response", response);
                     JSONObject result = new JSONObject();
                     result.put("model", model);
@@ -1812,6 +1864,23 @@ public class OllamaApiServer {
                                         break;
                                     }
                                     try {
+                                        String metricsSuffix = buildPerfMetricsSuffix();
+                                        if (!metricsSuffix.isEmpty()) {
+                                            JSONObject metricsChunk = new JSONObject();
+                                            metricsChunk.put("model", model);
+                                            metricsChunk.put("created_at", getTimestamp());
+                                            JSONObject metricsMsg = new JSONObject();
+                                            metricsMsg.put("role", "assistant");
+                                            metricsMsg.put("content", metricsSuffix);
+                                            metricsChunk.put("message", metricsMsg);
+                                            metricsChunk.put("done", false);
+                                            byte[] mBytes = (metricsChunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
+                                            synchronized (writeLock) {
+                                                outputStream.write((Integer.toHexString(mBytes.length) + "\r\n").getBytes(StandardCharsets.UTF_8));
+                                                outputStream.write(mBytes);
+                                                outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                                            }
+                                        }
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
@@ -1946,7 +2015,7 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
-                    String response = stripResponseMarkers(rawResponse);
+                    String response = appendPerfMetrics(stripResponseMarkers(rawResponse));
                     logMaxDebugPayload("api.chat.nonstream.response", response);
 
                     JSONObject result = new JSONObject();
@@ -2153,6 +2222,10 @@ public class OllamaApiServer {
                                 Object ev = tokenQueue.take();
                                 if (ev == TOKEN_COMPLETE) {
                                     synchronized (writeLock) {
+                                        String metricsSuffix = buildPerfMetricsSuffix();
+                                        if (!metricsSuffix.isEmpty()) {
+                                            sendSseEvent(outputStream, buildOpenAiStreamChunk(model, metricsSuffix, null, null, null).toString());
+                                        }
                                         sendSseEvent(
                                                 outputStream,
                                                 buildOpenAiStreamChunk(model, "", null, null, "stop").toString()
@@ -2230,7 +2303,7 @@ public class OllamaApiServer {
                     }
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
-                    String response = stripResponseMarkers(rawResponse);
+                    String response = appendPerfMetrics(stripResponseMarkers(rawResponse));
                     sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, response).toString());
                 }
             } finally {

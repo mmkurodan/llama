@@ -103,6 +103,7 @@ public class ModelManager {
     private boolean reinitializing = false;
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
+    private volatile ConfigurationManager.Configuration lastLoadedConfig = null;
     private volatile String currentConfiguredMmprojPath = null;
     // Backend config the currently-loaded model was built with. A change here must
     // force a model reload (tensors are placed on the accelerator at load time).
@@ -223,6 +224,10 @@ public class ModelManager {
     
     public String getCurrentConfigName() {
         return currentConfigName;
+    }
+
+    public ConfigurationManager.Configuration getCurrentConfig() {
+        return lastLoadedConfig;
     }
     
     public String getCurrentModelPath() {
@@ -532,6 +537,7 @@ public class ModelManager {
                 Log.i(TAG, "Same model already loaded, re-applying parameters: " + configName);
                 applyConfiguration(config);
                 currentConfigName = configName;
+                lastLoadedConfig = config;
                 DiagnosticsLogger.logMemorySnapshot(
                         context,
                         "model-load-skip",
@@ -616,6 +622,7 @@ public class ModelManager {
             applyConfiguration(config);
 
             currentConfigName = configName;
+            lastLoadedConfig = config;
             modelLoaded = true;
             // この設定でモデルを構築したことを記録 (再ロード判定に使用)
             currentBackendType = config.backendType;

@@ -459,12 +459,16 @@ public class MainActivity extends Activity {
                             Log.d(TAG, "stream complete");
                         }
                         final String tail = streamOutputFilter.onComplete();
+                        final String metrics = buildPerfMetricsSuffix();
                         runIfDirectGenerationSessionActive(generationSessionId, () -> {
                             if (!tail.isEmpty()) {
                                 logMaxDebugPayload("direct.stream.tail", tail);
                                 outputView.append(tail);
-                                scrollTextViewToBottom(outputView);
                             }
+                            if (!metrics.isEmpty()) {
+                                outputView.append(metrics);
+                            }
+                            scrollTextViewToBottom(outputView);
                             appendMessage("streaming complete");
                         });
                     }
@@ -490,11 +494,12 @@ public class MainActivity extends Activity {
             String gen = modelManager.generate(chatPrompt);
             logMaxDebugPayload("direct.nonstream.model.raw", gen);
             final String finalGen = gen;
+            final String metrics = buildPerfMetricsSuffix();
             runIfDirectGenerationSessionActive(generationSessionId, () -> {
                 appendMessage("generate() returned.");
                 String safe = stripResponseMarkers(finalGen);
                 logMaxDebugPayload("direct.nonstream.output", safe);
-                outputView.setText(safe);
+                outputView.setText(metrics.isEmpty() ? safe : safe + metrics);
                 scrollTextViewToTop(outputView);
             });
         } catch (Throwable t) {
@@ -720,6 +725,43 @@ public class MainActivity extends Activity {
         return sb.toString();
     }
     
+    /**
+     * Returns a performance metrics suffix "(in:N out:M Xs 温度:T°C)" if showPerfMetrics is enabled,
+     * otherwise returns an empty string.
+     */
+    private String buildPerfMetricsSuffix() {
+        if (currentConfig == null || !currentConfig.showPerfMetrics) return "";
+        LlamaNative llama = (modelManager != null) ? modelManager.getLlama() : null;
+        if (llama == null) return "";
+        int nIn   = llama.getLastNPromptTokens();
+        int nOut  = llama.getLastNEvalTokens();
+        double ms = llama.getLastTotalTimeMs();
+        double sec = ms / 1000.0;
+        String timeStr = (sec < 60.0)
+                ? String.format(java.util.Locale.US, "%.1fs", sec)
+                : String.format(java.util.Locale.US, "%dm%.1fs", (int)(sec / 60), sec % 60);
+        String tempStr = getDeviceTempString(this);
+        return String.format(java.util.Locale.US,
+                "\n(%s: %d  %s: %d  %s  %s: %s)",
+                localizedText("入力", "in"), nIn,
+                localizedText("出力", "out"), nOut,
+                timeStr,
+                localizedText("温度", "temp"), tempStr);
+    }
+
+    private static String getDeviceTempString(android.content.Context ctx) {
+        try {
+            Intent intent = ctx.registerReceiver(null,
+                    new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (intent == null) return "?°C";
+            int tenths = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Integer.MIN_VALUE);
+            if (tenths == Integer.MIN_VALUE) return "?°C";
+            return String.format(java.util.Locale.US, "%.1f°C", tenths / 10.0f);
+        } catch (Exception e) {
+            return "?°C";
+        }
+    }
+
     private void clearLogFile() {
         if (isViewingLog) {
             DiagnosticsLogger.clearLogFiles(this);
