@@ -2600,7 +2600,7 @@ static void log_generation_perf(const char * log_prefix) {
     g_last_gen_tps.store(gen_tps, std::memory_order_relaxed);
     g_last_n_prompt.store(static_cast<int32_t>(p.n_p_eval), std::memory_order_relaxed);
     g_last_n_eval.store(static_cast<int32_t>(p.n_eval),     std::memory_order_relaxed);
-    g_last_t_total_ms.store(p.t_p_eval_ms + p.t_eval_ms,    std::memory_order_relaxed);
+    g_last_t_total_ms.store(p.t_eval_ms,                    std::memory_order_relaxed);
     const double pp_tps  = (p.t_p_eval_ms > 0.0) ? (1.0e3 * p.n_p_eval / p.t_p_eval_ms) : 0.0;
     std::ostringstream ss;
     ss << log_prefix << ": speed: gen " << std::fixed << std::setprecision(2) << gen_tps

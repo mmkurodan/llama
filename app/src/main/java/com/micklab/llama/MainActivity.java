@@ -740,12 +740,16 @@ public class MainActivity extends Activity {
         String timeStr = (sec < 60.0)
                 ? String.format(java.util.Locale.US, "%.1fs", sec)
                 : String.format(java.util.Locale.US, "%dm%.1fs", (int)(sec / 60), sec % 60);
+        String tpsStr = (sec > 0.0)
+                ? String.format(java.util.Locale.US, "%.1ftok/s", nOut / sec)
+                : "-";
         String tempStr = getDeviceTempString(this);
         return String.format(java.util.Locale.US,
-                "\n(%s: %d  %s: %d  %s  %s: %s)",
+                "\n(%s: %d  %s: %d  %s: %s  %s  %s: %s)",
                 localizedText("入力", "in"), nIn,
                 localizedText("出力", "out"), nOut,
-                timeStr,
+                localizedText("時間", "time"), timeStr,
+                tpsStr,
                 localizedText("温度", "temp"), tempStr);
     }
 

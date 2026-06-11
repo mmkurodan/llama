@@ -642,9 +642,12 @@ public class OllamaApiServer {
         String timeStr = (sec < 60.0)
                 ? String.format(Locale.US, "%.1fs", sec)
                 : String.format(Locale.US, "%dm%.1fs", (int)(sec / 60), sec % 60);
+        String tpsStr = (sec > 0.0)
+                ? String.format(Locale.US, "%.1ftok/s", nOut / sec)
+                : "-";
         String tempStr = getDeviceTempString();
         return String.format(Locale.US,
-                "\n(in: %d  out: %d  %s  temp: %s)", nIn, nOut, timeStr, tempStr);
+                "\n(in: %d  out: %d  time: %s  %s  temp: %s)", nIn, nOut, timeStr, tpsStr, tempStr);
     }
 
     private String getDeviceTempString() {
