@@ -730,7 +730,8 @@ public class MainActivity extends Activity {
      * otherwise returns an empty string.
      */
     private String buildPerfMetricsSuffix() {
-        if (currentConfig == null || !currentConfig.showPerfMetrics) return "";
+        SharedPreferences prefs = getSharedPreferences("ollama_prefs", MODE_PRIVATE);
+        if (!prefs.getBoolean("show_perf_metrics", false)) return "";
         LlamaNative llama = (modelManager != null) ? modelManager.getLlama() : null;
         if (llama == null) return "";
         int nIn   = llama.getLastNPromptTokens();

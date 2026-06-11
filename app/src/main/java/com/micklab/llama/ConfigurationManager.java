@@ -78,7 +78,6 @@ public class ConfigurationManager {
         
         // Streaming parameter
         public boolean streaming;
-        public boolean showPerfMetrics;
 
         // Runtime behavior switches
         public int gpuOffloadLayers;
@@ -134,7 +133,6 @@ public class ConfigurationManager {
             
             // Streaming default
             streaming = true;
-            showPerfMetrics = false;
 
             // Runtime behavior defaults
             gpuOffloadLayers = 0;
@@ -197,7 +195,6 @@ public class ConfigurationManager {
             
             // Streaming
             json.put("streaming", streaming);
-            json.put("showPerfMetrics", showPerfMetrics);
 
             // Runtime behavior switches
             json.put("gpuOffloadLayers", gpuOffloadLayers);
@@ -263,7 +260,6 @@ public class ConfigurationManager {
             
             // Streaming (with default for backward compatibility)
             config.streaming = json.optBoolean("streaming", true);
-            config.showPerfMetrics = json.optBoolean("showPerfMetrics", false);
 
             // Runtime behavior switches (with defaults for backward compatibility)
             if (json.has("gpuOffloadLayers")) {

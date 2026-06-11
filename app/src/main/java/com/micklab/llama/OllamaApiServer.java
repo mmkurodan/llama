@@ -632,8 +632,8 @@ public class OllamaApiServer {
 
     /** Returns "\n(in:N  out:M  Xs  temp:T°C)" if showPerfMetrics is enabled, else "". */
     private String buildPerfMetricsSuffix() {
-        ConfigurationManager.Configuration cfg = modelManager.getCurrentConfig();
-        if (cfg == null || !cfg.showPerfMetrics) return "";
+        android.content.SharedPreferences prefs = context.getSharedPreferences("ollama_prefs", android.content.Context.MODE_PRIVATE);
+        if (!prefs.getBoolean("show_perf_metrics", false)) return "";
         LlamaNative llama = modelManager.getLlama();
         if (llama == null) return "";
         int nIn  = llama.getLastNPromptTokens();

@@ -66,6 +66,7 @@ public class SettingsActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
+    private static final String PREF_SHOW_PERF_METRICS = "show_perf_metrics";
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
@@ -998,9 +999,13 @@ public class SettingsActivity extends Activity {
         dryPenaltyLastNInput.setText(String.valueOf(config.dryPenaltyLastN));
         drySequenceBreakersInput.setText(config.drySequenceBreakers);
         
-        // Streaming / metrics
+        // Streaming
         streamingSwitch.setChecked(config.streaming);
-        if (showPerfMetricsSwitch != null) showPerfMetricsSwitch.setChecked(config.showPerfMetrics);
+        // Performance metrics (global pref)
+        if (showPerfMetricsSwitch != null) {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            showPerfMetricsSwitch.setChecked(prefs.getBoolean(PREF_SHOW_PERF_METRICS, false));
+        }
         int layers = config.gpuOffloadLayers;
         int displayLayers = (layers < 0) ? 40 : layers;
         gpuLayersSeekBar.setProgress(displayLayers);
@@ -1217,9 +1222,8 @@ public class SettingsActivity extends Activity {
             config.drySequenceBreakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
         }
         
-        // Streaming / metrics
+        // Streaming
         config.streaming = streamingSwitch.isChecked();
-        config.showPerfMetrics = (showPerfMetricsSwitch != null) && showPerfMetricsSwitch.isChecked();
         int progress = gpuLayersSeekBar.getProgress();
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
@@ -1303,7 +1307,10 @@ public class SettingsActivity extends Activity {
         }
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putInt(PREF_API_PORT, resolveApiPortFromUi()).apply();
+        prefs.edit()
+                .putInt(PREF_API_PORT, resolveApiPortFromUi())
+                .putBoolean(PREF_SHOW_PERF_METRICS, showPerfMetricsSwitch != null && showPerfMetricsSwitch.isChecked())
+                .apply();
         McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
         McpSettingsHelper.saveSharedFunctionDefinitionsJson(this, rawFunctionDefinitionsJson);
         McpSettingsHelper.saveSharedMcpEnabledOutsideWebUi(
