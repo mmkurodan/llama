@@ -752,11 +752,14 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
                              : "GPU";
         } else {
             // 要求したアクセラレータ (NPU/GPU) がこのチップで利用不可 → CPU にフォールバック。
-            // g_accel_devices[0] は既に nullptr。空の (NULL終端) デバイスリストを明示し全レイヤ
-            // を CPU に載せる。devices=NULL のままだと llama が自動登録された全デバイス
-            // (GGML_USE_HEXAGON では常に自動登録される HTP を含む) を使おうとし、DSP セッション
-            // が異常 (例: 0x80000406) のとき load_tensors 中に SIGABRT する。
-            mparams.devices = g_accel_devices;  // empty list → pure CPU, never touches HTP
+            // g_accel_devices[0] は既に nullptr。空の (NULL終端) デバイスリストを明示して全レイヤを
+            // CPU に載せる。devices=NULL のままだと llama が自動登録された GPU 型デバイスを層配置に
+            // 拾う (GGML_USE_HEXAGON では HTP も GPU 型として常に自動登録される) ため、DSP が健全でも
+            // CPU モードが純 CPU にならない。空リストで純 CPU の層配置を保証する。
+            // 注: stuck DSP (0x80000406) 由来の load_tensors 中 SIGABRT を防ぐのはこの空リストではなく、
+            // ggml-backend-reg.cpp register_device の null デバイスガード (失敗 HTP セッションが
+            // グローバルレジストリに null を残すのを防ぐ) である。
+            mparams.devices = g_accel_devices;  // empty list → pure CPU layer placement
             mparams.n_gpu_layers = 0;
             g_active_backend = "CPU (fallback)";
             log_to_file("build_model_params: requested accelerator unavailable on this chip "
@@ -764,10 +767,13 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
         }
     } else {
         // CPU only (backendType=0)。空の (NULL終端) デバイスリストを明示する。
-        // GGML_USE_HEXAGON ビルドでは Hexagon/HTP バックエンドが ggml レジストリ初期化時に常に
-        // 自動登録される。devices=NULL のままだと llama がその HTP デバイスも使おうとし、直前の
-        // クラッシュ等で DSP セッションが異常 (0x80000406) になっていると load_tensors 中に
-        // SIGABRT する。空リストにすれば CPU モードは純 CPU で動き DSP 状態に影響されない。
+        // GGML_USE_HEXAGON ビルドでは HTP が ggml レジストリ初期化時に常に自動登録され、しかも
+        // GPU 型として報告される。devices=NULL のままだと llama がその HTP を層配置に拾うため、
+        // 空リストで純 CPU を保証する。
+        // 注: stuck DSP (0x80000406) で HTP セッションが開けないとき、失敗デバイスが null として
+        // グローバルレジストリに入り、load_tensors 中の make_cpu_buft_list の全デバイス列挙で
+        // SIGABRT していた。これを止めるのは ggml-backend-reg.cpp register_device の null ガードで
+        // あり、空リスト (model->devices) はグローバル列挙と無関係なので関与しない。
         g_accel_devices[0] = nullptr;
         mparams.devices = g_accel_devices;
         mparams.n_gpu_layers = 0;

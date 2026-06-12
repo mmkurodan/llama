@@ -198,6 +198,16 @@ struct ggml_backend_registry {
     }
 
     void register_device(ggml_backend_dev_t device) {
+        // A backend reg may report device_count > 0 yet return a null device from
+        // get_device(i) when that device failed to initialize (e.g. the Hexagon/HTP
+        // backend reports ndev=1 but returns nullptr when the DSP session can't be
+        // opened, error 0x80000406). Never store a null device: it would later trip
+        // GGML_ASSERT(device) in ggml_backend_dev_type() during device enumeration
+        // (e.g. make_cpu_buft_list), aborting (SIGABRT) even a pure-CPU model load.
+        if (!device) {
+            return;
+        }
+
         for (auto & dev : devices) {
             if (dev == device) {
                 return;
