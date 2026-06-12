@@ -953,17 +953,24 @@ static void ensure_backend_initialized_locked(const char * log_prefix) {
     }
 
 #if defined(GGML_USE_HEXAGON)
-    // When NPU is active: set ADSP_LIBRARY_PATH so HTP skel .so files are found by the DSP loader.
     const bool npu_active = g_npu_enabled && (g_backend_type == 2 || g_backend_type == 3);
-    if (npu_active && !g_native_lib_dir.empty()) {
+    // Set ADSP_LIBRARY_PATH UNCONDITIONALLY (not only for NPU) and BEFORE llama_backend_init():
+    // the Hexagon backend is auto-registered by the ggml registry on the first backend init
+    // regardless of the selected backend, and that registration eagerly opens a DSP session
+    // which loads libggml-htp-vNN.so via the FastRPC loader. If the path is unset at that moment
+    // (e.g. the app's first init is CPU mode at startup), the skel is not found, the session
+    // fails (error 0x80000406), and ggml_backend_hexagon_reg() caches that failure for the whole
+    // process — so a later switch to NPU never finds a Hexagon device and silently falls back to
+    // CPU. Setting it here lets the very first session attempt succeed and keeps NPU available.
+    if (!g_native_lib_dir.empty()) {
         if (setenv("ADSP_LIBRARY_PATH", g_native_lib_dir.c_str(), 1) == 0) {
-            std::ostringstream ss;
-            ss << log_prefix << ": set ADSP_LIBRARY_PATH=" << g_native_lib_dir;
-            log_to_file(ss.str());
+            log_to_file(std::string(log_prefix) + ": set ADSP_LIBRARY_PATH=" + g_native_lib_dir);
         } else {
             log_to_file(std::string(log_prefix) + ": setenv(ADSP_LIBRARY_PATH) failed",
                         GGML_LOG_LEVEL_WARN);
         }
+    }
+    if (npu_active && !g_native_lib_dir.empty()) {
         // 診断: HTP skel が nativeLibraryDir に「ファイルとして」存在するか確認する。
         // 1 つも無ければ extractNativeLibs/useLegacyPackaging が効いておらず NPU は必ず失敗する。
         int skel_found = 0;
@@ -3535,6 +3542,17 @@ Java_com_micklab_llama_LlamaNative_setBackendConfig(
     g_backend_type    = new_type;
     g_npu_enabled     = new_npu;
     g_native_lib_dir  = new_dir;
+
+#if defined(GGML_USE_HEXAGON)
+    // Publish ADSP_LIBRARY_PATH as soon as the native lib dir is known. This is the earliest
+    // point in the process — well before the first llama_backend_init, where the Hexagon backend
+    // is auto-registered and opens its DSP session (which needs this path to load the HTP skel).
+    // A first session attempt without the path fails and is cached for the whole process, which
+    // is why a missed CPU-mode startup permanently disables NPU. See init_backend_locked.
+    if (!g_native_lib_dir.empty()) {
+        setenv("ADSP_LIBRARY_PATH", g_native_lib_dir.c_str(), 1);
+    }
+#endif
 
     // 設定された (要求) バックエンドを表示用に即反映する。
     // 実効値 (フォールバック含む) は次回モデル構築時に build_model_params が精緻化する。
