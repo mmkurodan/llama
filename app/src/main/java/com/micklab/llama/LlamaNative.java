@@ -91,6 +91,16 @@ public class LlamaNative {
     /** Effective compute backend after the last model load (CPU/GPU/NPU/HTP/GPU+NPU/CPU (fallback)). */
     public native String getActiveBackend();
 
+    /**
+     * True when NPU/HTP is the effective backend but the loaded model's quantization is not
+     * HTP-accelerable (only Q4_0/Q8_0/IQ4_NL/MXFP4 are). The model still runs, but mostly on CPU
+     * (many graph splits → slow). Used purely to show a UI warning; reflects the last model load.
+     */
+    public native boolean isNpuModelIncompatible();
+
+    /** Short name of the loaded model's quantization ("Q4_K_M", "Q4_0", "F16", …). */
+    public native String getModelQuantName();
+
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;
     }

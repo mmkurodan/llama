@@ -1,0 +1,28 @@
+2026-06-12 20:46:16.315 pid=13235 [model-load] Loading configuration: default
+2026-06-12 20:46:16.510 pid=13235 [runtime-memory] Before model load model=gemma-3-4b-it-Q4_K_M.gguf
+  javaUsed=12.4MB javaTotal=27.8MB javaMax=256.0MB nativeHeap=53.1MB nativeHeapFree=78.3MB nativeHeapSize=134.8MB
+  pssTotal=140.3MB privateDirty=110.0MB sharedDirty=43.8MB nativePss=57.2MB dalvikPss=10.2MB otherPss=72.8MB
+  systemAvail=12.4GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=224
+  procStatus VmRSS=281704 kB VmHWM=3288696 kB VmSize=18621976 kB VmSwap=2052 kB Threads=41 FDSize=512
+2026-06-12 20:46:16.597 pid=13235 [runtime-memory] After model load cleanup model=gemma-3-4b-it-Q4_K_M.gguf
+  javaUsed=3.8MB javaTotal=27.8MB javaMax=256.0MB nativeHeap=49.3MB nativeHeapFree=82.1MB nativeHeapSize=134.8MB
+  pssTotal=129.9MB privateDirty=99.6MB sharedDirty=43.8MB nativePss=54.4MB dalvikPss=2.7MB otherPss=72.8MB
+  systemAvail=12.4GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=219
+  procStatus VmRSS=271176 kB VmHWM=3288696 kB VmSize=18621976 kB VmSwap=2052 kB Threads=41 FDSize=512
+2026-06-12 20:46:17.497 pid=13235 [model-load-complete] config=default model=gemma-3-4b-it-Q4_K_M.gguf mmproj=(none)
+  javaUsed=4.1MB javaTotal=27.8MB javaMax=256.0MB nativeHeap=417.4MB nativeHeapFree=67.9MB nativeHeapSize=488.9MB
+  pssTotal=2.5GB privateDirty=161.9MB sharedDirty=43.8MB nativePss=116.5MB dalvikPss=2.8MB otherPss=2.4GB
+  systemAvail=12.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=226
+  procStatus VmRSS=2759940 kB VmHWM=3288696 kB VmSize=21672716 kB VmSwap=2052 kB Threads=41 FDSize=512
+2026-06-12 20:46:17.604 pid=13235 [generation-start] id=14 config=default model=gemma-3-4b-it-Q4_K_M.gguf promptLen=97 mediaCount=0
+  javaUsed=4.2MB javaTotal=27.8MB javaMax=256.0MB nativeHeap=417.4MB nativeHeapFree=67.9MB nativeHeapSize=488.9MB
+  pssTotal=2.5GB privateDirty=162.1MB sharedDirty=43.8MB nativePss=116.6MB dalvikPss=2.9MB otherPss=2.4GB
+  systemAvail=12.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=221
+  procStatus VmRSS=2759940 kB VmHWM=3288696 kB VmSize=21672716 kB VmSwap=2052 kB Threads=41 FDSize=512
+2026-06-12 20:46:17.713 pid=13235 [generation-stage] id=14 stage=native-call-start
+2026-06-12 20:46:39.247 pid=13235 [generation-stage] id=14 stage=native-call-end resultLen=14
+2026-06-12 20:46:39.247 pid=13235 [generation-end] id=14 resultLen=14
+  javaUsed=4.8MB javaTotal=27.9MB javaMax=256.0MB nativeHeap=417.9MB nativeHeapFree=67.6MB nativeHeapSize=489.1MB
+  pssTotal=2.5GB privateDirty=157.5MB sharedDirty=43.8MB nativePss=111.5MB dalvikPss=3.4MB otherPss=2.4GB
+  systemAvail=12.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=224
+  procStatus VmRSS=2755540 kB VmHWM=3288696 kB VmSize=21672716 kB VmSwap=2052 kB Threads=41 FDSize=512

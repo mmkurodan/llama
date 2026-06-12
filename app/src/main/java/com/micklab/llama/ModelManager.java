@@ -3,7 +3,10 @@ package com.micklab.llama;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Debug;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.json.JSONException;
 
@@ -634,6 +637,14 @@ public class ModelManager {
                 listener.onModelLoaded(configName);
             }
 
+            // NPU/HTP は Q4_0/Q8_0/IQ4_NL/MXFP4 のみ高速化できる。それ以外の量子化 (例: Q4_K_M) を
+            // NPU で読み込むと重みのほぼ全部が CPU 落ちし、CPU↔HTP のグラフ分割が多発して低速になる。
+            // 実行は変えず (要望通り遅延は許容)、警告だけを Toast + ログで出す。実モデルを再ロードした
+            // ときのみ判定する (設定だけの変更で再掲しない)。
+            if (requiresModelInit && llama.isNpuModelIncompatible()) {
+                warnNpuModelIncompatible(llama.getModelQuantName());
+            }
+
             Log.i(TAG, "Configuration loaded: " + configName);
             DiagnosticsLogger.logMemorySnapshot(
                     context,
@@ -657,6 +668,22 @@ public class ModelManager {
                 }
             }
         }
+    }
+
+    /**
+     * Show a Toast + log warning when an NPU/HTP-incompatible model was loaded with NPU selected.
+     * The model still runs (mostly on CPU, slow) — we only warn, per product decision. Posts to
+     * the main thread because model loads happen off the UI thread and Toast requires a Looper.
+     */
+    private void warnNpuModelIncompatible(String quant) {
+        final String q = (quant == null || quant.isEmpty()) ? "?" : quant;
+        Log.w(TAG, "NPU/HTP-incompatible model quantization: " + q
+                + " — HTP accelerates only Q4_0/Q8_0/IQ4_NL/MXFP4; this model runs on CPU (slow)");
+        final String msg = "⚠ NPU非対応の量子化: " + q + "\n"
+                + "NPU(HTP)が高速化できるのは Q4_0 / Q8_0 / IQ4_NL / MXFP4 のみです。"
+                + "このモデルはCPUで実行され、デコードが遅くなります。";
+        new Handler(Looper.getMainLooper()).post(
+                () -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show());
     }
 
     /**
