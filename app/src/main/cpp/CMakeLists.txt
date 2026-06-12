@@ -131,6 +131,27 @@ set(GGML_SOURCES
 )
 
 # ---------------------------------------------------------
+# ARM feature flags for the repacked-quant GEMM/GEMV kernels (decode hot path).
+#
+# ggml 0.13.0 repacks Q4_0/Q4_K/Q5_K/Q6_K weights into interleaved layouts and routes their
+# matmul through ggml_gemv/gemm_*_q8 in ggml-cpu/arch/arm/repack.cpp. WHICH layout is offered
+# is chosen AT RUNTIME from CPU feature detection (ggml_cpu_has_dotprod / _matmul_int8 via
+# getauxval, in cpu-feats.cpp), but those kernel bodies are gated AT COMPILE TIME by
+# __ARM_FEATURE_DOTPROD / __ARM_FEATURE_MATMUL_INT8. With the NDK default (-march=armv8-a)
+# those macros are undefined, so on a dotprod-capable device (e.g. Snapdragon 8 Elite) the
+# weights are repacked but the GEMM falls back to the scalar *_generic path -> ~0.1 tok/s
+# decode on every backend (GPU not built / NPU stuck both fall back to this CPU path).
+#
+# Compile these kernels for the features the runtime already assumes. They are only ever
+# reached AFTER the matching runtime feature check, so this stays safe on CPUs that lack
+# the features (a non-dotprod device is never offered the repack layout and never enters
+# this code, keeping the plain NEON vec_dot path). ABI is arm64-v8a only (see build.gradle).
+set_source_files_properties(
+    ${GGML_ROOT_DIR}/src/ggml-cpu/arch/arm/repack.cpp
+    PROPERTIES COMPILE_OPTIONS "-march=armv8.2-a+dotprod+i8mm"
+)
+
+# ---------------------------------------------------------
 # Optional: Hexagon / HTP NPU backend
 #
 # ビルド有効化:
