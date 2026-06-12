@@ -84,15 +84,6 @@ static ggml_backend_dev_t g_accel_devices[4] = {nullptr, nullptr, nullptr, nullp
 // it caused freezes/ANR during long (VL/MCP) runs. Values are static string literals.
 static std::atomic<const char *> g_active_backend{"CPU"};
 
-// NPU/HTP model-quantization compatibility — UI warning only, does NOT change execution.
-// The Hexagon HTP backend accelerates matmul only for Q4_0/Q8_0/IQ4_NL/MXFP4 weights
-// (ggml-hexagon.cpp supports_op). With any other quant (e.g. Q4_K_M) almost every weight
-// tensor falls back to CPU, producing hundreds of CPU<->HTP graph splits and slow decode.
-// When NPU/HTP is the effective backend but the model is one of those, we surface a warning;
-// per product decision we keep running rather than fall back. Read lock-free from the UI.
-static std::atomic<bool>         g_npu_model_incompatible{false};
-static std::atomic<const char *> g_model_quant_name{"unknown"};  // static string literals only
-
 // Keep track of currently loaded model path to avoid redundant inits
 static std::string g_current_model_path;
 static std::string g_current_mmproj_path;
@@ -691,87 +682,6 @@ static ggml_backend_dev_t find_gpu_device_locked() {
         return dev;
     }
     return nullptr;
-}
-
-// ---- NPU/HTP model-quantization compatibility (UI warning only) ----
-// HTP accelerates matmul only for these weight ftypes; everything else runs on CPU.
-// Compiles/links regardless of GGML_USE_HEXAGON (g_active_backend is never "NPU/HTP" without it,
-// so the check simply never fires), which keeps the JNI getters available unconditionally.
-static bool htp_friendly_ftype(int ftype) {
-    switch (ftype) {
-        case LLAMA_FTYPE_MOSTLY_Q4_0:       // 2
-        case LLAMA_FTYPE_MOSTLY_Q8_0:       // 7
-        case LLAMA_FTYPE_MOSTLY_IQ4_NL:     // 25
-        case LLAMA_FTYPE_MOSTLY_MXFP4_MOE:  // 38
-            return true;
-        default:
-            return false;
-    }
-}
-
-static const char * ftype_short_name(int ftype) {
-    switch (ftype) {
-        case LLAMA_FTYPE_ALL_F32:          return "F32";
-        case LLAMA_FTYPE_MOSTLY_F16:       return "F16";
-        case LLAMA_FTYPE_MOSTLY_BF16:      return "BF16";
-        case LLAMA_FTYPE_MOSTLY_Q4_0:      return "Q4_0";
-        case LLAMA_FTYPE_MOSTLY_Q4_1:      return "Q4_1";
-        case LLAMA_FTYPE_MOSTLY_Q5_0:      return "Q5_0";
-        case LLAMA_FTYPE_MOSTLY_Q5_1:      return "Q5_1";
-        case LLAMA_FTYPE_MOSTLY_Q8_0:      return "Q8_0";
-        case LLAMA_FTYPE_MOSTLY_Q2_K:      return "Q2_K";
-        case LLAMA_FTYPE_MOSTLY_Q2_K_S:    return "Q2_K_S";
-        case LLAMA_FTYPE_MOSTLY_Q3_K_S:    return "Q3_K_S";
-        case LLAMA_FTYPE_MOSTLY_Q3_K_M:    return "Q3_K_M";
-        case LLAMA_FTYPE_MOSTLY_Q3_K_L:    return "Q3_K_L";
-        case LLAMA_FTYPE_MOSTLY_Q4_K_S:    return "Q4_K_S";
-        case LLAMA_FTYPE_MOSTLY_Q4_K_M:    return "Q4_K_M";
-        case LLAMA_FTYPE_MOSTLY_Q5_K_S:    return "Q5_K_S";
-        case LLAMA_FTYPE_MOSTLY_Q5_K_M:    return "Q5_K_M";
-        case LLAMA_FTYPE_MOSTLY_Q6_K:      return "Q6_K";
-        case LLAMA_FTYPE_MOSTLY_IQ4_NL:    return "IQ4_NL";
-        case LLAMA_FTYPE_MOSTLY_IQ4_XS:    return "IQ4_XS";
-        case LLAMA_FTYPE_MOSTLY_MXFP4_MOE: return "MXFP4";
-        default:                           return "unknown";
-    }
-}
-
-// Records the loaded model's quantization and, when NPU/HTP is the effective backend but that
-// quant is not HTP-accelerable, logs a warning (listing the supported quants) and raises a flag
-// the UI reads to show a Toast. Execution is intentionally NOT changed. Call under g_mutex after
-// a successful model load (g_active_backend already finalized by build_model_params_locked).
-static void check_npu_model_compat_locked(const char * log_prefix) {
-    g_npu_model_incompatible.store(false, std::memory_order_relaxed);
-    g_model_quant_name.store("unknown", std::memory_order_relaxed);
-    if (!g_model) {
-        return;
-    }
-
-    int ftype = -1;
-    char buf[64];
-    if (llama_model_meta_val_str(g_model, "general.file_type", buf, sizeof(buf)) >= 0) {
-        try {
-            ftype = std::stoi(std::string(buf));
-        } catch (...) {
-            ftype = -1;  // unparseable → treat as unknown, don't warn
-        }
-    }
-    g_model_quant_name.store(ftype_short_name(ftype), std::memory_order_relaxed);
-
-    // Only meaningful when the HTP device is actually engaged (the 343-split case).
-    const std::string be = g_active_backend.load(std::memory_order_relaxed);
-    const bool htp_engaged = (be == "NPU/HTP" || be == "GPU+NPU");
-    if (!htp_engaged || ftype < 0 || htp_friendly_ftype(ftype)) {
-        return;
-    }
-
-    g_npu_model_incompatible.store(true, std::memory_order_relaxed);
-    log_to_file(std::string(log_prefix) + ": NPU/HTP selected but model quantization " +
-                ftype_short_name(ftype) + " is NOT HTP-accelerable. The Hexagon NPU accelerates "
-                "only Q4_0, Q8_0, IQ4_NL and MXFP4 weights; every other tensor runs on CPU, which "
-                "forces hundreds of CPU<->HTP graph splits and slow decode. Use a "
-                "Q4_0/Q8_0/IQ4_NL/MXFP4 GGUF to actually accelerate on the NPU.",
-                GGML_LOG_LEVEL_WARN);
 }
 
 static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
@@ -2216,7 +2126,6 @@ Java_com_micklab_llama_LlamaNative_init(
                 log_to_file(ss.str());
             }
         }
-        check_npu_model_compat_locked("init");
         g_current_model_path = model_path;
         g_current_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
@@ -2431,7 +2340,6 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 log_to_file(ss.str());
             }
         }
-        check_npu_model_compat_locked("initWithMmproj");
         const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
                 mmproj_path,
@@ -3609,26 +3517,6 @@ Java_com_micklab_llama_LlamaNative_getActiveBackend(
 ) {
     // No g_mutex: lock-free read so the UI poller never blocks on an in-flight generation.
     return env->NewStringUTF(g_active_backend.load(std::memory_order_relaxed));
-}
-
-// True when NPU/HTP is the effective backend but the loaded model's quantization is not
-// HTP-accelerable (e.g. Q4_K_M) — the UI uses this to show a one-time warning. Execution
-// is unaffected: the model still runs (slowly, mostly on CPU). Lock-free read.
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_micklab_llama_LlamaNative_isNpuModelIncompatible(
-        JNIEnv *, jobject /*thiz*/
-) {
-    return g_npu_model_incompatible.load(std::memory_order_relaxed) ? JNI_TRUE : JNI_FALSE;
-}
-
-// Short name of the loaded model's quantization ("Q4_K_M", "Q4_0", "F16", …) for warnings.
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_micklab_llama_LlamaNative_getModelQuantName(
-        JNIEnv * env, jobject /*thiz*/
-) {
-    return env->NewStringUTF(g_model_quant_name.load(std::memory_order_relaxed));
 }
 
 // ---------------- JNI: setBackendConfig ----------------

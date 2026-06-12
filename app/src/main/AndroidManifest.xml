@@ -44,13 +44,6 @@
                 android:value="llm_inference" />
         </service>
 
-        <!-- Hexagon NPU: allow loading Qualcomm FastRPC/cDSP driver (vendor lib).
-             targetSdk>=31 blocks dlopen("libcdsprpc.so") by name unless declared here.
-             required=false so non-Snapdragon devices still install/run (NPU just unavailable). -->
-        <uses-native-library
-            android:name="libcdsprpc.so"
-            android:required="false" />
-
         <!-- Adreno GPU: allow loading the Qualcomm OpenCL driver (vendor lib).
              Used by the libggml-opencl.so DL plugin; required=false so non-OpenCL
              devices still run (GPU just unavailable). -->

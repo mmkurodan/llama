@@ -7,20 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read           # gh release list/download (Hexagon 成果物取得) に必要
+  contents: read
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Hexagon NPU サポートについて
-#
-# build-apk ジョブは build-hexagon-artifacts.yml が発行した最新の
-# hexagon-artifacts-* Release を自動取得し、app/src/main/cpp/hexagon-artifacts/
-# に展開 + skel を jniLibs/arm64-v8a/ に配置します。これにより CMakeLists.txt が
-# Mode B (artifacts 自動検出) で GGML_HEXAGON=ON にしてビルドします。
-#
-# Release が無い/取得失敗の場合はコミット済みバンドル vendor/hexagon/*.tar.gz に
-# フォールバックします。それも無ければ GGML_HEXAGON=OFF (NPU なし) でビルドします。
-#
-# NPU 成果物の生成方法は build-hexagon-artifacts.yml / scripts/hexagon-files.md 参照。
+# NPU note: Hexagon/HTP NPU support was REMOVED from this repo to avoid Qualcomm
+# Hexagon SDK (Community Version) redistribution restrictions on the compiled HTP
+# skels (they statically link Qualcomm QuRT runtime). The build is CPU/GPU-only
+# (GGML_HEXAGON stays OFF). The vendored ggml-hexagon sources are kept but never
+# compiled. Backup + how to re-enable: local /root/llama-npu-backup/.
 # ──────────────────────────────────────────────────────────────────────────────
 
 jobs:
@@ -181,69 +175,11 @@ jobs:
           # the runtime driver comes from the device's libOpenCL.so).
           echo "OPENCL_STUB_LIB=$LIB" >> "$GITHUB_ENV"
 
-      # ── Hexagon NPU 成果物を最新 Release から自動取得 ───────────────────────
-      # build-hexagon-artifacts.yml が発行した hexagon-artifacts-* Release を取得し
-      # app/src/main/cpp/hexagon-artifacts/ に展開、skel を jniLibs へ配置する。
-      # Release が無ければ NPU 無しでビルド続行 (フォールバック)。
-      - name: Fetch Hexagon artifacts from latest Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          DEST="app/src/main/cpp/hexagon-artifacts"
-          JNI="app/src/main/jniLibs/arm64-v8a"
-          VENDOR="vendor/hexagon"
-          mkdir -p /tmp/hexdl "${DEST}" "${JNI}"
-          TARBALL=""
-          # 1) 最新 Release を優先取得
-          TAG=$(gh release list --repo "${{ github.repository }}" --limit 50 \
-                  --json tagName \
-                  --jq '[.[].tagName | select(startswith("hexagon-artifacts-"))] | sort | last' \
-                2>/dev/null || true)
-          if [[ -n "${TAG}" && "${TAG}" != "null" ]]; then
-            echo "📥 Hexagon artifacts release: ${TAG}"
-            if gh release download "${TAG}" --repo "${{ github.repository }}" \
-                 --pattern '*.tar.gz' --dir /tmp/hexdl --clobber 2>/dev/null; then
-              TARBALL=$(ls /tmp/hexdl/*.tar.gz 2>/dev/null | head -1 || true)
-            fi
-          fi
-          # 2) Release が無い/取得失敗ならコミット済みバンドル (vendor/hexagon) にフォールバック
-          if [[ -z "${TARBALL}" ]]; then
-            TARBALL=$(ls "${VENDOR}"/*.tar.gz 2>/dev/null | head -1 || true)
-            [[ -n "${TARBALL}" ]] && echo "📦 Release 無し → コミット済みバンドルを使用: ${TARBALL}"
-          fi
-          # 3) どちらも無ければ NPU 無しで継続
-          if [[ -z "${TARBALL}" ]]; then
-            echo "ℹ️  Hexagon 成果物が見つからないため NPU 無しでビルドします。"
-            exit 0
-          fi
-          # トップの hexagon-artifacts-vX.Y.Z/ を剥がし stub/ sdk-incs/ skel/ を直下へ
-          tar -xzf "${TARBALL}" -C "${DEST}" --strip-components=1
-          # DSP skel を jniLibs/arm64-v8a/ へ (APK 同梱、実行時に DSP ローダーが検出)
-          if compgen -G "${DEST}/skel/*.so" > /dev/null; then
-            cp "${DEST}/skel/"*.so "${JNI}/"
-          fi
-          echo "✅ placed under ${DEST}:"
-          ( find "${DEST}" -maxdepth 2 \( -name '*.c' -o -name '*.so' \) | head -20 ) || true
-          ls -la "${JNI}"/libggml-htp-*.so 2>/dev/null || true
-
-      # ── Hexagon NPU サポート確認 (上記で取得できた場合のみ有効) ──────────────
-      - name: Check Hexagon NPU availability
-        id: hexagon
-        run: |
-          ARTIFACTS_DIR="app/src/main/cpp/hexagon-artifacts"
-          STUB="${ARTIFACTS_DIR}/stub/htp_iface_stub.c"
-          if [[ -f "${STUB}" ]]; then
-            echo "enabled=true"  >> "$GITHUB_OUTPUT"
-            echo "✅ Hexagon NPU: ENABLED (artifacts found at ${ARTIFACTS_DIR})"
-            find "${ARTIFACTS_DIR}" -maxdepth 3 -name "*.c" -o -name "*.h" -o -name "*.so" \
-              | head -20
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "⚠️  Hexagon NPU: DISABLED"
-            echo "   hexagon-artifacts/stub/htp_iface_stub.c が見つかりません"
-            echo "   NPU 対応ビルドには scripts/hexagon-files.md を参照してください"
-          fi
+      # ── Hexagon/HTP NPU: removed ──────────────────────────────────────────────
+      # NPU support (Qualcomm Hexagon HTP skels) was removed from this repo to avoid
+      # Hexagon SDK (Community Version) redistribution restrictions. No skels are
+      # fetched or placed into jniLibs; GGML_HEXAGON stays OFF so the APK is
+      # CPU/GPU-only. Backup + how to re-enable: local /root/llama-npu-backup/.
 
       # ── Gradle セットアップ ──────────────────────────────────────────────────
       - name: Set up JDK 17
@@ -315,11 +251,9 @@ jobs:
       # ── ビルドサマリー ───────────────────────────────────────────────────────
       - name: Build summary
         run: |
-          NPU_STATUS="${{ steps.hexagon.outputs.enabled == 'true' && 'ENABLED' || 'DISABLED' }}"
           echo "## Build Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
           echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Hexagon NPU | ${NPU_STATUS} |" >> "$GITHUB_STEP_SUMMARY"
           if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
             SIZE=$(du -sh app/build/outputs/apk/release/app-release.apk | cut -f1)
             echo "| Release APK | ${SIZE} |" >> "$GITHUB_STEP_SUMMARY"
@@ -337,11 +271,11 @@ jobs:
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release${{ steps.hexagon.outputs.enabled == 'true' && '-npu' || '' }}
+          name: app-release
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab${{ steps.hexagon.outputs.enabled == 'true' && '-npu' || '' }}
+          name: app-release-aab
           path: app/build/outputs/bundle/release/app-release.aab

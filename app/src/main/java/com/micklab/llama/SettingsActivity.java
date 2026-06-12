@@ -128,9 +128,8 @@ public class SettingsActivity extends Activity {
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
     private Switch enableThinkingSwitch;
-    // Compute backend (backendType is derived from these two switches; both off = CPU)
+    // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
-    private Switch  npuEnabledSwitch;
 
     // New prompt settings
     private EditText systemPromptInput;
@@ -312,20 +311,11 @@ public class SettingsActivity extends Activity {
         streamingSwitch = findViewById(R.id.streamingSwitch);
         showPerfMetricsSwitch = findViewById(R.id.showPerfMetricsSwitch);
 
-        // Compute backend: GPU / NPU 独立トグル (両方 OFF = CPU)。
-        // backendType はこの 2 つから導出する (スピナー廃止)。
+        // Compute backend: GPU トグル (OFF = CPU, ON = GPU)。backendType をこれから導出する。
         gpuEnabledSwitch = findViewById(R.id.gpuEnabledSwitch);
-        npuEnabledSwitch = findViewById(R.id.npuEnabledSwitch);
         CompoundButton.OnCheckedChangeListener backendToggleListener = (button, checked) -> {
             if (checked) {
-                // NPU と GPU は排他: 真のハイブリッドは ggml 側未対応で単一へ縮退するため、
-                // 片方を有効化したらもう片方を自動的に無効化する。
-                if (button == gpuEnabledSwitch && npuEnabledSwitch != null && npuEnabledSwitch.isChecked()) {
-                    npuEnabledSwitch.setChecked(false);
-                } else if (button == npuEnabledSwitch && gpuEnabledSwitch != null && gpuEnabledSwitch.isChecked()) {
-                    gpuEnabledSwitch.setChecked(false);
-                }
-                // GPU/NPU を有効化したとき、オフロード未設定(0)なら ALL(-1) を既定値にする
+                // GPU を有効化したとき、オフロード未設定(0)なら ALL(-1) を既定値にする
                 if (gpuLayersSeekBar != null && gpuLayersSeekBar.getProgress() == 0) {
                     gpuLayersSeekBar.setProgress(40); // 40 = ALL (= -1)
                 }
@@ -333,7 +323,6 @@ public class SettingsActivity extends Activity {
             updateBackendDependentUi();
         };
         if (gpuEnabledSwitch != null) gpuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
-        if (npuEnabledSwitch != null) npuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
 
         gpuLayersSeekBar = findViewById(R.id.gpuLayersSeekBar);
         gpuLayersValue = findViewById(R.id.gpuLayersValue);
@@ -489,13 +478,10 @@ public class SettingsActivity extends Activity {
         updateActionButtonStateForBusy();
     }
 
-    /** GPU/NPU トグルに応じてオフロード Layers スライダーの有効・無効を切り替える。
-     *  オフロード (n_gpu_layers) は GPU・NPU いずれかが有効なら適用されるため、
-     *  どちらか ON でスライダーを活性化する (両方 OFF = CPU はスライダー無効)。 */
+    /** GPU トグルに応じてオフロード Layers スライダーの有効・無効を切り替える。
+     *  オフロード (n_gpu_layers) は GPU 有効時のみ適用される (OFF = CPU はスライダー無効)。 */
     private void updateBackendDependentUi() {
-        final boolean gpu = (gpuEnabledSwitch != null) && gpuEnabledSwitch.isChecked();
-        final boolean npu = (npuEnabledSwitch != null) && npuEnabledSwitch.isChecked();
-        final boolean offloadActive = gpu || npu;
+        final boolean offloadActive = (gpuEnabledSwitch != null) && gpuEnabledSwitch.isChecked();
 
         if (gpuLayersSeekBar != null) gpuLayersSeekBar.setEnabled(offloadActive);
         if (gpuLayersValue   != null) gpuLayersValue.setEnabled(offloadActive);
@@ -629,10 +615,9 @@ public class SettingsActivity extends Activity {
                 case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
                 case "Threads (n_threads):": return "スレッド数 (n_threads):";
                 case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
-                case "Compute Backend (both off = CPU):": return "計算バックエンド (両方OFF = CPU):";
+                case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
                 case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
-                case "NPU (Hexagon HTP) Enabled:": return "NPU (Hexagon HTP) 有効:";
-                case "Offload Layers (GPU/NPU):": return "オフロード層 (GPU/NPU):";
+                case "Offload Layers (GPU):": return "オフロード層 (GPU):";
                 case "Temperature (temp):": return "温度 (temp):";
                 case "Top-p (top_p):": return "Top-p (top_p):";
                 case "Top-k (top_k):": return "Top-k (top_k):";
@@ -913,7 +898,7 @@ public class SettingsActivity extends Activity {
         scrollView.addView(textView);
 
         new AlertDialog.Builder(this)
-            .setTitle("LLM tester with llama.cpp License")
+            .setTitle("License & Third-Party Notices")
             .setView(scrollView)
             .setPositiveButton("Close", null)
             .show();
@@ -932,11 +917,34 @@ public class SettingsActivity extends Activity {
             + "The above copyright notice and this permission notice (including the commercial use restriction) shall be included in all copies or substantial portions of the Software.\n\n"
             + "4. Disclaimer of Warranty\n"
             + "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n"
+            + "================================================================\n"
+            + "THIRD-PARTY SOFTWARE NOTICES\n"
+            + "This application includes the following third-party open-source software.\n"
+            + "================================================================\n\n"
+            + "--- llama.cpp / ggml ---\n"
             + "MIT License\n\n"
-            + "Copyright (c) 2023-2024 The ggml authors\n\n"
+            + "Copyright (c) 2023-2026 The ggml authors\n\n"
             + "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\n"
             + "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\n"
-            + "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n";
+            + "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n"
+            + "--- nlohmann/json ---\n"
+            + "MIT License — Copyright (c) 2013-2025 Niels Lohmann\n"
+            + "Licensed under the MIT License (same terms as shown above for llama.cpp/ggml).\n\n"
+            + "--- cURL / libcurl ---\n"
+            + "Copyright (c) 1996-2024, Daniel Stenberg, daniel@haxx.se, and many contributors. All rights reserved.\n\n"
+            + "Permission to use, copy, modify, and distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.\n\n"
+            + "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n"
+            + "--- Mbed TLS ---\n"
+            + "Copyright The Mbed TLS Contributors\n"
+            + "Licensed under the Apache License, Version 2.0 (see the Apache-2.0 notice below).\n\n"
+            + "--- OpenCL Headers (Khronos) ---\n"
+            + "Copyright (c) 2008-2026 The Khronos Group Inc.\n"
+            + "Licensed under the Apache License, Version 2.0 (see the Apache-2.0 notice below).\n"
+            + "Note: the Adreno/OpenCL GPU driver itself is provided by the device's vendor and is NOT included in this application.\n\n"
+            + "--- Apache License 2.0 (applies to Mbed TLS and OpenCL Headers above) ---\n"
+            + "Licensed under the Apache License, Version 2.0 (the \"License\"); you may not use these files except in compliance with the License. You may obtain a copy of the License at\n\n"
+            + "    http://www.apache.org/licenses/LICENSE-2.0\n\n"
+            + "Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.\n";
     }
     
     private void loadConfigList() {
@@ -1012,14 +1020,9 @@ public class SettingsActivity extends Activity {
         gpuLayersValue.setText(displayLayers > 39 ? "ALL" : String.valueOf(displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
 
-        // Compute backend: backendType (0-3) を GPU/NPU トグルへ分解
-        int bt = Math.max(0, Math.min(3, config.backendType));
-        boolean gpuOn = (bt == ConfigurationManager.Configuration.BACKEND_GPU
-                      || bt == ConfigurationManager.Configuration.BACKEND_GPU_NPU);
-        boolean npuOn = (bt == ConfigurationManager.Configuration.BACKEND_NPU_HTP
-                      || bt == ConfigurationManager.Configuration.BACKEND_GPU_NPU);
+        // Compute backend: backendType を GPU トグルへ分解 (GPU=ON, それ以外=OFF=CPU)
+        boolean gpuOn = (config.backendType == ConfigurationManager.Configuration.BACKEND_GPU);
         if (gpuEnabledSwitch != null) gpuEnabledSwitch.setChecked(gpuOn);
-        if (npuEnabledSwitch != null) npuEnabledSwitch.setChecked(npuOn);
         updateBackendDependentUi();
         
         // New prompt settings
@@ -1228,15 +1231,12 @@ public class SettingsActivity extends Activity {
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
 
-        // Compute backend: GPU/NPU トグルから backendType を導出 (両方 OFF = CPU)
+        // Compute backend: GPU トグルから backendType を導出 (OFF = CPU)
         boolean gpuOn = (gpuEnabledSwitch != null) && gpuEnabledSwitch.isChecked();
-        boolean npuOn = (npuEnabledSwitch != null) && npuEnabledSwitch.isChecked();
         config.backendType = gpuOn
-                ? (npuOn ? ConfigurationManager.Configuration.BACKEND_GPU_NPU
-                         : ConfigurationManager.Configuration.BACKEND_GPU)
-                : (npuOn ? ConfigurationManager.Configuration.BACKEND_NPU_HTP
-                         : ConfigurationManager.Configuration.BACKEND_CPU);
-        config.npuEnabled = npuOn;
+                ? ConfigurationManager.Configuration.BACKEND_GPU
+                : ConfigurationManager.Configuration.BACKEND_CPU;
+        config.npuEnabled = false;
 
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();

@@ -1,9 +1,14 @@
 app/src/main/assets/*.gguf
 
-# Hexagon NPU artifacts (manually placed — NOT committed to public repos)
-# 取得・配置方法: scripts/hexagon-files.md を参照
+# NPU/Hexagon removed from the public repo to avoid Qualcomm Hexagon SDK
+# (Community Version) redistribution restrictions. Kept locally only; full
+# backup at /root/llama-npu-backup/ (git bundle + tarballs). 2026-06.
 app/src/main/cpp/hexagon-artifacts/
 app/src/main/jniLibs/arm64-v8a/libggml-htp-*.so
+vendor/hexagon/
+.github/workflows/build-hexagon-artifacts.yml
+scripts/*hexagon*
+/LICENSE AGREEMENT.txt
 
 # ローカル専用ツール (PAT 等の機密を含むためコミットしない)
 gha_log_analyzer.sh

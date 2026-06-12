@@ -84,12 +84,11 @@ public class ConfigurationManager {
         public boolean enableThinking;
 
         // Compute backend
-        // 0=CPU  1=GPU  2=NPU/HTP  3=GPU+NPU
+        // 0=CPU  1=GPU  (NPU/HTP removed — Qualcomm Hexagon SDK redistribution restriction)
         public static final int BACKEND_CPU     = 0;
         public static final int BACKEND_GPU     = 1;
-        public static final int BACKEND_NPU_HTP = 2;
-        public static final int BACKEND_GPU_NPU = 3;
         public int  backendType;
+        // Retained for serialization back-compat only; always false (NPU support removed).
         public boolean npuEnabled;
         
         public Configuration() {
@@ -272,10 +271,10 @@ public class ConfigurationManager {
 
             // Compute backend (backward compat: default CPU)
             config.backendType = json.optInt("backendType", Configuration.BACKEND_CPU);
-            if (config.backendType < BACKEND_CPU || config.backendType > BACKEND_GPU_NPU) {
-                config.backendType = BACKEND_CPU;
+            if (config.backendType < BACKEND_CPU || config.backendType > BACKEND_GPU) {
+                config.backendType = BACKEND_CPU;  // legacy NPU(2)/GPU+NPU(3) profiles fall back to CPU
             }
-            config.npuEnabled = json.optBoolean("npuEnabled", false);
+            config.npuEnabled = false;  // NPU support removed; ignore any stored value
 
             // New prompt settings (with defaults for backward compatibility)
             config.systemPrompt = json.optString("systemPrompt", "");

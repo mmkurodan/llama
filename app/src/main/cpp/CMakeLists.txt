@@ -183,15 +183,13 @@ option(GGML_HEXAGON "Enable Hexagon/HTP NPU backend" OFF)
 set(HEXAGON_SDK_ROOT        "" CACHE PATH "Hexagon SDK root [mode A]")
 set(GGML_HEXAGON_ARTIFACTS_DIR "" CACHE PATH "Pre-built artifacts dir [mode B]")
 
-# ----- Auto-detect mode B artifacts -----
-# CI が hexagon-artifacts/ を配置するだけで自動有効化される
-set(_HEXAGON_AUTO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/hexagon-artifacts")
-if(NOT GGML_HEXAGON AND IS_DIRECTORY "${_HEXAGON_AUTO_DIR}/stub"
-                     AND EXISTS "${_HEXAGON_AUTO_DIR}/stub/htp_iface_stub.c")
-    set(GGML_HEXAGON             ON  CACHE BOOL "" FORCE)
-    set(GGML_HEXAGON_ARTIFACTS_DIR "${_HEXAGON_AUTO_DIR}" CACHE PATH "" FORCE)
-    message(STATUS "hexagon: auto-detected artifacts at ${_HEXAGON_AUTO_DIR}")
-endif()
+# ----- Hexagon/HTP NPU backend: DISABLED -----
+# NPU support was removed from this repo to avoid Qualcomm Hexagon SDK (Community
+# Version) redistribution restrictions on the compiled HTP skels (they statically
+# link Qualcomm QuRT runtime). The vendored ggml-hexagon sources are kept in-tree
+# but are never compiled: GGML_HEXAGON stays OFF and GGML_USE_HEXAGON is undefined,
+# so the app builds CPU/GPU-only. Backup + how to re-enable: /root/llama-npu-backup/.
+# Do NOT re-introduce the artifacts auto-detect that force-set GGML_HEXAGON=ON.
 
 set(GGML_HEXAGON_SOURCES "")
 

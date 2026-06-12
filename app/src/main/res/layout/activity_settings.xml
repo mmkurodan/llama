@@ -253,12 +253,12 @@
             android:inputType="number"
             android:text="16" />
 
-        <!-- Compute Backend Selection: CPU is the base; toggle GPU and/or NPU.
-             backendType is derived from these two switches (both off = CPU). -->
+        <!-- Compute Backend Selection: CPU is the base; toggle GPU.
+             backendType is derived from this switch (off = CPU, on = GPU). -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Compute Backend (both off = CPU):"
+            android:text="Compute Backend (off = CPU):"
             android:paddingTop="8dp" />
 
         <!-- GPU Enable/Disable toggle -->
@@ -283,29 +283,7 @@
                 android:checked="false" />
         </LinearLayout>
 
-        <!-- NPU Enable/Disable quick toggle -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="NPU (Hexagon HTP) Enabled:" />
-
-            <Switch
-                android:id="@+id/npuEnabledSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="false" />
-        </LinearLayout>
-
-        <!-- GPU/NPU Offload Layers (active when backend != CPU) -->
+        <!-- GPU Offload Layers (active when GPU is enabled) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -317,7 +295,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Offload Layers (GPU/NPU):" />
+                android:text="Offload Layers (GPU):" />
 
             <LinearLayout
                 android:layout_width="wrap_content"

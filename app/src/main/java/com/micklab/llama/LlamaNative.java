@@ -52,10 +52,9 @@ public class LlamaNative {
     /**
      * Compute backend を設定する。
      *
-     * @param backendType  0=CPU, 1=GPU, 2=NPU/HTP, 3=GPU+NPU
-     * @param npuEnabled   false にすると NPU を即座に無効化 (backendType は保持)
+     * @param backendType  0=CPU, 1=GPU
+     * @param npuEnabled   常に false (NPU 対応は削除済み; シグネチャは後方互換のため保持)
      * @param nativeLibDir context.getApplicationInfo().nativeLibraryDir
-     *                     (HTP skel .so の ADSP_LIBRARY_PATH に使用)
      */
     public native void setBackendConfig(int backendType, boolean npuEnabled, String nativeLibDir);
     
@@ -88,18 +87,8 @@ public class LlamaNative {
     /** Total generation time (prompt + decode) in milliseconds of the most recent generation. */
     public native double getLastTotalTimeMs();
 
-    /** Effective compute backend after the last model load (CPU/GPU/NPU/HTP/GPU+NPU/CPU (fallback)). */
+    /** Effective compute backend after the last model load (CPU/GPU/CPU (fallback)). */
     public native String getActiveBackend();
-
-    /**
-     * True when NPU/HTP is the effective backend but the loaded model's quantization is not
-     * HTP-accelerable (only Q4_0/Q8_0/IQ4_NL/MXFP4 are). The model still runs, but mostly on CPU
-     * (many graph splits → slow). Used purely to show a UI warning; reflects the last model load.
-     */
-    public native boolean isNpuModelIncompatible();
-
-    /** Short name of the loaded model's quantization ("Q4_K_M", "Q4_0", "F16", …). */
-    public native String getModelQuantName();
 
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;

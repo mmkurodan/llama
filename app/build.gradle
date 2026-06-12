@@ -63,9 +63,8 @@ android {
 
     ndkVersion "27.2.12479018"
 
-    // DSP (Hexagon HTP) skel .so は FastRPC がファイルパスから読み込むため、
+    // GPU プラグイン libggml-opencl.so は dlopen で nativeLibraryDir から読み込むため、
     // APK 内に圧縮格納せず必ず展開する (extractNativeLibs=true 相当)。
-    // これをしないと libggml-htp-vXX.so が nativeLibraryDir に存在せず NPU が CPU にフォールバックする。
     packaging {
         jniLibs {
             useLegacyPackaging = true

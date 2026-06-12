@@ -154,7 +154,7 @@ public class DocumentsActivity extends Activity {
         sb.append("アプリ名: LLM AI Server with llama.cpp\n");
         sb.append("Built with Llama (llama.cpp)\n");
         sb.append("本アプリは端末上でLLMを実行し、プロンプトに対する回答を生成します。\n");
-        sb.append("計算バックエンドは CPU / GPU(Adreno OpenCL) / NPU(Hexagon) を利用でき、対応端末では設定でGPU/NPUへオフロードできます。未対応の場合は自動的にCPUへフォールバックします。\n");
+        sb.append("計算バックエンドは CPU / GPU(Adreno OpenCL) を利用でき、対応端末では設定でGPUへオフロードできます。未対応の場合は自動的にCPUへフォールバックします。\n");
         sb.append("必要に応じてOllama互換APIサーバーと llama.cpp 標準WebUIを同じポートで起動でき、メイン画面のWeb UI URLからブラウザで開けます。\n\n");
         sb.append("2. 初期設定（推奨手順）\n");
         sb.append("0) アプリ起動時にAPI/WebUI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n");
@@ -166,7 +166,7 @@ public class DocumentsActivity extends Activity {
         sb.append("4) パラメータを調整する場合は各項目を編集し「設定を保存」で保存します。\n");
         sb.append("5) 「保存して閉じる」を押すと設定が保存され、モデルに即座に適用されます。\n\n");
         sb.append("3. メイン画面\n");
-        sb.append("- 最上部ステータス: 直近に実行された推論（ダイレクト/API問わず）のモデル名・生成速度(tok/s)・デバイス温度・実行中の計算バックエンド(CPU/GPU/NPU)を表示し、自動更新します。\n");
+        sb.append("- 最上部ステータス: 直近に実行された推論（ダイレクト/API問わず）のモデル名・生成速度(tok/s)・デバイス温度・実行中の計算バックエンド(CPU/GPU)を表示し、自動更新します。\n");
         sb.append("- 操作ボタン（縦並び）: 「API/WebUI開始・停止」「リセット」「設定」。リセットは進行中の生成を停止し、現在のプロファイルでモデルを再初期化します。設定は推論中（Busy）は自動的に無効化され、完了後に再有効化されます。\n");
         sb.append("- Web UI URL: タップで既定ブラウザを開き、長押しでURLをコピーします（権限不要）。Wi-Fi接続時はLAN IP、未接続時はlocalhostを、現在のポートで表示します。\n");
         sb.append("- 処理状況/ログ（見出しタップで開閉・既定で開）: タイムスタンプ付きの処理ログを表示します。\n");
@@ -189,7 +189,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。各スイッチをオフにした場合は WebUI でのみ利用され、メイン画面のプロンプト入力や /api/chat、/api/generate、/v1/chat/completions では未設定として扱われます。オンにした場合のみ、それぞれ共有MCP設定と共有 function calling 定義として利用されます。\n");
         sb.append("- 表示言語: 日本語/English の表示言語を切り替えます。初回は端末設定から自動選択され、次回以降は選択が保存されます。\n");
         sb.append("- ログ設定: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
-        sb.append("- ライセンス表示: ライセンス文面を表示します。\n");
+        sb.append("- ライセンス表示: ライセンス文面（サードパーティ通知を含む）を表示します。\n");
         sb.append("- ドキュメント: 操作マニュアルとプライバシーポリシーを確認できます。\n");
         sb.append("- 保存して閉じる: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n");
         sb.append("- 閉じる: 何も保存せずメイン画面に戻ります。\n\n");
@@ -283,7 +283,7 @@ public class DocumentsActivity extends Activity {
         sb.append("App name: LLM AI Server with llama.cpp\n");
         sb.append("Built with Llama (llama.cpp).\n");
         sb.append("This app runs an LLM on your device and generates responses to prompts.\n");
-        sb.append("Compute backends: CPU / GPU (Adreno OpenCL) / NPU (Hexagon). On supported devices you can offload to the GPU/NPU from Settings; it falls back to CPU automatically when unsupported.\n");
+        sb.append("Compute backends: CPU / GPU (Adreno OpenCL). On supported devices you can offload to the GPU from Settings; it falls back to CPU automatically when unsupported.\n");
         sb.append("An Ollama-compatible API server and the standard llama.cpp WebUI can be started together on the same port, reachable from the Web UI URL on the main screen.\n\n");
         sb.append("2. Recommended Setup\n");
         sb.append("0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n");
@@ -295,7 +295,7 @@ public class DocumentsActivity extends Activity {
         sb.append("4) Edit parameters if needed and tap \"Save Config\".\n");
         sb.append("5) Tap \"SAVE & CLOSE\" to save settings and apply them to the model immediately.\n\n");
         sb.append("3. Main Screen\n");
-        sb.append("- Top status: Shows the most recent run (direct OR API) — model name, generation speed (tok/s), device temperature, and the active compute backend (CPU/GPU/NPU). It auto-updates.\n");
+        sb.append("- Top status: Shows the most recent run (direct OR API) — model name, generation speed (tok/s), device temperature, and the active compute backend (CPU/GPU). It auto-updates.\n");
         sb.append("- Action buttons (stacked): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset stops the active generation and reinitializes the current profile. Settings is disabled while inference is busy and re-enabled when it completes.\n");
         sb.append("- Web UI URL: Tap to open it in the default browser, long-press to copy the URL (no permission required). Shows the LAN IP on Wi-Fi, otherwise localhost, with the current port.\n");
         sb.append("- Processing Status/Logs (collapsible header, expanded by default): Shows timestamped processing logs.\n");
@@ -318,7 +318,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. When the new switches are off, they are available only in the WebUI and are treated as absent everywhere else. When enabled, they are also used as shared MCP and function-calling settings for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Display Language: Switch UI language between Japanese and English. On first launch it follows your device locale, and your choice is saved for later launches.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
-        sb.append("- Show License: Display license text.\n");
+        sb.append("- Show License: Display license text (including third-party notices).\n");
         sb.append("- Documents: View the user manual and the privacy policy.\n");
         sb.append("- SAVE & CLOSE: Save current settings and apply them to the model immediately.\n");
         sb.append("- CLOSE: Return to the main screen without saving any changes.\n\n");
