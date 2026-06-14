@@ -3,6 +3,7 @@ package com.micklab.llama;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Debug;
+import android.os.PowerManager;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -88,6 +89,9 @@ public class ModelManager {
     private static final int GPU_LAYERS_ENABLED_ALL = -1;
     private static final Pattern SPLIT_GGUF_PATTERN = Pattern.compile("^(.*)-(\\d{5})-of-(\\d{5})\\.gguf$");
     private static final String DOWNLOAD_CA_BUNDLE_FILENAME = "download-ca-bundle.pem";
+    private static final String DOWNLOAD_WAKE_LOCK_TAG = "llama:model-download";
+    // Safety cap so a stuck/native-hung download can never hold the CPU awake forever.
+    private static final long DOWNLOAD_WAKE_LOCK_TIMEOUT_MS = 6L * 60L * 60L * 1000L;
     
     private static ModelManager instance;
     
@@ -117,6 +121,10 @@ public class ModelManager {
     private volatile boolean currentSupportsVision = false;
     private volatile boolean currentSupportsAudio = false;
     private volatile boolean modelLoaded = false;
+    // Filename of an mmproj that the last load() disabled for being incompatible (request #6),
+    // or null. The ModelManager.ModelListener is currently unused, so the UI consumes this
+    // after loadConfiguration() returns to show the user a message.
+    private volatile String lastDisabledMmprojMessage = null;
 
     private static final class MultimodalProjectorResolution {
         private final String projectorPath;
@@ -232,6 +240,16 @@ public class ModelManager {
     
     public String getCurrentModelPath() {
         return currentModelPath;
+    }
+
+    /**
+     * Returns (and clears) the filename of an mmproj that the most recent load disabled for being
+     * incompatible with the model, or null if none. Lets the UI inform the user (request #6).
+     */
+    public String consumeLastDisabledMmprojMessage() {
+        String message = lastDisabledMmprojMessage;
+        lastDisabledMmprojMessage = null;
+        return message;
     }
 
     /** Force the next load() to actually reload (e.g. after settings are saved). */
@@ -396,6 +414,10 @@ public class ModelManager {
     }
 
     public boolean downloadConfigurationAssets(String configName) {
+        return downloadConfigurationAssets(configName, true);
+    }
+
+    public boolean downloadConfigurationAssets(String configName, boolean allowProjectorDownload) {
         boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
@@ -434,7 +456,8 @@ public class ModelManager {
 
             MultimodalProjectorResolution availableProjector = ensureMultimodalProjectorAvailable(
                     config,
-                    projectorResolution.projectorPath);
+                    projectorResolution.projectorPath,
+                    allowProjectorDownload);
             if (availableProjector.errorMessage != null) {
                 Log.e(TAG, availableProjector.errorMessage);
                 if (listener != null) {
@@ -479,6 +502,15 @@ public class ModelManager {
     }
 
     public boolean loadConfiguration(String configName, boolean preferVisionProjector, boolean preferAudioProjector) {
+        return loadConfiguration(configName, preferVisionProjector, preferAudioProjector, true);
+    }
+
+    public boolean loadConfiguration(
+            String configName,
+            boolean preferVisionProjector,
+            boolean preferAudioProjector,
+            boolean allowProjectorDownload) {
+        lastDisabledMmprojMessage = null;
         boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
@@ -506,7 +538,8 @@ public class ModelManager {
             }
             MultimodalProjectorResolution availableProjector = ensureMultimodalProjectorAvailable(
                     config,
-                    projectorResolution.projectorPath);
+                    projectorResolution.projectorPath,
+                    allowProjectorDownload);
             if (availableProjector.errorMessage != null) {
                 Log.e(TAG, availableProjector.errorMessage);
                 if (listener != null) {
@@ -515,6 +548,28 @@ public class ModelManager {
                 return false;
             }
             String mmprojPath = availableProjector.projectorPath;
+
+            // Guard against an incompatible mmproj that would crash native clip init
+            // (GGML_ASSERT -> abort, which cannot be caught in Java). When the cheap
+            // metadata pre-check is confident the projector does not fit this model,
+            // disable it, load the model text-only, and tell the user. (request #6)
+            if (mmprojPath != null) {
+                String mmprojValidation = llama.validateMmproj(modelPath, mmprojPath);
+                if (mmprojValidation != null && mmprojValidation.startsWith("incompatible")) {
+                    String disabledMmprojName = new File(mmprojPath).getName();
+                    Log.w(TAG, "Disabling incompatible mmproj (" + mmprojValidation + "): " + mmprojPath);
+                    DiagnosticsLogger.logEvent(context, "mmproj-incompatible",
+                            "config=" + configName + " mmproj=" + disabledMmprojName + " reason=" + mmprojValidation);
+                    // Surfaced to the UI after this call returns (the ModelListener is unused).
+                    lastDisabledMmprojMessage = disabledMmprojName;
+                    if (listener != null) {
+                        listener.onError("Selected mmproj is incompatible with this model and was disabled;"
+                                + " loaded text-only (" + disabledMmprojName + ")");
+                    }
+                    mmprojPath = null;
+                }
+            }
+
             boolean enableAudioForLoad = mmprojPath != null;
             boolean projectorRequestedButInactive =
                     mmprojPath != null && !currentSupportsVision && !currentSupportsAudio;
@@ -940,6 +995,38 @@ public class ModelManager {
         return ModelFileHelper.extractFilename(url);
     }
 
+    /**
+     * Run the native download while holding a partial wake lock so the transfer is less
+     * likely to be interrupted when the app is backgrounded or the screen turns off.
+     * The wake lock has a long safety timeout and is always released in the finally block.
+     */
+    private String downloadWithWakeLock(String url, String destPath) {
+        PowerManager.WakeLock wakeLock = null;
+        try {
+            PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null) {
+                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, DOWNLOAD_WAKE_LOCK_TAG);
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(DOWNLOAD_WAKE_LOCK_TIMEOUT_MS);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to acquire download wake lock; continuing without it", t);
+            wakeLock = null;
+        }
+
+        try {
+            return llama.download(url, destPath);
+        } finally {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                try {
+                    wakeLock.release();
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to release download wake lock", t);
+                }
+            }
+        }
+    }
+
     private File getModelStorageDir() {
         return ModelFileHelper.getModelStorageDir(context);
     }
@@ -968,7 +1055,7 @@ public class ModelManager {
                 }
             }
             Log.i(TAG, "Downloading model from: " + config.modelUrl);
-            String downloadResult = llama.download(config.modelUrl, destFile.getAbsolutePath());
+            String downloadResult = downloadWithWakeLock(config.modelUrl, destFile.getAbsolutePath());
             if (!"ok".equals(downloadResult)) {
                 return "Download failed: " + downloadResult;
             }
@@ -989,6 +1076,12 @@ public class ModelManager {
             ConfigurationManager.Configuration config,
             boolean preferVisionProjector,
             boolean preferAudioProjector) {
+        // If the selected model is itself an mmproj/projector GGUF, never resolve or download a
+        // separate projector for it. This avoids trying to (re)download an mmproj while the user
+        // is downloading an mmproj file directly (request #5).
+        if (ModelFileHelper.isLikelyProjectorFilename(extractFilenameFromUrl(config.modelUrl))) {
+            return new MultimodalProjectorResolution(null, null);
+        }
         if (config.multimodalProjectorUrl == null || config.multimodalProjectorUrl.trim().isEmpty()) {
             File autoDetectedProjector = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(
                     context,
@@ -1018,7 +1111,8 @@ public class ModelManager {
 
     private MultimodalProjectorResolution ensureMultimodalProjectorAvailable(
             ConfigurationManager.Configuration config,
-            String mmprojPath) {
+            String mmprojPath,
+            boolean allowProjectorDownload) {
         if (mmprojPath == null || mmprojPath.isEmpty()) {
             return new MultimodalProjectorResolution(null, null);
         }
@@ -1039,6 +1133,13 @@ public class ModelManager {
                     "Configured mmproj file is missing: " + mmprojFile.getAbsolutePath());
         }
 
+        // The mmproj is remote and not yet downloaded. Only download it when the caller (UI)
+        // has confirmed it (request #2). Otherwise skip it and load the model text-only.
+        if (!allowProjectorDownload) {
+            Log.i(TAG, "Skipping mmproj download (not permitted by caller); loading text-only: " + mmprojReference);
+            return new MultimodalProjectorResolution(null, null);
+        }
+
         if (mmprojReference.regionMatches(true, 0, "https://", 0, 8)) {
             String trustStoreError = configureNativeDownloadTrustStore();
             if (trustStoreError != null) {
@@ -1049,7 +1150,7 @@ public class ModelManager {
         }
 
         Log.i(TAG, "Downloading multimodal projector from: " + mmprojReference);
-        String downloadResult = llama.download(mmprojReference, mmprojFile.getAbsolutePath());
+        String downloadResult = downloadWithWakeLock(mmprojReference, mmprojFile.getAbsolutePath());
         if (!"ok".equals(downloadResult)) {
             return new MultimodalProjectorResolution(
                     null,

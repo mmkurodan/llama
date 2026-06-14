@@ -1618,6 +1618,141 @@ static bool read_split_count_from_gguf(
     return true;
 }
 
+// ---- mmproj <-> model compatibility pre-check (request #6) --------------------
+// Reading GGUF *metadata only* (no_alloc) lets us catch the common "wrong mmproj"
+// mistakes BEFORE mtmd_init_from_file. mtmd catches std::exceptions (e.g. the
+// explicit n_embd mismatch throw), but a structurally wrong projector trips a
+// GGML_ASSERT during clip construction, which calls abort() and cannot be caught
+// in Java — so we must reject it up-front instead.
+
+static bool gguf_read_uint_kv_as_i64(
+        const gguf_context * ctx, const char * key, int64_t & out_value) {
+    const int64_t kid = gguf_find_key(ctx, key);
+    if (kid < 0) {
+        return false;
+    }
+    switch (gguf_get_kv_type(ctx, kid)) {
+        case GGUF_TYPE_UINT32: out_value = (int64_t) gguf_get_val_u32(ctx, kid); return true;
+        case GGUF_TYPE_INT32:  out_value = (int64_t) gguf_get_val_i32(ctx, kid); return true;
+        case GGUF_TYPE_UINT64: out_value = (int64_t) gguf_get_val_u64(ctx, kid); return true;
+        case GGUF_TYPE_INT64:  out_value = (int64_t) gguf_get_val_i64(ctx, kid); return true;
+        case GGUF_TYPE_UINT16: out_value = (int64_t) gguf_get_val_u16(ctx, kid); return true;
+        case GGUF_TYPE_INT16:  out_value = (int64_t) gguf_get_val_i16(ctx, kid); return true;
+        default:               return false;
+    }
+}
+
+static bool gguf_kv_is_true(const gguf_context * ctx, const char * key) {
+    const int64_t kid = gguf_find_key(ctx, key);
+    if (kid < 0 || gguf_get_kv_type(ctx, kid) != GGUF_TYPE_BOOL) {
+        return false;
+    }
+    return gguf_get_val_bool(ctx, kid);
+}
+
+// Returns "ok" | "incompatible:..." | "unknown". Confident answers only; anything
+// it cannot determine is reported as "unknown" so valid combinations are never blocked.
+static std::string validate_mmproj_for_model(
+        const std::string & model_path,
+        const std::string & mmproj_path) {
+    if (mmproj_path.empty()) {
+        return "unknown";
+    }
+
+    // Load mmproj metadata + tensor shapes (no_alloc => cheap, no tensor data, no asserts).
+    struct ggml_context * mmproj_ggml = nullptr;
+    struct gguf_init_params mmproj_params = { /*.no_alloc =*/ true, /*.ctx =*/ &mmproj_ggml };
+    gguf_context * mmproj_gguf = gguf_init_from_file(mmproj_path.c_str(), mmproj_params);
+    if (!mmproj_gguf) {
+        return "unknown";
+    }
+
+    std::string result = "unknown";
+    int64_t model_n_embd = -1;
+    bool model_known = false;
+
+    // A genuine mmproj/CLIP file always advertises a vision and/or audio encoder.
+    // Otherwise the user picked a normal model file as the projector — a clear error.
+    const bool is_mmproj =
+            gguf_kv_is_true(mmproj_gguf, "clip.has_vision_encoder") ||
+            gguf_kv_is_true(mmproj_gguf, "clip.has_audio_encoder");
+
+    if (!is_mmproj) {
+        result = "incompatible:not_mmproj";
+    } else {
+        // Collect raw dims of the multimodal projector ("mm.*") tensors. The projector
+        // output dim (which must equal the text model's embedding length) is always one
+        // of these raw ne values, regardless of projector type — so membership is a safe,
+        // type-agnostic compatibility test with no false positives for "mm.*" projectors.
+        std::vector<int64_t> mm_dims;
+        if (mmproj_ggml) {
+            const int64_t n_tensors = gguf_get_n_tensors(mmproj_gguf);
+            for (int64_t i = 0; i < n_tensors; ++i) {
+                const char * name = gguf_get_tensor_name(mmproj_gguf, i);
+                if (!name || std::strncmp(name, "mm.", 3) != 0) {
+                    continue;
+                }
+                const ggml_tensor * t = ggml_get_tensor(mmproj_ggml, name);
+                if (t) {
+                    mm_dims.push_back(t->ne[0]);
+                    mm_dims.push_back(t->ne[1]);
+                }
+            }
+        }
+
+        // Read the text model's embedding length from its GGUF metadata.
+        struct gguf_init_params model_params = { /*.no_alloc =*/ true, /*.ctx =*/ nullptr };
+        gguf_context * model_gguf = gguf_init_from_file(model_path.c_str(), model_params);
+        if (model_gguf) {
+            const int64_t arch_kid = gguf_find_key(model_gguf, "general.architecture");
+            if (arch_kid >= 0 && gguf_get_kv_type(model_gguf, arch_kid) == GGUF_TYPE_STRING) {
+                const std::string arch = gguf_get_val_str(model_gguf, arch_kid);
+                const std::string embd_key = arch + ".embedding_length";
+                model_known = gguf_read_uint_kv_as_i64(model_gguf, embd_key.c_str(), model_n_embd)
+                              && model_n_embd > 0;
+            }
+            gguf_free(model_gguf);
+        }
+
+        if (!model_known || mm_dims.empty()) {
+            // Could not read the model embd, or projector stores its output under a
+            // non-"mm." prefix (e.g. minicpmv resampler.*). Don't guess.
+            result = "unknown";
+        } else {
+            bool matched = false;
+            for (int64_t d : mm_dims) {
+                if (d == model_n_embd) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
+                result = "ok";
+            } else {
+                std::ostringstream ss;
+                ss << "incompatible:embd:model=" << model_n_embd;
+                result = ss.str();
+            }
+        }
+    }
+
+    gguf_free(mmproj_gguf);
+    if (mmproj_ggml) {
+        ggml_free(mmproj_ggml);
+    }
+
+    std::ostringstream log;
+    log << "validateMmproj: model=" << path_filename(model_path)
+        << " mmproj=" << path_filename(mmproj_path)
+        << " result=" << result;
+    if (model_known) {
+        log << " n_embd=" << model_n_embd;
+    }
+    log_to_file(log.str());
+
+    return result;
+}
+
 static bool find_missing_split_shard_path(
         const std::string & model_path,
         std::string & missing_path) {
@@ -2363,6 +2498,31 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         clear_partial_init();
         return new_java_string_utf8(env, "init unknown exception");
     }
+}
+
+// ---------------- JNI: validateMmproj ----------------
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_validateMmproj(
+        JNIEnv * env,
+        jobject,
+        jstring jModelPath,
+        jstring jMmprojPath) {
+    std::string result = "unknown";
+    try {
+        const std::string model_path  = jModelPath  ? jstring_to_std(env, jModelPath)  : "";
+        const std::string mmproj_path = jMmprojPath ? jstring_to_std(env, jMmprojPath) : "";
+        if (!model_path.empty() && !mmproj_path.empty()) {
+            result = validate_mmproj_for_model(model_path, mmproj_path);
+        }
+    } catch (const std::exception & e) {
+        log_to_file(std::string("validateMmproj: exception: ") + e.what(), GGML_LOG_LEVEL_ERROR);
+        result = "unknown";
+    } catch (...) {
+        log_to_file("validateMmproj: unknown exception", GGML_LOG_LEVEL_ERROR);
+        result = "unknown";
+    }
+    return new_java_string_utf8(env, result);
 }
 
 // ---------------- JNI: setLoadParameters ----------------

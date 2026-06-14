@@ -905,7 +905,7 @@ public class SettingsActivity extends Activity {
     }
 
     private String getLicenseText() {
-        return "LLM tester with llama.cpp\n"
+        return "LLM AI Server with llama.cpp\n"
             + "Built with Llama (llama.cpp)\n\n"
             + "Copyright (c) 2026 Mitsuo Kuroda\n\n"
             + "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n"
@@ -1510,43 +1510,62 @@ public class SettingsActivity extends Activity {
     }
 
     private void showModelMaintenanceDialog() {
-        final File[] modelFiles = getDownloadedModelFiles();
-        if (modelFiles.length == 0) {
-            showToast("No downloaded model files found");
+        final File[] ggufFiles = getManagedGgufFiles();
+        if (ggufFiles.length == 0) {
+            showToast(localizedText("ダウンロード済みのモデルが見つかりません", "No downloaded model files found"));
             return;
         }
 
-        String[] fileItems = new String[modelFiles.length];
-        for (int i = 0; i < modelFiles.length; i++) {
-            fileItems[i] = modelFiles[i].getName() + " (" + modelFiles[i].length() + " bytes)";
+        String[] fileItems = new String[ggufFiles.length];
+        for (int i = 0; i < ggufFiles.length; i++) {
+            boolean projector = ModelFileHelper.isLikelyProjectorFilename(ggufFiles[i].getName());
+            fileItems[i] = ggufFiles[i].getName()
+                    + (projector ? "  [mmproj]" : "")
+                    + " (" + ggufFiles[i].length() + " bytes)";
         }
 
-        showScrollableSingleChoiceDialog(
-                localizedText("モデル管理", "Model Maintenance"),
-                fileItems,
-                0,
-                localizedText("選択モデルを使用", "Use Selected Model"),
-                selectedIndex -> switchCurrentProfileToDownloadedModel(modelFiles[selectedIndex]),
-                localizedText("選択モデルを削除", "Delete Selected"),
-                selectedIndex -> confirmDeleteModelFile(modelFiles[selectedIndex]));
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("モデル管理", "Model Maintenance"))
+                .setItems(fileItems, (dialog, which) -> showModelFileActionsDialog(ggufFiles[which]))
+                .setNegativeButton(localizedText("閉じる", "Close"), null)
+                .show();
     }
 
-    private File[] getDownloadedModelFiles() {
-        List<File> modelFiles = new ArrayList<>();
+    private void showModelFileActionsDialog(File file) {
+        boolean projector = ModelFileHelper.isLikelyProjectorFilename(file.getName());
+
+        List<String> actions = new ArrayList<>();
+        List<Runnable> handlers = new ArrayList<>();
+        // "Use as model" only makes sense for a regular model, not an mmproj/projector.
+        if (!projector) {
+            actions.add(localizedText("このモデルを使用", "Use as model"));
+            handlers.add(() -> switchCurrentProfileToDownloadedModel(file));
+        }
+        actions.add(localizedText("名前を変更", "Rename"));
+        handlers.add(() -> promptRenameModelFile(file));
+        actions.add(localizedText("削除", "Delete"));
+        handlers.add(() -> confirmDeleteModelFile(file));
+
+        new AlertDialog.Builder(this)
+                .setTitle(file.getName())
+                .setItems(actions.toArray(new String[0]), (dialog, which) -> handlers.get(which).run())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private File[] getManagedGgufFiles() {
+        List<File> files = new ArrayList<>();
         File modelDir = getModelStorageDir();
         File[] existingFiles = modelDir.listFiles();
         if (existingFiles != null) {
             for (File file : existingFiles) {
                 if (file.isFile()
                         && file.length() > 0
-                        && !"ollama.log".equals(file.getName())
-                        && !"last_crash.txt".equals(file.getName())
-                        && !"native_crash.txt".equals(file.getName())
-                        && !ModelFileHelper.isLikelyProjectorFilename(file.getName())
+                        && ModelFileHelper.isGgufFilename(file.getName())
                         && !file.getName().endsWith(IMPORT_TEMP_SUFFIX)
                         && !PendingModelLoadStore.isMarkerFile(file.getName())
-                        && !containsFile(modelFiles, file)) {
-                    modelFiles.add(file);
+                        && !containsFile(files, file)) {
+                    files.add(file);
                 }
             }
         }
@@ -1555,14 +1574,14 @@ public class SettingsActivity extends Activity {
             File loadedFile = new File(loadedModelPath);
             if (loadedFile.isFile()
                     && loadedFile.length() > 0
-                    && !ModelFileHelper.isLikelyProjectorFilename(loadedFile.getName())
-                    && !containsFile(modelFiles, loadedFile)) {
-                modelFiles.add(loadedFile);
+                    && ModelFileHelper.isGgufFilename(loadedFile.getName())
+                    && !containsFile(files, loadedFile)) {
+                files.add(loadedFile);
             }
         }
 
-        modelFiles.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-        return modelFiles.toArray(new File[0]);
+        files.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        return files.toArray(new File[0]);
     }
 
     private boolean containsFile(List<File> files, File target) {
@@ -1655,6 +1674,130 @@ public class SettingsActivity extends Activity {
         } else {
             showToast("Failed to delete model file: " + modelFile.getName());
         }
+    }
+
+    private void promptRenameModelFile(File modelFile) {
+        if (importInProgress || modelManager.isBusy()) {
+            showToast(localizedText(
+                    "モデル処理中は名前を変更できません",
+                    "Cannot rename while a model operation is running"));
+            return;
+        }
+        String currentModelPath = modelManager.getCurrentModelPath();
+        if (currentModelPath != null && currentModelPath.equals(modelFile.getAbsolutePath())) {
+            showToast(localizedText(
+                    "読み込み中のモデルは名前を変更できません。先に別モデルへ切り替えてください",
+                    "Cannot rename the currently loaded model. Switch models first"));
+            return;
+        }
+
+        final String oldName = modelFile.getName();
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(oldName);
+        // Pre-select the stem (everything before ".gguf") for quick editing.
+        int stemEnd = oldName.toLowerCase(Locale.US).endsWith(".gguf")
+                ? oldName.length() - 5
+                : oldName.length();
+        input.setSelection(0, Math.max(0, stemEnd));
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("名前を変更", "Rename file"))
+                .setView(input)
+                .setPositiveButton(localizedText("変更", "Rename"),
+                        (dialog, which) -> renameModelFile(modelFile, input.getText().toString().trim()))
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private void renameModelFile(File modelFile, String newName) {
+        if (newName == null || newName.isEmpty()) {
+            showToast(localizedText("ファイル名を入力してください", "Enter a file name"));
+            return;
+        }
+        if (newName.contains("/") || newName.contains("\\")) {
+            showToast(localizedText("ファイル名にスラッシュは使えません", "File name cannot contain a slash"));
+            return;
+        }
+        if (!ModelFileHelper.isGgufFilename(newName)) {
+            showToast(localizedText(".gguf で終わる名前にしてください", "Name must end with .gguf"));
+            return;
+        }
+        final String oldName = modelFile.getName();
+        if (newName.equals(oldName)) {
+            return;
+        }
+        File destFile = new File(modelFile.getParentFile(), newName);
+        if (destFile.exists()) {
+            showToast(localizedText("同名のファイルが既に存在します", "A file with that name already exists"));
+            return;
+        }
+        // Re-check busy/loaded state right before mutating the file.
+        if (importInProgress || modelManager.isBusy()) {
+            showToast(localizedText(
+                    "モデル処理中は名前を変更できません",
+                    "Cannot rename while a model operation is running"));
+            return;
+        }
+        String currentModelPath = modelManager.getCurrentModelPath();
+        if (currentModelPath != null && currentModelPath.equals(modelFile.getAbsolutePath())) {
+            showToast(localizedText(
+                    "読み込み中のモデルは名前を変更できません",
+                    "Cannot rename the currently loaded model"));
+            return;
+        }
+
+        if (!modelFile.renameTo(destFile)) {
+            showToast(localizedText("名前の変更に失敗しました: ", "Failed to rename: ") + oldName);
+            return;
+        }
+
+        // Keep saved profiles and the editing UI pointing at the new local filename so the
+        // rename does not trigger a re-download (request #4).
+        int updatedProfiles = updateConfigurationReferencesForRename(oldName, newName);
+        updateUiReferencesForRename(oldName, newName);
+
+        String suffix = updatedProfiles > 0
+                ? localizedText("（更新したプロファイル: " + updatedProfiles + "）", " (updated profiles: " + updatedProfiles + ")")
+                : "";
+        showToast(localizedText("名前を変更しました: ", "Renamed to: ") + newName + suffix);
+    }
+
+    private int updateConfigurationReferencesForRename(String oldName, String newName) {
+        int updated = 0;
+        for (String configName : configManager.listConfigurations()) {
+            try {
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                boolean changed = false;
+                if (oldName.equals(extractFilenameFromUrl(config.modelUrl))) {
+                    config.modelUrl = newName;
+                    changed = true;
+                }
+                if (oldName.equals(extractFilenameFromUrl(config.multimodalProjectorUrl))) {
+                    config.multimodalProjectorUrl = newName;
+                    changed = true;
+                }
+                if (changed) {
+                    configManager.saveConfiguration(config);
+                    updated++;
+                }
+            } catch (IOException | JSONException e) {
+                Log.w(TAG, "Failed to update references for renamed model in config: " + configName, e);
+            }
+        }
+        return updated;
+    }
+
+    private void updateUiReferencesForRename(String oldName, String newName) {
+        if (modelUrlInput != null
+                && oldName.equals(extractFilenameFromUrl(modelUrlInput.getText().toString()))) {
+            modelUrlInput.setText(newName);
+        }
+        if (oldName.equals(extractFilenameFromUrl(normalizeReference(selectedProjectorReference)))) {
+            setSelectedProjectorReference(newName, selectedProjectorManualSelection);
+        }
+        currentConfig = getConfigFromUI();
+        updateAutoTemplatePreview(currentConfig);
     }
 
     private void showHuggingFaceSearchDialog() {
@@ -1992,9 +2135,29 @@ public class SettingsActivity extends Activity {
                 labels,
                 selectedIndex,
                 localizedText("選択", "Select"),
-                index -> setSelectedProjectorReference(projectorFiles[index].getName(), true),
+                index -> selectProjectorWithCompatibilityCheck(modelReference, projectorFiles[index]),
                 localizedText("解除", "Clear"),
                 index -> setSelectedProjectorReference("", false));
+    }
+
+    private void selectProjectorWithCompatibilityCheck(String modelReference, File projectorFile) {
+        if (ModelFileHelper.canAutoApplyProjectorReference(modelReference, projectorFile.getName())) {
+            setSelectedProjectorReference(projectorFile.getName(), true);
+            return;
+        }
+        // The chosen mmproj does not look like it matches this model. Warn before applying;
+        // an actually-incompatible projector is also disabled automatically at load time (#6).
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("mmproj の互換性に注意", "mmproj may be incompatible"))
+                .setMessage(localizedText(
+                        "選択した mmproj (" + projectorFile.getName() + ") はこのモデルと互換でない可能性があります。"
+                                + "互換性がない場合、読み込み時に自動で無効化されます。それでも設定しますか？",
+                        "The selected mmproj (" + projectorFile.getName() + ") may be incompatible with this model. "
+                                + "If it is, it will be disabled automatically at load time. Set it anyway?"))
+                .setPositiveButton(localizedText("設定する", "Set anyway"),
+                        (dialog, which) -> setSelectedProjectorReference(projectorFile.getName(), true))
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
     }
 
     private void showScrollableSingleChoiceDialog(
@@ -2281,7 +2444,7 @@ public class SettingsActivity extends Activity {
         return null;
     }
     
-    private void loadModel() {
+    private void loadModel(boolean allowProjectorDownload) {
         final ConfigurationManager.Configuration config = saveConfigurationForModelAction();
         if (config == null) {
             return;
@@ -2298,9 +2461,10 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> showToast("Model is busy"));
                 return;
             }
-            
+
             try {
-                boolean success = modelManager.loadConfiguration(config.name);
+                boolean success = modelManager.loadConfiguration(config.name, false, false, allowProjectorDownload);
+                final String disabledMmproj = modelManager.consumeLastDisabledMmprojMessage();
                 runOnUiThread(() -> {
                     loadedModelPath = modelManager.getCurrentModelPath();
                     modelLoadedSuccessfully = success;
@@ -2311,6 +2475,11 @@ public class SettingsActivity extends Activity {
                     lastDownloadProgress = success ? 100 : 0;
                     loadModelButton.setEnabled(true);
                     showToast(success ? "Model initialized successfully" : "Model initialization failed");
+                    if (success && disabledMmproj != null) {
+                        showToast(localizedText(
+                                "選択した mmproj はこのモデルと非互換のため無効化し、テキスト専用で読み込みました: " + disabledMmproj,
+                                "The selected mmproj is incompatible and was disabled; loaded text-only: " + disabledMmproj));
+                    }
                     updateAutoTemplatePreview(config);
                 });
             } catch (Throwable t) {
@@ -2335,11 +2504,52 @@ public class SettingsActivity extends Activity {
             return;
         }
 
-        if (loadAfterDownload) {
-            loadModel();
-        } else {
-            downloadModelFilesOnly();
+        // Nothing remote to fetch -> no separate mmproj download to confirm.
+        runModelAction(loadAfterDownload, true);
+    }
+
+    /**
+     * After the model download/load decision is made, ask the user before downloading a
+     * separate remote mmproj (request #2). Skipped when the model itself is an mmproj
+     * (request #5) or when no remote mmproj download is pending.
+     */
+    private void startResolvedModelAction(boolean loadAfterDownload) {
+        ConfigurationManager.Configuration config = getConfigFromUI();
+        if (!mmprojDownloadNeedsConfirmation(config)) {
+            runModelAction(loadAfterDownload, true);
+            return;
         }
+
+        String mmprojName = extractFilenameFromUrl(config.multimodalProjectorUrl);
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("mmproj をダウンロード", "Download mmproj"))
+                .setMessage(localizedText(
+                        "このマルチモーダルモデルは mmproj (" + mmprojName + ") も使用します。"
+                                + "続けてダウンロードしますか？\nスキップした場合はテキスト専用で読み込みます。",
+                        "This multimodal model also uses an mmproj (" + mmprojName + "). "
+                                + "Download it as well?\nIf you skip, the model loads text-only."))
+                .setPositiveButton(localizedText("ダウンロードする", "Download"),
+                        (dialog, which) -> runModelAction(loadAfterDownload, true))
+                .setNegativeButton(localizedText("スキップ", "Skip"),
+                        (dialog, which) -> runModelAction(loadAfterDownload, false))
+                .show();
+    }
+
+    private void runModelAction(boolean loadAfterDownload, boolean allowProjectorDownload) {
+        if (loadAfterDownload) {
+            loadModel(allowProjectorDownload);
+        } else {
+            downloadModelFilesOnly(allowProjectorDownload);
+        }
+    }
+
+    private boolean mmprojDownloadNeedsConfirmation(ConfigurationManager.Configuration config) {
+        // The model itself being an mmproj means there is no separate projector to fetch.
+        String modelFilename = extractFilenameFromUrl(config.modelUrl);
+        if (ModelFileHelper.isLikelyProjectorFilename(modelFilename)) {
+            return false;
+        }
+        return referenceNeedsRemoteDownload(config.multimodalProjectorUrl);
     }
 
     private void showRemoteDownloadDecisionDialog(boolean loadAfterDownload, Runnable onCancel) {
@@ -2378,24 +2588,24 @@ public class SettingsActivity extends Activity {
         if (projectorDownload) {
             builder.setPositiveButton(
                     localizedText("ダウンロードのみ（推奨）", "Download only (Recommended)"),
-                    (dialog, which) -> downloadModelFilesOnly());
+                    (dialog, which) -> startResolvedModelAction(false));
             builder.setNeutralButton(
                     localizedText("ダウンロードしてロード", "Download and load"),
-                    (dialog, which) -> loadModel());
+                    (dialog, which) -> startResolvedModelAction(true));
         } else if (loadAfterDownload) {
             builder.setPositiveButton(
                     localizedText("ダウンロードしてロード", "Download and load"),
-                    (dialog, which) -> loadModel());
+                    (dialog, which) -> startResolvedModelAction(true));
             builder.setNeutralButton(
                     localizedText("ダウンロードのみ", "Download only"),
-                    (dialog, which) -> downloadModelFilesOnly());
+                    (dialog, which) -> startResolvedModelAction(false));
         } else {
             builder.setPositiveButton(
                     localizedText("ダウンロードのみ", "Download only"),
-                    (dialog, which) -> downloadModelFilesOnly());
+                    (dialog, which) -> startResolvedModelAction(false));
             builder.setNeutralButton(
                     localizedText("ダウンロードしてロード", "Download and load"),
-                    (dialog, which) -> loadModel());
+                    (dialog, which) -> startResolvedModelAction(true));
         }
 
         AlertDialog dialog = builder.create();
@@ -2431,7 +2641,7 @@ public class SettingsActivity extends Activity {
         return config;
     }
 
-    private void downloadModelFilesOnly() {
+    private void downloadModelFilesOnly(boolean allowProjectorDownload) {
         final ConfigurationManager.Configuration config = saveConfigurationForModelAction();
         if (config == null) {
             return;
@@ -2449,7 +2659,7 @@ public class SettingsActivity extends Activity {
             }
 
             try {
-                boolean success = modelManager.downloadConfigurationAssets(config.name);
+                boolean success = modelManager.downloadConfigurationAssets(config.name, allowProjectorDownload);
                 runOnUiThread(() -> {
                     String filename = extractFilenameFromUrl(config.modelUrl);
                     modelFileInfo.setText(success

@@ -27,6 +27,19 @@ public class LlamaNative {
     public native void setDownloadCaBundlePath(String path);
     public native String init(String modelPath);
     public native String initWithMmproj(String modelPath, String mmprojPath, boolean enableAudio);
+
+    /**
+     * Cheaply check (GGUF metadata only, without building the model) whether {@code mmprojPath}
+     * is a usable multimodal projector for {@code modelPath}. Returns one of:
+     * <ul>
+     *   <li>{@code "ok"} — confidently compatible</li>
+     *   <li>{@code "incompatible:..."} — confidently incompatible (e.g. not an mmproj, or the
+     *       projector/text-model embedding dimensions differ); loading it would likely crash</li>
+     *   <li>{@code "unknown"} — could not determine (caller should fall back to other checks)</li>
+     * </ul>
+     * Never throws across the JNI boundary.
+     */
+    public native String validateMmproj(String modelPath, String mmprojPath);
     public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
     public native String generate(String prompt);
     public native String generateWithMedia(String prompt, byte[][] mediaFiles);
