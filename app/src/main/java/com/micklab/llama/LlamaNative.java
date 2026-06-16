@@ -100,6 +100,12 @@ public class LlamaNative {
     /** Total generation time (prompt + decode) in milliseconds of the most recent generation. */
     public native double getLastTotalTimeMs();
 
+    /** Prompt processing (prefill) time in milliseconds of the most recent generation. */
+    public native double getLastPromptEvalTimeMs();
+
+    /** Model load time in milliseconds of the most recent model load. */
+    public native double getLastLoadTimeMs();
+
     /** Effective compute backend after the last model load (CPU/GPU/CPU (fallback)). */
     public native String getActiveBackend();
 

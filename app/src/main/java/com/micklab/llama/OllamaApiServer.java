@@ -668,6 +668,31 @@ public class OllamaApiServer {
         String suffix = buildPerfMetricsSuffix();
         return suffix.isEmpty() ? content : content + suffix;
     }
+
+    /**
+     * Adds Ollama-compatible performance fields to a final {@code done:true} response object,
+     * using the metrics from the most recent generation. Durations are in nanoseconds, matching
+     * the Ollama API ({@code total_duration}, {@code load_duration}, {@code prompt_eval_count},
+     * {@code prompt_eval_duration}, {@code eval_count}, {@code eval_duration}). No-op if the
+     * native context is unavailable. Always emitted (Ollama clients rely on these for tok/s).
+     */
+    private void putOllamaMetrics(JSONObject obj) {
+        try {
+            LlamaNative llama = modelManager.getLlama();
+            if (llama == null) return;
+            long loadNs       = Math.round(llama.getLastLoadTimeMs()       * 1.0e6);
+            long promptEvalNs = Math.round(llama.getLastPromptEvalTimeMs() * 1.0e6);
+            long evalNs       = Math.round(llama.getLastTotalTimeMs()      * 1.0e6); // decode time
+            obj.put("total_duration", loadNs + promptEvalNs + evalNs);
+            obj.put("load_duration", loadNs);
+            obj.put("prompt_eval_count", llama.getLastNPromptTokens());
+            obj.put("prompt_eval_duration", promptEvalNs);
+            obj.put("eval_count", llama.getLastNEvalTokens());
+            obj.put("eval_duration", evalNs);
+        } catch (JSONException e) {
+            Log.w(TAG, "Failed to add Ollama perf metrics", e);
+        }
+    }
     
     public void setPort(int port) {
         this.port = port;
@@ -1592,6 +1617,7 @@ public class OllamaApiServer {
                                         chunk.put("created_at", getTimestamp());
                                         chunk.put("response", "");
                                         chunk.put("done", true);
+                                        putOllamaMetrics(chunk);
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
@@ -1720,6 +1746,7 @@ public class OllamaApiServer {
                     result.put("created_at", getTimestamp());
                     result.put("response", response);
                     result.put("done", true);
+                    putOllamaMetrics(result);
                     logMaxDebugPayload("api.generate.nonstream.response.json", result.toString());
 
                     sendJsonResponse(outputStream, 200, result.toString());
@@ -1893,6 +1920,7 @@ public class OllamaApiServer {
                                         message.put("content", "");
                                         chunk.put("message", message);
                                         chunk.put("done", true);
+                                        putOllamaMetrics(chunk);
 
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
@@ -2030,6 +2058,7 @@ public class OllamaApiServer {
                     message.put("content", response);
                     result.put("message", message);
                     result.put("done", true);
+                    putOllamaMetrics(result);
                     logMaxDebugPayload("api.chat.nonstream.response.json", result.toString());
 
                     sendJsonResponse(outputStream, 200, result.toString());
@@ -2610,6 +2639,7 @@ public class OllamaApiServer {
         result.put("message", message);
         result.put("done", true);
         result.put("done_reason", toolResult.finishReason != null ? toolResult.finishReason : "stop");
+        putOllamaMetrics(result);
         return result;
     }
 
@@ -2632,6 +2662,7 @@ public class OllamaApiServer {
         }
         result.put("done", true);
         result.put("done_reason", toolResult.finishReason != null ? toolResult.finishReason : "stop");
+        putOllamaMetrics(result);
         return result;
     }
 
@@ -2664,7 +2695,25 @@ public class OllamaApiServer {
         JSONArray choices = new JSONArray();
         choices.put(choice);
         response.put("choices", choices);
+        putOpenAiUsage(response);
         return response;
+    }
+
+    /** Adds an OpenAI-style {@code usage} object (prompt/completion/total tokens) from the last generation. */
+    private void putOpenAiUsage(JSONObject response) {
+        try {
+            LlamaNative llama = modelManager.getLlama();
+            if (llama == null) return;
+            int promptTokens = llama.getLastNPromptTokens();
+            int completionTokens = llama.getLastNEvalTokens();
+            JSONObject usage = new JSONObject();
+            usage.put("prompt_tokens", promptTokens);
+            usage.put("completion_tokens", completionTokens);
+            usage.put("total_tokens", promptTokens + completionTokens);
+            response.put("usage", usage);
+        } catch (JSONException e) {
+            Log.w(TAG, "Failed to add OpenAI usage", e);
+        }
     }
 
     private JSONObject buildOpenAiStreamChunk(String model, String content, boolean done) throws JSONException {

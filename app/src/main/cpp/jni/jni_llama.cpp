@@ -2760,6 +2760,10 @@ static std::atomic<double>  g_last_gen_tps{0.0};
 static std::atomic<int32_t> g_last_n_prompt{0};
 static std::atomic<int32_t> g_last_n_eval{0};
 static std::atomic<double>  g_last_t_total_ms{0.0};
+// Prompt-eval (prefill) and model-load durations of the most recent generation,
+// in milliseconds. Exposed so the API layer can report Ollama-style ns durations.
+static std::atomic<double>  g_last_t_p_eval_ms{0.0};
+static std::atomic<double>  g_last_t_load_ms{0.0};
 
 // Log generation / prompt throughput (tok/s) from the per-generation perf
 // counters (reset at the start of each generation). Surfaces in the diagnostics
@@ -2774,6 +2778,8 @@ static void log_generation_perf(const char * log_prefix) {
     g_last_n_prompt.store(static_cast<int32_t>(p.n_p_eval), std::memory_order_relaxed);
     g_last_n_eval.store(static_cast<int32_t>(p.n_eval),     std::memory_order_relaxed);
     g_last_t_total_ms.store(p.t_eval_ms,                    std::memory_order_relaxed);
+    g_last_t_p_eval_ms.store(p.t_p_eval_ms,                 std::memory_order_relaxed);
+    g_last_t_load_ms.store(p.t_load_ms,                     std::memory_order_relaxed);
     const double pp_tps  = (p.t_p_eval_ms > 0.0) ? (1.0e3 * p.n_p_eval / p.t_p_eval_ms) : 0.0;
     std::ostringstream ss;
     ss << log_prefix << ": speed: gen " << std::fixed << std::setprecision(2) << gen_tps
@@ -3667,6 +3673,24 @@ Java_com_micklab_llama_LlamaNative_getLastTotalTimeMs(
         JNIEnv *, jobject /*thiz*/
 ) {
     return (jdouble) g_last_t_total_ms.load(std::memory_order_relaxed);
+}
+
+// 直近の生成のプロンプト処理 (prefill) 時間 (ms) を返す。
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_micklab_llama_LlamaNative_getLastPromptEvalTimeMs(
+        JNIEnv *, jobject /*thiz*/
+) {
+    return (jdouble) g_last_t_p_eval_ms.load(std::memory_order_relaxed);
+}
+
+// 直近のモデルロード時間 (ms) を返す。
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_micklab_llama_LlamaNative_getLastLoadTimeMs(
+        JNIEnv *, jobject /*thiz*/
+) {
+    return (jdouble) g_last_t_load_ms.load(std::memory_order_relaxed);
 }
 
 // 実効的な計算バックエンド名 ("CPU"/"GPU"/"NPU/HTP"/"GPU+NPU"/"CPU (fallback)") を返す。
