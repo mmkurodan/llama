@@ -59,9 +59,10 @@ using json = nlohmann::ordered_json;
 static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
-// GBNF grammar applied to the manual sampler chain in generate(); empty = no constraint.
+// Grammar constraint applied via common_sampler in generate(); empty (type NONE) = no constraint.
 // Set via setGrammar() before a generate() call (OllamaApiServer wires format/grammar here).
-static std::string    g_grammar;
+// USER = raw GBNF; OUTPUT_FORMAT = JSON schema (converted by common_sampler).
+static common_grammar g_grammar;
 static mtmd_context  *g_mtmd  = nullptr;
 static JavaVM *g_jvm = nullptr;
 // Token listener global ref and method IDs
@@ -2691,20 +2692,16 @@ Java_com_micklab_llama_LlamaNative_setGrammar(
         if (c) { schema = c; env->ReleaseStringUTFChars(jschema, c); }
     }
     if (!gbnf.empty()) {
-        g_grammar = gbnf;
+        g_grammar = { COMMON_GRAMMAR_TYPE_USER, gbnf };
     } else if (!schema.empty()) {
-        try {
-            g_grammar = json_schema_to_grammar(nlohmann::ordered_json::parse(schema));
-        } catch (const std::exception & e) {
-            g_grammar.clear();
-            log_to_file(std::string("setGrammar: json_schema_to_grammar failed: ") + e.what(),
-                        GGML_LOG_LEVEL_WARN);
-        }
+        // Pass the JSON schema as-is; common_sampler converts it to a grammar internally.
+        g_grammar = { COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, schema };
     } else {
-        g_grammar.clear();
+        g_grammar = {};
     }
     log_to_file(std::string("setGrammar: grammar ")
-                + (g_grammar.empty() ? "cleared" : "set (" + std::to_string(g_grammar.size()) + " bytes)"));
+                + (g_grammar.empty() ? "cleared"
+                                     : "set (" + std::to_string(g_grammar.grammar.size()) + " bytes)"));
 }
 
 // ---------------- JNI: embed ----------------
@@ -3232,19 +3229,26 @@ static jstring generate_locked(
     const llama_pos generation_base_pos = n_past;
     const int n_vocab = llama_vocab_n_tokens(vocab);
 
-    auto sparams = llama_sampler_chain_default_params();
-    llama_sampler * smpl = llama_sampler_chain_init(sparams);
-
-    // GBNF grammar constraint (structured output). Added first so it masks disallowed
-    // tokens before the other samplers narrow the distribution.
+    // Structured output: when a grammar is active, use common_sampler — the proven path that
+    // correctly applies GBNF / JSON-schema grammars (same as generateOpenAiChatCompletion). A raw
+    // llama_sampler_init_grammar in the manual chain aborts in this fork, so it must not be used.
+    // Otherwise fall back to the manual sampler chain (unchanged for normal generation).
+    common_sampler_ptr gsmpl;
+    llama_sampler * smpl = nullptr;
     if (!g_grammar.empty()) {
-        llama_sampler * grammar_smpl = llama_sampler_init_grammar(vocab, g_grammar.c_str(), "root");
-        if (grammar_smpl != nullptr) {
-            llama_sampler_chain_add(smpl, grammar_smpl);
-        } else {
-            log_to_file("generate: failed to init grammar sampler (invalid GBNF?)", GGML_LOG_LEVEL_WARN);
+        common_params_sampling sp = build_chat_sampling_params_locked(common_chat_params{});
+        sp.grammar = g_grammar;
+        sp.grammar_lazy = false;
+        gsmpl.reset(common_sampler_init(g_model, sp));
+        if (!gsmpl) {
+            log_to_file("generate: common_sampler_init failed for grammar; continuing unconstrained",
+                        GGML_LOG_LEVEL_WARN);
         }
     }
+
+    if (!gsmpl) {
+    auto sparams = llama_sampler_chain_default_params();
+    smpl = llama_sampler_chain_init(sparams);
 
     if (g_penalty_last_n > 0 && (g_penalty_repeat != 1.0f || g_penalty_freq != 0.0f || g_penalty_present != 0.0f)) {
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(
@@ -3311,6 +3315,7 @@ static jstring generate_locked(
     } else {
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
     }
+    } // end manual sampler chain (used when no grammar is active)
 
     std::string output;
     output.reserve(max_tokens * 4);
@@ -3330,8 +3335,13 @@ static jstring generate_locked(
             logged_first_sampling_step = true;
         }
 
-        const llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
-        llama_sampler_accept(smpl, id);
+        const llama_token id = gsmpl ? common_sampler_sample(gsmpl.get(), g_ctx, -1)
+                                     : llama_sampler_sample(smpl, g_ctx, -1);
+        if (gsmpl) {
+            common_sampler_accept(gsmpl.get(), id, true);
+        } else {
+            llama_sampler_accept(smpl, id);
+        }
         if (i == 0) {
             log_to_file("generate: first token sampled id=" + std::to_string(id));
         }
@@ -3394,7 +3404,7 @@ static jstring generate_locked(
             const char * errmsg = "decode failed (generation)";
             log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
             notify_token_error(errmsg);
-            llama_sampler_free(smpl);
+            if (smpl) llama_sampler_free(smpl);
             return new_java_string_utf8(env, errmsg);
         }
         if (i == 0) {
@@ -3411,7 +3421,7 @@ static jstring generate_locked(
         log_to_file("generate: completed with cancellation", GGML_LOG_LEVEL_WARN);
     }
 
-    llama_sampler_free(smpl);
+    if (smpl) llama_sampler_free(smpl);
 
     size_t safe_len = validate_utf8(output);
     if (safe_len < output.size()) {
