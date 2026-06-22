@@ -866,8 +866,40 @@ public class ModelManager {
         if (listener != null) {
             listener.onGenerationComplete(currentConfigName, result);
         }
-        
+
         return result;
+    }
+
+    /**
+     * Set the GBNF grammar / JSON schema constraint applied by the next {@link #generate(String)}.
+     * Pass empty strings to clear. NOT thread-safe; caller holds the busy lock (same as generate).
+     */
+    public void setGrammarConstraint(String gbnf, String jsonSchema) {
+        if (!modelLoaded) {
+            return;
+        }
+        try {
+            llama.setGrammar(gbnf == null ? "" : gbnf, jsonSchema == null ? "" : jsonSchema);
+        } catch (Throwable t) {
+            Log.e(TAG, "setGrammarConstraint failed", t);
+        }
+    }
+
+    /**
+     * Compute a sentence embedding for {@code text}. Returns the native JSON string
+     * ({@code {"embedding":[...]}} on success, {@code {"error":"..."}} on failure).
+     * NOT thread-safe; caller holds the busy lock (same as generate).
+     */
+    public String embed(String text) {
+        if (!modelLoaded) {
+            return "{\"error\":\"model not loaded\"}";
+        }
+        try {
+            return llama.embed(text == null ? "" : text);
+        } catch (Throwable t) {
+            Log.e(TAG, "embed failed", t);
+            return "{\"error\":\"embed exception\"}";
+        }
     }
 
     private void clearTransientLoadReferences() {

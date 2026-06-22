@@ -861,6 +861,12 @@ public class OllamaApiServer {
                     handleTags(outputStream);
                 } else if ("/v1/chat/completions".equals(path)) {
                     handleOpenAiChat(outputStream, body);
+                } else if ("/api/embed".equals(path)) {
+                    handleEmbed(outputStream, body);
+                } else if ("/api/embeddings".equals(path)) {
+                    handleEmbeddings(outputStream, body);
+                } else if ("/v1/embeddings".equals(path)) {
+                    handleOpenAiEmbeddings(outputStream, body);
                 } else if ("/models/load".equals(path)) {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
@@ -1508,7 +1514,10 @@ public class OllamaApiServer {
                 if (abortIfResetRequested(outputStream, "/api/generate")) {
                     return;
                 }
-                
+
+                // Structured output: apply format/grammar (GBNF / JSON Schema) to the sampler.
+                applyStructuredOutputConstraint(request);
+
                 ConfigurationManager.Configuration config = null;
                 try {
                     config = configManager.loadConfiguration(model);
@@ -1799,7 +1808,10 @@ public class OllamaApiServer {
                 if (abortIfResetRequested(outputStream, "/api/chat")) {
                     return;
                 }
-                
+
+                // Structured output: apply format/grammar (GBNF / JSON Schema) to the sampler.
+                applyStructuredOutputConstraint(request);
+
                 // Get configuration for prompt template settings
                 ConfigurationManager.Configuration config = null;
                 try {
@@ -2355,6 +2367,205 @@ public class OllamaApiServer {
                     e.getMessage() != null ? e.getMessage() : "OpenAI chat request failed",
                     "server_error");
         }
+    }
+
+    // ==================== Embeddings ====================
+
+    /** Ollama /api/embed : { "model", "input": string | [string,...] } -> { "model", "embeddings": [[...]] } */
+    private void handleEmbed(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = request.optString("model", "default");
+            List<String> inputs = extractEmbeddingInputs(request.opt("input"));
+            if (inputs.isEmpty()) {
+                sendErrorResponse(outputStream, 400, "'input' is required");
+                return;
+            }
+            if (!acquireGenerationSlot(outputStream, "/api/embed")) {
+                return;
+            }
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+                    return;
+                }
+                JSONArray embeddings = new JSONArray();
+                for (String in : inputs) {
+                    float[] vec = computeEmbeddingOrNull(in);
+                    if (vec == null) {
+                        sendErrorResponse(outputStream, 500, "Embedding generation failed");
+                        return;
+                    }
+                    embeddings.put(floatArrayToJson(vec));
+                }
+                JSONObject result = new JSONObject();
+                result.put("model", model);
+                result.put("embeddings", embeddings);
+                sendJsonResponse(outputStream, 200, result.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
+        }
+    }
+
+    /** Ollama legacy /api/embeddings : { "model", "prompt" } -> { "embedding": [...] } */
+    private void handleEmbeddings(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = request.optString("model", "default");
+            String prompt = request.optString("prompt", "");
+            if (prompt.isEmpty()) {
+                sendErrorResponse(outputStream, 400, "'prompt' is required");
+                return;
+            }
+            if (!acquireGenerationSlot(outputStream, "/api/embeddings")) {
+                return;
+            }
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+                    return;
+                }
+                float[] vec = computeEmbeddingOrNull(prompt);
+                if (vec == null) {
+                    sendErrorResponse(outputStream, 500, "Embedding generation failed");
+                    return;
+                }
+                JSONObject result = new JSONObject();
+                result.put("embedding", floatArrayToJson(vec));
+                sendJsonResponse(outputStream, 200, result.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
+        }
+    }
+
+    /** OpenAI /v1/embeddings : { "model", "input": string | [string,...] } -> { object:list, data:[...] } */
+    private void handleOpenAiEmbeddings(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = request.optString("model", "default");
+            List<String> inputs = extractEmbeddingInputs(request.opt("input"));
+            if (inputs.isEmpty()) {
+                sendOpenAiErrorResponse(outputStream, 400, "'input' is required", "invalid_request_error");
+                return;
+            }
+            if (!acquireGenerationSlot(outputStream, "/v1/embeddings", true)) {
+                return;
+            }
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
+                    return;
+                }
+                JSONArray data = new JSONArray();
+                for (int i = 0; i < inputs.size(); i++) {
+                    float[] vec = computeEmbeddingOrNull(inputs.get(i));
+                    if (vec == null) {
+                        sendOpenAiErrorResponse(outputStream, 500, "Embedding generation failed", "server_error");
+                        return;
+                    }
+                    JSONObject item = new JSONObject();
+                    item.put("object", "embedding");
+                    item.put("index", i);
+                    item.put("embedding", floatArrayToJson(vec));
+                    data.put(item);
+                }
+                JSONObject result = new JSONObject();
+                result.put("object", "list");
+                result.put("data", data);
+                result.put("model", model);
+                result.put("usage", new JSONObject().put("prompt_tokens", 0).put("total_tokens", 0));
+                sendJsonResponse(outputStream, 200, result.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendOpenAiErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage(), "invalid_request_error");
+        }
+    }
+
+    private List<String> extractEmbeddingInputs(Object input) {
+        List<String> out = new ArrayList<>();
+        if (input instanceof String) {
+            String s = (String) input;
+            if (!s.isEmpty()) {
+                out.add(s);
+            }
+        } else if (input instanceof JSONArray) {
+            JSONArray arr = (JSONArray) input;
+            for (int i = 0; i < arr.length(); i++) {
+                String s = arr.optString(i, "");
+                if (!s.isEmpty()) {
+                    out.add(s);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Calls native embed and parses {"embedding":[...]}; returns null on error (caller holds the slot). */
+    private float[] computeEmbeddingOrNull(String text) {
+        String json = modelManager.embed(text);
+        if (json == null) {
+            return null;
+        }
+        try {
+            JSONObject obj = new JSONObject(json);
+            JSONArray arr = obj.optJSONArray("embedding");
+            if (arr == null) {
+                Log.w(TAG, "embed returned error: " + obj.optString("error", json));
+                return null;
+            }
+            float[] vec = new float[arr.length()];
+            for (int i = 0; i < arr.length(); i++) {
+                vec[i] = (float) arr.optDouble(i, 0.0);
+            }
+            return vec;
+        } catch (JSONException e) {
+            Log.w(TAG, "embed parse error", e);
+            return null;
+        }
+    }
+
+    private JSONArray floatArrayToJson(float[] vec) throws JSONException {
+        JSONArray arr = new JSONArray();
+        for (float v : vec) {
+            arr.put(Float.isFinite(v) ? (double) v : 0.0);
+        }
+        return arr;
+    }
+
+    /**
+     * Applies the structured-output constraint from an /api/chat or /api/generate request to the
+     * native sampler for the upcoming generation. Reads "grammar" (raw GBNF) and "format"
+     * (Ollama: the string "json" or a JSON Schema object). Always set-or-clears, so a constraint
+     * from a previous request never leaks into the next one.
+     */
+    private void applyStructuredOutputConstraint(JSONObject request) {
+        String gbnf = "";
+        String schema = "";
+        try {
+            gbnf = request.optString("grammar", "");
+            Object format = request.opt("format");
+            if (format instanceof JSONObject) {
+                schema = format.toString();
+            } else if (format instanceof String) {
+                String f = ((String) format).trim();
+                if ("json".equalsIgnoreCase(f)) {
+                    schema = "{\"type\":\"object\"}";
+                } else if (f.startsWith("{")) {
+                    schema = f;
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "applyStructuredOutputConstraint parse failed", t);
+        }
+        modelManager.setGrammarConstraint(gbnf, schema);
     }
 
     private boolean acquireGenerationSlot(OutputStream outputStream, String endpoint) throws IOException {

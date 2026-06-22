@@ -35,6 +35,7 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
 #include <nlohmann/json.hpp>
+#include <cstdio>
 
 #include "llama.h"
 #include "gguf.h"
@@ -48,6 +49,8 @@
 #include "mtmd.h"
 #include "mtmd-helper.h"
 #include "sampling.h"
+#include "common.h"
+#include "json-schema-to-grammar.h"
 #include <curl/curl.h>
 
 using json = nlohmann::ordered_json;
@@ -56,6 +59,9 @@ using json = nlohmann::ordered_json;
 static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
+// GBNF grammar applied to the manual sampler chain in generate(); empty = no constraint.
+// Set via setGrammar() before a generate() call (OllamaApiServer wires format/grammar here).
+static std::string    g_grammar;
 static mtmd_context  *g_mtmd  = nullptr;
 static JavaVM *g_jvm = nullptr;
 // Token listener global ref and method IDs
@@ -2664,6 +2670,144 @@ Java_com_micklab_llama_LlamaNative_setTokenListener(
     }
 }
 
+// ---------------- JNI: setGrammar ----------------
+// Sets the GBNF grammar applied by the next generate() call. Precedence: a non-empty raw
+// GBNF string is used directly; otherwise a non-empty JSON Schema string is converted via
+// json_schema_to_grammar; otherwise the constraint is cleared. OllamaApiServer calls this
+// from the /api/chat and /api/generate "format"/"grammar" fields.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setGrammar(
+        JNIEnv * env, jobject, jstring jgbnf, jstring jschema) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    std::string gbnf;
+    std::string schema;
+    if (jgbnf != nullptr) {
+        const char * c = env->GetStringUTFChars(jgbnf, nullptr);
+        if (c) { gbnf = c; env->ReleaseStringUTFChars(jgbnf, c); }
+    }
+    if (jschema != nullptr) {
+        const char * c = env->GetStringUTFChars(jschema, nullptr);
+        if (c) { schema = c; env->ReleaseStringUTFChars(jschema, c); }
+    }
+    if (!gbnf.empty()) {
+        g_grammar = gbnf;
+    } else if (!schema.empty()) {
+        try {
+            g_grammar = json_schema_to_grammar(nlohmann::ordered_json::parse(schema));
+        } catch (const std::exception & e) {
+            g_grammar.clear();
+            log_to_file(std::string("setGrammar: json_schema_to_grammar failed: ") + e.what(),
+                        GGML_LOG_LEVEL_WARN);
+        }
+    } else {
+        g_grammar.clear();
+    }
+    log_to_file(std::string("setGrammar: grammar ")
+                + (g_grammar.empty() ? "cleared" : "set (" + std::to_string(g_grammar.size()) + " bytes)"));
+}
+
+// ---------------- JNI: embed ----------------
+// Computes a sentence embedding for `text` with the loaded model and returns JSON
+// {"embedding":[...]} (or {"error":"..."}). For generative (causal) models the per-token
+// hidden states are mean-pooled (pooling_type NONE) and L2-normalized; a dedicated embedding
+// model with mean/cls pooling yields better quality. The KV cache is cleared before and after
+// so an in-progress chat session is not polluted.
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_embed(
+        JNIEnv * env, jobject, jstring jtext) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_model || !g_ctx) {
+        return new_java_string_utf8(env, "{\"error\":\"model not loaded\"}");
+    }
+    std::string text;
+    if (jtext != nullptr) {
+        const char * c = env->GetStringUTFChars(jtext, nullptr);
+        if (c) { text = c; env->ReleaseStringUTFChars(jtext, c); }
+    }
+
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    std::vector<llama_token> tokens = common_tokenize(vocab, text, true, false);
+    if (tokens.empty()) {
+        return new_java_string_utf8(env, "{\"error\":\"empty input\"}");
+    }
+    if ((int) tokens.size() > g_n_ctx) {
+        tokens.resize(g_n_ctx);
+    }
+
+    const int n_embd = llama_model_n_embd_out(g_model);
+    if (n_embd <= 0) {
+        return new_java_string_utf8(env, "{\"error\":\"model has no embedding output\"}");
+    }
+
+    reusable_token_batch batch((int32_t) tokens.size());
+    if (!batch.valid()) {
+        return new_java_string_utf8(env, "{\"error\":\"batch alloc failed\"}");
+    }
+    batch.batch.n_tokens = (int32_t) tokens.size();
+    for (int i = 0; i < (int) tokens.size(); ++i) {
+        // logits=true => per-token embeddings are produced (required for pooling_type NONE)
+        batch.set_token(i, tokens[i], (llama_pos) i, true);
+    }
+
+    llama_memory_t mem = llama_get_memory(g_ctx);
+    llama_memory_clear(mem, true);
+    llama_set_embeddings(g_ctx, true);
+
+    const int rc = llama_decode(g_ctx, batch.batch);
+
+    std::vector<float> pooled(n_embd, 0.0f);
+    bool ok = (rc >= 0);
+    if (ok) {
+        const enum llama_pooling_type pooling = llama_pooling_type(g_ctx);
+        if (pooling == LLAMA_POOLING_TYPE_NONE) {
+            int counted = 0;
+            for (int i = 0; i < (int) tokens.size(); ++i) {
+                const float * e = llama_get_embeddings_ith(g_ctx, i);
+                if (e == nullptr) continue;
+                for (int d = 0; d < n_embd; ++d) pooled[d] += e[d];
+                ++counted;
+            }
+            if (counted > 0) {
+                for (int d = 0; d < n_embd; ++d) pooled[d] /= (float) counted;
+            } else {
+                ok = false;
+            }
+        } else {
+            const float * e = llama_get_embeddings_seq(g_ctx, 0);
+            if (e != nullptr) {
+                for (int d = 0; d < n_embd; ++d) pooled[d] = e[d];
+            } else {
+                ok = false;
+            }
+        }
+    }
+
+    // restore generation mode and drop the scratch tokens from the KV cache
+    llama_set_embeddings(g_ctx, false);
+    llama_memory_clear(mem, true);
+
+    if (!ok) {
+        return new_java_string_utf8(env, "{\"error\":\"embedding decode failed\"}");
+    }
+
+    std::vector<float> normed(n_embd, 0.0f);
+    common_embd_normalize(pooled.data(), normed.data(), n_embd, 2 /* L2 */);
+
+    std::string out;
+    out.reserve((size_t) n_embd * 12 + 32);
+    out += "{\"embedding\":[";
+    for (int d = 0; d < n_embd; ++d) {
+        if (d > 0) out += ',';
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%.7g", normed[d]);
+        out += buf;
+    }
+    out += "]}";
+    return new_java_string_utf8(env, out);
+}
+
 // ---------------- JNI: cancelGeneration ----------------
 extern "C"
 JNIEXPORT void JNICALL
@@ -3090,6 +3234,17 @@ static jstring generate_locked(
 
     auto sparams = llama_sampler_chain_default_params();
     llama_sampler * smpl = llama_sampler_chain_init(sparams);
+
+    // GBNF grammar constraint (structured output). Added first so it masks disallowed
+    // tokens before the other samplers narrow the distribution.
+    if (!g_grammar.empty()) {
+        llama_sampler * grammar_smpl = llama_sampler_init_grammar(vocab, g_grammar.c_str(), "root");
+        if (grammar_smpl != nullptr) {
+            llama_sampler_chain_add(smpl, grammar_smpl);
+        } else {
+            log_to_file("generate: failed to init grammar sampler (invalid GBNF?)", GGML_LOG_LEVEL_WARN);
+        }
+    }
 
     if (g_penalty_last_n > 0 && (g_penalty_repeat != 1.0f || g_penalty_freq != 0.0f || g_penalty_present != 0.0f)) {
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(

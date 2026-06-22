@@ -55,6 +55,15 @@ public class LlamaNative {
     public native void cancelGeneration();
     public native void free();
 
+    // Structured output: set the GBNF grammar for the next generate() call.
+    // Pass a raw GBNF string in `gbnf`, or a JSON Schema string in `jsonSchema`
+    // (converted natively via json_schema_to_grammar); pass "" for both to clear.
+    public native void setGrammar(String gbnf, String jsonSchema);
+
+    // Embedding generation: returns JSON {"embedding":[...]} or {"error":"..."}.
+    // Mean-pools per-token hidden states for generative models; best with an embedding model.
+    public native String embed(String text);
+
     // Token listener registration (native will keep a global ref)
     public native void setTokenListener(TokenListener listener);
 
