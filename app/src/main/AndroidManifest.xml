@@ -19,6 +19,7 @@
 
         <activity
             android:name="com.micklab.llama.MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="true">
 
             <intent-filter>
@@ -31,11 +32,13 @@
         <activity
             android:name="com.micklab.llama.SettingsActivity"
             android:label="Settings"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="true" />
 
         <activity
             android:name="com.micklab.llama.DocumentsActivity"
             android:label="Documents"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="true" />
             
         <service

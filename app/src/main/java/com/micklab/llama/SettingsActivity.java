@@ -1368,7 +1368,7 @@ public class SettingsActivity extends Activity {
             return;
         }
 
-        setCopyableUrl(apiLoopbackUrlView, buildServerUrl("localhost", apiPort), true);
+        setCopyableUrl(apiLoopbackUrlView, buildServerUrl("127.0.0.1", apiPort), true);
         String wifiIpv4Address = getActiveWifiIpv4Address();
         if (wifiIpv4Address == null || wifiIpv4Address.isEmpty()) {
             apiWifiUrlContainer.setVisibility(View.GONE);

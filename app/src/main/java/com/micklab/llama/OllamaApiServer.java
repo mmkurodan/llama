@@ -73,6 +73,12 @@ public class OllamaApiServer {
         contentTypes.put("bundle.js", "application/javascript; charset=utf-8");
         contentTypes.put("bundle.css", "text/css; charset=utf-8");
         contentTypes.put("loading.html", "text/html; charset=utf-8");
+        // PWA assets
+        contentTypes.put("manifest.webmanifest", "application/manifest+json; charset=utf-8");
+        contentTypes.put("sw.js", "application/javascript; charset=utf-8");
+        contentTypes.put("icon-192.png", "image/png");
+        contentTypes.put("icon-512.png", "image/png");
+        contentTypes.put("icon-512-maskable.png", "image/png");
         WEBUI_CONTENT_TYPES = Collections.unmodifiableMap(contentTypes);
     }
     

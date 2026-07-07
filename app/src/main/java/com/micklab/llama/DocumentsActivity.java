@@ -185,7 +185,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
         sb.append("- 出力設定: ストリーミング出力の有効/無効を切り替えます。\n");
         sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
-        sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURLは http://localhost:ポート番号 で表示され、Wi-Fi接続中はLAN URLも表示してタップでコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
+        sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURLは http://127.0.0.1:ポート番号 で表示され、Wi-Fi接続中はLAN URLも表示してタップでコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
         sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。各スイッチをオフにした場合は WebUI でのみ利用され、メイン画面のプロンプト入力や /api/chat、/api/generate、/v1/chat/completions では未設定として扱われます。オンにした場合のみ、それぞれ共有MCP設定と共有 function calling 定義として利用されます。\n");
         sb.append("- 表示言語: 日本語/English の表示言語を切り替えます。初回は端末設定から自動選択され、次回以降は選択が保存されます。\n");
         sb.append("- ログ設定: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
@@ -322,7 +322,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
-        sb.append("- Llama API Server: Set the server port. The Local URL is shown as http://localhost:<port>, and while connected to Wi-Fi the LAN URL is also shown and can be tapped to copy. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
+        sb.append("- Llama API Server: Set the server port. The Local URL is shown as http://127.0.0.1:<port>, and while connected to Wi-Fi the LAN URL is also shown and can be tapped to copy. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
         sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. When the new switches are off, they are available only in the WebUI and are treated as absent everywhere else. When enabled, they are also used as shared MCP and function-calling settings for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Display Language: Switch UI language between Japanese and English. On first launch it follows your device locale, and your choice is saved for later launches.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
