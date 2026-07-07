@@ -1326,7 +1326,31 @@ public class SettingsActivity extends Activity {
         if (targetView == null) {
             return;
         }
-        targetView.setOnClickListener(v -> copyUrlToClipboard(targetView, label));
+        // Same behavior as the main screen's Web UI URL: tap opens the browser, long-press copies.
+        targetView.setOnClickListener(v -> openUrlInBrowser(targetView));
+        targetView.setOnLongClickListener(v -> {
+            copyUrlToClipboard(targetView, label);
+            return true;
+        });
+    }
+
+    private void openUrlInBrowser(TextView sourceView) {
+        if (sourceView == null) {
+            return;
+        }
+        Object tag = sourceView.getTag();
+        if (!(tag instanceof String)) {
+            return;
+        }
+        String url = (String) tag;
+        if (url.isEmpty()) {
+            return;
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+        }
     }
 
     private void copyUrlToClipboard(TextView sourceView, String label) {

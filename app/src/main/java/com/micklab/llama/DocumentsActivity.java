@@ -185,7 +185,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
         sb.append("- 出力設定: ストリーミング出力の有効/無効を切り替えます。\n");
         sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
-        sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURLは http://127.0.0.1:ポート番号 で表示され、Wi-Fi接続中はLAN URLも表示してタップでコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
+        sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURL(http://127.0.0.1:ポート番号)を表示し、Wi-Fi接続中はLAN URLも表示します。各URLはメイン画面のWeb UI URLと同様に、タップで既定ブラウザを開き、長押しでURLをコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
         sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。各スイッチをオフにした場合は WebUI でのみ利用され、メイン画面のプロンプト入力や /api/chat、/api/generate、/v1/chat/completions では未設定として扱われます。オンにした場合のみ、それぞれ共有MCP設定と共有 function calling 定義として利用されます。\n");
         sb.append("- 表示言語: 日本語/English の表示言語を切り替えます。初回は端末設定から自動選択され、次回以降は選択が保存されます。\n");
         sb.append("- ログ設定: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
@@ -241,6 +241,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- アプリ起動時にローカルAPI/WebUIサーバーを有効化するかどうか確認するポップアップが表示されます。\n");
         sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots と WebUI の静的ファイルを提供します。\n");
         sb.append("- WebUIは同じポートの http://<端末IP>:<ポート>/ で利用できます。\n");
+        sb.append("- WebUIはPWA対応で、ブラウザのメニューからホーム画面に追加してアプリのように利用できます（自動のインストール案内は表示しません）。端末上でインストールする場合は http://127.0.0.1:<ポート>/ で開いてください（ホーム追加やオフライン表示にはセキュアコンテキストが必要で、LAN IP では利用できません）。\n");
         sb.append("- アプリ設定で保存したMCPコンフィグJSONは共通設定として /props 経由でWebUIにも渡され、WebUIのローカルMCP設定と合わせて利用されます。\n");
         sb.append("- MCP の外部利用スイッチをオンにすると、共有MCP設定は WebUI に加えて、メイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions の内部ツール実行にも利用されます。オフでは WebUI のみで利用されます。\n");
         sb.append("- Function Calling の外部利用スイッチをオンにすると、Function Definitions JSON は共通の function calling 定義としてメイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions に自動で追加されます。オフでは WebUI のみで利用されます。\n");
@@ -322,7 +323,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
         sb.append("- Output Settings: Toggle streaming output on/off.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
-        sb.append("- Llama API Server: Set the server port. The Local URL is shown as http://127.0.0.1:<port>, and while connected to Wi-Fi the LAN URL is also shown and can be tapped to copy. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
+        sb.append("- Llama API Server: Set the server port. The Local URL (http://127.0.0.1:<port>) is shown, and while connected to Wi-Fi the LAN URL is shown too. As on the main screen's Web UI URL, tap a URL to open it in the default browser and long-press to copy it. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
         sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. When the new switches are off, they are available only in the WebUI and are treated as absent everywhere else. When enabled, they are also used as shared MCP and function-calling settings for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Display Language: Switch UI language between Japanese and English. On first launch it follows your device locale, and your choice is saved for later launches.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
@@ -378,6 +379,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- On app launch, a popup asks whether to enable the local API/WebUI server, and you can check \"Don't show next time\" to skip it on future launches.\n");
         sb.append("- Provides /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots, and the bundled WebUI on device.\n");
         sb.append("- The WebUI is available at http://<device-ip>:<port>/ on the same port.\n");
+        sb.append("- The WebUI is a PWA: you can add it to your home screen from the browser menu and use it like an app (no automatic install prompt is shown). To install it on-device, open http://127.0.0.1:<port>/ (home-screen install and offline use require a secure context and are not available over the LAN IP).\n");
         sb.append("- MCP config JSON saved in the app settings is exposed to the WebUI through /props as a shared setting and is used together with the WebUI's local MCP settings.\n");
         sb.append("- When MCP outside WebUI is enabled, shared MCP settings are also used by the main prompt input, /api/chat, /api/generate, and /v1/chat/completions for internal tool execution. When disabled, they remain WebUI-only.\n");
         sb.append("- When Function Calling outside WebUI is enabled, Function Definitions JSON is automatically added as shared function-calling definitions for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions. When disabled, it remains WebUI-only.\n");
@@ -445,7 +447,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- ユーザーの入力内容（会話全文）はローカル API に送信されますが、インターネットを経由して外部サーバーへ送信されることはありません。\n");
         sb.append("- MCPサーバーを設定してメイン画面、API連携、またはWebUIから利用した場合、会話内容やツール入力の一部が設定先のMCPサーバーへ送信されることがあります。送信先や取扱いは各MCPサーバーの設定・運用に依存します。\n");
         sb.append("- ローカルネットワーク内からアクセス可能ですが、外部ネットワークからのアクセスは意図されておらず、アプリは外部公開を行いません。\n");
-        sb.append("- ローカル通信は暗号化されていない場合がありますが、通信は端末内または同一ネットワーク内に限定されます。\n\n");
+        sb.append("- ローカル通信は暗号化されていない場合がありますが、通信は端末内または同一ネットワーク内に限定されます。\n");
+        sb.append("- WebUIはPWAとして、表示用の静的ファイル（HTML/CSS/JS・アイコン）をブラウザのキャッシュに保存する場合があります。これらは端末内のブラウザ領域に保存されるのみで、会話内容などの個人情報は含まず、外部サーバーへ送信されません。\n\n");
         sb.append("3. 利用目的\n");
         sb.append("上記データは、アプリの動作、生成機能、表示のために使用します。ユーザーの入力内容は生成処理のためにのみ利用され、外部送信・第三者提供・保存は行いません。\n\n");
         sb.append("4. ログ\n");
@@ -477,7 +480,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- User input (full conversation text) is sent to the local API, but it is never transmitted over the internet or to any external server.\n");
         sb.append("- If you configure and use MCP servers from the main prompt input, API integrations, or the WebUI, parts of conversation content or tool inputs may be sent to those configured MCP servers. The destination and handling depend on each MCP server's own configuration and operation.\n");
         sb.append("- The API may be accessible from devices within the same local network, but it is not intended for external network access, and the application does not expose the API to the internet.\n");
-        sb.append("- Local communication may be unencrypted, but all communication is restricted to the device or the same local network.\n\n");
+        sb.append("- Local communication may be unencrypted, but all communication is restricted to the device or the same local network.\n");
+        sb.append("- As a PWA, the WebUI may store its static presentation files (HTML/CSS/JS and icons) in the browser cache. These are kept only in the browser storage on the device, contain no personal information such as conversation content, and are not transmitted to any external server.\n\n");
         sb.append("3. Purpose of Use\n");
         sb.append("The collected data is used solely for application functionality, generation processing, and display. User input is used only for generation and is not transmitted externally, shared with third parties, or stored.\n\n");
         sb.append("4. Logs\n");

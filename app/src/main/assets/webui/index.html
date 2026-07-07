@@ -39,72 +39,15 @@
 				}
 			</script>
 		</div>
-		<!-- PWA: service worker registration + Android install prompt -->
+		<!-- PWA: service worker registration (installable via the browser menu; no auto prompt) -->
 		<script>
-			(function () {
-				if ('serviceWorker' in navigator) {
-					window.addEventListener('load', function () {
-						navigator.serviceWorker.register('./sw.js').catch(function (e) {
-							console.warn('SW registration failed', e);
-						});
+			if ('serviceWorker' in navigator) {
+				window.addEventListener('load', function () {
+					navigator.serviceWorker.register('./sw.js').catch(function (e) {
+						console.warn('SW registration failed', e);
 					});
-				}
-
-				// Android/Chromium: capture the install prompt and offer it right away.
-				var deferredPrompt = null;
-				function standalone() {
-					return window.matchMedia('(display-mode: standalone)').matches ||
-						window.navigator.standalone === true;
-				}
-				function makeBanner() {
-					if (document.getElementById('pwa-install-banner')) return null;
-					var bar = document.createElement('div');
-					bar.id = 'pwa-install-banner';
-					bar.setAttribute('role', 'dialog');
-					bar.style.cssText = [
-						'position:fixed', 'left:12px', 'right:12px', 'bottom:12px', 'z-index:2147483647',
-						'display:flex', 'align-items:center', 'gap:12px',
-						'padding:12px 14px', 'border-radius:12px',
-						'background:#1b1f20', 'color:#fff',
-						'box-shadow:0 6px 24px rgba(0,0,0,.35)',
-						'font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
-						'max-width:520px', 'margin:0 auto'
-					].join(';');
-					bar.innerHTML =
-						'<img src="./icon-192.png" alt="" width="36" height="36" style="border-radius:8px;flex:0 0 auto"/>' +
-						'<span style="flex:1 1 auto">このアプリをホーム画面に追加できます / Install this app</span>' +
-						'<button id="pwa-install-yes" style="flex:0 0 auto;background:#ff8236;color:#1b1f20;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer">インストール</button>' +
-						'<button id="pwa-install-no" aria-label="close" style="flex:0 0 auto;background:transparent;color:#aaa;border:0;font-size:20px;cursor:pointer;padding:0 4px">×</button>';
-					document.body.appendChild(bar);
-					return bar;
-				}
-				function showBanner() {
-					if (standalone() || !deferredPrompt) return;
-					var bar = makeBanner();
-					if (!bar) return;
-					bar.querySelector('#pwa-install-yes').addEventListener('click', function () {
-						bar.remove();
-						if (!deferredPrompt) return;
-						deferredPrompt.prompt();
-						deferredPrompt.userChoice.finally(function () { deferredPrompt = null; });
-					});
-					bar.querySelector('#pwa-install-no').addEventListener('click', function () {
-						bar.remove();
-					});
-				}
-				window.addEventListener('beforeinstallprompt', function (e) {
-					e.preventDefault();
-					deferredPrompt = e;
-					// Offer installation as soon as the UI is shown.
-					if (document.readyState === 'complete') showBanner();
-					else window.addEventListener('load', showBanner);
 				});
-				window.addEventListener('appinstalled', function () {
-					deferredPrompt = null;
-					var bar = document.getElementById('pwa-install-banner');
-					if (bar) bar.remove();
-				});
-			})();
+			}
 		</script>
 	</body>
 </html>
