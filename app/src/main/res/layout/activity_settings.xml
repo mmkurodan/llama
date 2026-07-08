@@ -898,7 +898,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Local URL (tap to copy):"
+            android:text="Local URL (tap to open / long-press to copy):"
             android:paddingTop="12dp"
             android:paddingBottom="4dp" />
 
@@ -921,7 +921,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="LAN URL (tap to copy):"
+                android:text="LAN URL (tap to open / long-press to copy):"
                 android:paddingTop="12dp"
                 android:paddingBottom="4dp" />
 

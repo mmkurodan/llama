@@ -658,8 +658,8 @@ public class SettingsActivity extends Activity {
                 case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
                 case "Llama API Server": return "Llama APIサーバー";
                 case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
-                case "Local URL (tap to copy):": return "ローカルURL（タップでコピー）:";
-                case "LAN URL (tap to copy):": return "LAN URL（タップでコピー）:";
+                case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
+                case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
                 case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
                 case "MCP Settings": return "MCP設定";
                 case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
