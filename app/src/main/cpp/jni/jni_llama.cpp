@@ -2332,12 +2332,18 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             log_to_file(ss.str());
         }
 
+        // Only skip re-init when the *effective* multimodal state already matches the request:
+        //  - request has no mmproj  -> skip only if no projector is currently active
+        //    (both the configured path is empty AND g_mtmd == nullptr). The previous
+        //    "|| g_mtmd != nullptr" term wrongly skipped when a projector was loaded, so
+        //    clearing the projector never took effect natively.
+        //  - request has an mmproj  -> skip only if the same projector path is loaded.
         if (!g_current_model_path.empty()
                 && g_current_model_path == model_path
                 && g_model && g_ctx
                 && (!enable_audio || g_current_audio_requested)
-                && ((mmproj_path.empty() && (g_current_mmproj_path.empty() || g_mtmd != nullptr))
-                || g_current_mmproj_path == mmproj_path)) {
+                && ((mmproj_path.empty() && g_current_mmproj_path.empty() && g_mtmd == nullptr)
+                || (!mmproj_path.empty() && g_current_mmproj_path == mmproj_path))) {
             std::ostringstream ss;
             ss << "initWithMmproj: model already initialized at path=" << model_path
                << " mmproj=" << (g_current_mmproj_path.empty() ? "<none>" : g_current_mmproj_path)
@@ -3236,13 +3242,27 @@ static jstring generate_locked(
     common_sampler_ptr gsmpl;
     llama_sampler * smpl = nullptr;
     if (!g_grammar.empty()) {
-        common_params_sampling sp = build_chat_sampling_params_locked(common_chat_params{});
-        sp.grammar = g_grammar;
-        sp.grammar_lazy = false;
-        gsmpl.reset(common_sampler_init(g_model, sp));
+        // A malformed JSON schema / GBNF makes common_sampler_init throw (json_schema_to_grammar
+        // raises std::runtime_error, and the prefill path in common_sampler_init re-throws).
+        // generate_locked has no outer try, so an uncaught throw would cross the JNI boundary and
+        // SIGABRT the whole app. Catch it here, and fail loudly rather than silently producing
+        // unconstrained output the caller explicitly asked to be structured.
+        try {
+            common_params_sampling sp = build_chat_sampling_params_locked(common_chat_params{});
+            sp.grammar = g_grammar;
+            sp.grammar_lazy = false;
+            gsmpl.reset(common_sampler_init(g_model, sp));
+        } catch (const std::exception & e) {
+            const std::string errmsg = std::string("invalid structured-output constraint: ") + e.what();
+            log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
+            notify_token_error(errmsg.c_str());
+            return new_java_string_utf8(env, errmsg);
+        }
         if (!gsmpl) {
-            log_to_file("generate: common_sampler_init failed for grammar; continuing unconstrained",
-                        GGML_LOG_LEVEL_WARN);
+            const char * errmsg = "invalid structured-output constraint (grammar/schema could not be compiled)";
+            log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
+            notify_token_error(errmsg);
+            return new_java_string_utf8(env, errmsg);
         }
     }
 

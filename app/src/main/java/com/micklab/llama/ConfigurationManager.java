@@ -8,9 +8,11 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +50,10 @@ public class ConfigurationManager {
         public String customChatTemplate;    // カスタムプロンプトテンプレート
         public String multimodalProjectorUrl; // Optional multimodal projector (mmproj) reference
         public boolean multimodalProjectorManualSelection; // True when the user explicitly chose a GGUF as projector
+        // True when the user explicitly cleared the projector. Distinguishes an intentional
+        // "disable vision" from an unset projector: when disabled, no co-located mmproj is
+        // auto-detected, so clearing actually takes effect (previously auto-discovery re-applied it).
+        public boolean multimodalProjectorDisabled;
         
         // Penalty parameters
         public int penaltyLastN;
@@ -146,6 +152,7 @@ public class ConfigurationManager {
             customChatTemplate = "";     // Empty by default (use auto-detection)
             multimodalProjectorUrl = ""; // Empty by default (use auto-discovery)
             multimodalProjectorManualSelection = false;
+            multimodalProjectorDisabled = false; // Auto-discovery allowed until the user explicitly clears
         }
         
         public Configuration(String name) {
@@ -209,6 +216,7 @@ public class ConfigurationManager {
             json.put("customChatTemplate", customChatTemplate);
             json.put("multimodalProjectorUrl", multimodalProjectorUrl);
             json.put("multimodalProjectorManualSelection", multimodalProjectorManualSelection);
+            json.put("multimodalProjectorDisabled", multimodalProjectorDisabled);
             
             return json;
         }
@@ -282,6 +290,8 @@ public class ConfigurationManager {
             config.multimodalProjectorUrl = json.optString("multimodalProjectorUrl", "");
             config.multimodalProjectorManualSelection =
                     json.optBoolean("multimodalProjectorManualSelection", false);
+            config.multimodalProjectorDisabled =
+                    json.optBoolean("multimodalProjectorDisabled", false);
             
             return config;
         }
@@ -308,33 +318,60 @@ public class ConfigurationManager {
         }
     }
     
+    // Shared across ALL ConfigurationManager instances (MainActivity, SettingsActivity and the API
+    // server each construct their own, all pointing at the same directory). Serialises config file
+    // I/O process-wide so a save can never interleave with a concurrent read or another save.
+    private static final Object CONFIG_IO_LOCK = new Object();
+
     public void saveConfiguration(Configuration config) throws IOException, JSONException {
         if (config.name == null || config.name.trim().isEmpty()) {
             throw new IllegalArgumentException("Configuration name cannot be empty");
         }
-        
+
+        String json = config.toJSON().toString(2); // Pretty print with indent of 2
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         File configFile = new File(configDir, config.name + ".json");
-        try (FileWriter writer = new FileWriter(configFile)) {
-            writer.write(config.toJSON().toString(2)); // Pretty print with indent of 2
+        File tempFile = new File(configDir, config.name + ".json.tmp");
+        synchronized (CONFIG_IO_LOCK) {
+            // Write to a temp file, flush it to disk, then atomically rename over the real file so a
+            // reader (even another instance/process) always sees either the complete old or complete
+            // new file — never a half-written one. A crash mid-write leaves the previous config
+            // intact instead of a truncated, unparseable JSON.
+            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                fos.write(bytes);
+                fos.flush();
+                fos.getFD().sync();
+            }
+            if (!tempFile.renameTo(configFile)) {
+                // renameTo can fail if the destination exists on some filesystems; retry after delete.
+                if (!(configFile.delete() && tempFile.renameTo(configFile))) {
+                    tempFile.delete();
+                    throw new IOException("Failed to persist configuration: " + config.name);
+                }
+            }
         }
         Log.d(TAG, "Saved configuration: " + config.name);
     }
-    
+
     public Configuration loadConfiguration(String name) throws IOException, JSONException {
         File configFile = new File(configDir, name + ".json");
-        if (!configFile.exists()) {
-            throw new IOException("Configuration not found: " + name);
-        }
-        
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
+        String content;
+        synchronized (CONFIG_IO_LOCK) {
+            if (!configFile.exists()) {
+                throw new IOException("Configuration not found: " + name);
             }
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+            }
+            content = sb.toString();
         }
-        
-        JSONObject json = new JSONObject(sb.toString());
+
+        JSONObject json = new JSONObject(content);
         Configuration config = Configuration.fromJSON(json);
         Log.d(TAG, "Loaded configuration: " + name);
         return config;
