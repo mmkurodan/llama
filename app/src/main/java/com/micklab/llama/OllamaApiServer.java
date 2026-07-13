@@ -40,6 +40,8 @@ import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,6 +66,9 @@ public class OllamaApiServer {
     private static final String WEBUI_ASSET_ROOT = "webui/";
     private static final String MTMD_MEDIA_MARKER = "<__media__>";
     private static final int MAX_REMOTE_MEDIA_BYTES = 10 * 1024 * 1024;
+    // Hard cap on a single request body. Guards against a malicious/buggy Content-Length (or a huge
+    // inline base64 image) allocating an unbounded buffer and OOM-killing the app.
+    private static final int MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024;
     private static final String BUILD_INFO = "llama.cpp build 8653 (1f34806c441f335f7d66e56fdb8ab3f5d09684e9)";
     private static final Map<String, String> WEBUI_CONTENT_TYPES;
 
@@ -196,7 +201,7 @@ public class OllamaApiServer {
                 URLConnection connection = new URL(url).openConnection();
                 connection.setConnectTimeout(10_000);
                 connection.setReadTimeout(10_000);
-                return readAllBytesLimited(connection.getInputStream(), MAX_REMOTE_MEDIA_BYTES);
+                return validateImageBytes(readAllBytesLimited(connection.getInputStream(), MAX_REMOTE_MEDIA_BYTES));
             } catch (IOException e) {
                 throw new InvalidMediaException("Failed to download image input", e);
             }
@@ -211,10 +216,48 @@ public class OllamaApiServer {
             throw new InvalidMediaException("image_url.url must be a base64 data URL");
         }
         try {
-            return Base64.decode(url.substring(commaIndex + 1), Base64.DEFAULT);
+            return validateImageBytes(Base64.decode(url.substring(commaIndex + 1), Base64.DEFAULT));
         } catch (IllegalArgumentException e) {
             throw new InvalidMediaException("image_url.url contains invalid base64 data", e);
         }
+    }
+
+    /**
+     * Rejects image formats the native mtmd/stb_image decoder cannot read but that are the DEFAULT
+     * camera/screenshot formats on modern Android (HEIC/HEIF, WebP, AVIF). Previously these were
+     * accepted by the header check and then failed deep in native with a generic
+     * "failed to decode multimodal input"; here we fail early with an actionable message.
+     */
+    private static byte[] validateImageBytes(byte[] data) throws InvalidMediaException {
+        String unsupported = detectUnsupportedImageFormat(data);
+        if (unsupported != null) {
+            throw new InvalidMediaException("unsupported image format: " + unsupported
+                    + " (the on-device decoder supports PNG, JPEG, BMP and GIF; please convert to PNG or JPEG)");
+        }
+        return data;
+    }
+
+    private static String detectUnsupportedImageFormat(byte[] data) {
+        if (data == null || data.length < 12) {
+            return null;
+        }
+        // WEBP: "RIFF"<4 bytes>"WEBP"
+        if (data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F'
+                && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P') {
+            return "webp";
+        }
+        // ISO-BMFF (HEIF/HEIC/AVIF): bytes 4..7 == "ftyp", major brand at 8..11
+        if (data[4] == 'f' && data[5] == 't' && data[6] == 'y' && data[7] == 'p') {
+            String brand = new String(data, 8, 4, StandardCharsets.US_ASCII).toLowerCase(Locale.ROOT);
+            if (brand.startsWith("avi")) {
+                return "avif";
+            }
+            if (brand.startsWith("hei") || brand.startsWith("hev")
+                    || brand.startsWith("mif") || brand.startsWith("msf")) {
+                return "heic";
+            }
+        }
+        return null;
     }
 
     private static byte[] decodeInputAudio(JSONObject inputAudio) throws InvalidMediaException {
@@ -718,7 +761,16 @@ public class OllamaApiServer {
             return;
         }
         
-        executorService = Executors.newCachedThreadPool();
+        // Bounded, cached-style pool: reuse idle threads but cap the maximum so a connection flood
+        // cannot spawn unbounded threads (each of which may buffer a large request body) and OOM the
+        // app. CallerRunsPolicy applies natural backpressure — under extreme load the acceptor runs
+        // the handler inline instead of queueing without limit.
+        int maxHandlerThreads = Math.max(32, Runtime.getRuntime().availableProcessors() * 8);
+        executorService = new ThreadPoolExecutor(
+                0, maxHandlerThreads,
+                60L, TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                new ThreadPoolExecutor.CallerRunsPolicy());
         executorService.submit(() -> {
             try {
                 // Bind to 0.0.0.0 to accept external connections
@@ -841,20 +893,57 @@ public class OllamaApiServer {
                     String value = headerLine.substring(colonIndex + 1).trim();
                     headers.put(key, value);
                     if ("content-length".equals(key)) {
-                        contentLength = Integer.parseInt(value);
+                        try {
+                            contentLength = Integer.parseInt(value.trim());
+                        } catch (NumberFormatException e) {
+                            // Previously this threw and the connection was closed with no response;
+                            // the client saw a reset instead of a proper error.
+                            sendErrorResponse(outputStream, 400, "Invalid Content-Length header");
+                            clientSocket.close();
+                            return;
+                        }
                     }
                 }
             }
-            
-            // Read body
-            String body = "";
-            if (contentLength > 0) {
-                char[] bodyChars = new char[contentLength];
-                int read = reader.read(bodyChars, 0, contentLength);
-                body = new String(bodyChars, 0, read);
+
+            if (contentLength < 0) {
+                sendErrorResponse(outputStream, 400, "Invalid Content-Length header");
+                clientSocket.close();
+                return;
+            }
+            if (contentLength > MAX_REQUEST_BODY_BYTES) {
+                sendErrorResponse(outputStream, 413,
+                        "Request body too large (max " + MAX_REQUEST_BODY_BYTES + " bytes)");
+                clientSocket.close();
+                return;
             }
 
-            Log.d(TAG, "Raw request body:\n" + body);
+            // Read the body until the full Content-Length (a byte count) has been consumed. A single
+            // Reader.read() is not guaranteed to fill its buffer, so large bodies (e.g. a base64
+            // image) were previously truncated and then failed JSON parsing as a misleading
+            // "Invalid JSON". Track progress in UTF-8 bytes (the Reader yields decoded chars) so
+            // multibyte bodies neither truncate nor block waiting for chars that will never arrive.
+            String body = "";
+            if (contentLength > 0) {
+                StringBuilder bodyBuilder = new StringBuilder(Math.min(contentLength, 1 << 16));
+                char[] chunk = new char[8192];
+                int bytesConsumed = 0;
+                while (bytesConsumed < contentLength) {
+                    int r = reader.read(chunk, 0, chunk.length);
+                    if (r == -1) {
+                        break;
+                    }
+                    bodyBuilder.append(chunk, 0, r);
+                    bytesConsumed += new String(chunk, 0, r).getBytes(StandardCharsets.UTF_8).length;
+                }
+                body = bodyBuilder.toString();
+            }
+
+            // Avoid dumping an entire (possibly multi-MB base64 image) body into logcat.
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Raw request body (" + body.length() + " chars):\n"
+                        + (body.length() > 2048 ? body.substring(0, 2048) + "…[truncated]" : body));
+            }
             logMaxDebugPayload("api.request.body", body);
             
             // Route request

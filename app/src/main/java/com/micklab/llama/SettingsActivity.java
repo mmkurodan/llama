@@ -162,6 +162,9 @@ public class SettingsActivity extends Activity {
     private String loadedModelPath = null;
     private String selectedProjectorReference = "";
     private boolean selectedProjectorManualSelection = false;
+    // True when the user explicitly tapped "Clear Projector": disables mmproj auto-discovery
+    // so the clear actually sticks (see ModelManager.resolveMultimodalProjectorPath).
+    private boolean selectedProjectorDisabled = false;
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
     private volatile boolean huggingFaceSearchInProgress = false;
@@ -449,6 +452,8 @@ public class SettingsActivity extends Activity {
             if (isBusyActionBlocked()) {
                 return;
             }
+            // Explicit user intent to disable vision: suppress mmproj auto-discovery too.
+            selectedProjectorDisabled = true;
             setSelectedProjectorReference("", false);
         });
         modelUrlInput.addTextChangedListener(new TextWatcher() {
@@ -972,6 +977,7 @@ public class SettingsActivity extends Activity {
         configNameInput.setText(config.name);
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
+        selectedProjectorDisabled = config.multimodalProjectorDisabled;
         modelUrlInput.setText(config.modelUrl);
         nCtxInput.setText(String.valueOf(config.nCtx));
         nThreadsInput.setText(String.valueOf(config.nThreads));
@@ -1107,6 +1113,9 @@ public class SettingsActivity extends Activity {
         config.multimodalProjectorUrl = normalizeReference(selectedProjectorReference);
         config.multimodalProjectorManualSelection =
                 !config.multimodalProjectorUrl.isEmpty() && selectedProjectorManualSelection;
+        // Only meaningful when no projector is configured: true = user cleared it, suppress auto-discovery.
+        config.multimodalProjectorDisabled =
+                config.multimodalProjectorUrl.isEmpty() && selectedProjectorDisabled;
         
         // Penalty parameters
         try {
@@ -1948,6 +1957,7 @@ public class SettingsActivity extends Activity {
         String previousModelReference = modelUrlInput.getText().toString().trim();
         String previousProjectorReference = selectedProjectorReference;
         boolean previousProjectorManualSelection = selectedProjectorManualSelection;
+        boolean previousProjectorDisabled = selectedProjectorDisabled;
         modelUrlInput.setText(downloadUrl);
         HuggingFaceApiClient.GgufFileInfo suggestedProjectorInfo =
                 repositoryFiles.findMatchingProjector(selectedFile, false, false);
@@ -1967,6 +1977,7 @@ public class SettingsActivity extends Activity {
                 () -> {
                     modelUrlInput.setText(previousModelReference);
                     setSelectedProjectorReference(previousProjectorReference, previousProjectorManualSelection);
+                    selectedProjectorDisabled = previousProjectorDisabled;
                     currentConfig = getConfigFromUI();
                     updateAutoTemplatePreview(currentConfig);
                 });
@@ -2279,6 +2290,11 @@ public class SettingsActivity extends Activity {
     private void setSelectedProjectorReference(String projectorReference, boolean manualSelection) {
         selectedProjectorReference = normalizeReference(projectorReference);
         selectedProjectorManualSelection = !selectedProjectorReference.isEmpty() && manualSelection;
+        // Choosing a projector re-enables vision; an empty reference keeps whatever the caller set
+        // (the Clear button sets selectedProjectorDisabled = true explicitly before calling this).
+        if (!selectedProjectorReference.isEmpty()) {
+            selectedProjectorDisabled = false;
+        }
         updateMultimodalProjectorInfo();
     }
 

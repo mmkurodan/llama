@@ -1115,6 +1115,11 @@ public class ModelManager {
             return new MultimodalProjectorResolution(null, null);
         }
         if (config.multimodalProjectorUrl == null || config.multimodalProjectorUrl.trim().isEmpty()) {
+            // The user explicitly cleared the projector: honor that and do NOT auto-discover a
+            // co-located mmproj (otherwise "Clear Projector" would silently re-enable vision).
+            if (config.multimodalProjectorDisabled) {
+                return new MultimodalProjectorResolution(null, null);
+            }
             File autoDetectedProjector = ModelFileHelper.findAutoDetectedMultimodalProjectorFile(
                     context,
                     config.modelUrl,
