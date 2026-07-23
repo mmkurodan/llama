@@ -3122,7 +3122,11 @@ static bool prefill_multimodal_prompt_locked(
     };
 
     for (const auto & file : media_files) {
-        mtmd_bitmap * bitmap = mtmd_helper_bitmap_init_from_buf(g_mtmd, file.data(), file.size());
+        // b10091: mtmd_helper_bitmap_init_from_buf now returns a wrapper (bitmap +
+        // optional video_ctx) and takes a `placeholder` flag. We only decode real
+        // image/audio buffers here (video is not fed through this path), so pass
+        // placeholder=false and take the bitmap; video_ctx is null for these inputs.
+        mtmd_bitmap * bitmap = mtmd_helper_bitmap_init_from_buf(g_mtmd, file.data(), file.size(), false).bitmap;
         if (!bitmap) {
             error_message = "failed to decode multimodal input";
             cleanup();
@@ -3132,10 +3136,14 @@ static bool prefill_multimodal_prompt_locked(
     }
 
     std::vector<const mtmd_bitmap *> bitmap_ptrs(bitmaps.begin(), bitmaps.end());
+    // b10091 inserted `size_t text_len` as the 2nd field of mtmd_input_text (used
+    // directly as the string length in mtmd_tokenize). Initialise all four fields
+    // explicitly so the length/flags are not silently misassigned.
     mtmd_input_text input_text = {
-            prompt.c_str(),
-            true,
-            true
+            /* text          */ prompt.c_str(),
+            /* text_len      */ prompt.size(),
+            /* add_special   */ true,
+            /* parse_special */ true,
     };
 
     const int32_t tokenized = mtmd_tokenize(
