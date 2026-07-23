@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        App theme (framework Material Light; the app does not depend on AndroidX).
+
+        targetSdk 36 (Android 16) enforces edge-to-edge: system bars become
+        transparent and are drawn over the app content, and setStatusBarColor /
+        setNavigationBarColor become no-ops. This app has a light UI, so request
+        dark system-bar icons for readable contrast over the light background.
+
+        Content is kept clear of the bars by android:fitsSystemWindows="true" on the
+        root view of each activity layout (activity_main / activity_settings /
+        activity_documents), which the framework still honours under edge-to-edge.
+
+        android:windowLightNavigationBar is API 27+; it is ignored at runtime on
+        older API levels (resource compiles against compileSdk 36).
+    -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

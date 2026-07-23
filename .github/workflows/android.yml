@@ -188,14 +188,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Gradle 8.7
+      # compileSdk/targetSdk 36 (Android 16) needs platform-36 + build-tools 36.
+      # AGP does not auto-download platforms, so install them explicitly.
+      - name: Install Android SDK 36 components
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip -q gradle-8.7-bin.zip
-          echo "$PWD/gradle-8.7/bin" >> "$GITHUB_PATH"
+          set -euo pipefail
+          SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMGR" ] || SDKMGR="$(command -v sdkmanager)"
+          yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+          "$SDKMGR" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Generate Gradle Wrapper (8.7)
-        run: gradle wrapper --gradle-version 8.7
+      # AGP 8.9 requires Gradle 8.11.1+.
+      - name: Download Gradle 8.11.1
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
+          unzip -q gradle-8.11.1-bin.zip
+          echo "$PWD/gradle-8.11.1/bin" >> "$GITHUB_PATH"
+
+      - name: Generate Gradle Wrapper (8.11.1)
+        run: gradle wrapper --gradle-version 8.11.1
 
       # ── APK ビルド ──────────────────────────────────────────────────────────
       - name: Build debug APK
