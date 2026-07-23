@@ -50,6 +50,7 @@
 #include "mtmd-helper.h"
 #include "sampling.h"
 #include "common.h"
+#include "speculative.h"
 #include "json-schema-to-grammar.h"
 #include <curl/curl.h>
 
@@ -64,6 +65,23 @@ static llama_context *g_ctx   = nullptr;
 // USER = raw GBNF; OUTPUT_FORMAT = JSON schema (converted by common_sampler).
 static common_grammar g_grammar;
 static mtmd_context  *g_mtmd  = nullptr;
+
+// ---- MTP / speculative decoding (draft-mtp) ----
+// g_spec_init owns the draft (MTP-head) model + its context; g_ctx_dft is borrowed
+// from it. g_spec_cp must outlive g_spec because common_speculative_init() takes its
+// speculative params by reference. All are set up in maybe_init_speculative_locked()
+// after g_ctx exists, and torn down in release_speculative_locked() (before g_ctx).
+static common_speculative              *g_spec = nullptr;
+static common_speculative_init_result_ptr g_spec_init;   // owns model_dft + ctx_dft
+static llama_context                   *g_ctx_dft = nullptr; // borrowed from g_spec_init
+static common_params                    g_spec_cp;       // kept alive for g_spec
+static common_context_seq_rm_type       g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+static common_context_seq_rm_type       g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+// Config pushed from Java via setSpeculative(); applied at the next init/initWithMmproj.
+static std::string g_mtp_path;            // path to the MTP-head draft GGUF ("" = none)
+static int32_t     g_mtp_n_draft = 4;     // max tokens drafted per step
+static bool        g_mtp_enabled = false; // master toggle (default off = unchanged behaviour)
+
 static JavaVM *g_jvm = nullptr;
 // Token listener global ref and method IDs
 static jobject g_token_listener = nullptr;
@@ -820,7 +838,28 @@ static void release_multimodal_locked(const char * log_prefix) {
     }
 }
 
+// Frees the speculative (draft-mtp) context. Must run before g_ctx is freed because
+// g_spec holds g_ctx as its target context. Safe to call when nothing is set up.
+static void release_speculative_locked(const char * log_prefix) {
+    if (!g_spec && !g_spec_init) {
+        return;
+    }
+    if (g_spec) {
+        common_speculative_free(g_spec);
+        g_spec = nullptr;
+    }
+    g_spec_init.reset();   // frees the draft model + ctx_dft
+    g_ctx_dft = nullptr;
+    g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+    g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+    if (log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": speculative context freed");
+    }
+}
+
 static void release_context_locked(const char * log_prefix) {
+    // The speculative context borrows g_ctx as its target; tear it down first.
+    release_speculative_locked(log_prefix);
     if (!g_ctx) {
         return;
     }
@@ -853,6 +892,63 @@ static void release_backend_locked(const char * log_prefix) {
     g_backend_initialized = false;
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": backend freed");
+    }
+}
+
+// Sets up the MTP (draft-mtp) speculative context on top of the already-created
+// g_model / g_ctx, when enabled via setSpeculative(). Non-fatal: on any failure it
+// logs, tears down partial state, and leaves g_spec == nullptr so generation simply
+// falls back to the normal (non-speculative) path. Call after g_ctx is created.
+static void maybe_init_speculative_locked(const char * log_prefix) {
+    // Start from a clean slate so a stale spec from a previous model never leaks.
+    release_speculative_locked(log_prefix);
+
+    if (!g_mtp_enabled || g_mtp_path.empty() || !g_model || !g_ctx) {
+        return;
+    }
+
+    try {
+        g_spec_cp = common_params{};
+        g_spec_cp.speculative.types = { COMMON_SPECULATIVE_TYPE_DRAFT_MTP };
+        g_spec_cp.speculative.draft.mparams.path = g_mtp_path;
+        g_spec_cp.speculative.draft.n_max = g_mtp_n_draft > 0 ? g_mtp_n_draft : 4;
+
+        // Loads the MTP-head draft model and creates its context (ctx_dft).
+        common_params params_dft = common_base_params_to_speculative(g_spec_cp);
+        g_spec_init = common_speculative_init_from_params(params_dft, g_model, g_ctx);
+        g_ctx_dft = g_spec_init ? g_spec_init->context() : nullptr;
+        if (!g_ctx_dft) {
+            log_to_file(std::string(log_prefix) + ": MTP draft context creation failed; falling back to text-only decode",
+                        GGML_LOG_LEVEL_WARN);
+            release_speculative_locked(log_prefix);
+            return;
+        }
+
+        g_spec_cp.speculative.draft.ctx_tgt = g_ctx;
+        g_spec_cp.speculative.draft.ctx_dft = g_ctx_dft;
+
+        g_spec = common_speculative_init(g_spec_cp.speculative, 1);
+        if (!g_spec) {
+            log_to_file(std::string(log_prefix) + ": common_speculative_init returned null; falling back",
+                        GGML_LOG_LEVEL_WARN);
+            release_speculative_locked(log_prefix);
+            return;
+        }
+
+        g_ctx_tgt_rm = common_context_can_seq_rm(g_ctx);
+        g_ctx_dft_rm = common_context_can_seq_rm(g_ctx_dft);
+
+        std::ostringstream ss;
+        ss << log_prefix << ": MTP speculative decoding enabled (draft=" << g_mtp_path
+           << " n_draft=" << g_spec_cp.speculative.draft.n_max
+           << " tgt_seq_rm=" << (int) g_ctx_tgt_rm << " dft_seq_rm=" << (int) g_ctx_dft_rm << ")";
+        log_to_file(ss.str());
+    } catch (const std::exception & e) {
+        log_to_file(std::string(log_prefix) + ": MTP setup exception: " + e.what(), GGML_LOG_LEVEL_ERROR);
+        release_speculative_locked(log_prefix);
+    } catch (...) {
+        log_to_file(std::string(log_prefix) + ": MTP setup unknown exception", GGML_LOG_LEVEL_ERROR);
+        release_speculative_locked(log_prefix);
     }
 }
 
@@ -2275,6 +2371,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 false,
                 "init");
         g_current_audio_requested = false;
+        maybe_init_speculative_locked("init");
         log_to_file("init: initialization complete");
 
         return new_java_string_utf8(env, "ok");
@@ -2497,6 +2594,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         g_current_model_path = model_path;
         g_current_mmproj_path = selected_mmproj_path;
         g_current_audio_requested = enable_audio && !selected_mmproj_path.empty();
+        maybe_init_speculative_locked("initWithMmproj");
         log_to_file("initWithMmproj: initialization complete");
 
         return new_java_string_utf8(env, "ok");
