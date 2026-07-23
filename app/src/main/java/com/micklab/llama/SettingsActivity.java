@@ -81,6 +81,7 @@ public class SettingsActivity extends Activity {
     private TextView multimodalProjectorInfo;
     private Button selectProjectorButton;
     private Button clearProjectorButton;
+    private Button mtpModelButton;
     private Button searchGgufButton;
     private EditText nCtxInput;
     private EditText nThreadsInput;
@@ -269,6 +270,7 @@ public class SettingsActivity extends Activity {
         multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
         clearProjectorButton = findViewById(R.id.clearProjectorButton);
+        mtpModelButton = findViewById(R.id.mtpModelButton);
         searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
         nThreadsInput = findViewById(R.id.nThreadsInput);
@@ -456,6 +458,14 @@ public class SettingsActivity extends Activity {
             selectedProjectorDisabled = true;
             setSelectedProjectorReference("", false);
         });
+        if (mtpModelButton != null) {
+            mtpModelButton.setOnClickListener(v -> {
+                if (isBusyActionBlocked()) {
+                    return;
+                }
+                showMtpSelectionDialog();
+            });
+        }
         modelUrlInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -2173,6 +2183,41 @@ public class SettingsActivity extends Activity {
                 index -> selectProjectorWithCompatibilityCheck(modelReference, projectorFiles[index]),
                 localizedText("解除", "Clear"),
                 index -> setSelectedProjectorReference("", false));
+    }
+
+    // Experimental: pick the MTP-head draft GGUF (or disable). Persisted to prefs and
+    // applied by ModelManager at the next model load (llama.setSpeculative before init).
+    private void showMtpSelectionDialog() {
+        File[] files = getDownloadedProjectorFiles();  // all downloaded GGUFs
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean enabled = prefs.getBoolean(ModelManager.PREF_MTP_ENABLED, false);
+        String curPath = prefs.getString(ModelManager.PREF_MTP_PATH, "");
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        final java.util.List<String> paths = new java.util.ArrayList<>();
+        labels.add(localizedText("MTP を無効化", "Disable MTP"));
+        paths.add("");
+        for (File f : files) {
+            boolean sel = enabled && f.getAbsolutePath().equals(curPath);
+            labels.add(f.getName() + " (" + f.length() + " bytes)" + (sel ? "  ✓" : ""));
+            paths.add(f.getAbsolutePath());
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("MTP ドラフトモデル (実験的)", "MTP draft model (experimental)"))
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    String path = paths.get(which);
+                    boolean en = !path.isEmpty();
+                    prefs.edit()
+                            .putBoolean(ModelManager.PREF_MTP_ENABLED, en)
+                            .putString(ModelManager.PREF_MTP_PATH, path)
+                            .apply();
+                    Toast.makeText(this,
+                            en ? localizedText("MTP 有効: " + new File(path).getName() + " (再読み込みで反映)",
+                                               "MTP enabled: " + new File(path).getName() + " (reload model to apply)")
+                               : localizedText("MTP を無効化しました", "MTP disabled"),
+                            Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
     }
 
     private void selectProjectorWithCompatibilityCheck(String modelReference, File projectorFile) {
