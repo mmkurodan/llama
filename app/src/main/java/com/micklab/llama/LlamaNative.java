@@ -41,6 +41,13 @@ public class LlamaNative {
      */
     public native String validateMmproj(String modelPath, String mmprojPath);
     public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
+    /**
+     * Configure MTP (multi-token prediction) speculative decoding. Applied at the next
+     * {@link #init}/{@link #initWithMmproj}. Pass {@code enabled=false} or an empty path to
+     * use plain decoding. {@code mtpModelPath} is the MTP-head draft GGUF (a *mtp* sidecar
+     * of the main model); {@code nDraft} is the max tokens drafted per step (e.g. 4).
+     */
+    public native void setSpeculative(String mtpModelPath, int nDraft, boolean enabled);
     public native String generate(String prompt);
     public native String generateWithMedia(String prompt, byte[][] mediaFiles);
     public native String generateOpenAiChatCompletion(

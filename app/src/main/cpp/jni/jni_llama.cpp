@@ -2792,6 +2792,26 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
     }
 }
 
+// ---------------- JNI: setSpeculative (MTP draft-mtp) ----------------
+// Records the MTP draft-model path + settings; applied at the next init/initWithMmproj
+// (maybe_init_speculative_locked). enabled=false or empty path => plain decoding.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setSpeculative(
+        JNIEnv *env, jobject,
+        jstring jMtpModelPath, jint nDraft, jboolean enabled
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_mtp_path    = jMtpModelPath ? jstring_to_std(env, jMtpModelPath) : "";
+    g_mtp_n_draft = nDraft > 0 ? nDraft : 4;
+    g_mtp_enabled = (enabled == JNI_TRUE) && !g_mtp_path.empty();
+    std::ostringstream ss;
+    ss << "setSpeculative: enabled=" << (g_mtp_enabled ? "true" : "false")
+       << " n_draft=" << g_mtp_n_draft << " mtp=" << g_mtp_path
+       << " (applies at next init)";
+    log_to_file(ss.str());
+}
+
 // ---------------- JNI: setParameters ----------------
 extern "C"
 JNIEXPORT void JNICALL
@@ -3577,7 +3597,9 @@ static jstring generate_locked(
     const bool spec_active = (g_spec != nullptr) && !has_media;
     if (spec_active && !gsmpl) {
         try {
-            gsmpl.reset(common_sampler_init(g_model, build_chat_sampling_params_locked(common_chat_params{})));
+            // common_sampler_init takes params by non-const ref, so bind to an lvalue.
+            common_params_sampling sp = build_chat_sampling_params_locked(common_chat_params{});
+            gsmpl.reset(common_sampler_init(g_model, sp));
         } catch (...) { gsmpl.reset(); }
     }
     const bool use_spec = spec_active && (bool) gsmpl;
