@@ -78,10 +78,6 @@ public class ModelManager {
     private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
-    // MTP (multi-token prediction) speculative decoding — experimental, off by default.
-    static final String PREF_MTP_ENABLED = "mtp_enabled";
-    static final String PREF_MTP_PATH    = "mtp_model_path";   // absolute path to the MTP-head GGUF
-    static final String PREF_MTP_NDRAFT  = "mtp_n_draft";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
     private static final int DEFAULT_N_CTX = 2048;
     private static final int DEFAULT_N_THREADS = 2;
@@ -788,16 +784,21 @@ public class ModelManager {
         String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;
         llama.setBackendConfig(config.backendType, config.npuEnabled, nativeLibDir);
 
-        // MTP (multi-token prediction) speculative decoding — applied at the upcoming init.
-        // Experimental and off unless the user picked an MTP-head GGUF and enabled it.
-        SharedPreferences mtpPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        boolean mtpEnabled = mtpPrefs.getBoolean(PREF_MTP_ENABLED, false);
-        String mtpPath = mtpPrefs.getString(PREF_MTP_PATH, "");
-        int mtpNDraft = mtpPrefs.getInt(PREF_MTP_NDRAFT, 2);
-        // A set-but-valid sidecar path uses a separate draft model; empty (or missing) path
-        // with MTP enabled means "use the loaded model's own embedded MTP head" (Qwen3.5-MTP).
-        String mtpPathToUse = (mtpPath != null && !mtpPath.isEmpty() && new File(mtpPath).isFile()) ? mtpPath : "";
-        llama.setSpeculative(mtpEnabled ? mtpPathToUse : "", mtpNDraft, mtpEnabled);
+        // MTP (multi-token prediction) speculative decoding — per-model config, applied at init.
+        // mtpModelReference="" with mtpEnabled means "use the loaded model's own embedded MTP head"
+        // (Qwen3.5-MTP / Gemma 4); a reference names a separate sidecar draft GGUF.
+        int mtpNDraft = config.mtpNDraft > 0 ? config.mtpNDraft : 2;
+        String mtpPathToUse = "";
+        if (config.mtpEnabled && config.mtpModelReference != null && !config.mtpModelReference.isEmpty()) {
+            File mtpFile = new File(config.mtpModelReference);
+            if (!mtpFile.isAbsolute()) {
+                mtpFile = new File(getModelStorageDir(), config.mtpModelReference);
+            }
+            if (mtpFile.isFile()) {
+                mtpPathToUse = mtpFile.getAbsolutePath();
+            }
+        }
+        llama.setSpeculative(config.mtpEnabled ? mtpPathToUse : "", mtpNDraft, config.mtpEnabled);
     }
 
     private int safePositive(int value, int fallback) {
