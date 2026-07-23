@@ -3571,6 +3571,29 @@ static jstring generate_locked(
     }
     } // end manual sampler chain (used when no grammar is active)
 
+    // MTP speculative decoding (draft-mtp): active for text generation when g_spec is set.
+    // sample_and_accept_n needs a common_sampler, so if none was built above (no grammar),
+    // build one from the same g_* sampling params. When inactive the loop is byte-identical.
+    const bool spec_active = (g_spec != nullptr) && !has_media;
+    if (spec_active && !gsmpl) {
+        try {
+            gsmpl.reset(common_sampler_init(g_model, build_chat_sampling_params_locked(common_chat_params{})));
+        } catch (...) { gsmpl.reset(); }
+    }
+    const bool use_spec = spec_active && (bool) gsmpl;
+    std::vector<llama_token> spec_buf;   // accepted tokens from the current step
+    size_t      spec_pos = 0;
+    llama_token spec_id_last = 0;
+    llama_pos   spec_n_past = generation_base_pos;
+    common_prompt_checkpoint spec_ckpt;
+    bool spec_bootstrap = true;
+    bool spec_failed = false;
+    if (use_spec) {
+        g_spec_prompt.clear();
+        common_speculative_begin(g_spec, 0, g_spec_prompt);
+        log_to_file("generate: MTP speculative decoding active");
+    }
+
     std::string output;
     output.reserve(max_tokens * 4);
     std::vector<llama_token> out_tokens;
@@ -3589,12 +3612,35 @@ static jstring generate_locked(
             logged_first_sampling_step = true;
         }
 
-        const llama_token id = gsmpl ? common_sampler_sample(gsmpl.get(), g_ctx, -1)
-                                     : llama_sampler_sample(smpl, g_ctx, -1);
-        if (gsmpl) {
-            common_sampler_accept(gsmpl.get(), id, true);
+        llama_token id;
+        if (use_spec) {
+            if (spec_bootstrap) {
+                // First output token: sample from the prefill logits. Its id seeds the
+                // first speculative step (which decodes it), so it is NOT decoded here.
+                id = common_sampler_sample(gsmpl.get(), g_ctx, -1);
+                common_sampler_accept(gsmpl.get(), id, true);
+                spec_id_last = id;
+                spec_bootstrap = false;
+            } else {
+                if (spec_pos >= spec_buf.size()) {
+                    spec_buf.clear();
+                    spec_pos = 0;
+                    if (!spec_decode_step_locked(gsmpl, spec_id_last, spec_n_past, spec_ckpt, spec_buf)
+                            || spec_buf.empty()) {
+                        spec_failed = true;
+                        break;
+                    }
+                }
+                id = spec_buf[spec_pos++];
+            }
         } else {
-            llama_sampler_accept(smpl, id);
+            id = gsmpl ? common_sampler_sample(gsmpl.get(), g_ctx, -1)
+                       : llama_sampler_sample(smpl, g_ctx, -1);
+            if (gsmpl) {
+                common_sampler_accept(gsmpl.get(), id, true);
+            } else {
+                llama_sampler_accept(smpl, id);
+            }
         }
         if (i == 0) {
             log_to_file("generate: first token sampled id=" + std::to_string(id));
@@ -3646,24 +3692,32 @@ static jstring generate_locked(
             }
         }
 
-        generation_batch.batch.n_tokens = 1;
-        generation_batch.set_token(0, id, generation_base_pos + i, true);
+        // Non-speculative path decodes the sampled token here. In the MTP path the token
+        // was already committed to the KV inside spec_decode_step_locked, so skip this.
+        if (!use_spec) {
+            generation_batch.batch.n_tokens = 1;
+            generation_batch.set_token(0, id, generation_base_pos + i, true);
 
-        if (!logged_first_decode_step) {
-            log_to_file("generate: decoding first sampled token");
-            logged_first_decode_step = true;
+            if (!logged_first_decode_step) {
+                log_to_file("generate: decoding first sampled token");
+                logged_first_decode_step = true;
+            }
+            const int rc_step = llama_decode(g_ctx, generation_batch.batch);
+            if (rc_step != 0) {
+                const char * errmsg = "decode failed (generation)";
+                log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
+                notify_token_error(errmsg);
+                if (smpl) llama_sampler_free(smpl);
+                return new_java_string_utf8(env, errmsg);
+            }
+            if (i == 0) {
+                log_to_file("generate: first sampled token decode complete");
+            }
         }
-        const int rc_step = llama_decode(g_ctx, generation_batch.batch);
-        if (rc_step != 0) {
-            const char * errmsg = "decode failed (generation)";
-            log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
-            notify_token_error(errmsg);
-            if (smpl) llama_sampler_free(smpl);
-            return new_java_string_utf8(env, errmsg);
-        }
-        if (i == 0) {
-            log_to_file("generate: first sampled token decode complete");
-        }
+    }
+
+    if (spec_failed) {
+        log_to_file("generate: MTP speculative step failed; ending generation early", GGML_LOG_LEVEL_WARN);
     }
 
     log_generation_perf("generate");
