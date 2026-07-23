@@ -79,6 +79,11 @@ static common_context_seq_rm_type       g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYP
 static common_context_seq_rm_type       g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
 static llama_batch                      g_spec_batch = {};   // [id_last, draft...] eval batch
 static std::vector<llama_token>         g_spec_prompt;       // committed tokens (draft params .prompt)
+// Per-generation MTP stats (reset before the loop, logged after). g_spec_stat_eval counts
+// every position fed to llama_decode during speculation (incl. rejected drafts + retries);
+// on a compute-bound CPU each position ~= one token of work, so eval/out is the slowdown
+// factor vs. plain decoding (>1 means speculation is costing more than it produces).
+static long g_spec_stat_steps = 0, g_spec_stat_out = 0, g_spec_stat_eval = 0;
 // Config pushed from Java via setSpeculative(); applied at the next init/initWithMmproj.
 static std::string g_mtp_path;            // path to the MTP-head draft GGUF ("" = none)
 static int32_t     g_mtp_n_draft = 4;     // max tokens drafted per step
@@ -1038,6 +1043,8 @@ static bool spec_decode_step_locked(
             return false;
         }
 
+        g_spec_stat_eval += (long) g_spec_batch.n_tokens;  // positions actually decoded
+
         // Feed the decoded batch to the MTP speculator (extracts the nextn hidden states).
         common_speculative_process(g_spec, g_spec_batch);
 
@@ -1081,6 +1088,8 @@ static bool spec_decode_step_locked(
             }
         }
 
+        g_spec_stat_steps++;
+        g_spec_stat_out += (long) out_ids.size();
         n_past += (llama_pos) out_ids.size();
         id_last = out_ids.back();
         return true;
@@ -3624,6 +3633,7 @@ static jstring generate_locked(
     if (use_spec) {
         g_spec_prompt.clear();
         common_speculative_begin(g_spec, 0, g_spec_prompt);
+        g_spec_stat_steps = g_spec_stat_out = g_spec_stat_eval = 0;
         log_to_file("generate: MTP speculative decoding active");
     }
 
@@ -3751,6 +3761,16 @@ static jstring generate_locked(
 
     if (spec_failed) {
         log_to_file("generate: MTP speculative step failed; ending generation early", GGML_LOG_LEVEL_WARN);
+    }
+    if (use_spec && g_spec_stat_steps > 0) {
+        const double eval_per_out = (double) g_spec_stat_eval / (double) std::max(1L, g_spec_stat_out);
+        std::ostringstream ss;
+        ss << "generate: MTP stats steps=" << g_spec_stat_steps
+           << " out_tokens=" << g_spec_stat_out
+           << " decoded_positions=" << g_spec_stat_eval
+           << " (eval/out=" << eval_per_out << "x; >1 means speculation decoded more"
+           << " positions than it produced -> net slower on a compute-bound CPU)";
+        log_to_file(ss.str());
     }
 
     log_generation_perf("generate");
