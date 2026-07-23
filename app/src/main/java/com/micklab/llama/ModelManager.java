@@ -794,8 +794,10 @@ public class ModelManager {
         boolean mtpEnabled = mtpPrefs.getBoolean(PREF_MTP_ENABLED, false);
         String mtpPath = mtpPrefs.getString(PREF_MTP_PATH, "");
         int mtpNDraft = mtpPrefs.getInt(PREF_MTP_NDRAFT, 4);
-        boolean mtpActive = mtpEnabled && mtpPath != null && !mtpPath.isEmpty() && new File(mtpPath).isFile();
-        llama.setSpeculative(mtpActive ? mtpPath : "", mtpNDraft, mtpActive);
+        // A set-but-valid sidecar path uses a separate draft model; empty (or missing) path
+        // with MTP enabled means "use the loaded model's own embedded MTP head" (Qwen3.5-MTP).
+        String mtpPathToUse = (mtpPath != null && !mtpPath.isEmpty() && new File(mtpPath).isFile()) ? mtpPath : "";
+        llama.setSpeculative(mtpEnabled ? mtpPathToUse : "", mtpNDraft, mtpEnabled);
     }
 
     private int safePositive(int value, int fallback) {

@@ -2194,27 +2194,39 @@ public class SettingsActivity extends Activity {
         String curPath = prefs.getString(ModelManager.PREF_MTP_PATH, "");
         java.util.List<String> labels = new java.util.ArrayList<>();
         final java.util.List<String> paths = new java.util.ArrayList<>();
-        labels.add(localizedText("MTP を無効化", "Disable MTP"));
+        final java.util.List<Boolean> enables = new java.util.ArrayList<>();
+        // Recommended: models like Qwen3.5-MTP embed the MTP head in the main GGUF (no
+        // separate mtp* file). Empty path => reuse the loaded model's own head (no 2nd load).
+        boolean ownSel = enabled && (curPath == null || curPath.isEmpty());
+        labels.add(localizedText("このモデル自身のMTPヘッドを使用 (推奨)",
+                                 "Use this model's own MTP head (recommended)") + (ownSel ? "  ✓" : ""));
         paths.add("");
+        enables.add(true);
         for (File f : files) {
             boolean sel = enabled && f.getAbsolutePath().equals(curPath);
-            labels.add(f.getName() + " (" + f.length() + " bytes)" + (sel ? "  ✓" : ""));
+            labels.add(localizedText("別ドラフト: ", "Separate draft: ") + f.getName() + (sel ? "  ✓" : ""));
             paths.add(f.getAbsolutePath());
+            enables.add(true);
         }
+        labels.add(localizedText("MTP を無効化", "Disable MTP") + (!enabled ? "  ✓" : ""));
+        paths.add("");
+        enables.add(false);
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("MTP ドラフトモデル (実験的)", "MTP draft model (experimental)"))
+                .setTitle(localizedText("MTP (実験的)", "MTP (experimental)"))
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     String path = paths.get(which);
-                    boolean en = !path.isEmpty();
+                    boolean en = enables.get(which);
                     prefs.edit()
                             .putBoolean(ModelManager.PREF_MTP_ENABLED, en)
                             .putString(ModelManager.PREF_MTP_PATH, path)
                             .apply();
-                    Toast.makeText(this,
-                            en ? localizedText("MTP 有効: " + new File(path).getName() + " (再読み込みで反映)",
-                                               "MTP enabled: " + new File(path).getName() + " (reload model to apply)")
-                               : localizedText("MTP を無効化しました", "MTP disabled"),
-                            Toast.LENGTH_LONG).show();
+                    String msg = !en ? localizedText("MTP を無効化しました", "MTP disabled")
+                            : path.isEmpty()
+                                ? localizedText("MTP有効: 自モデルのヘッド (再読み込みで反映)",
+                                                "MTP enabled: own head (reload model to apply)")
+                                : localizedText("MTP有効: " + new File(path).getName() + " (再読み込みで反映)",
+                                                "MTP enabled: " + new File(path).getName() + " (reload model to apply)");
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
                 .show();

@@ -910,17 +910,26 @@ static void maybe_init_speculative_locked(const char * log_prefix) {
     // Start from a clean slate so a stale spec from a previous model never leaks.
     release_speculative_locked(log_prefix);
 
-    if (!g_mtp_enabled || g_mtp_path.empty() || !g_model || !g_ctx) {
+    if (!g_mtp_enabled || !g_model || !g_ctx) {
         return;
     }
 
     try {
         g_spec_cp = common_params{};
         g_spec_cp.speculative.types = { COMMON_SPECULATIVE_TYPE_DRAFT_MTP };
-        g_spec_cp.speculative.draft.mparams.path = g_mtp_path;
         g_spec_cp.speculative.draft.n_max = g_mtp_n_draft > 0 ? g_mtp_n_draft : 4;
 
-        // Loads the MTP-head draft model and creates its context (ctx_dft).
+        // Set a separate draft model ONLY when the user picked a different sidecar file.
+        // An empty path (or the loaded model itself) means "use this model's own embedded
+        // MTP head": common_speculative reuses the target model (memory-shared, no second
+        // model load) -- the lightweight/correct path for Qwen3.5-MTP / DeepSeek etc. whose
+        // MTP head ships inside the main GGUF (there is no separate mtp* sidecar file).
+        const bool separate_draft = !g_mtp_path.empty() && g_mtp_path != g_current_model_path;
+        if (separate_draft) {
+            g_spec_cp.speculative.draft.mparams.path = g_mtp_path;
+        }
+
+        // Creates the MTP draft context (loads a separate draft model only if set above).
         common_params params_dft = common_base_params_to_speculative(g_spec_cp);
         g_spec_init = common_speculative_init_from_params(params_dft, g_model, g_ctx);
         g_ctx_dft = g_spec_init ? g_spec_init->context() : nullptr;
@@ -949,7 +958,8 @@ static void maybe_init_speculative_locked(const char * log_prefix) {
         g_spec_batch = llama_batch_init(g_spec_cp.speculative.draft.n_max + 1, 0, 1);
 
         std::ostringstream ss;
-        ss << log_prefix << ": MTP speculative decoding enabled (draft=" << g_mtp_path
+        ss << log_prefix << ": MTP speculative decoding enabled (draft="
+           << (separate_draft ? g_mtp_path : std::string("<own embedded MTP head>"))
            << " n_draft=" << g_spec_cp.speculative.draft.n_max
            << " tgt_seq_rm=" << (int) g_ctx_tgt_rm << " dft_seq_rm=" << (int) g_ctx_dft_rm << ")";
         log_to_file(ss.str());
@@ -2804,7 +2814,8 @@ Java_com_micklab_llama_LlamaNative_setSpeculative(
     std::lock_guard<std::mutex> lock(g_mutex);
     g_mtp_path    = jMtpModelPath ? jstring_to_std(env, jMtpModelPath) : "";
     g_mtp_n_draft = nDraft > 0 ? nDraft : 4;
-    g_mtp_enabled = (enabled == JNI_TRUE) && !g_mtp_path.empty();
+    // Empty path is valid: it means "use the loaded model's own embedded MTP head".
+    g_mtp_enabled = (enabled == JNI_TRUE);
     std::ostringstream ss;
     ss << "setSpeculative: enabled=" << (g_mtp_enabled ? "true" : "false")
        << " n_draft=" << g_mtp_n_draft << " mtp=" << g_mtp_path
