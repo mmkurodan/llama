@@ -86,7 +86,7 @@ static std::vector<llama_token>         g_spec_prompt;       // committed tokens
 static long g_spec_stat_steps = 0, g_spec_stat_out = 0, g_spec_stat_eval = 0;
 // Config pushed from Java via setSpeculative(); applied at the next init/initWithMmproj.
 static std::string g_mtp_path;            // path to the MTP-head draft GGUF ("" = none)
-static int32_t     g_mtp_n_draft = 4;     // max tokens drafted per step
+static int32_t     g_mtp_n_draft = 2;     // max tokens drafted per step (MTP heads reliably predict ~1-2 ahead)
 static bool        g_mtp_enabled = false; // master toggle (default off = unchanged behaviour)
 
 static JavaVM *g_jvm = nullptr;
@@ -922,7 +922,7 @@ static void maybe_init_speculative_locked(const char * log_prefix) {
     try {
         g_spec_cp = common_params{};
         g_spec_cp.speculative.types = { COMMON_SPECULATIVE_TYPE_DRAFT_MTP };
-        g_spec_cp.speculative.draft.n_max = g_mtp_n_draft > 0 ? g_mtp_n_draft : 4;
+        g_spec_cp.speculative.draft.n_max = g_mtp_n_draft > 0 ? g_mtp_n_draft : 2;
 
         // Set a separate draft model ONLY when the user picked a different sidecar file.
         // An empty path (or the loaded model itself) means "use this model's own embedded
@@ -2822,7 +2822,7 @@ Java_com_micklab_llama_LlamaNative_setSpeculative(
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
     g_mtp_path    = jMtpModelPath ? jstring_to_std(env, jMtpModelPath) : "";
-    g_mtp_n_draft = nDraft > 0 ? nDraft : 4;
+    g_mtp_n_draft = nDraft > 0 ? nDraft : 2;
     // Empty path is valid: it means "use the loaded model's own embedded MTP head".
     g_mtp_enabled = (enabled == JNI_TRUE);
     std::ostringstream ss;

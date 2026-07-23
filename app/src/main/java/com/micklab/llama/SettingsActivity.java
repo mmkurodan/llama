@@ -82,6 +82,8 @@ public class SettingsActivity extends Activity {
     private Button selectProjectorButton;
     private Button clearProjectorButton;
     private Button mtpModelButton;
+    private Switch mtpEnableToggle;
+    private EditText mtpNDraftInput;
     private Button searchGgufButton;
     private EditText nCtxInput;
     private EditText nThreadsInput;
@@ -271,6 +273,8 @@ public class SettingsActivity extends Activity {
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
         clearProjectorButton = findViewById(R.id.clearProjectorButton);
         mtpModelButton = findViewById(R.id.mtpModelButton);
+        mtpEnableToggle = findViewById(R.id.mtpEnableToggle);
+        mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
         searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
         nThreadsInput = findViewById(R.id.nThreadsInput);
@@ -458,13 +462,41 @@ public class SettingsActivity extends Activity {
             selectedProjectorDisabled = true;
             setSelectedProjectorReference("", false);
         });
-        if (mtpModelButton != null) {
-            mtpModelButton.setOnClickListener(v -> {
-                if (isBusyActionBlocked()) {
-                    return;
-                }
-                showMtpSelectionDialog();
-            });
+        // ---- MTP (experimental) controls: explicit enable toggle + n_draft + model picker ----
+        {
+            SharedPreferences mtpPrefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            if (mtpEnableToggle != null) {
+                mtpEnableToggle.setChecked(mtpPrefs.getBoolean(ModelManager.PREF_MTP_ENABLED, false));
+                mtpEnableToggle.setOnCheckedChangeListener((btn, checked) -> {
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                            .putBoolean(ModelManager.PREF_MTP_ENABLED, checked).apply();
+                    updateMtpControlsEnabled();
+                });
+            }
+            if (mtpNDraftInput != null) {
+                mtpNDraftInput.setText(String.valueOf(mtpPrefs.getInt(ModelManager.PREF_MTP_NDRAFT, 2)));
+                mtpNDraftInput.addTextChangedListener(new TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                    @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                    @Override public void afterTextChanged(Editable s) {
+                        int n = 2;
+                        try { n = Integer.parseInt(s.toString().trim()); } catch (NumberFormatException ignore) {}
+                        if (n < 1) n = 1;
+                        if (n > 16) n = 16;
+                        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                                .putInt(ModelManager.PREF_MTP_NDRAFT, n).apply();
+                    }
+                });
+            }
+            if (mtpModelButton != null) {
+                mtpModelButton.setOnClickListener(v -> {
+                    if (isBusyActionBlocked()) {
+                        return;
+                    }
+                    showMtpSelectionDialog();
+                });
+            }
+            updateMtpControlsEnabled();
         }
         modelUrlInput.addTextChangedListener(new TextWatcher() {
             @Override
@@ -547,6 +579,18 @@ public class SettingsActivity extends Activity {
         if (cancelButton != null) cancelButton.setEnabled(true);
         if (licenseButton != null) licenseButton.setEnabled(true);
         if (documentsButton != null) documentsButton.setEnabled(true);
+        updateMtpControlsEnabled();
+    }
+
+    // MTP model picker + n_draft are usable only when the MTP toggle is on and nothing is
+    // running; the toggle itself is disabled while busy (like the other action buttons).
+    private void updateMtpControlsEnabled() {
+        boolean busy = importInProgress || huggingFaceSearchInProgress
+                || (modelManager != null && modelManager.isBusy());
+        boolean on = mtpEnableToggle != null && mtpEnableToggle.isChecked();
+        if (mtpEnableToggle != null) mtpEnableToggle.setEnabled(!busy);
+        if (mtpModelButton != null) mtpModelButton.setEnabled(on && !busy);
+        if (mtpNDraftInput != null) mtpNDraftInput.setEnabled(on && !busy);
     }
 
     private String localizedText(String ja, String en) {
@@ -2187,46 +2231,36 @@ public class SettingsActivity extends Activity {
 
     // Experimental: pick the MTP-head draft GGUF (or disable). Persisted to prefs and
     // applied by ModelManager at the next model load (llama.setSpeculative before init).
+    // Picks the MTP draft source (the enable/disable is owned by the toggle). Empty path =
+    // reuse the loaded model's own embedded MTP head (Qwen3.5-MTP / Gemma 4); a file = a
+    // separate sidecar draft model.
     private void showMtpSelectionDialog() {
         File[] files = getDownloadedProjectorFiles();  // all downloaded GGUFs
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        boolean enabled = prefs.getBoolean(ModelManager.PREF_MTP_ENABLED, false);
         String curPath = prefs.getString(ModelManager.PREF_MTP_PATH, "");
         java.util.List<String> labels = new java.util.ArrayList<>();
         final java.util.List<String> paths = new java.util.ArrayList<>();
-        final java.util.List<Boolean> enables = new java.util.ArrayList<>();
-        // Recommended: models like Qwen3.5-MTP embed the MTP head in the main GGUF (no
-        // separate mtp* file). Empty path => reuse the loaded model's own head (no 2nd load).
-        boolean ownSel = enabled && (curPath == null || curPath.isEmpty());
+        boolean ownSel = (curPath == null || curPath.isEmpty());
         labels.add(localizedText("このモデル自身のMTPヘッドを使用 (推奨)",
                                  "Use this model's own MTP head (recommended)") + (ownSel ? "  ✓" : ""));
         paths.add("");
-        enables.add(true);
         for (File f : files) {
-            boolean sel = enabled && f.getAbsolutePath().equals(curPath);
+            boolean sel = f.getAbsolutePath().equals(curPath);
             labels.add(localizedText("別ドラフト: ", "Separate draft: ") + f.getName() + (sel ? "  ✓" : ""));
             paths.add(f.getAbsolutePath());
-            enables.add(true);
         }
-        labels.add(localizedText("MTP を無効化", "Disable MTP") + (!enabled ? "  ✓" : ""));
-        paths.add("");
-        enables.add(false);
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("MTP (実験的)", "MTP (experimental)"))
+                .setTitle(localizedText("MTP ドラフトモデル", "MTP draft model"))
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     String path = paths.get(which);
-                    boolean en = enables.get(which);
-                    prefs.edit()
-                            .putBoolean(ModelManager.PREF_MTP_ENABLED, en)
-                            .putString(ModelManager.PREF_MTP_PATH, path)
-                            .apply();
-                    String msg = !en ? localizedText("MTP を無効化しました", "MTP disabled")
-                            : path.isEmpty()
-                                ? localizedText("MTP有効: 自モデルのヘッド (再読み込みで反映)",
-                                                "MTP enabled: own head (reload model to apply)")
-                                : localizedText("MTP有効: " + new File(path).getName() + " (再読み込みで反映)",
-                                                "MTP enabled: " + new File(path).getName() + " (reload model to apply)");
-                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                    prefs.edit().putString(ModelManager.PREF_MTP_PATH, path).apply();
+                    Toast.makeText(this,
+                            path.isEmpty()
+                                ? localizedText("MTP: 自モデルのヘッドを使用 (再読み込みで反映)",
+                                                "MTP: using own head (reload model to apply)")
+                                : localizedText("MTP: " + new File(path).getName() + " (再読み込みで反映)",
+                                                "MTP: " + new File(path).getName() + " (reload model to apply)"),
+                            Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
                 .show();
