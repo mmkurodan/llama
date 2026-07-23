@@ -2,30 +2,21 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" href="favicon.ico" sizes="48x48" />
+		<link rel="icon" href="favicon.svg" sizes="any" type="image/svg+xml" />
 
-		<!-- PWA -->
-		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
-		<meta name="theme-color" content="#1b1f20" />
-		<meta name="mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="apple-mobile-web-app-title" content="LLM AI" />
-		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-192.png" />
+		<link rel="apple-touch-icon" href="apple-touch-icon-180x180.png" />
+
+		<link rel="manifest" href="./manifest.webmanifest" />
+
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+		/>
 		%sveltekit.head%
 	</head>
+
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
-		<!-- PWA: service worker registration (installable via the browser menu; no auto prompt) -->
-		<script>
-			if ('serviceWorker' in navigator) {
-				window.addEventListener('load', function () {
-					navigator.serviceWorker.register('sw.js').catch(function (e) {
-						console.warn('SW registration failed', e);
-					});
-				});
-			}
-		</script>
 	</body>
 </html>
