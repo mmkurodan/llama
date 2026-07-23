@@ -54,7 +54,12 @@ public class ConfigurationManager {
         // "disable vision" from an unset projector: when disabled, no co-located mmproj is
         // auto-detected, so clearing actually takes effect (previously auto-discovery re-applied it).
         public boolean multimodalProjectorDisabled;
-        
+
+        // MTP (multi-token prediction) speculative decoding — per-model (experimental).
+        public boolean mtpEnabled;          // explicit enable toggle
+        public String  mtpModelReference;   // draft source: "" = model's own embedded MTP head; else a GGUF reference
+        public int     mtpNDraft;           // max tokens drafted per step
+
         // Penalty parameters
         public int penaltyLastN;
         public double penaltyRepeat;
@@ -153,6 +158,9 @@ public class ConfigurationManager {
             multimodalProjectorUrl = ""; // Empty by default (use auto-discovery)
             multimodalProjectorManualSelection = false;
             multimodalProjectorDisabled = false; // Auto-discovery allowed until the user explicitly clears
+            mtpEnabled = false;
+            mtpModelReference = "";
+            mtpNDraft = 2;
         }
         
         public Configuration(String name) {
@@ -217,7 +225,10 @@ public class ConfigurationManager {
             json.put("multimodalProjectorUrl", multimodalProjectorUrl);
             json.put("multimodalProjectorManualSelection", multimodalProjectorManualSelection);
             json.put("multimodalProjectorDisabled", multimodalProjectorDisabled);
-            
+            json.put("mtpEnabled", mtpEnabled);
+            json.put("mtpModelReference", mtpModelReference);
+            json.put("mtpNDraft", mtpNDraft);
+
             return json;
         }
         
@@ -292,7 +303,10 @@ public class ConfigurationManager {
                     json.optBoolean("multimodalProjectorManualSelection", false);
             config.multimodalProjectorDisabled =
                     json.optBoolean("multimodalProjectorDisabled", false);
-            
+            config.mtpEnabled = json.optBoolean("mtpEnabled", false);
+            config.mtpModelReference = json.optString("mtpModelReference", "");
+            config.mtpNDraft = json.optInt("mtpNDraft", 2);
+
             return config;
         }
     }

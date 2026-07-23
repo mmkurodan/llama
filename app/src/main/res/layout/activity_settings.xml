@@ -161,6 +161,42 @@
                 android:text="Clear mmproj" />
         </LinearLayout>
 
+        <Switch
+            android:id="@+id/mtpEnableToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="MTP speculative decoding (experimental)" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="n_draft:" />
+
+            <EditText
+                android:id="@+id/mtpNDraftInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:inputType="number"
+                android:text="2" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/mtpModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="MTP draft model (default: own head)" />
+
         <Button
             android:id="@+id/maintainModelButton"
             android:layout_width="match_parent"

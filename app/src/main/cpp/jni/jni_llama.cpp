@@ -50,6 +50,7 @@
 #include "mtmd-helper.h"
 #include "sampling.h"
 #include "common.h"
+#include "speculative.h"
 #include "json-schema-to-grammar.h"
 #include <curl/curl.h>
 
@@ -64,6 +65,30 @@ static llama_context *g_ctx   = nullptr;
 // USER = raw GBNF; OUTPUT_FORMAT = JSON schema (converted by common_sampler).
 static common_grammar g_grammar;
 static mtmd_context  *g_mtmd  = nullptr;
+
+// ---- MTP / speculative decoding (draft-mtp) ----
+// g_spec_init owns the draft (MTP-head) model + its context; g_ctx_dft is borrowed
+// from it. g_spec_cp must outlive g_spec because common_speculative_init() takes its
+// speculative params by reference. All are set up in maybe_init_speculative_locked()
+// after g_ctx exists, and torn down in release_speculative_locked() (before g_ctx).
+static common_speculative              *g_spec = nullptr;
+static common_speculative_init_result_ptr g_spec_init;   // owns model_dft + ctx_dft
+static llama_context                   *g_ctx_dft = nullptr; // borrowed from g_spec_init
+static common_params                    g_spec_cp;       // kept alive for g_spec
+static common_context_seq_rm_type       g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+static common_context_seq_rm_type       g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+static llama_batch                      g_spec_batch = {};   // [id_last, draft...] eval batch
+static std::vector<llama_token>         g_spec_prompt;       // committed tokens (draft params .prompt)
+// Per-generation MTP stats (reset before the loop, logged after). g_spec_stat_eval counts
+// every position fed to llama_decode during speculation (incl. rejected drafts + retries);
+// on a compute-bound CPU each position ~= one token of work, so eval/out is the slowdown
+// factor vs. plain decoding (>1 means speculation is costing more than it produces).
+static long g_spec_stat_steps = 0, g_spec_stat_out = 0, g_spec_stat_eval = 0;
+// Config pushed from Java via setSpeculative(); applied at the next init/initWithMmproj.
+static std::string g_mtp_path;            // path to the MTP-head draft GGUF ("" = none)
+static int32_t     g_mtp_n_draft = 2;     // max tokens drafted per step (MTP heads reliably predict ~1-2 ahead)
+static bool        g_mtp_enabled = false; // master toggle (default off = unchanged behaviour)
+
 static JavaVM *g_jvm = nullptr;
 // Token listener global ref and method IDs
 static jobject g_token_listener = nullptr;
@@ -820,7 +845,33 @@ static void release_multimodal_locked(const char * log_prefix) {
     }
 }
 
+// Frees the speculative (draft-mtp) context. Must run before g_ctx is freed because
+// g_spec holds g_ctx as its target context. Safe to call when nothing is set up.
+static void release_speculative_locked(const char * log_prefix) {
+    if (!g_spec && !g_spec_init) {
+        return;
+    }
+    if (g_spec) {
+        common_speculative_free(g_spec);
+        g_spec = nullptr;
+    }
+    g_spec_init.reset();   // frees the draft model + ctx_dft
+    g_ctx_dft = nullptr;
+    g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+    g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+    if (g_spec_batch.token != nullptr) {
+        llama_batch_free(g_spec_batch);
+        g_spec_batch = {};
+    }
+    g_spec_prompt.clear();
+    if (log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": speculative context freed");
+    }
+}
+
 static void release_context_locked(const char * log_prefix) {
+    // The speculative context borrows g_ctx as its target; tear it down first.
+    release_speculative_locked(log_prefix);
     if (!g_ctx) {
         return;
     }
@@ -853,6 +904,195 @@ static void release_backend_locked(const char * log_prefix) {
     g_backend_initialized = false;
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": backend freed");
+    }
+}
+
+// Sets up the MTP (draft-mtp) speculative context on top of the already-created
+// g_model / g_ctx, when enabled via setSpeculative(). Non-fatal: on any failure it
+// logs, tears down partial state, and leaves g_spec == nullptr so generation simply
+// falls back to the normal (non-speculative) path. Call after g_ctx is created.
+static void maybe_init_speculative_locked(const char * log_prefix) {
+    // Start from a clean slate so a stale spec from a previous model never leaks.
+    release_speculative_locked(log_prefix);
+
+    if (!g_mtp_enabled || !g_model || !g_ctx) {
+        return;
+    }
+
+    try {
+        g_spec_cp = common_params{};
+        g_spec_cp.speculative.types = { COMMON_SPECULATIVE_TYPE_DRAFT_MTP };
+        g_spec_cp.speculative.draft.n_max = g_mtp_n_draft > 0 ? g_mtp_n_draft : 2;
+
+        // Set a separate draft model ONLY when the user picked a different sidecar file.
+        // An empty path (or the loaded model itself) means "use this model's own embedded
+        // MTP head": common_speculative reuses the target model (memory-shared, no second
+        // model load) -- the lightweight/correct path for Qwen3.5-MTP / DeepSeek etc. whose
+        // MTP head ships inside the main GGUF (there is no separate mtp* sidecar file).
+        const bool separate_draft = !g_mtp_path.empty() && g_mtp_path != g_current_model_path;
+        if (separate_draft) {
+            g_spec_cp.speculative.draft.mparams.path = g_mtp_path;
+        }
+
+        // Creates the MTP draft context (loads a separate draft model only if set above).
+        common_params params_dft = common_base_params_to_speculative(g_spec_cp);
+        g_spec_init = common_speculative_init_from_params(params_dft, g_model, g_ctx);
+        g_ctx_dft = g_spec_init ? g_spec_init->context() : nullptr;
+        if (!g_ctx_dft) {
+            log_to_file(std::string(log_prefix) + ": MTP draft context creation failed; falling back to text-only decode",
+                        GGML_LOG_LEVEL_WARN);
+            release_speculative_locked(log_prefix);
+            return;
+        }
+
+        g_spec_cp.speculative.draft.ctx_tgt = g_ctx;
+        g_spec_cp.speculative.draft.ctx_dft = g_ctx_dft;
+
+        g_spec = common_speculative_init(g_spec_cp.speculative, 1);
+        if (!g_spec) {
+            log_to_file(std::string(log_prefix) + ": common_speculative_init returned null; falling back",
+                        GGML_LOG_LEVEL_WARN);
+            release_speculative_locked(log_prefix);
+            return;
+        }
+
+        g_ctx_tgt_rm = common_context_can_seq_rm(g_ctx);
+        g_ctx_dft_rm = common_context_can_seq_rm(g_ctx_dft);
+
+        // Eval batch for [id_last, draft0..draftN-1] (capacity n_max + 1), single sequence.
+        g_spec_batch = llama_batch_init(g_spec_cp.speculative.draft.n_max + 1, 0, 1);
+
+        std::ostringstream ss;
+        ss << log_prefix << ": MTP speculative decoding enabled (draft="
+           << (separate_draft ? g_mtp_path : std::string("<own embedded MTP head>"))
+           << " n_draft=" << g_spec_cp.speculative.draft.n_max
+           << " tgt_seq_rm=" << (int) g_ctx_tgt_rm << " dft_seq_rm=" << (int) g_ctx_dft_rm << ")";
+        log_to_file(ss.str());
+    } catch (const std::exception & e) {
+        log_to_file(std::string(log_prefix) + ": MTP setup exception: " + e.what(), GGML_LOG_LEVEL_ERROR);
+        release_speculative_locked(log_prefix);
+    } catch (...) {
+        log_to_file(std::string(log_prefix) + ": MTP setup unknown exception", GGML_LOG_LEVEL_ERROR);
+        release_speculative_locked(log_prefix);
+    }
+}
+
+// One draft-mtp speculative step over sequence 0. Drafts from id_last, evaluates
+// [id_last, draft...] on g_ctx, runs the MTP process() hook, verifies with the target
+// sampler and accepts the matching prefix (+1 bonus). Rolls back the rejected-draft KV:
+// a direct seq_rm for PART contexts, or checkpoint-restore + re-evaluate-accepted for
+// FULL contexts (hybrid/GDN such as Qwen3.5). On success out_ids holds the accepted
+// tokens (>=1) and n_past/id_last are advanced. Returns false only on a hard decode
+// error, so the caller can fall back to plain decoding.
+static bool spec_decode_step_locked(
+        common_sampler_ptr & smpl,
+        llama_token & id_last,
+        llama_pos & n_past,
+        common_prompt_checkpoint & ckpt,
+        std::vector<llama_token> & out_ids) {
+    out_ids.clear();
+    if (!g_spec || !smpl || g_spec_batch.token == nullptr) {
+        return false;
+    }
+
+    const bool use_ckpt = (g_ctx_tgt_rm == COMMON_CONTEXT_SEQ_RM_TYPE_FULL);
+
+    std::vector<llama_token> draft;
+    bool reuse_draft = false;
+    const int max_retries = 16;
+
+    for (int attempt = 0; ; ++attempt) {
+        if (!reuse_draft) {
+            draft.clear();
+            common_speculative_get_draft_params(g_spec, 0) = {
+                /* .drafting = */ true,
+                /* .n_max    = */ -1,
+                /* .n_past   = */ n_past,
+                /* .id_last  = */ id_last,
+                /* .prompt   = */ &g_spec_prompt,
+                /* .result   = */ &draft,
+            };
+            common_speculative_draft(g_spec);
+        }
+        reuse_draft = false;
+
+        // Checkpoint before decode when the context cannot drop a partial tail (FULL).
+        if (use_ckpt) {
+            llama_memory_t mem = llama_get_memory(g_ctx);
+            ckpt.update_pos((int64_t) n_past,
+                            llama_memory_seq_pos_min(mem, 0),
+                            llama_memory_seq_pos_max(mem, 0));
+            ckpt.update_tgt(g_ctx, 0, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+            if (g_ctx_dft) {
+                ckpt.update_dft(g_ctx_dft, 0, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+            }
+        }
+
+        // Build [id_last, draft0..draftN-1] and evaluate on the target.
+        common_batch_clear(g_spec_batch);
+        std::vector<int> idxs;
+        idxs.reserve(draft.size() + 1);
+        common_batch_add(g_spec_batch, id_last, n_past, { 0 }, true);
+        idxs.push_back(0);
+        for (size_t k = 0; k < draft.size(); ++k) {
+            common_batch_add(g_spec_batch, draft[k], n_past + 1 + (llama_pos) k, { 0 }, true);
+            idxs.push_back((int) (k + 1));
+        }
+        if (llama_decode(g_ctx, g_spec_batch) != 0) {
+            log_to_file("spec_decode_step: target decode failed", GGML_LOG_LEVEL_ERROR);
+            return false;
+        }
+
+        g_spec_stat_eval += (long) g_spec_batch.n_tokens;  // positions actually decoded
+
+        // Feed the decoded batch to the MTP speculator (extracts the nextn hidden states).
+        common_speculative_process(g_spec, g_spec_batch);
+
+        // Verify against the target sampler; accept the matching prefix (+1 bonus token).
+        common_sampler_ptr smpl_save;
+        if (use_ckpt) {
+            smpl_save.reset(common_sampler_clone(smpl.get()));
+        }
+        out_ids = common_sampler_sample_and_accept_n(smpl.get(), g_ctx, idxs, draft);
+        if (out_ids.empty()) {
+            log_to_file("spec_decode_step: sample_and_accept_n returned empty", GGML_LOG_LEVEL_WARN);
+            return false;
+        }
+        const uint32_t n_rollback = (uint32_t) draft.size() + 1u - (uint32_t) out_ids.size();
+
+        if (n_rollback > 0 && use_ckpt) {
+            // FULL context: restore to the checkpoint (before this draft) and re-evaluate
+            // only the accepted tokens next round; they are the target's own samples, so
+            // they re-accept -> guaranteed forward progress within max_retries.
+            ckpt.load_tgt(g_ctx, 0, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+            common_context_seq_rm(g_ctx, 0, ckpt.pos_max + 1, -1);
+            if (g_ctx_dft) {
+                ckpt.load_dft(g_ctx_dft, 0, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+                common_context_seq_rm(g_ctx_dft, 0, ckpt.pos_max + 1, -1);
+            }
+            smpl = std::move(smpl_save);            // restore the pre-verify sampler state
+            draft = (attempt >= max_retries) ? std::vector<llama_token>{} : out_ids;
+            reuse_draft = true;
+            continue;
+        }
+
+        // Accept and commit.
+        common_speculative_accept(g_spec, 0, (uint16_t) (out_ids.size() - 1));
+
+        if (!use_ckpt) {
+            // PART context: drop the rejected draft tail directly.
+            const llama_pos keep = n_past + (llama_pos) out_ids.size();
+            common_context_seq_rm(g_ctx, 0, keep, -1);
+            if (g_ctx_dft) {
+                common_context_seq_rm(g_ctx_dft, 0, keep, -1);
+            }
+        }
+
+        g_spec_stat_steps++;
+        g_spec_stat_out += (long) out_ids.size();
+        n_past += (llama_pos) out_ids.size();
+        id_last = out_ids.back();
+        return true;
     }
 }
 
@@ -2275,6 +2515,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 false,
                 "init");
         g_current_audio_requested = false;
+        maybe_init_speculative_locked("init");
         log_to_file("init: initialization complete");
 
         return new_java_string_utf8(env, "ok");
@@ -2497,6 +2738,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
         g_current_model_path = model_path;
         g_current_mmproj_path = selected_mmproj_path;
         g_current_audio_requested = enable_audio && !selected_mmproj_path.empty();
+        maybe_init_speculative_locked("initWithMmproj");
         log_to_file("initWithMmproj: initialization complete");
 
         return new_java_string_utf8(env, "ok");
@@ -2567,6 +2809,27 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
            << " n_gpu_layers=" << g_n_gpu_layers;
         log_to_file(ss.str());
     }
+}
+
+// ---------------- JNI: setSpeculative (MTP draft-mtp) ----------------
+// Records the MTP draft-model path + settings; applied at the next init/initWithMmproj
+// (maybe_init_speculative_locked). enabled=false or empty path => plain decoding.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setSpeculative(
+        JNIEnv *env, jobject,
+        jstring jMtpModelPath, jint nDraft, jboolean enabled
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_mtp_path    = jMtpModelPath ? jstring_to_std(env, jMtpModelPath) : "";
+    g_mtp_n_draft = nDraft > 0 ? nDraft : 2;
+    // Empty path is valid: it means "use the loaded model's own embedded MTP head".
+    g_mtp_enabled = (enabled == JNI_TRUE);
+    std::ostringstream ss;
+    ss << "setSpeculative: enabled=" << (g_mtp_enabled ? "true" : "false")
+       << " n_draft=" << g_mtp_n_draft << " mtp=" << g_mtp_path
+       << " (applies at next init)";
+    log_to_file(ss.str());
 }
 
 // ---------------- JNI: setParameters ----------------
@@ -2999,6 +3262,9 @@ static bool prefill_text_prompt_locked(
             error_message = "decode failed (prompt)";
             return false;
         }
+        // MTP: feed every prompt ubatch to the speculator so its head accumulates the
+        // target hidden states it drafts from (no-op when MTP is disabled).
+        if (g_spec) { common_speculative_process(g_spec, prompt_batch.batch); }
     }
 
     log_to_file("generate: prefill complete n_prompt_tokens=" + std::to_string(n_tokens));
@@ -3345,6 +3611,32 @@ static jstring generate_locked(
     }
     } // end manual sampler chain (used when no grammar is active)
 
+    // MTP speculative decoding (draft-mtp): active for text generation when g_spec is set.
+    // sample_and_accept_n needs a common_sampler, so if none was built above (no grammar),
+    // build one from the same g_* sampling params. When inactive the loop is byte-identical.
+    const bool spec_active = (g_spec != nullptr) && !has_media;
+    if (spec_active && !gsmpl) {
+        try {
+            // common_sampler_init takes params by non-const ref, so bind to an lvalue.
+            common_params_sampling sp = build_chat_sampling_params_locked(common_chat_params{});
+            gsmpl.reset(common_sampler_init(g_model, sp));
+        } catch (...) { gsmpl.reset(); }
+    }
+    const bool use_spec = spec_active && (bool) gsmpl;
+    std::vector<llama_token> spec_buf;   // accepted tokens from the current step
+    size_t      spec_pos = 0;
+    llama_token spec_id_last = 0;
+    llama_pos   spec_n_past = generation_base_pos;
+    common_prompt_checkpoint spec_ckpt;
+    bool spec_bootstrap = true;
+    bool spec_failed = false;
+    if (use_spec) {
+        g_spec_prompt.clear();
+        common_speculative_begin(g_spec, 0, g_spec_prompt);
+        g_spec_stat_steps = g_spec_stat_out = g_spec_stat_eval = 0;
+        log_to_file("generate: MTP speculative decoding active");
+    }
+
     std::string output;
     output.reserve(max_tokens * 4);
     std::vector<llama_token> out_tokens;
@@ -3352,6 +3644,7 @@ static jstring generate_locked(
     std::string prev_text;
     bool logged_first_sampling_step = false;
     bool logged_first_decode_step = false;
+    const int64_t gen_wall_t0_us = ggml_time_us();  // wall-clock start of generation
 
     for (int i = 0; i < max_tokens; ++i) {
         if (g_cancel_generation.load()) {
@@ -3363,12 +3656,35 @@ static jstring generate_locked(
             logged_first_sampling_step = true;
         }
 
-        const llama_token id = gsmpl ? common_sampler_sample(gsmpl.get(), g_ctx, -1)
-                                     : llama_sampler_sample(smpl, g_ctx, -1);
-        if (gsmpl) {
-            common_sampler_accept(gsmpl.get(), id, true);
+        llama_token id;
+        if (use_spec) {
+            if (spec_bootstrap) {
+                // First output token: sample from the prefill logits. Its id seeds the
+                // first speculative step (which decodes it), so it is NOT decoded here.
+                id = common_sampler_sample(gsmpl.get(), g_ctx, -1);
+                common_sampler_accept(gsmpl.get(), id, true);
+                spec_id_last = id;
+                spec_bootstrap = false;
+            } else {
+                if (spec_pos >= spec_buf.size()) {
+                    spec_buf.clear();
+                    spec_pos = 0;
+                    if (!spec_decode_step_locked(gsmpl, spec_id_last, spec_n_past, spec_ckpt, spec_buf)
+                            || spec_buf.empty()) {
+                        spec_failed = true;
+                        break;
+                    }
+                }
+                id = spec_buf[spec_pos++];
+            }
         } else {
-            llama_sampler_accept(smpl, id);
+            id = gsmpl ? common_sampler_sample(gsmpl.get(), g_ctx, -1)
+                       : llama_sampler_sample(smpl, g_ctx, -1);
+            if (gsmpl) {
+                common_sampler_accept(gsmpl.get(), id, true);
+            } else {
+                llama_sampler_accept(smpl, id);
+            }
         }
         if (i == 0) {
             log_to_file("generate: first token sampled id=" + std::to_string(id));
@@ -3420,27 +3736,58 @@ static jstring generate_locked(
             }
         }
 
-        generation_batch.batch.n_tokens = 1;
-        generation_batch.set_token(0, id, generation_base_pos + i, true);
+        // Non-speculative path decodes the sampled token here. In the MTP path the token
+        // was already committed to the KV inside spec_decode_step_locked, so skip this.
+        if (!use_spec) {
+            generation_batch.batch.n_tokens = 1;
+            generation_batch.set_token(0, id, generation_base_pos + i, true);
 
-        if (!logged_first_decode_step) {
-            log_to_file("generate: decoding first sampled token");
-            logged_first_decode_step = true;
-        }
-        const int rc_step = llama_decode(g_ctx, generation_batch.batch);
-        if (rc_step != 0) {
-            const char * errmsg = "decode failed (generation)";
-            log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
-            notify_token_error(errmsg);
-            if (smpl) llama_sampler_free(smpl);
-            return new_java_string_utf8(env, errmsg);
-        }
-        if (i == 0) {
-            log_to_file("generate: first sampled token decode complete");
+            if (!logged_first_decode_step) {
+                log_to_file("generate: decoding first sampled token");
+                logged_first_decode_step = true;
+            }
+            const int rc_step = llama_decode(g_ctx, generation_batch.batch);
+            if (rc_step != 0) {
+                const char * errmsg = "decode failed (generation)";
+                log_to_file(std::string("generate: ") + errmsg, GGML_LOG_LEVEL_ERROR);
+                notify_token_error(errmsg);
+                if (smpl) llama_sampler_free(smpl);
+                return new_java_string_utf8(env, errmsg);
+            }
+            if (i == 0) {
+                log_to_file("generate: first sampled token decode complete");
+            }
         }
     }
 
+    if (spec_failed) {
+        log_to_file("generate: MTP speculative step failed; ending generation early", GGML_LOG_LEVEL_WARN);
+    }
+    if (use_spec && g_spec_stat_steps > 0) {
+        const double eval_per_out = (double) g_spec_stat_eval / (double) std::max(1L, g_spec_stat_out);
+        std::ostringstream ss;
+        ss << "generate: MTP stats steps=" << g_spec_stat_steps
+           << " out_tokens=" << g_spec_stat_out
+           << " decoded_positions=" << g_spec_stat_eval
+           << " (eval/out=" << eval_per_out << "x; >1 means speculation decoded more"
+           << " positions than it produced -> net slower on a compute-bound CPU)";
+        log_to_file(ss.str());
+    }
+
     log_generation_perf("generate");
+    if (use_spec) {
+        // llama_perf attributes MTP's multi-token draft batches to prompt-eval (n_p_eval),
+        // so its gen tok/s reads ~0. Report/store the real wall-clock generation speed.
+        const double gen_s = (ggml_time_us() - gen_wall_t0_us) / 1.0e6;
+        const int n_gen = (int) out_tokens.size();
+        const double gen_tps = (gen_s > 0.0) ? (n_gen / gen_s) : 0.0;
+        g_last_gen_tps.store(gen_tps, std::memory_order_relaxed);
+        g_last_n_eval.store(n_gen, std::memory_order_relaxed);
+        std::ostringstream ss;
+        ss << "generate: speed (MTP wall-clock): gen " << std::fixed << std::setprecision(2)
+           << gen_tps << " tok/s (" << n_gen << " tok / " << gen_s << " s)";
+        log_to_file(ss.str());
+    }
 
     const bool was_cancelled = g_cancel_generation.load();
     if (!was_cancelled) {

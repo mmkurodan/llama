@@ -81,6 +81,9 @@ public class SettingsActivity extends Activity {
     private TextView multimodalProjectorInfo;
     private Button selectProjectorButton;
     private Button clearProjectorButton;
+    private Button mtpModelButton;
+    private Switch mtpEnableToggle;
+    private EditText mtpNDraftInput;
     private Button searchGgufButton;
     private EditText nCtxInput;
     private EditText nThreadsInput;
@@ -161,6 +164,7 @@ public class SettingsActivity extends Activity {
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
     private String selectedProjectorReference = "";
+    private String selectedMtpReference = "";   // MTP draft source ("" = model's own head)
     private boolean selectedProjectorManualSelection = false;
     // True when the user explicitly tapped "Clear Projector": disables mmproj auto-discovery
     // so the clear actually sticks (see ModelManager.resolveMultimodalProjectorPath).
@@ -269,6 +273,9 @@ public class SettingsActivity extends Activity {
         multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
         clearProjectorButton = findViewById(R.id.clearProjectorButton);
+        mtpModelButton = findViewById(R.id.mtpModelButton);
+        mtpEnableToggle = findViewById(R.id.mtpEnableToggle);
+        mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
         searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
         nThreadsInput = findViewById(R.id.nThreadsInput);
@@ -456,6 +463,21 @@ public class SettingsActivity extends Activity {
             selectedProjectorDisabled = true;
             setSelectedProjectorReference("", false);
         });
+        // ---- MTP (experimental) controls. The values live in the per-model config
+        //      (updateUIFromConfig loads them, collectConfiguration saves them); here we only
+        //      wire the listeners. Takes effect on the next model (re)load / config save. ----
+        if (mtpEnableToggle != null) {
+            mtpEnableToggle.setOnCheckedChangeListener((btn, checked) -> updateMtpControlsEnabled());
+        }
+        if (mtpModelButton != null) {
+            mtpModelButton.setOnClickListener(v -> {
+                if (isBusyActionBlocked()) {
+                    return;
+                }
+                showMtpSelectionDialog();
+            });
+        }
+        updateMtpControlsEnabled();
         modelUrlInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -537,6 +559,29 @@ public class SettingsActivity extends Activity {
         if (cancelButton != null) cancelButton.setEnabled(true);
         if (licenseButton != null) licenseButton.setEnabled(true);
         if (documentsButton != null) documentsButton.setEnabled(true);
+        updateMtpControlsEnabled();
+    }
+
+    // MTP model picker + n_draft are usable only when the MTP toggle is on and nothing is
+    // running; the toggle itself is disabled while busy (like the other action buttons).
+    private void updateMtpControlsEnabled() {
+        boolean busy = importInProgress || huggingFaceSearchInProgress
+                || (modelManager != null && modelManager.isBusy());
+        boolean on = mtpEnableToggle != null && mtpEnableToggle.isChecked();
+        if (mtpEnableToggle != null) mtpEnableToggle.setEnabled(!busy);
+        if (mtpModelButton != null) mtpModelButton.setEnabled(on && !busy);
+        if (mtpNDraftInput != null) mtpNDraftInput.setEnabled(on && !busy);
+    }
+
+    private int parseMtpNDraft() {
+        int n = 2;
+        if (mtpNDraftInput != null) {
+            try { n = Integer.parseInt(mtpNDraftInput.getText().toString().trim()); }
+            catch (NumberFormatException ignore) {}
+        }
+        if (n < 1) n = 1;
+        if (n > 16) n = 16;
+        return n;
     }
 
     private String localizedText(String ja, String en) {
@@ -978,6 +1023,10 @@ public class SettingsActivity extends Activity {
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
         selectedProjectorDisabled = config.multimodalProjectorDisabled;
+        selectedMtpReference = normalizeReference(config.mtpModelReference);
+        if (mtpEnableToggle != null) mtpEnableToggle.setChecked(config.mtpEnabled);
+        if (mtpNDraftInput != null) mtpNDraftInput.setText(String.valueOf(config.mtpNDraft > 0 ? config.mtpNDraft : 2));
+        updateMtpControlsEnabled();
         modelUrlInput.setText(config.modelUrl);
         nCtxInput.setText(String.valueOf(config.nCtx));
         nThreadsInput.setText(String.valueOf(config.nThreads));
@@ -1116,7 +1165,10 @@ public class SettingsActivity extends Activity {
         // Only meaningful when no projector is configured: true = user cleared it, suppress auto-discovery.
         config.multimodalProjectorDisabled =
                 config.multimodalProjectorUrl.isEmpty() && selectedProjectorDisabled;
-        
+        config.mtpEnabled = mtpEnableToggle != null && mtpEnableToggle.isChecked();
+        config.mtpModelReference = normalizeReference(selectedMtpReference);
+        config.mtpNDraft = parseMtpNDraft();
+
         // Penalty parameters
         try {
             config.penaltyLastN = Integer.parseInt(penaltyLastNInput.getText().toString());
@@ -2173,6 +2225,41 @@ public class SettingsActivity extends Activity {
                 index -> selectProjectorWithCompatibilityCheck(modelReference, projectorFiles[index]),
                 localizedText("解除", "Clear"),
                 index -> setSelectedProjectorReference("", false));
+    }
+
+    // Experimental: pick the MTP-head draft GGUF (or disable). Persisted to prefs and
+    // applied by ModelManager at the next model load (llama.setSpeculative before init).
+    // Picks the MTP draft source (the enable/disable is owned by the toggle). Empty path =
+    // reuse the loaded model's own embedded MTP head (Qwen3.5-MTP / Gemma 4); a file = a
+    // separate sidecar draft model.
+    private void showMtpSelectionDialog() {
+        File[] files = getDownloadedProjectorFiles();  // all downloaded GGUFs
+        String cur = selectedMtpReference == null ? "" : selectedMtpReference;
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        final java.util.List<String> refs = new java.util.ArrayList<>();
+        boolean ownSel = cur.isEmpty();
+        labels.add(localizedText("このモデル自身のMTPヘッドを使用 (推奨)",
+                                 "Use this model's own MTP head (recommended)") + (ownSel ? "  ✓" : ""));
+        refs.add("");
+        for (File f : files) {
+            boolean sel = f.getName().equals(cur);
+            labels.add(localizedText("別ドラフト: ", "Separate draft: ") + f.getName() + (sel ? "  ✓" : ""));
+            refs.add(f.getName());
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("MTP ドラフトモデル", "MTP draft model"))
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    selectedMtpReference = refs.get(which);
+                    Toast.makeText(this,
+                            selectedMtpReference.isEmpty()
+                                ? localizedText("MTP: 自モデルのヘッドを使用 (設定保存で反映)",
+                                                "MTP: using own head (save config to apply)")
+                                : localizedText("MTP: " + selectedMtpReference + " (設定保存で反映)",
+                                                "MTP: " + selectedMtpReference + " (save config to apply)"),
+                            Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
     }
 
     private void selectProjectorWithCompatibilityCheck(String modelReference, File projectorFile) {

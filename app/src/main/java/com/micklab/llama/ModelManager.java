@@ -783,6 +783,22 @@ public class ModelManager {
         // Compute backend を JNI へ通知 (ADSP_LIBRARY_PATH 設定含む)
         String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;
         llama.setBackendConfig(config.backendType, config.npuEnabled, nativeLibDir);
+
+        // MTP (multi-token prediction) speculative decoding — per-model config, applied at init.
+        // mtpModelReference="" with mtpEnabled means "use the loaded model's own embedded MTP head"
+        // (Qwen3.5-MTP / Gemma 4); a reference names a separate sidecar draft GGUF.
+        int mtpNDraft = config.mtpNDraft > 0 ? config.mtpNDraft : 2;
+        String mtpPathToUse = "";
+        if (config.mtpEnabled && config.mtpModelReference != null && !config.mtpModelReference.isEmpty()) {
+            File mtpFile = new File(config.mtpModelReference);
+            if (!mtpFile.isAbsolute()) {
+                mtpFile = new File(getModelStorageDir(), config.mtpModelReference);
+            }
+            if (mtpFile.isFile()) {
+                mtpPathToUse = mtpFile.getAbsolutePath();
+            }
+        }
+        llama.setSpeculative(config.mtpEnabled ? mtpPathToUse : "", mtpNDraft, config.mtpEnabled);
     }
 
     private int safePositive(int value, int fallback) {
