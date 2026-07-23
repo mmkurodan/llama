@@ -3644,6 +3644,7 @@ static jstring generate_locked(
     std::string prev_text;
     bool logged_first_sampling_step = false;
     bool logged_first_decode_step = false;
+    const int64_t gen_wall_t0_us = ggml_time_us();  // wall-clock start of generation
 
     for (int i = 0; i < max_tokens; ++i) {
         if (g_cancel_generation.load()) {
@@ -3774,6 +3775,19 @@ static jstring generate_locked(
     }
 
     log_generation_perf("generate");
+    if (use_spec) {
+        // llama_perf attributes MTP's multi-token draft batches to prompt-eval (n_p_eval),
+        // so its gen tok/s reads ~0. Report/store the real wall-clock generation speed.
+        const double gen_s = (ggml_time_us() - gen_wall_t0_us) / 1.0e6;
+        const int n_gen = (int) out_tokens.size();
+        const double gen_tps = (gen_s > 0.0) ? (n_gen / gen_s) : 0.0;
+        g_last_gen_tps.store(gen_tps, std::memory_order_relaxed);
+        g_last_n_eval.store(n_gen, std::memory_order_relaxed);
+        std::ostringstream ss;
+        ss << "generate: speed (MTP wall-clock): gen " << std::fixed << std::setprecision(2)
+           << gen_tps << " tok/s (" << n_gen << " tok / " << gen_s << " s)";
+        log_to_file(ss.str());
+    }
 
     const bool was_cancelled = g_cancel_generation.load();
     if (!was_cancelled) {
