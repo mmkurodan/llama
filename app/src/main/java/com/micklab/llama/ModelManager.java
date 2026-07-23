@@ -796,6 +796,7 @@ public class ModelManager {
         int mtpNDraft = mtpPrefs.getInt(PREF_MTP_NDRAFT, 4);
         boolean mtpActive = mtpEnabled && mtpPath != null && !mtpPath.isEmpty() && new File(mtpPath).isFile();
         llama.setSpeculative(mtpActive ? mtpPath : "", mtpNDraft, mtpActive);
+    }
 
     private int safePositive(int value, int fallback) {
         return value > 0 ? value : fallback;
