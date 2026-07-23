@@ -50,7 +50,12 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            // R8: shrink + obfuscate code. Resource shrinking is intentionally left
+            // off (shrinkResources) to avoid stripping resources referenced only
+            // indirectly. Keep rules for the JNI boundary live in proguard-rules.pro;
+            // the release build emits mapping.txt for crash de-obfuscation.
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
     }
