@@ -252,7 +252,7 @@ public class SettingsActivity extends Activity {
             lastDownloadProgress = percent;
             runOnUiThread(() -> {
                 modelProgressBar.setProgress(percent);
-                modelFileInfo.setText("Downloading model... " + percent + "%");
+                modelFileInfo.setText(localizedText("モデルをダウンロード中... ", "Downloading model... ") + percent + "%");
             });
         });
         
@@ -532,7 +532,7 @@ public class SettingsActivity extends Activity {
         }
         if (modelManager != null && modelManager.isBusy()) {
             updateActionButtonStateForBusy();
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return true;
         }
         return false;
@@ -624,112 +624,109 @@ public class SettingsActivity extends Activity {
     }
 
     private String translateSettingsHint(String hint) {
-        if (AppLanguageManager.isJapanese(this)) {
-            if ("Enter configuration name".equals(hint)) return "設定名を入力";
-            if ("https://... or filename.gguf".equals(hint)) return "https://... または filename.gguf";
-            if ("Enter system prompt (optional)".equals(hint)) return "システムプロンプトを入力（任意）";
-            if ("Enter custom chat template (optional)".equals(hint)) return "カスタムチャットテンプレートを入力（任意）";
-            if (hint.startsWith("Default: ")) return "既定値: " + hint.substring("Default: ".length());
-        } else {
-            if ("設定名を入力".equals(hint)) return "Enter configuration name";
-            if ("https://... または filename.gguf".equals(hint)) return "https://... or filename.gguf";
-            if ("システムプロンプトを入力（任意）".equals(hint)) return "Enter system prompt (optional)";
-            if ("カスタムチャットテンプレートを入力（任意）".equals(hint)) return "Enter custom chat template (optional)";
-            if (hint.startsWith("既定値: ")) return "Default: " + hint.substring("既定値: ".length());
+        if (hint.startsWith("Default: ")) {
+            return localizedText("既定値: ", "Default: ") + hint.substring("Default: ".length());
         }
-        return hint;
+        return Translations.get(this, settingsHintJa(hint), hint);
+    }
+
+    private String settingsHintJa(String hint) {
+        switch (hint) {
+            case "Enter configuration name": return "設定名を入力";
+            case "https://... or filename.gguf": return "https://... または filename.gguf";
+            case "Enter system prompt (optional)": return "システムプロンプトを入力（任意）";
+            case "Enter custom chat template (optional)": return "カスタムチャットテンプレートを入力（任意）";
+            default: return hint;
+        }
     }
 
     private String translateSettingsText(String text) {
-        if (AppLanguageManager.isJapanese(this)) {
-            switch (text) {
-                case "Configuration Management": return "設定管理";
-                case "Display Language / 表示言語": return "表示言語";
-                case "Configuration Name:": return "設定名:";
-                case "Save Config": return "設定を保存";
-                case "Delete Config": return "設定を削除";
-                case "Load Configuration:": return "設定を読み込み:";
-                case "Load Selected Config": return "選択した設定を読み込む";
-                case "Model Selection": return "モデル選択";
-                case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
-                case "Multimodal Projector (mmproj):": return "マルチモーダル Projector (mmproj):";
-                case "No multimodal projector selected": return "mmproj は未選択です";
-                case "Select mmproj": return "mmproj を選択";
-                case "Clear mmproj": return "mmproj を解除";
-                case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
-                case "gguf import from local device": return "ローカル端末からggufを取り込む";
-                case "Load Model": return "モデルを読み込む";
-                case "MAINTAIN MODEL": return "モデル管理";
-                case "Model file: (none)": return "モデルファイル: （なし）";
-                case "Model Parameters": return "モデルパラメータ";
-                case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
-                case "Threads (n_threads):": return "スレッド数 (n_threads):";
-                case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
-                case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
-                case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
-                case "Offload Layers (GPU):": return "オフロード層 (GPU):";
-                case "Temperature (temp):": return "温度 (temp):";
-                case "Top-p (top_p):": return "Top-p (top_p):";
-                case "Top-k (top_k):": return "Top-k (top_k):";
-                case "Penalty Parameters": return "ペナルティ設定";
-                case "Penalty Last N:": return "ペナルティ対象直近N:";
-                case "Penalty Repeat:": return "反復ペナルティ:";
-                case "Penalty Frequency:": return "頻度ペナルティ:";
-                case "Penalty Presence:": return "出現ペナルティ:";
-                case "Mirostat Parameters": return "Mirostat 設定";
-                case "Mirostat (0=disabled, 1=v1, 2=v2):": return "Mirostat (0=無効, 1=v1, 2=v2):";
-                case "Mirostat Tau:": return "Mirostat タウ:";
-                case "Mirostat Eta:": return "Mirostat イータ:";
-                case "Additional Sampling Parameters": return "追加サンプリング設定";
-                case "Min-p:": return "Min-p:";
-                case "Typical P:": return "Typical P:";
-                case "XTC Probability:": return "XTC 確率:";
-                case "XTC Threshold:": return "XTC しきい値:";
-                case "Top-N-Sigma:": return "Top-N-Sigma:";
-                case "Dynamic Temperature Range:": return "動的温度レンジ:";
-                case "Dynamic Temperature Exponent:": return "動的温度指数:";
-                case "DRY (Don't Repeat Yourself) Parameters": return "DRY (重複抑制) 設定";
-                case "DRY Multiplier:": return "DRY 乗数:";
-                case "DRY Base:": return "DRY 基底:";
-                case "DRY Allowed Length:": return "DRY 許容長:";
-                case "DRY Penalty Last N:": return "DRY ペナルティ直近N:";
-                case "DRY Sequence Breakers:": return "DRY シーケンス区切り:";
-                case "Output Settings": return "出力設定";
-                case "Enable Streaming:": return "ストリーミングを有効化:";
-                case "Show Performance Metrics:": return "性能指標を表示:";
-                case "Prompt Template": return "プロンプトテンプレート";
-                case "System Prompt:": return "システムプロンプト:";
-                case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
-                case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
-                case "Custom Chat Template:": return "カスタムチャットテンプレート:";
-                case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
-                case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
-                case "Based on custom template or model family detection.": return "カスタムテンプレートまたはモデル種別判定に基づきます。";
-                case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
-                case "Llama API Server": return "Llama APIサーバー";
-                case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
-                case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
-                case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
-                case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
-                case "MCP Settings": return "MCP設定";
-                case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
-                case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
-                case "Available only in Web UI when disabled.": return "無効時は Web UI でのみ利用されます。";
-                case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
-                case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
-                case "Log Settings": return "ログ設定";
-                case "Log Level:": return "ログレベル:";
-                case "Show License": return "ライセンス表示";
-                case "Documents": return "ドキュメント";
-                case "SAVE & CLOSE": return "保存して閉じる";
-                case "CLOSE": return "閉じる";
-                default: return text;
-            }
-        } else {
-            switch (text) {
-                case "表示言語": return "Display Language";
-                default: return text;
-            }
+        return Translations.get(this, settingsTextJa(text), text);
+    }
+
+    private String settingsTextJa(String text) {
+        switch (text) {
+            case "Configuration Management": return "設定管理";
+            case "Display Language": return "表示言語";
+            case "Configuration Name:": return "設定名:";
+            case "Save Config": return "設定を保存";
+            case "Delete Config": return "設定を削除";
+            case "Load Configuration:": return "設定を読み込み:";
+            case "Load Selected Config": return "選択した設定を読み込む";
+            case "Model Selection": return "モデル選択";
+            case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
+            case "Multimodal Projector (mmproj):": return "マルチモーダル Projector (mmproj):";
+            case "No multimodal projector selected": return "mmproj は未選択です";
+            case "Select mmproj": return "mmproj を選択";
+            case "Clear mmproj": return "mmproj を解除";
+            case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
+            case "gguf import from local device": return "ローカル端末からggufを取り込む";
+            case "Load Model": return "モデルを読み込む";
+            case "MAINTAIN MODEL": return "モデル管理";
+            case "Model file: (none)": return "モデルファイル: （なし）";
+            case "Model Parameters": return "モデルパラメータ";
+            case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
+            case "Threads (n_threads):": return "スレッド数 (n_threads):";
+            case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
+            case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
+            case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
+            case "Offload Layers (GPU):": return "オフロード層 (GPU):";
+            case "Temperature (temp):": return "温度 (temp):";
+            case "Top-p (top_p):": return "Top-p (top_p):";
+            case "Top-k (top_k):": return "Top-k (top_k):";
+            case "Penalty Parameters": return "ペナルティ設定";
+            case "Penalty Last N:": return "ペナルティ対象直近N:";
+            case "Penalty Repeat:": return "反復ペナルティ:";
+            case "Penalty Frequency:": return "頻度ペナルティ:";
+            case "Penalty Presence:": return "出現ペナルティ:";
+            case "Mirostat Parameters": return "Mirostat 設定";
+            case "Mirostat (0=disabled, 1=v1, 2=v2):": return "Mirostat (0=無効, 1=v1, 2=v2):";
+            case "Mirostat Tau:": return "Mirostat タウ:";
+            case "Mirostat Eta:": return "Mirostat イータ:";
+            case "Additional Sampling Parameters": return "追加サンプリング設定";
+            case "Min-p:": return "Min-p:";
+            case "Typical P:": return "Typical P:";
+            case "XTC Probability:": return "XTC 確率:";
+            case "XTC Threshold:": return "XTC しきい値:";
+            case "Top-N-Sigma:": return "Top-N-Sigma:";
+            case "Dynamic Temperature Range:": return "動的温度レンジ:";
+            case "Dynamic Temperature Exponent:": return "動的温度指数:";
+            case "DRY (Don't Repeat Yourself) Parameters": return "DRY (重複抑制) 設定";
+            case "DRY Multiplier:": return "DRY 乗数:";
+            case "DRY Base:": return "DRY 基底:";
+            case "DRY Allowed Length:": return "DRY 許容長:";
+            case "DRY Penalty Last N:": return "DRY ペナルティ直近N:";
+            case "DRY Sequence Breakers:": return "DRY シーケンス区切り:";
+            case "Output Settings": return "出力設定";
+            case "Enable Streaming:": return "ストリーミングを有効化:";
+            case "Show Performance Metrics:": return "性能指標を表示:";
+            case "Prompt Template": return "プロンプトテンプレート";
+            case "System Prompt:": return "システムプロンプト:";
+            case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
+            case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
+            case "Custom Chat Template:": return "カスタムチャットテンプレート:";
+            case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
+            case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
+            case "Based on custom template or model family detection.": return "カスタムテンプレートまたはモデル種別判定に基づきます。";
+            case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
+            case "Llama API Server": return "Llama APIサーバー";
+            case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
+            case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
+            case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
+            case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
+            case "MCP Settings": return "MCP設定";
+            case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
+            case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
+            case "Available only in Web UI when disabled.": return "無効時は Web UI でのみ利用されます。";
+            case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
+            case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
+            case "Log Settings": return "ログ設定";
+            case "Log Level:": return "ログレベル:";
+            case "Show License": return "ライセンス表示";
+            case "Documents": return "ドキュメント";
+            case "SAVE & CLOSE": return "保存して閉じる";
+            case "CLOSE": return "閉じる";
+            default: return text;
         }
     }
 
@@ -932,7 +929,7 @@ public class SettingsActivity extends Activity {
                 modelManager.getLlama().setLogLevel(level);
                 SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
                 prefs.edit().putInt(PREF_LOG_LEVEL, level).apply();
-                showToast("Log level set to " + levels[position]);
+                showToast(localizedText("ログレベルを設定: ", "Log level set to ") + levels[position]);
             }
 
             @Override
@@ -953,9 +950,9 @@ public class SettingsActivity extends Activity {
         scrollView.addView(textView);
 
         new AlertDialog.Builder(this)
-            .setTitle("License & Third-Party Notices")
+            .setTitle(localizedText("ライセンスと第三者通知", "License & Third-Party Notices"))
             .setView(scrollView)
-            .setPositiveButton("Close", null)
+            .setPositiveButton(localizedText("閉じる", "Close"), null)
             .show();
     }
 
@@ -1013,10 +1010,10 @@ public class SettingsActivity extends Activity {
         try {
             currentConfig = configManager.loadConfiguration(name);
             updateUIFromConfig(currentConfig);
-            showToast("Loaded configuration: " + name);
+            showToast(localizedText("設定を読み込みました: ", "Loaded configuration: ") + name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load configuration: " + name, e);
-            showToast("Failed to load configuration: " + e.getMessage());
+            showToast(localizedText("設定の読み込みに失敗しました: ", "Failed to load configuration: ") + e.getMessage());
             // Load default
             currentConfig = new ConfigurationManager.Configuration();
             updateUIFromConfig(currentConfig);
@@ -1561,17 +1558,17 @@ public class SettingsActivity extends Activity {
                 configSpinner.setSelection(position);
             }
             
-            showToast("Configuration saved: " + config.name);
+            showToast(localizedText("設定を保存しました: ", "Configuration saved: ") + config.name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to save configuration", e);
-            showToast("Failed to save: " + e.getMessage());
+            showToast(localizedText("保存に失敗しました: ", "Failed to save: ") + e.getMessage());
         }
     }
     
     private void loadSelectedConfiguration() {
         String selectedName = (String) configSpinner.getSelectedItem();
         if (selectedName == null || selectedName.isEmpty()) {
-            showToast("No configuration selected");
+            showToast(localizedText("設定が選択されていません", "No configuration selected"));
             return;
         }
         loadConfigurationByName(selectedName);
@@ -1580,22 +1577,22 @@ public class SettingsActivity extends Activity {
     private void deleteSelectedConfiguration() {
         String selectedName = (String) configSpinner.getSelectedItem();
         if (selectedName == null || selectedName.isEmpty()) {
-            showToast("No configuration selected");
+            showToast(localizedText("設定が選択されていません", "No configuration selected"));
             return;
         }
         
         if ("default".equals(selectedName)) {
-            showToast("Cannot delete default configuration");
+            showToast(localizedText("デフォルト設定は削除できません", "Cannot delete default configuration"));
             return;
         }
         
         if (configManager.deleteConfiguration(selectedName)) {
             loadConfigList();
-            showToast("Deleted configuration: " + selectedName);
+            showToast(localizedText("設定を削除しました: ", "Deleted configuration: ") + selectedName);
             // Load default after deletion
             loadConfigurationByName("default");
         } else {
-            showToast("Failed to delete configuration");
+            showToast(localizedText("設定の削除に失敗しました", "Failed to delete configuration"));
         }
     }
 
@@ -1685,10 +1682,10 @@ public class SettingsActivity extends Activity {
 
     private void confirmDeleteModelFile(File modelFile) {
         new AlertDialog.Builder(this)
-            .setTitle("Delete Model File")
-            .setMessage("Delete " + modelFile.getName() + "?")
-            .setPositiveButton("Delete", (dialog, which) -> deleteModelFile(modelFile))
-            .setNegativeButton("Cancel", null)
+            .setTitle(localizedText("モデルファイルを削除", "Delete Model File"))
+            .setMessage(localizedText("次のモデルファイルを削除しますか？\n\n", "Delete this model file?\n\n") + modelFile.getName())
+            .setPositiveButton(localizedText("削除", "Delete"), (dialog, which) -> deleteModelFile(modelFile))
+            .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
             .show();
     }
 
@@ -1737,7 +1734,7 @@ public class SettingsActivity extends Activity {
 
     private void deleteModelFile(File modelFile) {
         if (importInProgress || modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
 
@@ -1756,13 +1753,13 @@ public class SettingsActivity extends Activity {
                 removedLoadedModel = true;
             }
             if (removedLoadedModel) {
-                modelFileInfo.setText("Model file: (none)");
+                modelFileInfo.setText(localizedText("モデルファイル: （なし）", "Model file: (none)"));
                 modelProgressBar.setProgress(0);
                 lastDownloadProgress = 0;
             }
-            showToast("Deleted model file: " + modelFile.getName());
+            showToast(localizedText("モデルファイルを削除しました: ", "Deleted model file: ") + modelFile.getName());
         } else {
-            showToast("Failed to delete model file: " + modelFile.getName());
+            showToast(localizedText("モデルファイルの削除に失敗しました: ", "Failed to delete model file: ") + modelFile.getName());
         }
     }
 
@@ -2183,7 +2180,7 @@ public class SettingsActivity extends Activity {
                     }
                 } else {
                     modelUrlInput.setText(displayName);
-                    modelFileInfo.setText("Model file: " + displayName + " (" + destFile.length() + " bytes)");
+                    modelFileInfo.setText(localizedText("モデルファイル: ", "Model file: ") + displayName + " (" + destFile.length() + " bytes)");
                 }
                 modelProgressBar.setProgress(0);
                 currentConfig = getConfigFromUI();
@@ -2584,14 +2581,14 @@ public class SettingsActivity extends Activity {
         }
 
         if (modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
 
         new Thread(() -> {
             // Acquire busy lock for load
             if (!modelManager.tryAcquire()) {
-                runOnUiThread(() -> showToast("Model is busy"));
+                runOnUiThread(() -> showToast(localizedText("モデルは処理中です", "Model is busy")));
                 return;
             }
 
@@ -2607,7 +2604,9 @@ public class SettingsActivity extends Activity {
                     modelProgressBar.setProgress(success ? 100 : 0);
                     lastDownloadProgress = success ? 100 : 0;
                     loadModelButton.setEnabled(true);
-                    showToast(success ? "Model initialized successfully" : "Model initialization failed");
+                    showToast(success
+                            ? localizedText("モデルの初期化に成功しました", "Model initialized successfully")
+                            : localizedText("モデルの初期化に失敗しました", "Model initialization failed"));
                     if (success && disabledMmproj != null) {
                         showToast(localizedText(
                                 "選択した mmproj はこのモデルと非互換のため無効化し、テキスト専用で読み込みました: ",
@@ -2618,8 +2617,8 @@ public class SettingsActivity extends Activity {
             } catch (Throwable t) {
                 Log.e(TAG, "Model load error", t);
                 runOnUiThread(() -> {
-                    showToast("Model load error: " + t.getMessage());
-                    modelFileInfo.setText("Model init failed");
+                    showToast(localizedText("モデル読み込みエラー: ", "Model load error: ") + t.getMessage());
+                    modelFileInfo.setText(localizedText("モデルの初期化に失敗しました", "Model init failed"));
                     modelProgressBar.setProgress(0);
                     lastDownloadProgress = 0;
                     loadModelButton.setEnabled(true);
@@ -2758,18 +2757,18 @@ public class SettingsActivity extends Activity {
             configManager.saveConfiguration(config);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to save configuration before model action", e);
-            showToast("Failed to save configuration: " + e.getMessage());
+            showToast(localizedText("設定の保存に失敗しました: ", "Failed to save configuration: ") + e.getMessage());
             return null;
         }
 
         final String filename = extractFilenameFromUrl(config.modelUrl);
         if (filename != null && !filename.isEmpty()) {
             File destFile = new File(getModelStorageDir(), filename);
-            modelFileInfo.setText("Model file: " + filename + (destFile.exists()
+            modelFileInfo.setText(localizedText("モデルファイル: ", "Model file: ") + filename + (destFile.exists()
                     ? " (" + destFile.length() + " bytes)"
-                    : " (checking...)"));
+                    : localizedText(" (確認中...)", " (checking...)")));
         } else {
-            modelFileInfo.setText("Model file: (unknown)");
+            modelFileInfo.setText(localizedText("モデルファイル: （不明）", "Model file: (unknown)"));
         }
         modelProgressBar.setProgress(0);
         lastDownloadProgress = 0;
@@ -2783,13 +2782,13 @@ public class SettingsActivity extends Activity {
         }
 
         if (modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
 
         new Thread(() -> {
             if (!modelManager.tryAcquire()) {
-                runOnUiThread(() -> showToast("Model is busy"));
+                runOnUiThread(() -> showToast(localizedText("モデルは処理中です", "Model is busy")));
                 return;
             }
 
@@ -2811,7 +2810,7 @@ public class SettingsActivity extends Activity {
             } catch (Throwable t) {
                 Log.e(TAG, "Model download error", t);
                 runOnUiThread(() -> {
-                    showToast("Model download error: " + t.getMessage());
+                    showToast(localizedText("モデルのダウンロードエラー: ", "Model download error: ") + t.getMessage());
                     modelFileInfo.setText(localizedText("ダウンロードに失敗しました", "Download failed"));
                     modelProgressBar.setProgress(0);
                     lastDownloadProgress = 0;
@@ -2850,7 +2849,7 @@ public class SettingsActivity extends Activity {
     
     private void initModelInBackground(final String modelPath) {
         runOnUiThread(() -> {
-            modelFileInfo.setText("Initializing model...");
+            modelFileInfo.setText(localizedText("モデルを初期化中...", "Initializing model..."));
             modelProgressBar.setProgress(0);
             loadModelButton.setEnabled(false);
         });
@@ -2859,7 +2858,7 @@ public class SettingsActivity extends Activity {
             // Try to acquire the lock
             if (!modelManager.tryAcquire()) {
                 runOnUiThread(() -> {
-                    showToast("Model is busy");
+                    showToast(localizedText("モデルは処理中です", "Model is busy"));
                     loadModelButton.setEnabled(true);
                 });
                 return;
@@ -2871,8 +2870,8 @@ public class SettingsActivity extends Activity {
                 
                 if (!"ok".equals(initResult)) {
                     runOnUiThread(() -> {
-                        showToast("Model init failed: " + initResult);
-                        modelFileInfo.setText("Model init failed: " + initResult);
+                        showToast(localizedText("モデルの初期化に失敗しました: ", "Model init failed: ") + initResult);
+                        modelFileInfo.setText(localizedText("モデルの初期化に失敗しました: ", "Model init failed: ") + initResult);
                         loadModelButton.setEnabled(true);
                     });
                     return;
@@ -2885,17 +2884,17 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> {
                     loadedModelPath = modelPath;
                     modelLoadedSuccessfully = true;
-                    modelFileInfo.setText("Model loaded: " + (new File(modelPath).getName()));
+                    modelFileInfo.setText(localizedText("モデルを読み込みました: ", "Model loaded: ") + (new File(modelPath).getName()));
                     loadModelButton.setEnabled(true);
                     modelProgressBar.setProgress(100);
-                    showToast("Model initialized successfully");
+                    showToast(localizedText("モデルの初期化に成功しました", "Model initialized successfully"));
                     updateAutoTemplatePreview(config);
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Model init error", t);
                 runOnUiThread(() -> {
-                    showToast("Model init error: " + t.getMessage());
-                    modelFileInfo.setText("Model init failed");
+                    showToast(localizedText("モデル初期化エラー: ", "Model init error: ") + t.getMessage());
+                    modelFileInfo.setText(localizedText("モデルの初期化に失敗しました", "Model init failed"));
                     loadModelButton.setEnabled(true);
                 });
             } finally {

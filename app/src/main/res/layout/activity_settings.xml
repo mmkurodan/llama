@@ -25,7 +25,7 @@
             android:id="@+id/languageLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Display Language / 表示言語"
+            android:text="Display Language"
             android:paddingTop="8dp" />
 
         <Spinner
