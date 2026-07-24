@@ -585,7 +585,7 @@ public class SettingsActivity extends Activity {
     }
 
     private String localizedText(String ja, String en) {
-        return AppLanguageManager.isJapanese(this) ? ja : en;
+        return Translations.get(this, ja, en);
     }
 
     private void applyLocalizedUiText() {
@@ -883,20 +883,25 @@ public class SettingsActivity extends Activity {
         if (languageLabel != null) {
             languageLabel.setText(localizedText("表示言語", "Display Language"));
         }
-        String[] languages = new String[] { "日本語", "English" };
+        String[] languages = AppLanguageManager.SUPPORTED_LANGUAGE_LABELS;
         ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, languages);
         languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         languageSpinner.setAdapter(languageAdapter);
 
         String currentLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
-        languageSpinner.setSelection(AppLanguageManager.LANGUAGE_JA.equals(currentLanguage) ? 0 : 1, false);
+        int currentIndex = AppLanguageManager.indexOf(currentLanguage);
+        if (currentIndex < 0) {
+            currentIndex = AppLanguageManager.indexOf(AppLanguageManager.LANGUAGE_EN);
+        }
+        languageSpinner.setSelection(currentIndex, false);
 
         languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
-                String selectedLanguage = (position == 0)
-                        ? AppLanguageManager.LANGUAGE_JA
-                        : AppLanguageManager.LANGUAGE_EN;
+                if (position < 0 || position >= AppLanguageManager.SUPPORTED_LANGUAGES.length) {
+                    return;
+                }
+                String selectedLanguage = AppLanguageManager.SUPPORTED_LANGUAGES[position];
                 String existingLanguage = AppLanguageManager.getOrInitDisplayLanguage(SettingsActivity.this);
                 if (!selectedLanguage.equals(existingLanguage)) {
                     AppLanguageManager.saveDisplayLanguage(SettingsActivity.this, selectedLanguage);

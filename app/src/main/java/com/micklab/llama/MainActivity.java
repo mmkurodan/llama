@@ -1193,7 +1193,7 @@ public class MainActivity extends Activity {
     }
 
     private String localizedText(String ja, String en) {
-        return AppLanguageManager.isJapanese(this) ? ja : en;
+        return Translations.get(this, ja, en);
     }
 
     private void applyLocalizedUiText() {
@@ -1279,27 +1279,24 @@ public class MainActivity extends Activity {
         }
 
         TextView messageView = new TextView(this);
-        messageView.setText(
-                "[English]\n" +
-                "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
-                "0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
-                "1) In Settings, load a model with Load Model.\n" +
-                "2) Tap SAVE & CLOSE to return to the main screen.\n" +
-                "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
-                "[日本語]\n" +
+        messageView.setText(localizedText(
                 "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
                 "0) 起動時にAPI/WebUI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
                 "1) SettingsでモデルをLoad Modelしてください。\n" +
                 "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
                 "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
-                "[TIPS]\n" +
-                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings.\n\n" +
-                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。");
+                "【ヒント】大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。",
+                "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
+                "0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
+                "1) In Settings, load a model with Load Model.\n" +
+                "2) Tap SAVE & CLOSE to return to the main screen.\n" +
+                "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
+                "TIPS: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings."));
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
-        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
+        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない", "Don't show next time"));
         doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
 
         LinearLayout dialogContentLayout = new LinearLayout(this);
@@ -1313,7 +1310,7 @@ public class MainActivity extends Activity {
         dialogScrollView.addView(dialogContentLayout);
 
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("クイックスタート / Quick Start", "Quick Start / クイックスタート"))
+                .setTitle(localizedText("クイックスタート", "Quick Start"))
                 .setView(dialogScrollView)
                 .setCancelable(false)
                 .setPositiveButton("OK", (dialog, which) -> {
@@ -1357,7 +1354,7 @@ public class MainActivity extends Activity {
         messageView.setLineSpacing(0f, 1.1f);
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
-        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
+        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない", "Don't show next time"));
         doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
 
         LinearLayout dialogContentLayout = new LinearLayout(this);

@@ -85,7 +85,7 @@ public class DocumentsActivity extends Activity {
     }
 
     private String localizedText(String ja, String en) {
-        return AppLanguageManager.isJapanese(this) ? ja : en;
+        return Translations.get(this, ja, en);
     }
 
     private void applyLocalizedUiText() {
