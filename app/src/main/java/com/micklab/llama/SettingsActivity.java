@@ -1719,14 +1719,14 @@ public class SettingsActivity extends Activity {
             loadedModelPath = null;
             modelLoadedSuccessfully = false;
             modelFileInfo.setText(localizedText(
-                    "現在のプロファイルを変更しました: " + modelFile.getName(),
-                    "Current profile now uses: " + modelFile.getName()));
+                    "現在のプロファイルを変更しました: ",
+                    "Current profile now uses: ") + modelFile.getName());
             modelProgressBar.setProgress(0);
             lastDownloadProgress = 0;
             updateAutoTemplatePreview(config);
             showToast(localizedText(
-                    "現在のプロファイルを更新しました: " + config.name,
-                    "Updated current profile: " + config.name));
+                    "現在のプロファイルを更新しました: ",
+                    "Updated current profile: ") + config.name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to switch current profile to downloaded model", e);
             showToast(localizedText(
@@ -1848,7 +1848,8 @@ public class SettingsActivity extends Activity {
         updateUiReferencesForRename(oldName, newName);
 
         String suffix = updatedProfiles > 0
-                ? localizedText("（更新したプロファイル: " + updatedProfiles + "）", " (updated profiles: " + updatedProfiles + ")")
+                ? localizedText("（更新したプロファイル: ", " (updated profiles: ") + updatedProfiles
+                        + localizedText("）", ")")
                 : "";
         showToast(localizedText("名前を変更しました: ", "Renamed to: ") + newName + suffix);
     }
@@ -1914,8 +1915,8 @@ public class SettingsActivity extends Activity {
     private void searchHuggingFaceRepositories(String rawQuery) {
         final String query = rawQuery != null ? rawQuery.trim() : "";
         setHuggingFaceSearchBusy(true, localizedText(
-                "Hugging Face を検索中... " + query,
-                "Searching Hugging Face... " + query));
+                "Hugging Face を検索中... ",
+                "Searching Hugging Face... ") + query);
 
         new Thread(() -> {
             try {
@@ -1964,8 +1965,8 @@ public class SettingsActivity extends Activity {
 
     private void fetchHuggingFaceRepositoryFiles(HuggingFaceApiClient.ModelSearchResult result) {
         setHuggingFaceSearchBusy(true, localizedText(
-                "GGUF 一覧を取得中... " + result.getRepoId(),
-                "Loading GGUF files... " + result.getRepoId()));
+                "GGUF 一覧を取得中... ",
+                "Loading GGUF files... ") + result.getRepoId());
 
         new Thread(() -> {
             try {
@@ -2027,8 +2028,8 @@ public class SettingsActivity extends Activity {
         updateAutoTemplatePreview(currentConfig);
 
         modelFileInfo.setText(localizedText(
-                "選択したモデル: " + selectedFile.getFilename(),
-                "Selected model: " + selectedFile.getFilename()));
+                "選択したモデル: ",
+                "Selected model: ") + selectedFile.getFilename());
         startModelAction(
                 true,
                 () -> {
@@ -2153,7 +2154,7 @@ public class SettingsActivity extends Activity {
         modelProgressBar.setIndeterminate(candidate.sizeBytes <= 0);
         modelProgressBar.setProgress(0);
         lastDownloadProgress = 0;
-        modelFileInfo.setText(localizedText("モデルを取り込み中... " + displayName, "Importing model... " + displayName));
+        modelFileInfo.setText(localizedText("モデルを取り込み中... ", "Importing model... ") + displayName);
 
         new Thread(() -> {
             String error = copyImportedModelToStorage(sourceUri, destFile, candidate.sizeBytes, displayName);
@@ -2173,9 +2174,8 @@ public class SettingsActivity extends Activity {
                 modelLoadedSuccessfully = false;
                 boolean importedProjector = ModelFileHelper.isLikelyProjectorFilename(displayName);
                 if (importedProjector) {
-                    modelFileInfo.setText(localizedText(
-                            "mmproj を取り込みました: " + displayName + " (" + destFile.length() + " bytes)",
-                            "Imported mmproj: " + displayName + " (" + destFile.length() + " bytes)"));
+                    modelFileInfo.setText(localizedText("mmproj を取り込みました: ", "Imported mmproj: ")
+                            + displayName + " (" + destFile.length() + " bytes)");
                     String modelReference = modelUrlInput.getText().toString().trim();
                     if (!modelReference.isEmpty()
                             && ModelFileHelper.canAutoApplyProjectorReference(modelReference, displayName)) {
@@ -2188,8 +2188,8 @@ public class SettingsActivity extends Activity {
                 modelProgressBar.setProgress(0);
                 currentConfig = getConfigFromUI();
                 showToast(importedProjector
-                        ? localizedText("mmproj を取り込みました: " + displayName, "Imported mmproj: " + displayName)
-                        : localizedText("モデルファイルを取り込みました: " + displayName, "Imported model file: " + displayName));
+                        ? localizedText("mmproj を取り込みました: ", "Imported mmproj: ") + displayName
+                        : localizedText("モデルファイルを取り込みました: ", "Imported model file: ") + displayName);
                 updateAutoTemplatePreview(currentConfig);
             });
         }).start();
@@ -2259,8 +2259,8 @@ public class SettingsActivity extends Activity {
                             selectedMtpReference.isEmpty()
                                 ? localizedText("MTP: 自モデルのヘッドを使用 (設定保存で反映)",
                                                 "MTP: using own head (save config to apply)")
-                                : localizedText("MTP: " + selectedMtpReference + " (設定保存で反映)",
-                                                "MTP: " + selectedMtpReference + " (save config to apply)"),
+                                : "MTP: " + selectedMtpReference
+                                                + localizedText(" (設定保存で反映)", " (save config to apply)"),
                             Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
@@ -2276,10 +2276,12 @@ public class SettingsActivity extends Activity {
         // an actually-incompatible projector is also disabled automatically at load time (#6).
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("mmproj の互換性に注意", "mmproj may be incompatible"))
-                .setMessage(localizedText(
-                        "選択した mmproj (" + projectorFile.getName() + ") はこのモデルと互換でない可能性があります。"
+                .setMessage(localizedText("選択した mmproj (", "The selected mmproj (")
+                        + projectorFile.getName()
+                        + localizedText(
+                        ") はこのモデルと互換でない可能性があります。"
                                 + "互換性がない場合、読み込み時に自動で無効化されます。それでも設定しますか？",
-                        "The selected mmproj (" + projectorFile.getName() + ") may be incompatible with this model. "
+                        ") may be incompatible with this model. "
                                 + "If it is, it will be disabled automatically at load time. Set it anyway?"))
                 .setPositiveButton(localizedText("設定する", "Set anyway"),
                         (dialog, which) -> setSelectedProjectorReference(projectorFile.getName(), true))
@@ -2427,9 +2429,8 @@ public class SettingsActivity extends Activity {
                     "Projector: 未選択",
                     "Projector: not selected"));
         } else {
-            multimodalProjectorInfo.setText(localizedText(
-                    "Projector: " + extractFilenameFromUrl(selectedProjectorReference),
-                    "Projector: " + extractFilenameFromUrl(selectedProjectorReference)));
+            multimodalProjectorInfo.setText(localizedText("Projector: ", "Projector: ")
+                    + extractFilenameFromUrl(selectedProjectorReference));
         }
         updateActionButtonStateForBusy();
     }
@@ -2536,8 +2537,8 @@ public class SettingsActivity extends Activity {
                                 modelProgressBar.setIndeterminate(false);
                                 modelProgressBar.setProgress(progressValue);
                                 modelFileInfo.setText(localizedText(
-                                        "モデルを取り込み中... " + displayName + " (" + progressValue + "%)",
-                                        "Importing model... " + displayName + " (" + progressValue + "%)"));
+                                        "モデルを取り込み中... ",
+                                        "Importing model... ") + displayName + " (" + progressValue + "%)");
                             });
                         }
                     }
@@ -2609,8 +2610,8 @@ public class SettingsActivity extends Activity {
                     showToast(success ? "Model initialized successfully" : "Model initialization failed");
                     if (success && disabledMmproj != null) {
                         showToast(localizedText(
-                                "選択した mmproj はこのモデルと非互換のため無効化し、テキスト専用で読み込みました: " + disabledMmproj,
-                                "The selected mmproj is incompatible and was disabled; loaded text-only: " + disabledMmproj));
+                                "選択した mmproj はこのモデルと非互換のため無効化し、テキスト専用で読み込みました: ",
+                                "The selected mmproj is incompatible and was disabled; loaded text-only: ") + disabledMmproj);
                     }
                     updateAutoTemplatePreview(config);
                 });
@@ -2655,10 +2656,12 @@ public class SettingsActivity extends Activity {
         String mmprojName = extractFilenameFromUrl(config.multimodalProjectorUrl);
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("mmproj をダウンロード", "Download mmproj"))
-                .setMessage(localizedText(
-                        "このマルチモーダルモデルは mmproj (" + mmprojName + ") も使用します。"
+                .setMessage(localizedText("このマルチモーダルモデルは mmproj (", "This multimodal model also uses an mmproj (")
+                        + mmprojName
+                        + localizedText(
+                        ") も使用します。"
                                 + "続けてダウンロードしますか？\nスキップした場合はテキスト専用で読み込みます。",
-                        "This multimodal model also uses an mmproj (" + mmprojName + "). "
+                        "). "
                                 + "Download it as well?\nIf you skip, the model loads text-only."))
                 .setPositiveButton(localizedText("ダウンロードする", "Download"),
                         (dialog, which) -> runModelAction(loadAfterDownload, true))
@@ -2795,9 +2798,8 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> {
                     String filename = extractFilenameFromUrl(config.modelUrl);
                     modelFileInfo.setText(success
-                            ? localizedText(
-                                    "ダウンロード完了: " + (filename == null ? config.name : filename),
-                                    "Download complete: " + (filename == null ? config.name : filename))
+                            ? localizedText("ダウンロード完了: ", "Download complete: ")
+                                    + (filename == null ? config.name : filename)
                             : localizedText("ダウンロードに失敗しました", "Download failed"));
                     modelProgressBar.setProgress(success ? 100 : 0);
                     lastDownloadProgress = success ? 100 : 0;

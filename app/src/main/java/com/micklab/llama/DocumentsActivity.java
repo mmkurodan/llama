@@ -116,7 +116,7 @@ public class DocumentsActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText(label, text);
         clipboard.setPrimaryClip(clip);
-        showToast(localizedText("クリップボードにコピーしました", label + " copied to clipboard"));
+        showToast(label + localizedText("をクリップボードにコピーしました", " copied to clipboard"));
     }
 
     private void showToast(final String msg) {

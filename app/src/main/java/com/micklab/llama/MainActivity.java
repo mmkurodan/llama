@@ -1333,8 +1333,12 @@ public class MainActivity extends Activity {
         }
 
         String message = localizedText(
-                "ローカルAPI/WebUIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API と WebUI を利用できます。WebUIはブラウザで http://<端末IP>:" + apiPort + "/ から開けます。後からメイン画面でも切り替えられます。",
-                "Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:" + apiPort + "/ . You can also change this later from the main screen.");
+                "ローカルAPI/WebUIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API と WebUI を利用できます。WebUIはブラウザで http://<端末IP>:",
+                "Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:")
+                + apiPort
+                + localizedText(
+                "/ から開けます。後からメイン画面でも切り替えられます。",
+                "/ . You can also change this later from the main screen.");
 
         TextView messageView = new TextView(this);
         messageView.setText(message);
@@ -1414,12 +1418,14 @@ public class MainActivity extends Activity {
         clearPendingModelLoadMarker();
 
         String message = localizedText(
-                "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: " + profileName
-                        + "\nモデル: " + modelName
-                        + "\n\n再試行は行いません。必要な場合は Settings から改めて Load Model を実行してください。",
-                "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: "
-                        + profileName + "\nModel: " + modelName
-                        + "\n\nNo automatic retry was performed. If needed, load the model again from Settings.");
+                "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: ",
+                "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: ")
+                + profileName
+                + localizedText("\nモデル: ", "\nModel: ")
+                + modelName
+                + localizedText(
+                "\n\n再試行は行いません。必要な場合は Settings から改めて Load Model を実行してください。",
+                "\n\nNo automatic retry was performed. If needed, load the model again from Settings.");
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
@@ -1454,7 +1460,7 @@ public class MainActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText(label, text);
         clipboard.setPrimaryClip(clip);
-        showToast(label + " copied to clipboard");
+        showToast(label + localizedText("をクリップボードにコピーしました", " copied to clipboard"));
     }
 
     private void downloadDisplayedLog() {
@@ -1553,9 +1559,9 @@ public class MainActivity extends Activity {
     private void updateApiServerUI() {
         if (isServiceRunning) {
             apiServerButton.setText(localizedText("API/WebUI停止", "Stop API/WebUI"));
-            apiServerStatusMain.setText(localizedText(
-                    "API/WebUI: ポート " + apiPort + " で稼働中 (WebUI: /)",
-                    "API/WebUI: Running on port " + apiPort + " (WebUI: /)"));
+            apiServerStatusMain.setText(localizedText("API/WebUI: ポート ", "API/WebUI: Running on port ")
+                    + apiPort
+                    + localizedText(" で稼働中 (WebUI: /)", " (WebUI: /)"));
         } else {
             apiServerButton.setText(localizedText("API/WebUI開始", "Start API/WebUI"));
             apiServerStatusMain.setText(localizedText("API/WebUI: 停止中", "API/WebUI: Stopped"));
