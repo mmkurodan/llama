@@ -54,7 +54,7 @@
             android:paddingTop="8dp">
 
             <Button
-                android:id="@+id/saveConfigButton"
+                style="@style/PrimaryButton" android:id="@+id/saveConfigButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -62,7 +62,7 @@
                 android:layout_marginEnd="4dp" />
 
             <Button
-                android:id="@+id/deleteConfigButton"
+                style="@style/SecondaryButton" android:id="@+id/deleteConfigButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -83,7 +83,7 @@
             android:minHeight="48dp" />
 
         <Button
-            android:id="@+id/loadConfigButton"
+            style="@style/SecondaryButton" android:id="@+id/loadConfigButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Load Selected Config" />
@@ -120,7 +120,7 @@
             android:minLines="2" />
 
         <Button
-            android:id="@+id/loadModelButton"
+            style="@style/PrimaryButton" android:id="@+id/loadModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Load Model" />
@@ -145,7 +145,7 @@
             android:paddingTop="4dp">
 
             <Button
-                android:id="@+id/selectProjectorButton"
+                style="@style/SecondaryButton" android:id="@+id/selectProjectorButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -153,7 +153,7 @@
                 android:text="Select mmproj" />
 
             <Button
-                android:id="@+id/clearProjectorButton"
+                style="@style/SecondaryButton" android:id="@+id/clearProjectorButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -191,26 +191,26 @@
         </LinearLayout>
 
         <Button
-            android:id="@+id/mtpModelButton"
+            style="@style/SecondaryButton" android:id="@+id/mtpModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="MTP draft model (default: own head)" />
 
         <Button
-            android:id="@+id/maintainModelButton"
+            style="@style/SecondaryButton" android:id="@+id/maintainModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="MAINTAIN MODEL" />
 
         <Button
-            android:id="@+id/searchGgufButton"
+            style="@style/PrimaryButton" android:id="@+id/searchGgufButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Search GGUF on Hugging Face" />
 
         <Button
-            android:id="@+id/importModelButton"
+            style="@style/SecondaryButton" android:id="@+id/importModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="gguf import from local device" />
@@ -1119,13 +1119,13 @@
             android:layout_marginBottom="16dp" />
 
         <Button
-            android:id="@+id/licenseButton"
+            style="@style/SecondaryButton" android:id="@+id/licenseButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show License" />
 
         <Button
-            android:id="@+id/documentsButton"
+            style="@style/SecondaryButton" android:id="@+id/documentsButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Documents"
@@ -1133,7 +1133,7 @@
 
         <!-- Back Button -->
         <Button
-            android:id="@+id/backButton"
+            style="@style/PrimaryButton" android:id="@+id/backButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="SAVE &amp; CLOSE"
@@ -1141,7 +1141,7 @@
 
         <!-- Cancel Button -->
         <Button
-            android:id="@+id/cancelButton"
+            style="@style/SecondaryButton" android:id="@+id/cancelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="CLOSE"
