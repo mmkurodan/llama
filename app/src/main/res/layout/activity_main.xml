@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- ① TOP STATUS CARD: API status / speed / temp / active backend -->
+        <!-- ① STATUS + ACTIONS CARD: status/stats, then API toggle + Reset/Settings -->
         <LinearLayout
             style="@style/Card"
             android:layout_width="match_parent"
@@ -36,19 +36,12 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 
-        </LinearLayout>
-
-        <!-- ② PRIMARY ACTIONS CARD: API on/off (primary) / Reset + Settings (secondary) -->
-        <LinearLayout
-            style="@style/Card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
             <Button
                 android:id="@+id/apiServerButton"
                 style="@style/PrimaryButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
                 android:text="Start API/WebUI" />
 
             <LinearLayout
@@ -79,20 +72,28 @@
 
         </LinearLayout>
 
-        <!-- ③ WEB UI URL CARD: tap to open in browser, long-press to copy -->
+        <!-- ② WEB AI CHAT CARD: title + open-in-browser button -->
         <LinearLayout
             style="@style/Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
             <TextView
-                android:id="@+id/webUiUrlView"
+                android:id="@+id/webChatTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Web UI: (start API/WebUI)"
-                android:textColor="@color/link_blue"
-                android:textSize="13sp"
+                android:text="Web AI Chat"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
                 android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/openWebUiButton"
+                style="@style/PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Open in browser" />
 
         </LinearLayout>
 

@@ -97,7 +97,8 @@ public class MainActivity extends Activity {
     private TextView directSectionHeader;   // collapsible header for the direct-run section
     private View     directSectionContent;  // collapsible body of the direct-run section
     private View     processingSectionContent;  // collapsible body of the processing/log section
-    private TextView webUiUrlView;          // Web UI URL (tap to open, long-press to copy)
+    private TextView webChatTitle;          // "Web AI Chat" card title
+    private Button   openWebUiButton;       // opens the Web UI in the browser
     private ConnectivityManager connectivityManager;
     private TextView promptLabel;
     private TextView outputSectionLabel;
@@ -253,7 +254,8 @@ public class MainActivity extends Activity {
         profileSpinner = findViewById(R.id.profileSpinner);
         directSectionHeader = findViewById(R.id.directSectionHeader);
         directSectionContent = findViewById(R.id.directSectionContent);
-        webUiUrlView = findViewById(R.id.webUiUrlView);
+        webChatTitle = findViewById(R.id.webChatTitle);
+        openWebUiButton = findViewById(R.id.openWebUiButton);
         processingSectionContent = findViewById(R.id.processingSectionContent);
         processingSectionLabel = findViewById(R.id.processingSectionLabel);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
@@ -986,12 +988,16 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---- Web UI URL (tap to open in browser, long-press to copy) ----
+    // ---- Web AI Chat: a button that opens the Web UI in the browser ----
     private void setupWebUiUrl() {
-        if (webUiUrlView == null) {
+        if (openWebUiButton == null) {
             return;
         }
-        webUiUrlView.setOnClickListener(v -> {
+        if (webChatTitle != null) {
+            webChatTitle.setText(localizedText("Web AI チャット", "Web AI Chat"));
+        }
+        openWebUiButton.setText(localizedText("ブラウザで開く", "Open in browser"));
+        openWebUiButton.setOnClickListener(v -> {
             final String url = buildWebUiUrl();
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
@@ -999,19 +1005,15 @@ public class MainActivity extends Activity {
                 showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
             }
         });
-        webUiUrlView.setOnLongClickListener(v -> {
-            copyToClipboard("Web UI URL", buildWebUiUrl());
-            return true;
-        });
         updateWebUiUrl();
     }
 
     private void updateWebUiUrl() {
-        if (webUiUrlView == null) {
+        if (openWebUiButton == null) {
             return;
         }
-        webUiUrlView.setText(localizedText("Web UI（タップで起動・長押しでコピー）: ",
-                "Web UI (tap to open / long-press to copy): ") + buildWebUiUrl());
+        // The Web UI is only reachable while the server is running.
+        openWebUiButton.setEnabled(isServiceRunning);
     }
 
     private String buildWebUiUrl() {

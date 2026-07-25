@@ -365,5 +365,9 @@ public final class Translations {
         e("Model init failed: ", "Échec de l'initialisation du modèle : ", "Error al inicializar el modelo: ", "Falha ao inicializar o modelo: ", "Modellinitialisierung fehlgeschlagen: ", "Inizializzazione del modello non riuscita: ", "模型初始化失败：", "모델 초기화 실패: ");
         e("Model loaded: ", "Modèle chargé : ", "Modelo cargado: ", "Modelo carregado: ", "Modell geladen: ", "Modello caricato: ", "已加载模型：", "모델 로드됨: ");
         e("Model init error: ", "Erreur d'initialisation du modèle : ", "Error de inicialización del modelo: ", "Erro de inicialização do modelo: ", "Fehler bei der Modellinitialisierung: ", "Errore di inizializzazione del modello: ", "模型初始化错误：", "모델 초기화 오류: ");
+
+        // Main screen Web AI Chat card (UI redesign).
+        e("Web AI Chat", "Chat IA Web", "Chat IA web", "Chat de IA na Web", "Web-KI-Chat", "Chat IA web", "Web AI 聊天", "웹 AI 채팅");
+        e("Open in browser", "Ouvrir dans le navigateur", "Abrir en el navegador", "Abrir no navegador", "Im Browser öffnen", "Apri nel browser", "在浏览器中打开", "브라우저에서 열기");
     }
 }
