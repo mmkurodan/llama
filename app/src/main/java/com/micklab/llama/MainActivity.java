@@ -315,55 +315,92 @@ public class MainActivity extends Activity {
                 showToast("Please enter a prompt");
                 return;
             }
-
-            exitLogViewToStatus();
-            
-            // Check if busy
-            if (!modelManager.tryAcquire()) {
-                showToast("Model is busy processing another request");
-                return;
+            // First-run guard: if the model still needs downloading, confirm before starting
+            // (the download then happens as part of loading the configuration).
+            if (!isCurrentModelDownloaded()) {
+                confirmFirstModelDownloadThen(() -> startDirectGeneration(userPrompt));
+            } else {
+                startDirectGeneration(userPrompt);
             }
-            updateSettingsButtonForBusyState();
-            final int generationSessionId = beginDirectGenerationSession();
-            
-            final String configName = resolveDirectInputConfigName();
-            // If the selected configuration model is not loaded, load it first
-            if (shouldLoadConfigurationModelForDirectInput()) {
-                appendMessage(modelManager.isModelLoaded()
-                        ? "Loaded model differs from selected profile. Loading profile \"" + configName + "\"..."
-                        : "Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
-                new Thread(() -> {
-                    try {
-                        boolean loadSuccess = modelManager.loadConfiguration(configName);
-                        if (!loadSuccess) {
-                            modelManager.release();
-                            showToast("Failed to load model. Please check Settings.");
-                            appendMessage("Model load failed.");
-                            return;
-                        }
-                        if (!shouldContinueDirectGeneration(generationSessionId)) {
-                            modelManager.release();
-                            runOnUiThread(this::updateSettingsButtonForBusyState);
-                            appendMessage("Prompt cancelled before generation started.");
-                            return;
-                        }
-                        appendMessage("Model loaded successfully. Processing prompt...");
-                        // Now proceed with generation
-                        processGeneration(userPrompt, generationSessionId);
-                    } catch (Throwable t) {
-                        modelManager.release();
-                        appendException("Model load error", t);
-                        showToast("Model load error: " + t.getMessage());
-                    }
-                }).start();
-                return;
-            }
-            new Thread(() -> processGeneration(userPrompt, generationSessionId)).start();
         });
 
         showStartupDialogs();
     }
     
+    // True when the active configuration's model file is already on the device (or there is
+    // nothing to download). Used to gate Send / Open-in-browser behind a first-download notice.
+    private boolean isCurrentModelDownloaded() {
+        String modelReference = (currentConfig != null) ? currentConfig.modelUrl : null;
+        return modelManager == null || modelManager.isModelReferenceDownloaded(modelReference);
+    }
+
+    // First-run notice: downloading the default model takes time and a large amount of data.
+    private void confirmFirstModelDownloadThen(Runnable onConfirm) {
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("モデルのダウンロード", "Download model"))
+                .setMessage(localizedText(
+                        "初回のみ、モデルのダウンロードに時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi での実行を推奨します。続行しますか？",
+                        "The model will be downloaded now. The first time only, this takes time and a large amount of data (possibly several GB). Wi-Fi is strongly recommended. Continue?"))
+                .setPositiveButton(localizedText("続行", "Continue"), (d, w) -> onConfirm.run())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private void openWebUiInBrowser() {
+        final String url = buildWebUiUrl();
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+        }
+    }
+
+    private void startDirectGeneration(final String userPrompt) {
+        exitLogViewToStatus();
+
+        // Check if busy
+        if (!modelManager.tryAcquire()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
+        updateSettingsButtonForBusyState();
+        final int generationSessionId = beginDirectGenerationSession();
+
+        final String configName = resolveDirectInputConfigName();
+        // If the selected configuration model is not loaded, load it first
+        if (shouldLoadConfigurationModelForDirectInput()) {
+            appendMessage(modelManager.isModelLoaded()
+                    ? "Loaded model differs from selected profile. Loading profile \"" + configName + "\"..."
+                    : "Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
+            new Thread(() -> {
+                try {
+                    boolean loadSuccess = modelManager.loadConfiguration(configName);
+                    if (!loadSuccess) {
+                        modelManager.release();
+                        showToast("Failed to load model. Please check Settings.");
+                        appendMessage("Model load failed.");
+                        return;
+                    }
+                    if (!shouldContinueDirectGeneration(generationSessionId)) {
+                        modelManager.release();
+                        runOnUiThread(this::updateSettingsButtonForBusyState);
+                        appendMessage("Prompt cancelled before generation started.");
+                        return;
+                    }
+                    appendMessage("Model loaded successfully. Processing prompt...");
+                    // Now proceed with generation
+                    processGeneration(userPrompt, generationSessionId);
+                } catch (Throwable t) {
+                    modelManager.release();
+                    appendException("Model load error", t);
+                    showToast("Model load error: " + t.getMessage());
+                }
+            }).start();
+            return;
+        }
+        new Thread(() -> processGeneration(userPrompt, generationSessionId)).start();
+    }
+
     private void processGeneration(String userPrompt, int generationSessionId) {
         if (!shouldContinueDirectGeneration(generationSessionId)) {
             modelManager.release();
@@ -998,11 +1035,12 @@ public class MainActivity extends Activity {
         }
         openWebUiButton.setText(localizedText("ブラウザで開く", "Open in browser"));
         openWebUiButton.setOnClickListener(v -> {
-            final String url = buildWebUiUrl();
-            try {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            } catch (Exception e) {
-                showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+            // The WebUI downloads the model on the first chat message; warn up front if the
+            // default model is not on the device yet, then just open the browser.
+            if (!isCurrentModelDownloaded()) {
+                confirmFirstModelDownloadThen(this::openWebUiInBrowser);
+            } else {
+                openWebUiInBrowser();
             }
         });
         updateWebUiUrl();
@@ -1578,6 +1616,10 @@ public class MainActivity extends Activity {
         }
         if (initModelButton != null) {
             initModelButton.setEnabled(true);
+        }
+        // Direct-run Send is disabled while an inference/generation is running.
+        if (sendButton != null) {
+            sendButton.setEnabled(!isBusy);
         }
     }
     
