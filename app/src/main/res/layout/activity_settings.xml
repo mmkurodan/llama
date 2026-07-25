@@ -86,12 +86,12 @@
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
-        <!-- Model Selection Section -->
+        <!-- Model Loading Section -->
         <TextView
             android:id="@+id/modelSelectionHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Model Selection"
+            android:text="Model Loading"
             android:textSize="18sp"
             android:textStyle="bold"
             android:paddingBottom="8dp" />
@@ -151,41 +151,15 @@
                 android:text="Clear mmproj" />
         </LinearLayout>
 
-        <Switch
-            android:id="@+id/mtpEnableToggle"
+        <!-- Model Management Section -->
+        <TextView
+            android:id="@+id/modelManagementHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="MTP speculative decoding (experimental)" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingTop="2dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:text="n_draft:" />
-
-            <EditText
-                android:id="@+id/mtpNDraftInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:inputType="number"
-                android:text="2" />
-        </LinearLayout>
-
-        <Button
-            style="@style/SecondaryButton" android:id="@+id/mtpModelButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="MTP draft model (default: own head)" />
+            android:text="Model Management"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
 
         <Button
             style="@style/SecondaryButton" android:id="@+id/maintainModelButton"
@@ -219,6 +193,51 @@
             style="?android:attr/progressBarStyleHorizontal"
             android:max="100"
             android:progress="0" />
+
+        <!-- MTP Settings Section -->
+        <TextView
+            android:id="@+id/mtpSettingsHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MTP Settings"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <Switch
+            android:id="@+id/mtpEnableToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MTP speculative decoding (experimental)" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="2dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="n_draft:" />
+
+            <EditText
+                android:id="@+id/mtpNDraftInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:inputType="number"
+                android:text="2" />
+        </LinearLayout>
+
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/mtpModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="MTP draft model (default: own head)" />
 
         <!-- Divider -->
         <View

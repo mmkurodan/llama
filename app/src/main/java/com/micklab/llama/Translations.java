@@ -265,7 +265,9 @@ public final class Translations {
         e("Delete Config", "Supprimer la config", "Eliminar config", "Excluir config", "Konfiguration löschen", "Elimina config", "删除配置", "구성 삭제");
         e("Load Configuration:", "Charger une configuration :", "Cargar configuración:", "Carregar configuração:", "Konfiguration laden:", "Carica configurazione:", "加载配置：", "구성 로드:");
         e("Load Selected Config", "Charger la config sélectionnée", "Cargar la config seleccionada", "Carregar a config selecionada", "Ausgewählte Konfiguration laden", "Carica la config selezionata", "加载所选配置", "선택한 구성 로드");
-        e("Model Selection", "Sélection du modèle", "Selección de modelo", "Seleção de modelo", "Modellauswahl", "Selezione del modello", "模型选择", "모델 선택");
+        e("Model Loading", "Chargement du modèle", "Carga de modelo", "Carregamento de modelo", "Modell laden", "Caricamento del modello", "模型加载", "모델 로드");
+        e("Model Management", "Gestion des modèles", "Gestión de modelos", "Gerenciamento de modelos", "Modellverwaltung", "Gestione modelli", "模型管理", "모델 관리");
+        e("MTP Settings", "Paramètres MTP", "Configuración de MTP", "Configurações de MTP", "MTP-Einstellungen", "Impostazioni MTP", "MTP 设置", "MTP 설정");
         e("Model URL / Imported File:", "URL du modèle / fichier importé :", "URL del modelo / archivo importado:", "URL do modelo / arquivo importado:", "Modell-URL / importierte Datei:", "URL del modello / file importato:", "模型 URL / 导入的文件：", "모델 URL / 가져온 파일:");
         e("Multimodal Projector (mmproj):", "Projecteur multimodal (mmproj) :", "Proyector multimodal (mmproj):", "Projetor multimodal (mmproj):", "Multimodaler Projektor (mmproj):", "Proiettore multimodale (mmproj):", "多模态投影器 (mmproj)：", "멀티모달 프로젝터 (mmproj):");
         e("No multimodal projector selected", "Aucun projecteur multimodal sélectionné", "Ningún proyector multimodal seleccionado", "Nenhum projetor multimodal selecionado", "Kein multimodaler Projektor ausgewählt", "Nessun proiettore multimodale selezionato", "未选择多模态投影器", "선택된 멀티모달 프로젝터 없음");

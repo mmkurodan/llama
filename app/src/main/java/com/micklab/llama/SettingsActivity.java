@@ -653,7 +653,9 @@ public class SettingsActivity extends Activity {
             case "Delete Config": return "設定を削除";
             case "Load Configuration:": return "設定を読み込み:";
             case "Load Selected Config": return "選択した設定を読み込む";
-            case "Model Selection": return "モデル選択";
+            case "Model Loading": return "モデル読込み";
+            case "Model Management": return "モデル管理";
+            case "MTP Settings": return "MTP設定";
             case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
             case "Multimodal Projector (mmproj):": return "マルチモーダル Projector (mmproj):";
             case "No multimodal projector selected": return "mmproj は未選択です";
@@ -738,6 +740,8 @@ public class SettingsActivity extends Activity {
         int[] headerIds = new int[]{
                 R.id.configurationManagementHeader,
                 R.id.modelSelectionHeader,
+                R.id.modelManagementHeader,
+                R.id.mtpSettingsHeader,
                 R.id.modelParametersHeader,
                 R.id.penaltyParametersHeader,
                 R.id.mirostatParametersHeader,
@@ -870,6 +874,7 @@ public class SettingsActivity extends Activity {
                 || headerId == R.id.mirostatParametersHeader
                 || headerId == R.id.additionalSamplingParametersHeader
                 || headerId == R.id.dryParametersHeader
+                || headerId == R.id.mtpSettingsHeader
                 || headerId == R.id.mcpSettingsHeader;
     }
 
@@ -877,6 +882,8 @@ public class SettingsActivity extends Activity {
     private String sectionIconGlyph(int headerId) {
         if (headerId == R.id.configurationManagementHeader) return "⚙";
         if (headerId == R.id.modelSelectionHeader) return "📦";
+        if (headerId == R.id.modelManagementHeader) return "🗂";
+        if (headerId == R.id.mtpSettingsHeader) return "⚡";
         if (headerId == R.id.modelParametersHeader) return "🎛";
         if (headerId == R.id.penaltyParametersHeader) return "⚖";
         if (headerId == R.id.mirostatParametersHeader) return "🎯";
