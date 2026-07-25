@@ -18,5 +18,7 @@
     <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
+        <!-- Light grey app background so the white content cards float on it. -->
+        <item name="android:windowBackground">@color/screen_bg</item>
     </style>
 </resources>
