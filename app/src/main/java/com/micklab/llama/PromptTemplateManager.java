@@ -111,14 +111,8 @@ public class PromptTemplateManager {
         "<|im_start|>user\n{USER}<|im_end|>\n" +
         "<|im_start|>assistant\n";
     
-    // Gemma has no "system" role: a system prompt is folded into the first user turn.
-    // Emitting a separate <start_of_turn>system turn (even an empty one) is out-of-distribution
-    // for Gemma and can make it ignore multimodal input ("I can't see/hear it").
     private static final String GEMMA_TEMPLATE =
-        "<start_of_turn>user\n{SYSTEM}\n\n{USER}\n<end_of_turn>\n" +
-        "<start_of_turn>model\n";
-
-    private static final String GEMMA_TEMPLATE_NO_SYSTEM =
+        "<start_of_turn>system\n{SYSTEM}\n<end_of_turn>\n" +
         "<start_of_turn>user\n{USER}\n<end_of_turn>\n" +
         "<start_of_turn>model\n";
     
@@ -216,7 +210,7 @@ public class PromptTemplateManager {
     public static String getTemplateForFamily(ModelFamily family, boolean hasSystem) {
         switch (family) {
             case GEMMA:
-                return hasSystem ? GEMMA_TEMPLATE : GEMMA_TEMPLATE_NO_SYSTEM;
+                return GEMMA_TEMPLATE;
             case LLAMA:
                 return hasSystem ? LLAMA_TEMPLATE : LLAMA_TEMPLATE_NO_SYSTEM;
             case MISTRAL:
@@ -723,30 +717,21 @@ public class PromptTemplateManager {
         return sb.toString();
     }
 
-    // Gemma family multi-turn. Gemma has NO "system" role — emitting a <start_of_turn>system
-    // turn (even an empty one) is out-of-distribution and makes the model ignore multimodal
-    // input ("I can't see/hear it"). The system prompt is folded into the first user turn.
+    // Gemma family multi-turn. Emit the leading system turn even when empty so the
+    // prompt shape stays compatible with the required system/user/model protocol.
     private static String buildMultiTurnGemma(String system, List<Message> history) {
         StringBuilder sb = new StringBuilder();
-        boolean systemPending = system != null && !system.isEmpty();
-        boolean firstUser = true;
+        sb.append("<start_of_turn>system\n")
+                .append(system != null ? system : "")
+                .append("\n<end_of_turn>\n");
         for (Message msg : history) {
             if ("user".equals(msg.role)) {
-                sb.append("<start_of_turn>user\n");
-                if (firstUser && systemPending) {
-                    sb.append(system).append("\n\n");
-                    systemPending = false;
-                }
-                sb.append(msg.content).append("\n<end_of_turn>\n");
-                firstUser = false;
+                sb.append("<start_of_turn>user\n")
+                  .append(msg.content).append("\n<end_of_turn>\n");
             } else if ("assistant".equals(msg.role)) {
                 sb.append("<start_of_turn>model\n")
                   .append(msg.content).append("\n<end_of_turn>\n");
             }
-        }
-        // A system prompt with no user message yet: still fold it into a user turn.
-        if (systemPending) {
-            sb.append("<start_of_turn>user\n").append(system).append("\n<end_of_turn>\n");
         }
         sb.append("<start_of_turn>model\n");
         return sb.toString();
