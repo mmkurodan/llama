@@ -787,10 +787,11 @@ public class SettingsActivity extends Activity {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
-            if (i > 0) {
-                sectionParams.topMargin = dpToPx(8);
-            }
+            sectionParams.bottomMargin = dpToPx(10);
             sectionLayout.setLayoutParams(sectionParams);
+            // Card look: white rounded background with internal padding.
+            sectionLayout.setBackgroundResource(R.drawable.bg_card);
+            sectionLayout.setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12));
 
             LinearLayout headerRow = new LinearLayout(this);
             headerRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -806,18 +807,30 @@ public class SettingsActivity extends Activity {
                     1f
             ));
 
+            // Section icon (mockup style): glyph before the title.
+            TextView iconView = new TextView(this);
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            iconParams.rightMargin = dpToPx(8);
+            iconView.setLayoutParams(iconParams);
+            iconView.setText(sectionIconGlyph(headerIds[i]));
+            iconView.setTextSize(18f);
+
+            // Expand/collapse chevron, now placed on the right edge of the row.
             TextView indicatorView = new TextView(this);
             indicatorView.setLayoutParams(new LinearLayout.LayoutParams(
                     dpToPx(28),
                     ViewGroup.LayoutParams.WRAP_CONTENT
             ));
             indicatorView.setGravity(Gravity.CENTER);
-            indicatorView.setTextSize(20f);
+            indicatorView.setTextSize(16f);
             indicatorView.setTypeface(Typeface.DEFAULT_BOLD);
-            indicatorView.setPadding(0, 0, dpToPx(8), 0);
 
-            headerRow.addView(indicatorView);
+            headerRow.addView(iconView);
             headerRow.addView(headerView);
+            headerRow.addView(indicatorView);
 
             LinearLayout contentLayout = new LinearLayout(this);
             contentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -858,6 +871,23 @@ public class SettingsActivity extends Activity {
                 || headerId == R.id.additionalSamplingParametersHeader
                 || headerId == R.id.dryParametersHeader
                 || headerId == R.id.mcpSettingsHeader;
+    }
+
+    // Emoji glyph shown before each collapsible section title (mockup card style).
+    private String sectionIconGlyph(int headerId) {
+        if (headerId == R.id.configurationManagementHeader) return "⚙";
+        if (headerId == R.id.modelSelectionHeader) return "📦";
+        if (headerId == R.id.modelParametersHeader) return "🎛";
+        if (headerId == R.id.penaltyParametersHeader) return "⚖";
+        if (headerId == R.id.mirostatParametersHeader) return "🎯";
+        if (headerId == R.id.additionalSamplingParametersHeader) return "🎲";
+        if (headerId == R.id.dryParametersHeader) return "🔁";
+        if (headerId == R.id.outputSettingsHeader) return "📤";
+        if (headerId == R.id.promptTemplateHeader) return "📝";
+        if (headerId == R.id.apiServerHeader) return "🌐";
+        if (headerId == R.id.mcpSettingsHeader) return "🔌";
+        if (headerId == R.id.logSettingsHeader) return "📄";
+        return "•";
     }
 
     private int findChildIndexById(List<View> children, int id) {
