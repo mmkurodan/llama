@@ -58,50 +58,59 @@ public final class Translations {
     public static String quickStart(Context ctx) {
         switch (AppLanguageManager.getOrInitDisplayLanguage(ctx)) {
             case "ja":
-                return "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
-                        "0) 起動時にAPI/WebUI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
-                        "1) SettingsでモデルをLoad Modelしてください。\n2) SAVE & CLOSEでメイン画面へ戻ります。\n3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
-                        "【ヒント】大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。";
+                return "かんたん2ステップで始められます。\n\n" +
+                        "① メイン画面で「API/WebUI開始」を押します。\n" +
+                        "② 「ブラウザで開く」を押すと、Web AI チャットが開きます。\n\n" +
+                        "※ 初回のみ、モデルのダウンロードに時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi をご利用ください。\n\n" +
+                        "このほか、メイン画面の「ダイレクト実行」から端末上で直接プロンプトを試せます。別のモデルの利用や各種機能の有効化は「設定」ボタンから行えます。";
             case "fr":
-                return "IMPORTANT : le téléchargement des modèles peut nécessiter plusieurs gigaoctets de données. L'utilisation des données mobiles peut entraîner des frais importants ; le téléchargement en Wi-Fi est fortement recommandé.\n\n" +
-                        "0) Si la fenêtre d'activation de l'API/WebUI apparaît au démarrage, activez-la si nécessaire ou cochez « Ne plus afficher » pour l'ignorer par la suite.\n" +
-                        "1) Dans les Paramètres, chargez un modèle avec Load Model.\n2) Appuyez sur SAVE & CLOSE pour revenir à l'écran principal.\n3) Saisissez votre instruction dans le champ et appuyez sur Send pour afficher la réponse.\n\n" +
-                        "CONSEILS : le chargement d'un très grand modèle peut s'arrêter si la réservation d'espace d'adressage échoue ou si le processus est interrompu par l'utilisateur. Dans ce cas, l'application affiche un avis au prochain démarrage. Si nécessaire, essayez un modèle plus petit ou rechargez le modèle depuis les Paramètres. Re-init Model est disponible pendant l'exécution et arrête la génération en cours avant de réinitialiser le profil actuel. En cas d'échec, consultez le journal ou rechargez le modèle depuis les Paramètres.";
+                return "Commencez en 2 étapes seulement.\n\n" +
+                        "1) Appuyez sur « Démarrer l'API/WebUI » sur l'écran principal.\n" +
+                        "2) Appuyez sur « Ouvrir dans le navigateur » pour ouvrir le Web AI Chat.\n\n" +
+                        "Remarque : la première fois uniquement, le téléchargement du modèle prend du temps et une grande quantité de données (potentiellement plusieurs Go). Utilisez le Wi-Fi si possible.\n\n" +
+                        "Vous pouvez aussi tester des invites directement sur l'appareil via « Exécution directe » sur l'écran principal. Utilisez d'autres modèles et activez d'autres fonctions depuis le bouton « Paramètres ».";
             case "es":
-                return "IMPORTANTE: descargar modelos puede requerir gigabytes de datos. Usar datos móviles puede generar cargos importantes; se recomienda encarecidamente descargar por Wi-Fi.\n\n" +
-                        "0) Si aparece la ventana de activación de API/WebUI al iniciar, actívela si es necesario o marque «No mostrar la próxima vez» para omitirla en el futuro.\n" +
-                        "1) En Configuración, cargue un modelo con Load Model.\n2) Toque SAVE & CLOSE para volver a la pantalla principal.\n3) Escriba su instrucción en el campo y toque Send para mostrar la respuesta.\n\n" +
-                        "CONSEJOS: la carga de un modelo muy grande puede detenerse si falla la reserva de espacio de direcciones o si el proceso se interrumpe por acción del usuario. En ese caso, la app muestra un aviso en el siguiente inicio. Si es necesario, pruebe un modelo más pequeño o vuelva a cargar el modelo desde Configuración. Re-init Model está disponible mientras hay trabajo en curso y detiene la generación activa antes de reinicializar el perfil actual. Si falla, revise el registro o cargue el modelo de nuevo desde Configuración.";
+                return "Empiece en solo 2 pasos.\n\n" +
+                        "1) Toque «Iniciar API/WebUI» en la pantalla principal.\n" +
+                        "2) Toque «Abrir en el navegador» para abrir el Web AI Chat.\n\n" +
+                        "Nota: solo la primera vez, descargar el modelo lleva tiempo y una gran cantidad de datos (posiblemente varios GB). Use Wi-Fi cuando sea posible.\n\n" +
+                        "También puede probar prompts directamente en el dispositivo desde «Ejecución directa» en la pantalla principal. Use otros modelos y active más funciones desde el botón «Configuración».";
             case "pt":
-                return "IMPORTANTE: baixar modelos pode exigir gigabytes de dados. Usar dados móveis pode gerar cobranças significativas; é altamente recomendável baixar via Wi-Fi.\n\n" +
-                        "0) Se a janela de ativação da API/WebUI aparecer ao iniciar, ative-a quando necessário ou marque \"Não mostrar da próxima vez\" para ignorá-la depois.\n" +
-                        "1) Em Configurações, carregue um modelo com Load Model.\n2) Toque em SAVE & CLOSE para voltar à tela principal.\n3) Digite sua instrução no campo e toque em Send para exibir a resposta.\n\n" +
-                        "DICAS: carregar um modelo muito grande pode parar se a reserva de espaço de endereço falhar ou se o processo for interrompido pelo usuário. Nesse caso, o app mostra um aviso no próximo início. Se necessário, tente um modelo menor ou carregue o modelo novamente em Configurações. Re-init Model está disponível durante a execução e interrompe a geração ativa antes de reinicializar o perfil atual. Se falhar, verifique o registro ou carregue o modelo novamente em Configurações.";
+                return "Comece em apenas 2 passos.\n\n" +
+                        "1) Toque em \"Iniciar API/WebUI\" na tela principal.\n" +
+                        "2) Toque em \"Abrir no navegador\" para abrir o Web AI Chat.\n\n" +
+                        "Observação: apenas na primeira vez, baixar o modelo leva tempo e uma grande quantidade de dados (possivelmente vários GB). Use Wi-Fi quando possível.\n\n" +
+                        "Você também pode testar prompts diretamente no dispositivo em \"Execução direta\" na tela principal. Use outros modelos e ative mais recursos pelo botão \"Configurações\".";
             case "de":
-                return "WICHTIG: Das Herunterladen von Modellen kann mehrere Gigabyte an Daten erfordern. Die Nutzung mobiler Daten kann hohe Kosten verursachen; das Herunterladen über WLAN wird dringend empfohlen.\n\n" +
-                        "0) Wenn beim Start das API/WebUI-Aktivierungsfenster erscheint, aktivieren Sie es bei Bedarf oder aktivieren Sie „Nächstes Mal nicht anzeigen“, um es künftig zu überspringen.\n" +
-                        "1) Laden Sie in den Einstellungen ein Modell mit Load Model.\n2) Tippen Sie auf SAVE & CLOSE, um zum Hauptbildschirm zurückzukehren.\n3) Geben Sie Ihre Anweisung in das Feld ein und tippen Sie auf Send, um die Antwort anzuzeigen.\n\n" +
-                        "TIPPS: Das Laden eines sehr großen Modells kann abbrechen, wenn die Reservierung des Adressraums fehlschlägt oder der Vorgang durch den Benutzer unterbrochen wird. In diesem Fall zeigt die App beim nächsten Start einen Hinweis. Versuchen Sie bei Bedarf ein kleineres Modell oder laden Sie das Modell erneut über die Einstellungen. Re-init Model ist während der Ausführung verfügbar und stoppt die laufende Generierung, bevor das aktuelle Profil neu initialisiert wird. Bei Fehlern prüfen Sie das Protokoll oder laden Sie das Modell erneut über die Einstellungen.";
+                return "In nur 2 Schritten loslegen.\n\n" +
+                        "1) Tippen Sie auf „API/WebUI starten“ auf dem Hauptbildschirm.\n" +
+                        "2) Tippen Sie auf „Im Browser öffnen“, um den Web-KI-Chat zu öffnen.\n\n" +
+                        "Hinweis: Nur beim ersten Mal dauert das Herunterladen des Modells und benötigt eine große Datenmenge (möglicherweise mehrere GB). Verwenden Sie nach Möglichkeit WLAN.\n\n" +
+                        "Sie können Eingaben auch direkt auf dem Gerät über „Direktausführung“ auf dem Hauptbildschirm testen. Nutzen Sie andere Modelle und aktivieren Sie weitere Funktionen über die Schaltfläche „Einstellungen“.";
             case "it":
-                return "IMPORTANTE: il download dei modelli può richiedere gigabyte di dati. L'uso della rete mobile può comportare costi elevati; si consiglia vivamente di scaricare tramite Wi-Fi.\n\n" +
-                        "0) Se all'avvio compare la finestra di attivazione API/WebUI, attivala se necessario o seleziona \"Non mostrare la prossima volta\" per ignorarla in futuro.\n" +
-                        "1) In Impostazioni, carica un modello con Load Model.\n2) Tocca SAVE & CLOSE per tornare alla schermata principale.\n3) Inserisci la tua istruzione nel campo e tocca Send per mostrare la risposta.\n\n" +
-                        "SUGGERIMENTI: il caricamento di un modello molto grande può interrompersi se la riserva dello spazio di indirizzamento fallisce o se il processo viene interrotto dall'utente. In tal caso l'app mostra un avviso al successivo avvio. Se necessario, prova un modello più piccolo o ricarica il modello dalle Impostazioni. Re-init Model è disponibile durante l'esecuzione e arresta la generazione attiva prima di reinizializzare il profilo corrente. Se fallisce, controlla il log o ricarica il modello dalle Impostazioni.";
+                return "Inizia in soli 2 passaggi.\n\n" +
+                        "1) Tocca \"Avvia API/WebUI\" nella schermata principale.\n" +
+                        "2) Tocca \"Apri nel browser\" per aprire il Web AI Chat.\n\n" +
+                        "Nota: solo la prima volta, scaricare il modello richiede tempo e una grande quantità di dati (possibilmente diversi GB). Usa il Wi-Fi quando possibile.\n\n" +
+                        "Puoi anche provare i prompt direttamente sul dispositivo da \"Esecuzione diretta\" nella schermata principale. Usa altri modelli e abilita altre funzioni dal pulsante \"Impostazioni\".";
             case "zh":
-                return "【重要】下载模型可能需要数 GB 的流量。使用移动数据可能产生高额费用，强烈建议在 Wi-Fi 环境下下载。\n\n" +
-                        "0) 若启动时出现 API/WebUI 启用弹窗，可按需启用，或勾选“下次不再显示”以后不再提示。\n" +
-                        "1) 在“设置”中用 Load Model 加载模型。\n2) 点按 SAVE & CLOSE 返回主界面。\n3) 在输入框中输入指令并点按 Send 显示回复。\n\n" +
-                        "【提示】加载超大模型可能因地址空间预留失败或被用户操作中断而停止。此时应用会在下次启动时显示通知。如有需要，请尝试更小的模型或在“设置”中重新加载模型。Re-init Model 在运行中也可点按，会停止进行中的生成并重新初始化当前配置文件。若失败，请查看日志或在“设置”中重新加载模型。";
+                return "只需 2 步即可开始。\n\n" +
+                        "① 在主界面点按“启动 API/WebUI”。\n" +
+                        "② 点按“在浏览器中打开”即可打开 Web AI 聊天。\n\n" +
+                        "注意：仅首次下载模型会耗时并产生大量流量（可能达数 GB）。请尽量使用 Wi-Fi。\n\n" +
+                        "此外，你还可以在主界面的“直接运行”中直接在设备上试用提示。使用其他模型或启用更多功能，可通过“设置”按钮进行。";
             case "ko":
-                return "【중요】모델 다운로드에는 수 GB의 데이터가 필요할 수 있습니다. 모바일 데이터를 사용하면 높은 요금이 발생할 수 있으므로 가능하면 Wi-Fi에서 다운로드하는 것을 강력히 권장합니다.\n\n" +
-                        "0) 시작 시 API/WebUI 활성화 팝업이 표시되면 필요에 따라 활성화하거나 \"다음에 표시 안 함\"을 선택하면 이후에는 표시되지 않습니다.\n" +
-                        "1) 설정에서 Load Model로 모델을 로드하세요.\n2) SAVE & CLOSE를 눌러 메인 화면으로 돌아갑니다.\n3) 입력란에 지시문을 입력하고 Send를 누르면 응답이 표시됩니다.\n\n" +
-                        "【팁】매우 큰 모델의 로드는 주소 공간 예약 실패 또는 사용자 조작으로 중단될 수 있습니다. 이 경우 앱이 다음 실행 시 알림을 표시합니다. 필요하면 더 작은 모델을 시도하거나 설정에서 모델을 다시 로드하세요. Re-init Model은 실행 중에도 누를 수 있으며 진행 중인 생성을 멈추고 현재 프로필을 다시 초기화합니다. 실패하면 로그를 확인하거나 설정에서 모델을 다시 로드하세요.";
+                return "단 2단계로 시작할 수 있습니다.\n\n" +
+                        "① 메인 화면에서 \"API/WebUI 시작\"을 누릅니다.\n" +
+                        "② \"브라우저에서 열기\"를 누르면 웹 AI 채팅이 열립니다.\n\n" +
+                        "참고: 최초 1회에 한해 모델 다운로드에 시간이 걸리고 대용량 데이터(수 GB일 수 있음)가 발생합니다. 가능하면 Wi-Fi를 사용하세요.\n\n" +
+                        "이 밖에도 메인 화면의 \"직접 실행\"에서 기기에서 직접 프롬프트를 시험해 볼 수 있습니다. 다른 모델 사용이나 기능 활성화는 \"설정\" 버튼에서 할 수 있습니다.";
             default:
-                return "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
-                        "0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
-                        "1) In Settings, load a model with Load Model.\n2) Tap SAVE & CLOSE to return to the main screen.\n3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
-                        "TIPS: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings.";
+                return "Get started in just 2 steps.\n\n" +
+                        "1) Tap \"Start API/WebUI\" on the main screen.\n" +
+                        "2) Tap \"Open in browser\" to open the Web AI Chat.\n\n" +
+                        "Note: the first time only, downloading the model takes time and a large amount of data (possibly several GB). Please use Wi-Fi when possible.\n\n" +
+                        "You can also try prompts directly on the device from \"Direct Run\" on the main screen. Use other models and enable more features from the \"Settings\" button.";
         }
     }
 
