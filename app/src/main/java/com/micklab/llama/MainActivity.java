@@ -97,7 +97,8 @@ public class MainActivity extends Activity {
     private TextView directSectionHeader;   // collapsible header for the direct-run section
     private View     directSectionContent;  // collapsible body of the direct-run section
     private View     processingSectionContent;  // collapsible body of the processing/log section
-    private TextView webUiUrlView;          // Web UI URL (tap to open, long-press to copy)
+    private TextView webChatTitle;          // "Web AI Chat" card title
+    private Button   openWebUiButton;       // opens the Web UI in the browser
     private ConnectivityManager connectivityManager;
     private TextView promptLabel;
     private TextView outputSectionLabel;
@@ -253,7 +254,8 @@ public class MainActivity extends Activity {
         profileSpinner = findViewById(R.id.profileSpinner);
         directSectionHeader = findViewById(R.id.directSectionHeader);
         directSectionContent = findViewById(R.id.directSectionContent);
-        webUiUrlView = findViewById(R.id.webUiUrlView);
+        webChatTitle = findViewById(R.id.webChatTitle);
+        openWebUiButton = findViewById(R.id.openWebUiButton);
         processingSectionContent = findViewById(R.id.processingSectionContent);
         processingSectionLabel = findViewById(R.id.processingSectionLabel);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
@@ -313,55 +315,92 @@ public class MainActivity extends Activity {
                 showToast("Please enter a prompt");
                 return;
             }
-
-            exitLogViewToStatus();
-            
-            // Check if busy
-            if (!modelManager.tryAcquire()) {
-                showToast("Model is busy processing another request");
-                return;
+            // First-run guard: if the model still needs downloading, confirm before starting
+            // (the download then happens as part of loading the configuration).
+            if (!isCurrentModelDownloaded()) {
+                confirmFirstModelDownloadThen(() -> startDirectGeneration(userPrompt));
+            } else {
+                startDirectGeneration(userPrompt);
             }
-            updateSettingsButtonForBusyState();
-            final int generationSessionId = beginDirectGenerationSession();
-            
-            final String configName = resolveDirectInputConfigName();
-            // If the selected configuration model is not loaded, load it first
-            if (shouldLoadConfigurationModelForDirectInput()) {
-                appendMessage(modelManager.isModelLoaded()
-                        ? "Loaded model differs from selected profile. Loading profile \"" + configName + "\"..."
-                        : "Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
-                new Thread(() -> {
-                    try {
-                        boolean loadSuccess = modelManager.loadConfiguration(configName);
-                        if (!loadSuccess) {
-                            modelManager.release();
-                            showToast("Failed to load model. Please check Settings.");
-                            appendMessage("Model load failed.");
-                            return;
-                        }
-                        if (!shouldContinueDirectGeneration(generationSessionId)) {
-                            modelManager.release();
-                            runOnUiThread(this::updateSettingsButtonForBusyState);
-                            appendMessage("Prompt cancelled before generation started.");
-                            return;
-                        }
-                        appendMessage("Model loaded successfully. Processing prompt...");
-                        // Now proceed with generation
-                        processGeneration(userPrompt, generationSessionId);
-                    } catch (Throwable t) {
-                        modelManager.release();
-                        appendException("Model load error", t);
-                        showToast("Model load error: " + t.getMessage());
-                    }
-                }).start();
-                return;
-            }
-            new Thread(() -> processGeneration(userPrompt, generationSessionId)).start();
         });
 
         showStartupDialogs();
     }
     
+    // True when the active configuration's model file is already on the device (or there is
+    // nothing to download). Used to gate Send / Open-in-browser behind a first-download notice.
+    private boolean isCurrentModelDownloaded() {
+        String modelReference = (currentConfig != null) ? currentConfig.modelUrl : null;
+        return modelManager == null || modelManager.isModelReferenceDownloaded(modelReference);
+    }
+
+    // First-run notice: downloading the default model takes time and a large amount of data.
+    private void confirmFirstModelDownloadThen(Runnable onConfirm) {
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("モデルのダウンロード", "Download model"))
+                .setMessage(localizedText(
+                        "初回のみ、モデルのダウンロードに長時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi での実行を推奨します。続行しますか？",
+                        "The model will be downloaded now. The first time only, this takes time and a large amount of data (possibly several GB). Wi-Fi is strongly recommended. Continue?"))
+                .setPositiveButton(localizedText("続行", "Continue"), (d, w) -> onConfirm.run())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private void openWebUiInBrowser() {
+        final String url = buildWebUiUrl();
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+        }
+    }
+
+    private void startDirectGeneration(final String userPrompt) {
+        exitLogViewToStatus();
+
+        // Check if busy
+        if (!modelManager.tryAcquire()) {
+            showToast("Model is busy processing another request");
+            return;
+        }
+        updateSettingsButtonForBusyState();
+        final int generationSessionId = beginDirectGenerationSession();
+
+        final String configName = resolveDirectInputConfigName();
+        // If the selected configuration model is not loaded, load it first
+        if (shouldLoadConfigurationModelForDirectInput()) {
+            appendMessage(modelManager.isModelLoaded()
+                    ? "Loaded model differs from selected profile. Loading profile \"" + configName + "\"..."
+                    : "Model not loaded. Initial loading for profile \"" + configName + "\" may take some time...");
+            new Thread(() -> {
+                try {
+                    boolean loadSuccess = modelManager.loadConfiguration(configName);
+                    if (!loadSuccess) {
+                        modelManager.release();
+                        showToast("Failed to load model. Please check Settings.");
+                        appendMessage("Model load failed.");
+                        return;
+                    }
+                    if (!shouldContinueDirectGeneration(generationSessionId)) {
+                        modelManager.release();
+                        runOnUiThread(this::updateSettingsButtonForBusyState);
+                        appendMessage("Prompt cancelled before generation started.");
+                        return;
+                    }
+                    appendMessage("Model loaded successfully. Processing prompt...");
+                    // Now proceed with generation
+                    processGeneration(userPrompt, generationSessionId);
+                } catch (Throwable t) {
+                    modelManager.release();
+                    appendException("Model load error", t);
+                    showToast("Model load error: " + t.getMessage());
+                }
+            }).start();
+            return;
+        }
+        new Thread(() -> processGeneration(userPrompt, generationSessionId)).start();
+    }
+
     private void processGeneration(String userPrompt, int generationSessionId) {
         if (!shouldContinueDirectGeneration(generationSessionId)) {
             modelManager.release();
@@ -986,32 +1025,33 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---- Web UI URL (tap to open in browser, long-press to copy) ----
+    // ---- Web AI Chat: a button that opens the Web UI in the browser ----
     private void setupWebUiUrl() {
-        if (webUiUrlView == null) {
+        if (openWebUiButton == null) {
             return;
         }
-        webUiUrlView.setOnClickListener(v -> {
-            final String url = buildWebUiUrl();
-            try {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            } catch (Exception e) {
-                showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+        if (webChatTitle != null) {
+            webChatTitle.setText(localizedText("Web AI チャット", "Web AI Chat"));
+        }
+        openWebUiButton.setText(localizedText("ブラウザで開く", "Open in browser"));
+        openWebUiButton.setOnClickListener(v -> {
+            // The WebUI downloads the model on the first chat message; warn up front if the
+            // default model is not on the device yet, then just open the browser.
+            if (!isCurrentModelDownloaded()) {
+                confirmFirstModelDownloadThen(this::openWebUiInBrowser);
+            } else {
+                openWebUiInBrowser();
             }
-        });
-        webUiUrlView.setOnLongClickListener(v -> {
-            copyToClipboard("Web UI URL", buildWebUiUrl());
-            return true;
         });
         updateWebUiUrl();
     }
 
     private void updateWebUiUrl() {
-        if (webUiUrlView == null) {
+        if (openWebUiButton == null) {
             return;
         }
-        webUiUrlView.setText(localizedText("Web UI（タップで起動・長押しでコピー）: ",
-                "Web UI (tap to open / long-press to copy): ") + buildWebUiUrl());
+        // The Web UI is only reachable while the server is running.
+        openWebUiButton.setEnabled(isServiceRunning);
     }
 
     private String buildWebUiUrl() {
@@ -1193,7 +1233,7 @@ public class MainActivity extends Activity {
     }
 
     private String localizedText(String ja, String en) {
-        return AppLanguageManager.isJapanese(this) ? ja : en;
+        return Translations.get(this, ja, en);
     }
 
     private void applyLocalizedUiText() {
@@ -1279,27 +1319,12 @@ public class MainActivity extends Activity {
         }
 
         TextView messageView = new TextView(this);
-        messageView.setText(
-                "[English]\n" +
-                "IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n" +
-                "0) If the API/WebUI enablement popup appears at launch, enable it when needed or check \"Don't show next time\" to skip it on future launches.\n" +
-                "1) In Settings, load a model with Load Model.\n" +
-                "2) Tap SAVE & CLOSE to return to the main screen.\n" +
-                "3) Enter your instruction in the input field and tap Send to display the response.\n\n" +
-                "[日本語]\n" +
-                "【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n" +
-                "0) 起動時にAPI/WebUI有効化ポップアップが表示された場合は、必要に応じて有効化するか、「次回以降は表示しない」をチェックすると次回から表示されません。\n" +
-                "1) SettingsでモデルをLoad Modelしてください。\n" +
-                "2) SAVE & CLOSEでメイン画面へ戻ります。\n" +
-                "3) 入力フィールドに指示文を入れてSendすると、回答が表示されます。\n\n" +
-                "[TIPS]\n" +
-                "English: Loading a very large model may stop because address-space reservation fails or because the process was interrupted by user action. In that case the app shows a notice on the next launch. If needed, try a smaller model or load the model again from Settings. Re-init Model is available while work is running and stops the active generation before reinitializing the current profile. If it fails, check the log or load the model again from Settings.\n\n" +
-                "日本語: 大きなモデルのロードは、アドレス空間の確保失敗またはユーザ操作により中断される場合があります。その場合は次回起動時に通知を表示します。必要に応じて、より小さいモデルを試すか、Settings から再度 Load Model を実行してください。Re-init Model は実行中でも押せて、進行中の生成を停止して現在のプロファイルを再初期化します。失敗した場合はログを確認するか、Settings から再度 Load Model を実行してください。");
+        messageView.setText(Translations.quickStart(this));
         messageView.setTextSize(14f);
         messageView.setLineSpacing(0f, 1.1f);
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
-        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
+        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない", "Don't show next time"));
         doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
 
         LinearLayout dialogContentLayout = new LinearLayout(this);
@@ -1313,7 +1338,7 @@ public class MainActivity extends Activity {
         dialogScrollView.addView(dialogContentLayout);
 
         new AlertDialog.Builder(this)
-                .setTitle(localizedText("クイックスタート / Quick Start", "Quick Start / クイックスタート"))
+                .setTitle(localizedText("クイックスタート", "Quick Start"))
                 .setView(dialogScrollView)
                 .setCancelable(false)
                 .setPositiveButton("OK", (dialog, which) -> {
@@ -1348,8 +1373,12 @@ public class MainActivity extends Activity {
         }
 
         String message = localizedText(
-                "ローカルAPI/WebUIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API と WebUI を利用できます。WebUIはブラウザで http://<端末IP>:" + apiPort + "/ から開けます。後からメイン画面でも切り替えられます。",
-                "Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:" + apiPort + "/ . You can also change this later from the main screen.");
+                "ローカルAPI/WebUIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API と WebUI を利用できます。WebUIはブラウザで http://<端末IP>:",
+                "Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:")
+                + apiPort
+                + localizedText(
+                "/ から開けます。後からメイン画面でも切り替えられます。",
+                "/ . You can also change this later from the main screen.");
 
         TextView messageView = new TextView(this);
         messageView.setText(message);
@@ -1357,7 +1386,7 @@ public class MainActivity extends Activity {
         messageView.setLineSpacing(0f, 1.1f);
 
         CheckBox doNotShowAgainCheckBox = new CheckBox(this);
-        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない / Don't show next time", "Don't show next time / 次回以降は表示しない"));
+        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない", "Don't show next time"));
         doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
 
         LinearLayout dialogContentLayout = new LinearLayout(this);
@@ -1429,12 +1458,14 @@ public class MainActivity extends Activity {
         clearPendingModelLoadMarker();
 
         String message = localizedText(
-                "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: " + profileName
-                        + "\nモデル: " + modelName
-                        + "\n\n再試行は行いません。必要な場合は Settings から改めて Load Model を実行してください。",
-                "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: "
-                        + profileName + "\nModel: " + modelName
-                        + "\n\nNo automatic retry was performed. If needed, load the model again from Settings.");
+                "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: ",
+                "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: ")
+                + profileName
+                + localizedText("\nモデル: ", "\nModel: ")
+                + modelName
+                + localizedText(
+                "\n\n再試行は行いません。必要な場合は Settings から改めて Load Model を実行してください。",
+                "\n\nNo automatic retry was performed. If needed, load the model again from Settings.");
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("中断されたモデルロード", "Interrupted Model Load"))
@@ -1469,7 +1500,7 @@ public class MainActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText(label, text);
         clipboard.setPrimaryClip(clip);
-        showToast(label + " copied to clipboard");
+        showToast(label + localizedText("をクリップボードにコピーしました", " copied to clipboard"));
     }
 
     private void downloadDisplayedLog() {
@@ -1568,9 +1599,9 @@ public class MainActivity extends Activity {
     private void updateApiServerUI() {
         if (isServiceRunning) {
             apiServerButton.setText(localizedText("API/WebUI停止", "Stop API/WebUI"));
-            apiServerStatusMain.setText(localizedText(
-                    "API/WebUI: ポート " + apiPort + " で稼働中 (WebUI: /)",
-                    "API/WebUI: Running on port " + apiPort + " (WebUI: /)"));
+            apiServerStatusMain.setText(localizedText("API/WebUI: ポート ", "API/WebUI: Running on port ")
+                    + apiPort
+                    + localizedText(" で稼働中 (WebUI: /)", " (WebUI: /)"));
         } else {
             apiServerButton.setText(localizedText("API/WebUI開始", "Start API/WebUI"));
             apiServerStatusMain.setText(localizedText("API/WebUI: 停止中", "API/WebUI: Stopped"));
@@ -1585,6 +1616,10 @@ public class MainActivity extends Activity {
         }
         if (initModelButton != null) {
             initModelButton.setEnabled(true);
+        }
+        // Direct-run Send is disabled while an inference/generation is running.
+        if (sendButton != null) {
+            sendButton.setEnabled(!isBusy);
         }
     }
     

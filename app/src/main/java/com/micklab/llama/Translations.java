@@ -1,0 +1,392 @@
+package com.micklab.llama;
+
+import android.content.Context;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Machine-generated UI translations for the languages beyond ja/en, keyed by the English
+ * string passed to {@code localizedText(ja, en)}. Value array order: fr, es, pt, de, it, zh, ko.
+ * A missing key (or language) falls back to English, so the app is always usable even for
+ * strings not yet in the table (e.g. concatenated / multi-line messages, or the manual).
+ */
+public final class Translations {
+    private Translations() {
+    }
+
+    private static final Map<String, String[]> T = new HashMap<>();
+
+    // en, then: fr, es, pt, de, it, zh, ko
+    private static void e(String en, String fr, String es, String pt, String de, String it, String zh, String ko) {
+        T.put(en, new String[]{fr, es, pt, de, it, zh, ko});
+    }
+
+    static {
+        registerAll();
+    }
+
+    public static String get(Context ctx, String ja, String en) {
+        String lang = AppLanguageManager.getOrInitDisplayLanguage(ctx);
+        if (AppLanguageManager.LANGUAGE_JA.equals(lang)) {
+            return ja;
+        }
+        if (AppLanguageManager.LANGUAGE_EN.equals(lang)) {
+            return en;
+        }
+        String[] a = T.get(en);
+        if (a != null) {
+            int i = -1;
+            switch (lang) {
+                case "fr": i = 0; break;
+                case "es": i = 1; break;
+                case "pt": i = 2; break;
+                case "de": i = 3; break;
+                case "it": i = 4; break;
+                case "zh": i = 5; break;
+                case "ko": i = 6; break;
+                default: break;
+            }
+            if (i >= 0 && a[i] != null) {
+                return a[i];
+            }
+        }
+        return en; // fallback to English
+    }
+
+    /** Quick Start dialog body, single language (display language, else English). */
+    public static String quickStart(Context ctx) {
+        switch (AppLanguageManager.getOrInitDisplayLanguage(ctx)) {
+            case "ja":
+                return "かんたん2ステップで始められます。\n\n" +
+                        "① メイン画面で「API/WebUI開始」を押します。\n" +
+                        "② 「ブラウザで開く」を押すと、Web AI チャットが開きます。\n\n" +
+                        "※ 初回のみ、モデルのダウンロードに時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi をご利用ください。\n\n" +
+                        "このほか、メイン画面の「ダイレクト実行」から端末上で直接プロンプトを試せます。別のモデルの利用や各種機能の有効化は「設定」ボタンから行えます。";
+            case "fr":
+                return "Commencez en 2 étapes seulement.\n\n" +
+                        "1) Appuyez sur « Démarrer l'API/WebUI » sur l'écran principal.\n" +
+                        "2) Appuyez sur « Ouvrir dans le navigateur » pour ouvrir le Web AI Chat.\n\n" +
+                        "Remarque : la première fois uniquement, le téléchargement du modèle prend du temps et une grande quantité de données (potentiellement plusieurs Go). Utilisez le Wi-Fi si possible.\n\n" +
+                        "Vous pouvez aussi tester des invites directement sur l'appareil via « Exécution directe » sur l'écran principal. Utilisez d'autres modèles et activez d'autres fonctions depuis le bouton « Paramètres ».";
+            case "es":
+                return "Empiece en solo 2 pasos.\n\n" +
+                        "1) Toque «Iniciar API/WebUI» en la pantalla principal.\n" +
+                        "2) Toque «Abrir en el navegador» para abrir el Web AI Chat.\n\n" +
+                        "Nota: solo la primera vez, descargar el modelo lleva tiempo y una gran cantidad de datos (posiblemente varios GB). Use Wi-Fi cuando sea posible.\n\n" +
+                        "También puede probar prompts directamente en el dispositivo desde «Ejecución directa» en la pantalla principal. Use otros modelos y active más funciones desde el botón «Configuración».";
+            case "pt":
+                return "Comece em apenas 2 passos.\n\n" +
+                        "1) Toque em \"Iniciar API/WebUI\" na tela principal.\n" +
+                        "2) Toque em \"Abrir no navegador\" para abrir o Web AI Chat.\n\n" +
+                        "Observação: apenas na primeira vez, baixar o modelo leva tempo e uma grande quantidade de dados (possivelmente vários GB). Use Wi-Fi quando possível.\n\n" +
+                        "Você também pode testar prompts diretamente no dispositivo em \"Execução direta\" na tela principal. Use outros modelos e ative mais recursos pelo botão \"Configurações\".";
+            case "de":
+                return "In nur 2 Schritten loslegen.\n\n" +
+                        "1) Tippen Sie auf „API/WebUI starten“ auf dem Hauptbildschirm.\n" +
+                        "2) Tippen Sie auf „Im Browser öffnen“, um den Web-KI-Chat zu öffnen.\n\n" +
+                        "Hinweis: Nur beim ersten Mal dauert das Herunterladen des Modells und benötigt eine große Datenmenge (möglicherweise mehrere GB). Verwenden Sie nach Möglichkeit WLAN.\n\n" +
+                        "Sie können Eingaben auch direkt auf dem Gerät über „Direktausführung“ auf dem Hauptbildschirm testen. Nutzen Sie andere Modelle und aktivieren Sie weitere Funktionen über die Schaltfläche „Einstellungen“.";
+            case "it":
+                return "Inizia in soli 2 passaggi.\n\n" +
+                        "1) Tocca \"Avvia API/WebUI\" nella schermata principale.\n" +
+                        "2) Tocca \"Apri nel browser\" per aprire il Web AI Chat.\n\n" +
+                        "Nota: solo la prima volta, scaricare il modello richiede tempo e una grande quantità di dati (possibilmente diversi GB). Usa il Wi-Fi quando possibile.\n\n" +
+                        "Puoi anche provare i prompt direttamente sul dispositivo da \"Esecuzione diretta\" nella schermata principale. Usa altri modelli e abilita altre funzioni dal pulsante \"Impostazioni\".";
+            case "zh":
+                return "只需 2 步即可开始。\n\n" +
+                        "① 在主界面点按“启动 API/WebUI”。\n" +
+                        "② 点按“在浏览器中打开”即可打开 Web AI 聊天。\n\n" +
+                        "注意：仅首次下载模型会耗时并产生大量流量（可能达数 GB）。请尽量使用 Wi-Fi。\n\n" +
+                        "此外，你还可以在主界面的“直接运行”中直接在设备上试用提示。使用其他模型或启用更多功能，可通过“设置”按钮进行。";
+            case "ko":
+                return "단 2단계로 시작할 수 있습니다.\n\n" +
+                        "① 메인 화면에서 \"API/WebUI 시작\"을 누릅니다.\n" +
+                        "② \"브라우저에서 열기\"를 누르면 웹 AI 채팅이 열립니다.\n\n" +
+                        "참고: 최초 1회에 한해 모델 다운로드에 시간이 걸리고 대용량 데이터(수 GB일 수 있음)가 발생합니다. 가능하면 Wi-Fi를 사용하세요.\n\n" +
+                        "이 밖에도 메인 화면의 \"직접 실행\"에서 기기에서 직접 프롬프트를 시험해 볼 수 있습니다. 다른 모델 사용이나 기능 활성화는 \"설정\" 버튼에서 할 수 있습니다.";
+            default:
+                return "Get started in just 2 steps.\n\n" +
+                        "1) Tap \"Start API/WebUI\" on the main screen.\n" +
+                        "2) Tap \"Open in browser\" to open the Web AI Chat.\n\n" +
+                        "Note: the first time only, downloading the model takes time and a large amount of data (possibly several GB). Please use Wi-Fi when possible.\n\n" +
+                        "You can also try prompts directly on the device from \"Direct Run\" on the main screen. Use other models and enable more features from the \"Settings\" button.";
+        }
+    }
+
+    private static void registerAll() {
+        e("  [Recommended]", "  [Recommandé]", "  [Recomendado]", "  [Recomendado]", "  [Empfohlen]", "  [Consigliato]", "  [推荐]", "  [권장]");
+        e(" (applied on next prompt)", " (appliqué à la prochaine invite)", " (se aplica en el próximo prompt)", " (aplicado no próximo prompt)", " (wird bei der nächsten Eingabe angewendet)", " (applicato al prossimo prompt)", "（下次提示时应用）", " (다음 프롬프트에 적용)");
+        e("A file with that name already exists", "Un fichier portant ce nom existe déjà", "Ya existe un archivo con ese nombre", "Já existe um arquivo com esse nome", "Eine Datei mit diesem Namen existiert bereits", "Esiste già un file con quel nome", "已存在同名文件", "같은 이름의 파일이 이미 있습니다");
+        e("API/WebUI: Stopped", "API/WebUI : Arrêté", "API/WebUI: Detenido", "API/WebUI: Parado", "API/WebUI: Gestoppt", "API/WebUI: Arrestato", "API/WebUI：已停止", "API/WebUI: 중지됨");
+        e("Available", "Disponible", "Disponible", "Disponível", "Verfügbar", "Disponibile", "可用", "사용 가능");
+        e("Back", "Retour", "Atrás", "Voltar", "Zurück", "Indietro", "返回", "뒤로");
+        e("Cancel", "Annuler", "Cancelar", "Cancelar", "Abbrechen", "Annulla", "取消", "취소");
+        e("Cannot change the profile while a model operation is running", "Impossible de changer de profil pendant une opération sur le modèle", "No se puede cambiar el perfil mientras se ejecuta una operación del modelo", "Não é possível alterar o perfil enquanto uma operação do modelo está em execução", "Profil kann während einer laufenden Modelloperation nicht geändert werden", "Impossibile cambiare profilo mentre è in corso un'operazione sul modello", "模型操作运行时无法更改配置文件", "모델 작업이 실행 중일 때는 프로필을 변경할 수 없습니다");
+        e("Cannot open browser: ", "Impossible d'ouvrir le navigateur : ", "No se puede abrir el navegador: ", "Não é possível abrir o navegador: ", "Browser kann nicht geöffnet werden: ", "Impossibile aprire il browser: ", "无法打开浏览器：", "브라우저를 열 수 없습니다: ");
+        e("Cannot rename the currently loaded model", "Impossible de renommer le modèle actuellement chargé", "No se puede renombrar el modelo cargado actualmente", "Não é possível renomear o modelo carregado atualmente", "Das aktuell geladene Modell kann nicht umbenannt werden", "Impossibile rinominare il modello attualmente caricato", "无法重命名当前已加载的模型", "현재 로드된 모델의 이름을 변경할 수 없습니다");
+        e("Cannot rename the currently loaded model. Switch models first", "Impossible de renommer le modèle actuellement chargé. Changez d'abord de modèle", "No se puede renombrar el modelo cargado actualmente. Cambie de modelo primero", "Não é possível renomear o modelo carregado atualmente. Troque de modelo primeiro", "Das aktuell geladene Modell kann nicht umbenannt werden. Wechseln Sie zuerst das Modell", "Impossibile rinominare il modello attualmente caricato. Cambia prima modello", "无法重命名当前已加载的模型。请先切换模型", "현재 로드된 모델의 이름을 변경할 수 없습니다. 먼저 모델을 전환하세요");
+        e("Cannot rename while a model operation is running", "Impossible de renommer pendant une opération sur le modèle", "No se puede renombrar mientras se ejecuta una operación del modelo", "Não é possível renomear enquanto uma operação do modelo está em execução", "Umbenennen während einer laufenden Modelloperation nicht möglich", "Impossibile rinominare mentre è in corso un'operazione sul modello", "模型操作运行时无法重命名", "모델 작업이 실행 중일 때는 이름을 변경할 수 없습니다");
+        e("Clear Log", "Effacer le journal", "Borrar registro", "Limpar registro", "Protokoll löschen", "Cancella log", "清除日志", "로그 지우기");
+        e("Clear", "Effacer", "Borrar", "Limpar", "Löschen", "Cancella", "清除", "지우기");
+        e("Clipboard is unavailable", "Le presse-papiers est indisponible", "El portapapeles no está disponible", "A área de transferência está indisponível", "Zwischenablage ist nicht verfügbar", "Gli appunti non sono disponibili", "剪贴板不可用", "클립보드를 사용할 수 없습니다");
+        e("Close", "Fermer", "Cerrar", "Fechar", "Schließen", "Chiudi", "关闭", "닫기");
+        e("Connect to Wi-Fi to show the LAN URL.", "Connectez-vous au Wi-Fi pour afficher l'URL LAN.", "Conéctese a Wi-Fi para mostrar la URL de LAN.", "Conecte-se ao Wi-Fi para mostrar a URL da LAN.", "Mit WLAN verbinden, um die LAN-URL anzuzeigen.", "Connettiti al Wi-Fi per mostrare l'URL LAN.", "连接 Wi-Fi 以显示 LAN URL。", "LAN URL을 표시하려면 Wi-Fi에 연결하세요.");
+        e("Copied: ", "Copié : ", "Copiado: ", "Copiado: ", "Kopiert: ", "Copiato: ", "已复制：", "복사됨: ");
+        e("Copy", "Copier", "Copiar", "Copiar", "Kopieren", "Copia", "复制", "복사");
+        e("Could not determine the selected file name", "Impossible de déterminer le nom du fichier sélectionné", "No se pudo determinar el nombre del archivo seleccionado", "Não foi possível determinar o nome do arquivo selecionado", "Der Name der ausgewählten Datei konnte nicht ermittelt werden", "Impossibile determinare il nome del file selezionato", "无法确定所选文件名", "선택한 파일 이름을 확인할 수 없습니다");
+        e("Could not open the file picker", "Impossible d'ouvrir le sélecteur de fichiers", "No se pudo abrir el selector de archivos", "Não foi possível abrir o seletor de arquivos", "Dateiauswahl konnte nicht geöffnet werden", "Impossibile aprire il selettore di file", "无法打开文件选择器", "파일 선택기를 열 수 없습니다");
+        e("Could not open the selected file", "Impossible d'ouvrir le fichier sélectionné", "No se pudo abrir el archivo seleccionado", "Não foi possível abrir o arquivo selecionado", "Die ausgewählte Datei konnte nicht geöffnet werden", "Impossibile aprire il file selezionato", "无法打开所选文件", "선택한 파일을 열 수 없습니다");
+        e("Delete", "Supprimer", "Eliminar", "Excluir", "Löschen", "Elimina", "删除", "삭제");
+        e("Display Language", "Langue d'affichage", "Idioma de la interfaz", "Idioma de exibição", "Anzeigesprache", "Lingua di visualizzazione", "显示语言", "표시 언어");
+        e("Display language updated", "Langue d'affichage mise à jour", "Idioma de la interfaz actualizado", "Idioma de exibição atualizado", "Anzeigesprache aktualisiert", "Lingua di visualizzazione aggiornata", "显示语言已更新", "표시 언어가 업데이트되었습니다");
+        e("Documents", "Documents", "Documentos", "Documentos", "Dokumente", "Documenti", "文档", "문서");
+        e("Don't show next time", "Ne plus afficher", "No mostrar la próxima vez", "Não mostrar da próxima vez", "Nächstes Mal nicht anzeigen", "Non mostrare la prossima volta", "下次不再显示", "다음에 표시 안 함");
+        e("Download and load", "Télécharger et charger", "Descargar y cargar", "Baixar e carregar", "Herunterladen und laden", "Scarica e carica", "下载并加载", "다운로드 후 로드");
+        e("Download completed", "Téléchargement terminé", "Descarga completada", "Download concluído", "Download abgeschlossen", "Download completato", "下载完成", "다운로드 완료");
+        e("Download failed", "Échec du téléchargement", "Error en la descarga", "Falha no download", "Download fehlgeschlagen", "Download non riuscito", "下载失败", "다운로드 실패");
+        e("Download mmproj", "Télécharger mmproj", "Descargar mmproj", "Baixar mmproj", "mmproj herunterladen", "Scarica mmproj", "下载 mmproj", "mmproj 다운로드");
+        e("Download only (Recommended)", "Télécharger seulement (Recommandé)", "Solo descargar (Recomendado)", "Somente baixar (Recomendado)", "Nur herunterladen (Empfohlen)", "Solo download (Consigliato)", "仅下载（推荐）", "다운로드만 (권장)");
+        e("Download only", "Télécharger seulement", "Solo descargar", "Somente baixar", "Nur herunterladen", "Solo download", "仅下载", "다운로드만");
+        e("Download", "Télécharger", "Descargar", "Baixar", "Herunterladen", "Scarica", "下载", "다운로드");
+        e("Enable API/WebUI", "Activer l'API/WebUI", "Habilitar API/WebUI", "Ativar API/WebUI", "API/WebUI aktivieren", "Abilita API/WebUI", "启用 API/WebUI", "API/WebUI 활성화");
+        e("Enable", "Activer", "Habilitar", "Ativar", "Aktivieren", "Abilita", "启用", "활성화");
+        e("Enter Prompt:", "Saisir l'invite :", "Ingrese el prompt:", "Digite o prompt:", "Eingabe:", "Inserisci il prompt:", "输入提示：", "프롬프트 입력:");
+        e("Enter a file name", "Saisissez un nom de fichier", "Ingrese un nombre de archivo", "Digite um nome de arquivo", "Dateinamen eingeben", "Inserisci un nome file", "输入文件名", "파일 이름을 입력하세요");
+        e("Enter a keyword", "Saisissez un mot-clé", "Ingrese una palabra clave", "Digite uma palavra-chave", "Stichwort eingeben", "Inserisci una parola chiave", "输入关键词", "키워드를 입력하세요");
+        e("Enter a port number between 1 and 65535", "Saisissez un numéro de port entre 1 et 65535", "Ingrese un número de puerto entre 1 y 65535", "Digite um número de porta entre 1 e 65535", "Portnummer zwischen 1 und 65535 eingeben", "Inserisci un numero di porta tra 1 e 65535", "输入 1 到 65535 之间的端口号", "1에서 65535 사이의 포트 번호를 입력하세요");
+        e("Enter a valid port to show the LAN URL", "Saisissez un port valide pour afficher l'URL LAN", "Ingrese un puerto válido para mostrar la URL de LAN", "Digite uma porta válida para mostrar a URL da LAN", "Gültigen Port eingeben, um die LAN-URL anzuzeigen", "Inserisci una porta valida per mostrare l'URL LAN", "输入有效端口以显示 LAN URL", "LAN URL을 표시하려면 유효한 포트를 입력하세요");
+        e("Enter a valid port to show the server URL", "Saisissez un port valide pour afficher l'URL du serveur", "Ingrese un puerto válido para mostrar la URL del servidor", "Digite uma porta válida para mostrar a URL do servidor", "Gültigen Port eingeben, um die Server-URL anzuzeigen", "Inserisci una porta valida per mostrare l'URL del server", "输入有效端口以显示服务器 URL", "서버 URL을 표시하려면 유효한 포트를 입력하세요");
+        e("Enter your prompt here", "Saisissez votre invite ici", "Escriba su prompt aquí", "Digite seu prompt aqui", "Geben Sie hier Ihre Eingabe ein", "Inserisci qui il tuo prompt", "在此输入您的提示", "여기에 프롬프트를 입력하세요");
+        e("Failed to load GGUF files: ", "Échec du chargement des fichiers GGUF : ", "Error al cargar los archivos GGUF: ", "Falha ao carregar os arquivos GGUF: ", "GGUF-Dateien konnten nicht geladen werden: ", "Impossibile caricare i file GGUF: ", "加载 GGUF 文件失败：", "GGUF 파일 로드 실패: ");
+        e("Failed to load profile: ", "Échec du chargement du profil : ", "Error al cargar el perfil: ", "Falha ao carregar o perfil: ", "Profil konnte nicht geladen werden: ", "Impossibile caricare il profilo: ", "加载配置文件失败：", "프로필 로드 실패: ");
+        e("Failed to rename: ", "Échec du renommage : ", "Error al renombrar: ", "Falha ao renomear: ", "Umbenennen fehlgeschlagen: ", "Rinomina non riuscita: ", "重命名失败：", "이름 변경 실패: ");
+        e("Failed to update profile: ", "Échec de la mise à jour du profil : ", "Error al actualizar el perfil: ", "Falha ao atualizar o perfil: ", "Profil konnte nicht aktualisiert werden: ", "Impossibile aggiornare il profilo: ", "更新配置文件失败：", "프로필 업데이트 실패: ");
+        e("File name cannot contain a slash", "Le nom de fichier ne peut pas contenir de barre oblique", "El nombre de archivo no puede contener una barra", "O nome do arquivo não pode conter uma barra", "Der Dateiname darf keinen Schrägstrich enthalten", "Il nome del file non può contenere una barra", "文件名不能包含斜杠", "파일 이름에 슬래시를 포함할 수 없습니다");
+        e("Function Definitions JSON must be a JSON array whose items include a name", "Le JSON des définitions de fonctions doit être un tableau JSON dont les éléments incluent un nom", "El JSON de definiciones de funciones debe ser un arreglo JSON cuyos elementos incluyan un nombre", "O JSON de definições de funções deve ser um array JSON cujos itens incluam um nome", "Das JSON der Funktionsdefinitionen muss ein JSON-Array sein, dessen Elemente einen Namen enthalten", "Il JSON delle definizioni di funzione deve essere un array JSON i cui elementi includono un nome", "函数定义 JSON 必须是其项包含 name 的 JSON 数组", "함수 정의 JSON은 항목에 name이 포함된 JSON 배열이어야 합니다");
+        e("Hugging Face search failed: ", "Échec de la recherche Hugging Face : ", "Error en la búsqueda de Hugging Face: ", "Falha na busca do Hugging Face: ", "Hugging-Face-Suche fehlgeschlagen: ", "Ricerca Hugging Face non riuscita: ", "Hugging Face 搜索失败：", "Hugging Face 검색 실패: ");
+        e("Hugging Face search is already running", "La recherche Hugging Face est déjà en cours", "La búsqueda de Hugging Face ya está en ejecución", "A busca do Hugging Face já está em execução", "Die Hugging-Face-Suche läuft bereits", "La ricerca Hugging Face è già in corso", "Hugging Face 搜索已在进行中", "Hugging Face 검색이 이미 실행 중입니다");
+        e("Interrupted Model Load", "Chargement du modèle interrompu", "Carga del modelo interrumpida", "Carregamento do modelo interrompido", "Modellladen unterbrochen", "Caricamento del modello interrotto", "模型加载被中断", "모델 로드 중단됨");
+        e("LAN URL", "URL LAN", "URL de LAN", "URL da LAN", "LAN-URL", "URL LAN", "LAN URL", "LAN URL");
+        e("Likes ", "J'aime ", "Me gusta ", "Curtidas ", "Likes ", "Mi piace ", "点赞 ", "좋아요 ");
+        e("Local URL", "URL locale", "URL local", "URL local", "Lokale URL", "URL locale", "本地 URL", "로컬 URL");
+        e("Logs cleared", "Journaux effacés", "Registros borrados", "Registros limpos", "Protokolle gelöscht", "Log cancellati", "日志已清除", "로그가 지워졌습니다");
+        e("MCP config JSON must be a JSON array", "Le JSON de configuration MCP doit être un tableau JSON", "El JSON de configuración de MCP debe ser un arreglo JSON", "O JSON de configuração do MCP deve ser um array JSON", "Das MCP-Konfigurations-JSON muss ein JSON-Array sein", "Il JSON di configurazione MCP deve essere un array JSON", "MCP 配置 JSON 必须是 JSON 数组", "MCP 구성 JSON은 JSON 배열이어야 합니다");
+        e("MTP draft model", "Modèle de brouillon MTP", "Modelo de borrador MTP", "Modelo de rascunho MTP", "MTP-Entwurfsmodell", "Modello draft MTP", "MTP 草稿模型", "MTP 드래프트 모델");
+        e("MTP: using own head (save config to apply)", "MTP : utilisation de sa propre tête (enregistrez la config pour appliquer)", "MTP: usando su propia cabeza (guarde la configuración para aplicar)", "MTP: usando a própria cabeça (salve a configuração para aplicar)", "MTP: eigener Kopf wird verwendet (Konfiguration speichern zum Anwenden)", "MTP: uso della propria testa (salva la configurazione per applicare)", "MTP：使用自身的头（保存配置以应用）", "MTP: 자체 헤드 사용 (적용하려면 설정 저장)");
+        e("Model Maintenance", "Maintenance du modèle", "Mantenimiento del modelo", "Manutenção do modelo", "Modellwartung", "Manutenzione del modello", "模型维护", "모델 유지 관리");
+        e("Model Output:", "Sortie du modèle :", "Salida del modelo:", "Saída do modelo:", "Modellausgabe:", "Output del modello:", "模型输出：", "모델 출력:");
+        e("Model import failed", "Échec de l'importation du modèle", "Error al importar el modelo", "Falha ao importar o modelo", "Modellimport fehlgeschlagen", "Importazione del modello non riuscita", "模型导入失败", "모델 가져오기 실패");
+        e("Model import is already running", "L'importation du modèle est déjà en cours", "La importación del modelo ya está en ejecución", "A importação do modelo já está em execução", "Modellimport läuft bereits", "L'importazione del modello è già in corso", "模型导入已在进行中", "모델 가져오기가 이미 실행 중입니다");
+        e("Model name or keyword (partial match)", "Nom du modèle ou mot-clé (correspondance partielle)", "Nombre del modelo o palabra clave (coincidencia parcial)", "Nome do modelo ou palavra-chave (correspondência parcial)", "Modellname oder Stichwort (Teiltreffer)", "Nome del modello o parola chiave (corrispondenza parziale)", "模型名称或关键词（部分匹配）", "모델 이름 또는 키워드 (부분 일치)");
+        e("Name must end with .gguf", "Le nom doit se terminer par .gguf", "El nombre debe terminar en .gguf", "O nome deve terminar com .gguf", "Der Name muss mit .gguf enden", "Il nome deve terminare con .gguf", "名称必须以 .gguf 结尾", "이름은 .gguf로 끝나야 합니다");
+        e("No downloadable GGUF files were found", "Aucun fichier GGUF téléchargeable n'a été trouvé", "No se encontraron archivos GGUF descargables", "Nenhum arquivo GGUF para download foi encontrado", "Keine herunterladbaren GGUF-Dateien gefunden", "Nessun file GGUF scaricabile trovato", "未找到可下载的 GGUF 文件", "다운로드 가능한 GGUF 파일을 찾을 수 없습니다");
+        e("No downloaded model files found", "Aucun fichier de modèle téléchargé trouvé", "No se encontraron archivos de modelo descargados", "Nenhum arquivo de modelo baixado encontrado", "Keine heruntergeladenen Modelldateien gefunden", "Nessun file di modello scaricato trovato", "未找到已下载的模型文件", "다운로드된 모델 파일을 찾을 수 없습니다");
+        e("No matching GGUF repositories were found", "Aucun dépôt GGUF correspondant n'a été trouvé", "No se encontraron repositorios GGUF coincidentes", "Nenhum repositório GGUF correspondente foi encontrado", "Keine passenden GGUF-Repositorys gefunden", "Nessun repository GGUF corrispondente trovato", "未找到匹配的 GGUF 仓库", "일치하는 GGUF 저장소를 찾을 수 없습니다");
+        e("No stored GGUF files were found", "Aucun fichier GGUF stocké n'a été trouvé", "No se encontraron archivos GGUF almacenados", "Nenhum arquivo GGUF armazenado foi encontrado", "Keine gespeicherten GGUF-Dateien gefunden", "Nessun file GGUF memorizzato trovato", "未找到已保存的 GGUF 文件", "저장된 GGUF 파일을 찾을 수 없습니다");
+        e("Not now", "Pas maintenant", "Ahora no", "Agora não", "Nicht jetzt", "Non ora", "暂不", "나중에");
+        e("Output will appear here", "La sortie apparaîtra ici", "La salida aparecerá aquí", "A saída aparecerá aqui", "Die Ausgabe erscheint hier", "L'output apparirà qui", "输出将显示在此处", "출력이 여기에 표시됩니다");
+        e("Please select a .gguf file", "Veuillez sélectionner un fichier .gguf", "Seleccione un archivo .gguf", "Selecione um arquivo .gguf", "Bitte eine .gguf-Datei auswählen", "Seleziona un file .gguf", "请选择一个 .gguf 文件", ".gguf 파일을 선택하세요");
+        e("Privacy Policy", "Politique de confidentialité", "Política de privacidad", "Política de privacidade", "Datenschutzrichtlinie", "Informativa sulla privacy", "隐私政策", "개인정보 처리방침");
+        e("Profile selected: ", "Profil sélectionné : ", "Perfil seleccionado: ", "Perfil selecionado: ", "Profil ausgewählt: ", "Profilo selezionato: ", "已选择配置文件：", "선택된 프로필: ");
+        e("Projector: not selected", "Projecteur : non sélectionné", "Proyector: no seleccionado", "Projetor: não selecionado", "Projektor: nicht ausgewählt", "Proiettore: non selezionato", "投影器：未选择", "프로젝터: 선택 안 됨");
+        e("Quick Start", "Démarrage rapide", "Inicio rápido", "Início rápido", "Schnellstart", "Avvio rapido", "快速入门", "빠른 시작");
+        e("Rename file", "Renommer le fichier", "Renombrar archivo", "Renomear arquivo", "Datei umbenennen", "Rinomina file", "重命名文件", "파일 이름 변경");
+        e("Rename", "Renommer", "Renombrar", "Renomear", "Umbenennen", "Rinomina", "重命名", "이름 변경");
+        e("Renamed to: ", "Renommé en : ", "Renombrado a: ", "Renomeado para: ", "Umbenannt in: ", "Rinominato in: ", "已重命名为：", "이름 변경됨: ");
+        e("Reset", "Réinitialiser", "Restablecer", "Redefinir", "Zurücksetzen", "Reimposta", "重置", "재설정");
+        e("Search GGUF on Hugging Face", "Rechercher des GGUF sur Hugging Face", "Buscar GGUF en Hugging Face", "Buscar GGUF no Hugging Face", "GGUF auf Hugging Face suchen", "Cerca GGUF su Hugging Face", "在 Hugging Face 上搜索 GGUF", "Hugging Face에서 GGUF 검색");
+        e("Search", "Rechercher", "Buscar", "Buscar", "Suchen", "Cerca", "搜索", "검색");
+        e("Select a GGUF file", "Sélectionner un fichier GGUF", "Seleccionar un archivo GGUF", "Selecionar um arquivo GGUF", "GGUF-Datei auswählen", "Seleziona un file GGUF", "选择一个 GGUF 文件", "GGUF 파일 선택");
+        e("Select a model first", "Sélectionnez d'abord un modèle", "Seleccione un modelo primero", "Selecione um modelo primeiro", "Zuerst ein Modell auswählen", "Seleziona prima un modello", "请先选择一个模型", "먼저 모델을 선택하세요");
+        e("Select a repository", "Sélectionner un dépôt", "Seleccionar un repositorio", "Selecionar um repositório", "Repository auswählen", "Seleziona un repository", "选择一个仓库", "저장소 선택");
+        e("Select document:", "Sélectionner un document :", "Seleccionar documento:", "Selecionar documento:", "Dokument auswählen:", "Seleziona documento:", "选择文档：", "문서 선택:");
+        e("Select mmproj", "Sélectionner mmproj", "Seleccionar mmproj", "Selecionar mmproj", "mmproj auswählen", "Seleziona mmproj", "选择 mmproj", "mmproj 선택");
+        e("Select", "Sélectionner", "Seleccionar", "Selecionar", "Auswählen", "Seleziona", "选择", "선택");
+        e("Send", "Envoyer", "Enviar", "Enviar", "Senden", "Invia", "发送", "전송");
+        e("Separate draft: ", "Brouillon séparé : ", "Borrador separado: ", "Rascunho separado: ", "Separater Entwurf: ", "Draft separato: ", "独立草稿：", "별도 드래프트: ");
+        e("Set anyway", "Définir quand même", "Establecer de todos modos", "Definir mesmo assim", "Trotzdem festlegen", "Imposta comunque", "仍然设置", "그래도 설정");
+        e("Settings", "Paramètres", "Configuración", "Configurações", "Einstellungen", "Impostazioni", "设置", "설정");
+        e("Show Status", "Afficher l'état", "Mostrar estado", "Mostrar status", "Status anzeigen", "Mostra stato", "显示状态", "상태 표시");
+        e("Skip", "Ignorer", "Omitir", "Pular", "Überspringen", "Salta", "跳过", "건너뛰기");
+        e("Start API/WebUI", "Démarrer l'API/WebUI", "Iniciar API/WebUI", "Iniciar API/WebUI", "API/WebUI starten", "Avvia API/WebUI", "启动 API/WebUI", "API/WebUI 시작");
+        e("Starting...\n", "Démarrage...\n", "Iniciando...\n", "Iniciando...\n", "Wird gestartet...\n", "Avvio...\n", "正在启动...\n", "시작 중...\n");
+        e("Stop API/WebUI", "Arrêter l'API/WebUI", "Detener API/WebUI", "Parar API/WebUI", "API/WebUI stoppen", "Arresta API/WebUI", "停止 API/WebUI", "API/WebUI 중지");
+        e("The currently loaded model cannot be replaced. Switch models or delete it first", "Le modèle actuellement chargé ne peut pas être remplacé. Changez de modèle ou supprimez-le d'abord", "El modelo cargado actualmente no se puede reemplazar. Cambie de modelo o elimínelo primero", "O modelo carregado atualmente não pode ser substituído. Troque de modelo ou exclua-o primeiro", "Das aktuell geladene Modell kann nicht ersetzt werden. Wechseln Sie zuerst das Modell oder löschen Sie es", "Il modello attualmente caricato non può essere sostituito. Cambia modello o eliminalo prima", "无法替换当前已加载的模型。请先切换或删除它", "현재 로드된 모델은 교체할 수 없습니다. 먼저 모델을 전환하거나 삭제하세요");
+        e("The previous model load record could not be read. If needed, load the model again from Settings.", "L'enregistrement du chargement de modèle précédent n'a pas pu être lu. Si nécessaire, rechargez le modèle depuis les Paramètres.", "No se pudo leer el registro de carga del modelo anterior. Si es necesario, vuelva a cargar el modelo desde Configuración.", "Não foi possível ler o registro de carregamento do modelo anterior. Se necessário, carregue o modelo novamente em Configurações.", "Der vorherige Modellladevorgang konnte nicht gelesen werden. Laden Sie das Modell bei Bedarf erneut über die Einstellungen.", "Impossibile leggere il record di caricamento del modello precedente. Se necessario, ricarica il modello dalle Impostazioni.", "无法读取上一次的模型加载记录。如有需要，请从“设置”重新加载模型。", "이전 모델 로드 기록을 읽을 수 없습니다. 필요하면 설정에서 모델을 다시 로드하세요.");
+        e("The selected model file is unavailable", "Le fichier de modèle sélectionné est indisponible", "El archivo de modelo seleccionado no está disponible", "O arquivo de modelo selecionado está indisponível", "Die ausgewählte Modelldatei ist nicht verfügbar", "Il file del modello selezionato non è disponibile", "所选模型文件不可用", "선택한 모델 파일을 사용할 수 없습니다");
+        e("This GGUF looks like an mmproj / projector. Download-only is recommended. Load it immediately after the download?", "Ce GGUF ressemble à un mmproj / projecteur. Le téléchargement seul est recommandé. Le charger immédiatement après le téléchargement ?", "Este GGUF parece un mmproj / proyector. Se recomienda solo descargar. ¿Cargarlo inmediatamente después de la descarga?", "Este GGUF parece um mmproj / projetor. Recomenda-se somente baixar. Carregá-lo imediatamente após o download?", "Diese GGUF sieht aus wie ein mmproj / Projektor. Nur Herunterladen wird empfohlen. Direkt nach dem Download laden?", "Questo GGUF sembra un mmproj / proiettore. Si consiglia solo il download. Caricarlo subito dopo il download?", "此 GGUF 看起来像 mmproj / 投影器。建议仅下载。下载后立即加载吗？", "이 GGUF는 mmproj / 프로젝터로 보입니다. 다운로드만 권장합니다. 다운로드 후 바로 로드할까요?");
+        e("This will download the model and an available projector. Load the model immediately after the download?", "Ceci téléchargera le modèle et un projecteur disponible. Charger le modèle immédiatement après le téléchargement ?", "Esto descargará el modelo y un proyector disponible. ¿Cargar el modelo inmediatamente después de la descarga?", "Isto baixará o modelo e um projetor disponível. Carregar o modelo imediatamente após o download?", "Dadurch werden das Modell und ein verfügbarer Projektor heruntergeladen. Modell direkt nach dem Download laden?", "Questo scaricherà il modello e un proiettore disponibile. Caricare il modello subito dopo il download?", "这将下载模型和一个可用的投影器。下载后立即加载模型吗？", "모델과 사용 가능한 프로젝터를 다운로드합니다. 다운로드 후 바로 모델을 로드할까요?");
+        e("This will download the model from the web. Load it immediately after the download?", "Ceci téléchargera le modèle depuis le web. Le charger immédiatement après le téléchargement ?", "Esto descargará el modelo de la web. ¿Cargarlo inmediatamente después de la descarga?", "Isto baixará o modelo da web. Carregá-lo imediatamente após o download?", "Dadurch wird das Modell aus dem Web heruntergeladen. Direkt nach dem Download laden?", "Questo scaricherà il modello dal web. Caricarlo subito dopo il download?", "这将从网络下载模型。下载后立即加载吗？", "웹에서 모델을 다운로드합니다. 다운로드 후 바로 로드할까요?");
+        e("Unknown", "Inconnu", "Desconocido", "Desconhecido", "Unbekannt", "Sconosciuto", "未知", "알 수 없음");
+        e("Update", "Mettre à jour", "Actualizar", "Atualizar", "Aktualisieren", "Aggiorna", "更新", "업데이트");
+        e("Use as model", "Utiliser comme modèle", "Usar como modelo", "Usar como modelo", "Als Modell verwenden", "Usa come modello", "用作模型", "모델로 사용");
+        e("Use this model's own MTP head (recommended)", "Utiliser la propre tête MTP de ce modèle (recommandé)", "Usar la propia cabeza MTP de este modelo (recomendado)", "Usar a própria cabeça MTP deste modelo (recomendado)", "Eigenen MTP-Kopf dieses Modells verwenden (empfohlen)", "Usa la testa MTP propria di questo modello (consigliato)", "使用此模型自身的 MTP 头（推荐）", "이 모델 자체의 MTP 헤드 사용 (권장)");
+        e("User Manual", "Manuel d'utilisation", "Manual de usuario", "Manual do usuário", "Benutzerhandbuch", "Manuale utente", "用户手册", "사용 설명서");
+        e("View Log", "Afficher le journal", "Ver registro", "Ver registro", "Protokoll anzeigen", "Visualizza log", "查看日志", "로그 보기");
+        e("Web UI (tap to open / long-press to copy): ", "Web UI (appuyez pour ouvrir / appui long pour copier) : ", "Web UI (toque para abrir / mantenga pulsado para copiar): ", "Web UI (toque para abrir / pressione e segure para copiar): ", "Web UI (tippen zum Öffnen / lange drücken zum Kopieren): ", "Web UI (tocca per aprire / tieni premuto per copiare): ", "Web UI（点按打开 / 长按复制）：", "Web UI (탭하여 열기 / 길게 눌러 복사): ");
+        e("in", "entrée", "entrada", "entrada", "Eingabe", "input", "输入", "입력");
+        e("mmproj may be incompatible", "mmproj peut être incompatible", "mmproj puede ser incompatible", "mmproj pode ser incompatível", "mmproj ist möglicherweise inkompatibel", "mmproj potrebbe essere incompatibile", "mmproj 可能不兼容", "mmproj가 호환되지 않을 수 있습니다");
+        e("out", "sortie", "salida", "saída", "Ausgabe", "output", "输出", "출력");
+        e("temp", "temp", "temp", "temp", "Temp", "temp", "温度", "온도");
+        e("time", "temps", "tiempo", "tempo", "Zeit", "tempo", "时间", "시간");
+        e("▶ Direct Run (tap to expand)", "▶ Exécution directe (appuyez pour développer)", "▶ Ejecución directa (toque para expandir)", "▶ Execução direta (toque para expandir)", "▶ Direktausführung (zum Aufklappen tippen)", "▶ Esecuzione diretta (tocca per espandere)", "▶ 直接运行（点按展开）", "▶ 직접 실행 (탭하여 펼치기)");
+        e("▶ Processing Status/Logs", "▶ État du traitement / Journaux", "▶ Estado del procesamiento/Registros", "▶ Status do processamento/Registros", "▶ Verarbeitungsstatus/Protokolle", "▶ Stato elaborazione/Log", "▶ 处理状态/日志", "▶ 처리 상태/로그");
+        e("▼ Direct Run", "▼ Exécution directe", "▼ Ejecución directa", "▼ Execução direta", "▼ Direktausführung", "▼ Esecuzione diretta", "▼ 直接运行", "▼ 직접 실행");
+        e("▼ Processing Status/Logs", "▼ État du traitement / Journaux", "▼ Estado del procesamiento/Registros", "▼ Status do processamento/Registros", "▼ Verarbeitungsstatus/Protokolle", "▼ Stato elaborazione/Log", "▼ 处理状态/日志", "▼ 처리 상태/로그");
+
+        // Fixed parts split out of runtime-concatenated messages (batch #2).
+        e("Current profile now uses: ", "Le profil actuel utilise désormais : ", "El perfil actual ahora usa: ", "O perfil atual agora usa: ", "Aktuelles Profil verwendet jetzt: ", "Il profilo attuale ora usa: ", "当前配置文件现在使用：", "현재 프로필이 다음을 사용합니다: ");
+        e("Updated current profile: ", "Profil actuel mis à jour : ", "Perfil actual actualizado: ", "Perfil atual atualizado: ", "Aktuelles Profil aktualisiert: ", "Profilo attuale aggiornato: ", "已更新当前配置文件：", "현재 프로필 업데이트됨: ");
+        e("Searching Hugging Face... ", "Recherche sur Hugging Face... ", "Buscando en Hugging Face... ", "Pesquisando no Hugging Face... ", "Suche auf Hugging Face... ", "Ricerca su Hugging Face... ", "正在搜索 Hugging Face... ", "Hugging Face 검색 중... ");
+        e("Loading GGUF files... ", "Chargement des fichiers GGUF... ", "Cargando archivos GGUF... ", "Carregando arquivos GGUF... ", "GGUF-Dateien werden geladen... ", "Caricamento dei file GGUF... ", "正在加载 GGUF 文件... ", "GGUF 파일 로드 중... ");
+        e("Selected model: ", "Modèle sélectionné : ", "Modelo seleccionado: ", "Modelo selecionado: ", "Ausgewähltes Modell: ", "Modello selezionato: ", "已选择模型：", "선택한 모델: ");
+        e("Importing model... ", "Importation du modèle... ", "Importando modelo... ", "Importando modelo... ", "Modell wird importiert... ", "Importazione del modello... ", "正在导入模型... ", "모델 가져오는 중... ");
+        e("Imported mmproj: ", "mmproj importé : ", "mmproj importado: ", "mmproj importado: ", "mmproj importiert: ", "mmproj importato: ", "已导入 mmproj：", "mmproj 가져옴: ");
+        e("Imported model file: ", "Fichier de modèle importé : ", "Archivo de modelo importado: ", "Arquivo de modelo importado: ", "Modelldatei importiert: ", "File del modello importato: ", "已导入模型文件：", "모델 파일 가져옴: ");
+        e("The selected mmproj is incompatible and was disabled; loaded text-only: ", "Le mmproj sélectionné est incompatible et a été désactivé ; chargé en texte seul : ", "El mmproj seleccionado es incompatible y se desactivó; cargado solo texto: ", "O mmproj selecionado é incompatível e foi desativado; carregado somente texto: ", "Das ausgewählte mmproj ist inkompatibel und wurde deaktiviert; nur Text geladen: ", "Il mmproj selezionato è incompatibile ed è stato disattivato; caricato solo testo: ", "所选 mmproj 不兼容，已禁用；已仅加载文本：", "선택한 mmproj가 호환되지 않아 비활성화되었습니다. 텍스트 전용으로 로드됨: ");
+        e("Download complete: ", "Téléchargement terminé : ", "Descarga completada: ", "Download concluído: ", "Download abgeschlossen: ", "Download completato: ", "下载完成：", "다운로드 완료: ");
+        e("Projector: ", "Projecteur : ", "Proyector: ", "Projetor: ", "Projektor: ", "Proiettore: ", "投影器：", "프로젝터: ");
+        e(" (save config to apply)", " (enregistrez la config pour appliquer)", " (guarde la configuración para aplicar)", " (salve a configuração para aplicar)", " (Konfiguration speichern zum Anwenden)", " (salva la configurazione per applicare)", "（保存配置以应用）", " (적용하려면 설정 저장)");
+        e("The selected mmproj (", "Le mmproj sélectionné (", "El mmproj seleccionado (", "O mmproj selecionado (", "Das ausgewählte mmproj (", "Il mmproj selezionato (", "所选 mmproj (", "선택한 mmproj (");
+        e(") may be incompatible with this model. If it is, it will be disabled automatically at load time. Set it anyway?", ") peut être incompatible avec ce modèle. Si c'est le cas, il sera désactivé automatiquement au chargement. Le définir quand même ?", ") puede ser incompatible con este modelo. Si lo es, se desactivará automáticamente al cargar. ¿Establecerlo de todos modos?", ") pode ser incompatível com este modelo. Se for, será desativado automaticamente ao carregar. Definir mesmo assim?", ") ist möglicherweise mit diesem Modell inkompatibel. In diesem Fall wird es beim Laden automatisch deaktiviert. Trotzdem festlegen?", ") potrebbe essere incompatibile con questo modello. In tal caso, verrà disattivato automaticamente al caricamento. Impostarlo comunque?", ") 可能与此模型不兼容。若不兼容，将在加载时自动禁用。仍然设置吗？", ")가 이 모델과 호환되지 않을 수 있습니다. 그럴 경우 로드 시 자동으로 비활성화됩니다. 그래도 설정할까요?");
+        e("This multimodal model also uses an mmproj (", "Ce modèle multimodal utilise aussi un mmproj (", "Este modelo multimodal también usa un mmproj (", "Este modelo multimodal também usa um mmproj (", "Dieses multimodale Modell verwendet auch ein mmproj (", "Questo modello multimodale usa anche un mmproj (", "此多模态模型还使用 mmproj (", "이 멀티모달 모델은 mmproj도 사용합니다 (");
+        e("). Download it as well?\nIf you skip, the model loads text-only.", "). Le télécharger aussi ?\nSi vous ignorez, le modèle se charge en texte seul.", "). ¿Descargarlo también?\nSi lo omite, el modelo se carga solo texto.", "). Baixá-lo também?\nSe você pular, o modelo carrega somente texto.", "). Ebenfalls herunterladen?\nWenn Sie überspringen, wird das Modell nur als Text geladen.", "). Scaricarlo anche?\nSe salti, il modello si carica solo testo.", ")。也一并下载吗？\n若跳过，模型将仅加载文本。", ")도 다운로드할까요?\n건너뛰면 모델이 텍스트 전용으로 로드됩니다.");
+        e("Download projector", "Télécharger le projecteur", "Descargar proyector", "Baixar projetor", "Projektor herunterladen", "Scarica proiettore", "下载投影器", "프로젝터 다운로드");
+        e("Download model", "Télécharger le modèle", "Descargar modelo", "Baixar modelo", "Modell herunterladen", "Scarica modello", "下载模型", "모델 다운로드");
+        e("Hide Log", "Masquer le journal", "Ocultar registro", "Ocultar registro", "Protokoll ausblenden", "Nascondi log", "隐藏日志", "로그 숨기기");
+        e("Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:", "Activer le serveur API/WebUI local ?\n\nS'il est activé, l'API et le WebUI peuvent être utilisés depuis cet appareil ou le même réseau local. Le WebUI est accessible dans un navigateur à l'adresse http://<device-ip>:", "¿Habilitar el servidor local de API/WebUI?\n\nSi se habilita, la API y el WebUI se pueden usar desde este dispositivo o la misma red local. El WebUI está disponible en un navegador en http://<device-ip>:", "Ativar o servidor local de API/WebUI?\n\nSe ativado, a API e o WebUI podem ser usados a partir deste dispositivo ou da mesma rede local. O WebUI está disponível em um navegador em http://<device-ip>:", "Lokalen API/WebUI-Server aktivieren?\n\nWenn aktiviert, können API und WebUI von diesem Gerät oder demselben lokalen Netzwerk aus verwendet werden. Das WebUI ist in einem Browser unter http://<device-ip>:", "Attivare il server API/WebUI locale?\n\nSe attivato, l'API e il WebUI possono essere usati da questo dispositivo o dalla stessa rete locale. Il WebUI è disponibile in un browser all'indirizzo http://<device-ip>:", "启用本地 API/WebUI 服务器吗？\n\n启用后，可从本机或同一局域网使用 API 和 WebUI。WebUI 可在浏览器中通过 http://<device-ip>:", "로컬 API/WebUI 서버를 활성화할까요?\n\n활성화하면 이 기기나 동일한 로컬 네트워크에서 API와 WebUI를 사용할 수 있습니다. WebUI는 브라우저에서 http://<device-ip>:");
+        e("/ . You can also change this later from the main screen.", "/ . Vous pouvez aussi le modifier plus tard depuis l'écran principal.", "/ . También puede cambiar esto más tarde desde la pantalla principal.", "/ . Você também pode alterar isso mais tarde na tela principal.", "/ erreichbar. Sie können dies später auch über den Hauptbildschirm ändern.", "/ . Puoi anche modificarlo in seguito dalla schermata principale.", "/ 打开。之后也可在主界面切换。", "/ 에서 열 수 있습니다. 나중에 메인 화면에서도 변경할 수 있습니다.");
+        e("The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: ", "Le chargement précédent du modèle a été interrompu car la réservation de l'espace d'adressage a échoué ou parce que le processus a été interrompu par l'utilisateur.\n\nProfil : ", "La carga anterior del modelo se interrumpió porque falló la reserva de espacio de direcciones o porque el proceso fue interrumpido por una acción del usuario.\n\nPerfil: ", "O carregamento anterior do modelo foi interrompido porque a reserva de espaço de endereço falhou ou porque o processo foi interrompido por ação do usuário.\n\nPerfil: ", "Das vorherige Laden des Modells wurde abgebrochen, weil die Reservierung des Adressraums fehlschlug oder weil der Vorgang durch den Benutzer unterbrochen wurde.\n\nProfil: ", "Il caricamento precedente del modello è stato interrotto perché la riserva dello spazio di indirizzamento è fallita o perché il processo è stato interrotto dall'utente.\n\nProfilo: ", "上一次模型加载因地址空间预留失败或被用户操作中断而停止。\n\n配置文件：", "이전 모델 로드가 주소 공간 예약 실패 또는 사용자 조작으로 인해 중단되었습니다.\n\n프로필: ");
+        e("\nModel: ", "\nModèle : ", "\nModelo: ", "\nModelo: ", "\nModell: ", "\nModello: ", "\n模型：", "\n모델: ");
+        e("\n\nNo automatic retry was performed. If needed, load the model again from Settings.", "\n\nAucune nouvelle tentative automatique n'a été effectuée. Si nécessaire, rechargez le modèle depuis les Paramètres.", "\n\nNo se realizó ningún reintento automático. Si es necesario, vuelva a cargar el modelo desde Configuración.", "\n\nNenhuma nova tentativa automática foi realizada. Se necessário, carregue o modelo novamente em Configurações.", "\n\nEs wurde kein automatischer erneuter Versuch durchgeführt. Laden Sie das Modell bei Bedarf erneut über die Einstellungen.", "\n\nNon è stato eseguito alcun nuovo tentativo automatico. Se necessario, ricarica il modello dalle Impostazioni.", "\n\n未自动重试。如有需要，请从“设置”重新加载模型。", "\n\n자동 재시도는 수행되지 않았습니다. 필요하면 설정에서 모델을 다시 로드하세요.");
+        e("API/WebUI: Running on port ", "API/WebUI : en cours d'exécution sur le port ", "API/WebUI: en ejecución en el puerto ", "API/WebUI: em execução na porta ", "API/WebUI: läuft auf Port ", "API/WebUI: in esecuzione sulla porta ", "API/WebUI：正在端口 ", "API/WebUI: 포트 ");
+        e(" (WebUI: /)", " (WebUI : /)", " (WebUI: /)", " (WebUI: /)", " (WebUI: /)", " (WebUI: /)", " 上运行 (WebUI: /)", "에서 실행 중 (WebUI: /)");
+        e(" copied to clipboard", " copié dans le presse-papiers", " copiado al portapapeles", " copiado para a área de transferência", " in die Zwischenablage kopiert", " copiato negli appunti", " 已复制到剪贴板", " 클립보드에 복사됨");
+        e(" (updated profiles: ", " (profils mis à jour : ", " (perfiles actualizados: ", " (perfis atualizados: ", " (aktualisierte Profile: ", " (profili aggiornati: ", "（已更新配置文件：", " (업데이트된 프로필: ");
+        e(")", ")", ")", ")", ")", ")", "）", ")");
+
+        // Settings screen labels/hints from the layout XML (batch #4).
+        e("Configuration Management", "Gestion des configurations", "Gestión de configuraciones", "Gerenciamento de configurações", "Konfigurationsverwaltung", "Gestione configurazioni", "配置管理", "구성 관리");
+        e("Profile:", "Profil :", "Perfil:", "Perfil:", "Profil:", "Profilo:", "配置文件：", "프로필:");
+        e("Configuration Name:", "Nom de la configuration :", "Nombre de la configuración:", "Nome da configuração:", "Konfigurationsname:", "Nome configurazione:", "配置名称：", "구성 이름:");
+        e("Save Config", "Enregistrer la config", "Guardar config", "Salvar config", "Konfiguration speichern", "Salva config", "保存配置", "구성 저장");
+        e("Delete Config", "Supprimer la config", "Eliminar config", "Excluir config", "Konfiguration löschen", "Elimina config", "删除配置", "구성 삭제");
+        e("Load Configuration:", "Charger une configuration :", "Cargar configuración:", "Carregar configuração:", "Konfiguration laden:", "Carica configurazione:", "加载配置：", "구성 로드:");
+        e("Load Selected Config", "Charger la config sélectionnée", "Cargar la config seleccionada", "Carregar a config selecionada", "Ausgewählte Konfiguration laden", "Carica la config selezionata", "加载所选配置", "선택한 구성 로드");
+        e("Model Loading", "Chargement du modèle", "Carga de modelo", "Carregamento de modelo", "Modell laden", "Caricamento del modello", "模型加载", "모델 로드");
+        e("Model Management", "Gestion des modèles", "Gestión de modelos", "Gerenciamento de modelos", "Modellverwaltung", "Gestione modelli", "模型管理", "모델 관리");
+        e("MTP Settings", "Paramètres MTP", "Configuración de MTP", "Configurações de MTP", "MTP-Einstellungen", "Impostazioni MTP", "MTP 设置", "MTP 설정");
+        e("Select downloaded model", "Sélectionner un modèle téléchargé", "Seleccionar modelo descargado", "Selecionar modelo baixado", "Heruntergeladenes Modell auswählen", "Seleziona un modello scaricato", "选择已下载的模型", "다운로드된 모델 선택");
+        e("Get models", "Obtenir des modèles", "Obtener modelos", "Obter modelos", "Modelle beziehen", "Ottieni modelli", "获取模型", "모델 가져오기");
+        e("Rename / delete models", "Renommer / supprimer des modèles", "Renombrar / eliminar modelos", "Renomear / excluir modelos", "Modelle umbenennen / löschen", "Rinomina / elimina modelli", "重命名 / 删除模型", "모델 이름 변경 / 삭제");
+        e("Select a model", "Sélectionner un modèle", "Seleccionar un modelo", "Selecionar um modelo", "Modell auswählen", "Seleziona un modello", "选择模型", "모델 선택");
+        e("No downloaded models", "Aucun modèle téléchargé", "No hay modelos descargados", "Nenhum modelo baixado", "Keine heruntergeladenen Modelle", "Nessun modello scaricato", "没有已下载的模型", "다운로드된 모델이 없습니다");
+        e("Model URL / Imported File:", "URL du modèle / fichier importé :", "URL del modelo / archivo importado:", "URL do modelo / arquivo importado:", "Modell-URL / importierte Datei:", "URL del modello / file importato:", "模型 URL / 导入的文件：", "모델 URL / 가져온 파일:");
+        e("Multimodal Projector (mmproj):", "Projecteur multimodal (mmproj) :", "Proyector multimodal (mmproj):", "Projetor multimodal (mmproj):", "Multimodaler Projektor (mmproj):", "Proiettore multimodale (mmproj):", "多模态投影器 (mmproj)：", "멀티모달 프로젝터 (mmproj):");
+        e("No multimodal projector selected", "Aucun projecteur multimodal sélectionné", "Ningún proyector multimodal seleccionado", "Nenhum projetor multimodal selecionado", "Kein multimodaler Projektor ausgewählt", "Nessun proiettore multimodale selezionato", "未选择多模态投影器", "선택된 멀티모달 프로젝터 없음");
+        e("Clear mmproj", "Effacer mmproj", "Borrar mmproj", "Limpar mmproj", "mmproj löschen", "Cancella mmproj", "清除 mmproj", "mmproj 지우기");
+        e("gguf import from local device", "Importer un gguf depuis l'appareil local", "Importar gguf desde el dispositivo local", "Importar gguf do dispositivo local", "gguf vom lokalen Gerät importieren", "Importa gguf dal dispositivo locale", "从本地设备导入 gguf", "로컬 기기에서 gguf 가져오기");
+        e("Load Model", "Charger le modèle", "Cargar modelo", "Carregar modelo", "Modell laden", "Carica modello", "加载模型", "모델 로드");
+        e("MAINTAIN MODEL", "GÉRER LE MODÈLE", "MANTENER MODELO", "MANTER MODELO", "MODELL VERWALTEN", "GESTISCI MODELLO", "模型管理", "모델 관리");
+        e("Model file: (none)", "Fichier du modèle : (aucun)", "Archivo del modelo: (ninguno)", "Arquivo do modelo: (nenhum)", "Modelldatei: (keine)", "File del modello: (nessuno)", "模型文件：（无）", "모델 파일: (없음)");
+        e("Model Parameters", "Paramètres du modèle", "Parámetros del modelo", "Parâmetros do modelo", "Modellparameter", "Parametri del modello", "模型参数", "모델 매개변수");
+        e("Context Size (n_ctx):", "Taille du contexte (n_ctx) :", "Tamaño de contexto (n_ctx):", "Tamanho do contexto (n_ctx):", "Kontextgröße (n_ctx):", "Dimensione contesto (n_ctx):", "上下文大小 (n_ctx)：", "컨텍스트 크기 (n_ctx):");
+        e("Threads (n_threads):", "Threads (n_threads) :", "Hilos (n_threads):", "Threads (n_threads):", "Threads (n_threads):", "Thread (n_threads):", "线程数 (n_threads)：", "스레드 (n_threads):");
+        e("Batch Size (n_batch):", "Taille de lot (n_batch) :", "Tamaño de lote (n_batch):", "Tamanho do lote (n_batch):", "Batch-Größe (n_batch):", "Dimensione batch (n_batch):", "批大小 (n_batch)：", "배치 크기 (n_batch):");
+        e("Compute Backend (off = CPU):", "Backend de calcul (désactivé = CPU) :", "Backend de cómputo (apagado = CPU):", "Backend de computação (desligado = CPU):", "Rechen-Backend (aus = CPU):", "Backend di calcolo (off = CPU):", "计算后端（关闭 = CPU）：", "연산 백엔드 (끄면 = CPU):");
+        e("GPU (OpenCL/Adreno) Enabled:", "GPU (OpenCL/Adreno) activé :", "GPU (OpenCL/Adreno) habilitada:", "GPU (OpenCL/Adreno) ativada:", "GPU (OpenCL/Adreno) aktiviert:", "GPU (OpenCL/Adreno) abilitata:", "GPU (OpenCL/Adreno) 已启用：", "GPU (OpenCL/Adreno) 활성화:");
+        e("Offload Layers (GPU):", "Couches déléguées (GPU) :", "Capas delegadas (GPU):", "Camadas delegadas (GPU):", "Ausgelagerte Schichten (GPU):", "Livelli delegati (GPU):", "卸载层数 (GPU)：", "오프로드 레이어 (GPU):");
+        e("Temperature (temp):", "Température (temp) :", "Temperatura (temp):", "Temperatura (temp):", "Temperatur (temp):", "Temperatura (temp):", "温度 (temp)：", "온도 (temp):");
+        e("Penalty Parameters", "Paramètres de pénalité", "Parámetros de penalización", "Parâmetros de penalidade", "Straf-Parameter", "Parametri di penalità", "惩罚参数", "페널티 매개변수");
+        e("Penalty Last N:", "Pénalité derniers N :", "Penalización últimos N:", "Penalidade últimos N:", "Strafe letzte N:", "Penalità ultimi N:", "惩罚最近 N：", "페널티 최근 N:");
+        e("Penalty Repeat:", "Pénalité de répétition :", "Penalización por repetición:", "Penalidade de repetição:", "Wiederholungsstrafe:", "Penalità di ripetizione:", "重复惩罚：", "반복 페널티:");
+        e("Penalty Frequency:", "Pénalité de fréquence :", "Penalización por frecuencia:", "Penalidade de frequência:", "Häufigkeitsstrafe:", "Penalità di frequenza:", "频率惩罚：", "빈도 페널티:");
+        e("Penalty Presence:", "Pénalité de présence :", "Penalización por presencia:", "Penalidade de presença:", "Präsenzstrafe:", "Penalità di presenza:", "存在惩罚：", "존재 페널티:");
+        e("Mirostat Parameters", "Paramètres Mirostat", "Parámetros Mirostat", "Parâmetros Mirostat", "Mirostat-Parameter", "Parametri Mirostat", "Mirostat 参数", "Mirostat 매개변수");
+        e("Mirostat (0=disabled, 1=v1, 2=v2):", "Mirostat (0=désactivé, 1=v1, 2=v2) :", "Mirostat (0=desactivado, 1=v1, 2=v2):", "Mirostat (0=desativado, 1=v1, 2=v2):", "Mirostat (0=deaktiviert, 1=v1, 2=v2):", "Mirostat (0=disattivato, 1=v1, 2=v2):", "Mirostat（0=关闭，1=v1，2=v2）：", "Mirostat (0=끔, 1=v1, 2=v2):");
+        e("Mirostat Tau:", "Mirostat Tau :", "Mirostat Tau:", "Mirostat Tau:", "Mirostat Tau:", "Mirostat Tau:", "Mirostat Tau：", "Mirostat Tau:");
+        e("Mirostat Eta:", "Mirostat Eta :", "Mirostat Eta:", "Mirostat Eta:", "Mirostat Eta:", "Mirostat Eta:", "Mirostat Eta：", "Mirostat Eta:");
+        e("Additional Sampling Parameters", "Paramètres d'échantillonnage supplémentaires", "Parámetros de muestreo adicionales", "Parâmetros de amostragem adicionais", "Zusätzliche Sampling-Parameter", "Parametri di campionamento aggiuntivi", "其他采样参数", "추가 샘플링 매개변수");
+        e("XTC Probability:", "Probabilité XTC :", "Probabilidad XTC:", "Probabilidade XTC:", "XTC-Wahrscheinlichkeit:", "Probabilità XTC:", "XTC 概率：", "XTC 확률:");
+        e("XTC Threshold:", "Seuil XTC :", "Umbral XTC:", "Limite XTC:", "XTC-Schwelle:", "Soglia XTC:", "XTC 阈值：", "XTC 임계값:");
+        e("Dynamic Temperature Range:", "Plage de température dynamique :", "Rango de temperatura dinámica:", "Faixa de temperatura dinâmica:", "Bereich der dynamischen Temperatur:", "Intervallo temperatura dinamica:", "动态温度范围：", "동적 온도 범위:");
+        e("Dynamic Temperature Exponent:", "Exposant de température dynamique :", "Exponente de temperatura dinámica:", "Expoente de temperatura dinâmica:", "Exponent der dynamischen Temperatur:", "Esponente temperatura dinamica:", "动态温度指数：", "동적 온도 지수:");
+        e("DRY (Don't Repeat Yourself) Parameters", "Paramètres DRY (Don't Repeat Yourself)", "Parámetros DRY (Don't Repeat Yourself)", "Parâmetros DRY (Don't Repeat Yourself)", "DRY-Parameter (Don't Repeat Yourself)", "Parametri DRY (Don't Repeat Yourself)", "DRY（Don't Repeat Yourself）参数", "DRY (Don't Repeat Yourself) 매개변수");
+        e("DRY Multiplier:", "Multiplicateur DRY :", "Multiplicador DRY:", "Multiplicador DRY:", "DRY-Multiplikator:", "Moltiplicatore DRY:", "DRY 乘数：", "DRY 배수:");
+        e("DRY Base:", "Base DRY :", "Base DRY:", "Base DRY:", "DRY-Basis:", "Base DRY:", "DRY 基数：", "DRY 기준:");
+        e("DRY Allowed Length:", "Longueur autorisée DRY :", "Longitud permitida DRY:", "Comprimento permitido DRY:", "DRY zulässige Länge:", "Lunghezza consentita DRY:", "DRY 允许长度：", "DRY 허용 길이:");
+        e("DRY Penalty Last N:", "Pénalité DRY derniers N :", "Penalización DRY últimos N:", "Penalidade DRY últimos N:", "DRY-Strafe letzte N:", "Penalità DRY ultimi N:", "DRY 惩罚最近 N：", "DRY 페널티 최근 N:");
+        e("DRY Sequence Breakers:", "Séparateurs de séquence DRY :", "Interruptores de secuencia DRY:", "Quebradores de sequência DRY:", "DRY-Sequenztrenner:", "Interruttori di sequenza DRY:", "DRY 序列分隔符：", "DRY 시퀀스 구분자:");
+        e("Output Settings", "Paramètres de sortie", "Configuración de salida", "Configurações de saída", "Ausgabeeinstellungen", "Impostazioni di output", "输出设置", "출력 설정");
+        e("Enable Streaming:", "Activer le streaming :", "Habilitar streaming:", "Ativar streaming:", "Streaming aktivieren:", "Abilita streaming:", "启用流式输出：", "스트리밍 활성화:");
+        e("Show Performance Metrics:", "Afficher les métriques de performance :", "Mostrar métricas de rendimiento:", "Mostrar métricas de desempenho:", "Leistungsmetriken anzeigen:", "Mostra metriche di prestazione:", "显示性能指标：", "성능 지표 표시:");
+        e("Prompt Template", "Modèle d'invite", "Plantilla de prompt", "Modelo de prompt", "Prompt-Vorlage", "Modello di prompt", "提示模板", "프롬프트 템플릿");
+        e("System Prompt:", "Invite système :", "Prompt del sistema:", "Prompt do sistema:", "System-Prompt:", "Prompt di sistema:", "系统提示：", "시스템 프롬프트:");
+        e("Used when API doesn't provide a system message.", "Utilisé lorsque l'API ne fournit pas de message système.", "Se usa cuando la API no proporciona un mensaje del sistema.", "Usado quando a API não fornece uma mensagem do sistema.", "Wird verwendet, wenn die API keine Systemnachricht liefert.", "Usato quando l'API non fornisce un messaggio di sistema.", "当 API 未提供系统消息时使用。", "API가 시스템 메시지를 제공하지 않을 때 사용됩니다.");
+        e("Enable Think (chat-template-kwargs.enable_thinking):", "Activer Think (chat-template-kwargs.enable_thinking) :", "Habilitar Think (chat-template-kwargs.enable_thinking):", "Ativar Think (chat-template-kwargs.enable_thinking):", "Think aktivieren (chat-template-kwargs.enable_thinking):", "Abilita Think (chat-template-kwargs.enable_thinking):", "启用 Think (chat-template-kwargs.enable_thinking)：", "Think 활성화 (chat-template-kwargs.enable_thinking):");
+        e("Custom Chat Template:", "Modèle de chat personnalisé :", "Plantilla de chat personalizada:", "Modelo de chat personalizado:", "Benutzerdefinierte Chat-Vorlage:", "Modello di chat personalizzato:", "自定义聊天模板：", "사용자 지정 채팅 템플릿:");
+        e("Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.", "Remplace la détection automatique. Utilisez les espaces réservés {SYSTEM} et {USER}.", "Anula la detección automática. Use los marcadores {SYSTEM} y {USER}.", "Substitui a detecção automática. Use os espaços reservados {SYSTEM} e {USER}.", "Überschreibt die automatische Erkennung. Verwenden Sie die Platzhalter {SYSTEM} und {USER}.", "Sostituisce il rilevamento automatico. Usa i segnaposto {SYSTEM} e {USER}.", "覆盖自动检测。使用 {SYSTEM} 和 {USER} 占位符。", "자동 감지를 재정의합니다. {SYSTEM} 및 {USER} 자리 표시자를 사용하세요.");
+        e("Auto-selected Prompt Template:", "Modèle d'invite sélectionné automatiquement :", "Plantilla de prompt seleccionada automáticamente:", "Modelo de prompt selecionado automaticamente:", "Automatisch ausgewählte Prompt-Vorlage:", "Modello di prompt selezionato automaticamente:", "自动选择的提示模板：", "자동 선택된 프롬프트 템플릿:");
+        e("Based on custom template or model family detection.", "Basé sur un modèle personnalisé ou la détection de la famille du modèle.", "Basado en la plantilla personalizada o la detección de la familia del modelo.", "Com base no modelo personalizado ou na detecção da família do modelo.", "Basierend auf benutzerdefinierter Vorlage oder Erkennung der Modellfamilie.", "In base al modello personalizzato o al rilevamento della famiglia del modello.", "基于自定义模板或模型家族检测。", "사용자 지정 템플릿 또는 모델 계열 감지를 기반으로 합니다.");
+        e("(auto-selected template will appear here)", "(le modèle sélectionné automatiquement apparaîtra ici)", "(la plantilla seleccionada automáticamente aparecerá aquí)", "(o modelo selecionado automaticamente aparecerá aqui)", "(die automatisch ausgewählte Vorlage erscheint hier)", "(il modello selezionato automaticamente apparirà qui)", "（自动选择的模板将显示在此处）", "(자동 선택된 템플릿이 여기에 표시됩니다)");
+        e("Llama API Server", "Serveur API Llama", "Servidor API de Llama", "Servidor de API Llama", "Llama-API-Server", "Server API Llama", "Llama API 服务器", "Llama API 서버");
+        e("Server Port (default: 11434):", "Port du serveur (par défaut : 11434) :", "Puerto del servidor (predeterminado: 11434):", "Porta do servidor (padrão: 11434):", "Server-Port (Standard: 11434):", "Porta del server (predefinita: 11434):", "服务器端口（默认：11434）：", "서버 포트 (기본값: 11434):");
+        e("Local URL (tap to open / long-press to copy):", "URL locale (appuyez pour ouvrir / appui long pour copier) :", "URL local (toque para abrir / mantenga pulsado para copiar):", "URL local (toque para abrir / pressione e segure para copiar):", "Lokale URL (tippen zum Öffnen / lange drücken zum Kopieren):", "URL locale (tocca per aprire / tieni premuto per copiare):", "本地 URL（点按打开 / 长按复制）：", "로컬 URL (탭하여 열기 / 길게 눌러 복사):");
+        e("LAN URL (tap to open / long-press to copy):", "URL LAN (appuyez pour ouvrir / appui long pour copier) :", "URL de LAN (toque para abrir / mantenga pulsado para copiar):", "URL da LAN (toque para abrir / pressione e segure para copiar):", "LAN-URL (tippen zum Öffnen / lange drücken zum Kopieren):", "URL LAN (tocca per aprire / tieni premuto per copiare):", "LAN URL（点按打开 / 长按复制）：", "LAN URL (탭하여 열기 / 길게 눌러 복사):");
+        e("MCP Settings", "Paramètres MCP", "Configuración de MCP", "Configurações de MCP", "MCP-Einstellungen", "Impostazioni MCP", "MCP 设置", "MCP 설정");
+        e("Enable MCP outside Web UI:", "Activer MCP hors Web UI :", "Habilitar MCP fuera de la Web UI:", "Ativar MCP fora da Web UI:", "MCP außerhalb der Web-UI aktivieren:", "Abilita MCP fuori dalla Web UI:", "在 Web UI 之外启用 MCP：", "Web UI 외부에서 MCP 활성화:");
+        e("Enable Function Calling outside Web UI:", "Activer Function Calling hors Web UI :", "Habilitar Function Calling fuera de la Web UI:", "Ativar Function Calling fora da Web UI:", "Function Calling außerhalb der Web-UI aktivieren:", "Abilita Function Calling fuori dalla Web UI:", "在 Web UI 之外启用 Function Calling：", "Web UI 외부에서 Function Calling 활성화:");
+        e("Available only in Web UI when disabled.", "Disponible uniquement dans la Web UI lorsque désactivé.", "Disponible solo en la Web UI cuando está desactivado.", "Disponível apenas na Web UI quando desativado.", "Bei Deaktivierung nur in der Web-UI verfügbar.", "Disponibile solo nella Web UI quando disattivato.", "禁用时仅在 Web UI 中可用。", "비활성화 시 Web UI에서만 사용할 수 있습니다.");
+        e("MCP Config JSON (shared):", "JSON de configuration MCP (partagé) :", "JSON de configuración de MCP (compartido):", "JSON de configuração do MCP (compartilhado):", "MCP-Konfigurations-JSON (gemeinsam):", "JSON di configurazione MCP (condiviso):", "MCP 配置 JSON（共享）：", "MCP 구성 JSON (공유):");
+        e("Function Definitions JSON (shared):", "JSON des définitions de fonctions (partagé) :", "JSON de definiciones de funciones (compartido):", "JSON de definições de funções (compartilhado):", "Funktionsdefinitions-JSON (gemeinsam):", "JSON delle definizioni di funzione (condiviso):", "函数定义 JSON（共享）：", "함수 정의 JSON (공유):");
+        e("Log Settings", "Paramètres de journalisation", "Configuración de registro", "Configurações de registro", "Protokolleinstellungen", "Impostazioni di log", "日志设置", "로그 설정");
+        e("Log Level:", "Niveau de journalisation :", "Nivel de registro:", "Nível de registro:", "Protokollstufe:", "Livello di log:", "日志级别：", "로그 수준:");
+        e("Show License", "Afficher la licence", "Mostrar licencia", "Mostrar licença", "Lizenz anzeigen", "Mostra licenza", "显示许可证", "라이선스 표시");
+        e("SAVE & CLOSE", "ENREGISTRER ET FERMER", "GUARDAR Y CERRAR", "SALVAR E FECHAR", "SPEICHERN & SCHLIESSEN", "SALVA E CHIUDI", "保存并关闭", "저장 후 닫기");
+        e("CLOSE", "FERMER", "CERRAR", "FECHAR", "SCHLIESSEN", "CHIUDI", "关闭", "닫기");
+        e("Default: ", "Par défaut : ", "Predeterminado: ", "Padrão: ", "Standard: ", "Predefinito: ", "默认：", "기본값: ");
+        e("Enter configuration name", "Saisissez un nom de configuration", "Ingrese un nombre de configuración", "Digite um nome de configuração", "Konfigurationsnamen eingeben", "Inserisci un nome di configurazione", "输入配置名称", "구성 이름을 입력하세요");
+        e("https://... or filename.gguf", "https://... ou filename.gguf", "https://... o filename.gguf", "https://... ou filename.gguf", "https://... oder filename.gguf", "https://... o filename.gguf", "https://... 或 filename.gguf", "https://... 또는 filename.gguf");
+        e("Enter system prompt (optional)", "Saisissez l'invite système (facultatif)", "Ingrese el prompt del sistema (opcional)", "Digite o prompt do sistema (opcional)", "System-Prompt eingeben (optional)", "Inserisci il prompt di sistema (facoltativo)", "输入系统提示（可选）", "시스템 프롬프트 입력 (선택)");
+        e("Enter custom chat template (optional)", "Saisissez un modèle de chat personnalisé (facultatif)", "Ingrese una plantilla de chat personalizada (opcional)", "Digite um modelo de chat personalizado (opcional)", "Benutzerdefinierte Chat-Vorlage eingeben (optional)", "Inserisci un modello di chat personalizzato (facoltativo)", "输入自定义聊天模板（可选）", "사용자 지정 채팅 템플릿 입력 (선택)");
+
+        // Settings screen runtime toasts / status / dialogs (batch #4b).
+        e("Model is busy processing another request", "Le modèle traite déjà une autre requête", "El modelo está ocupado procesando otra solicitud", "O modelo está ocupado processando outra solicitação", "Das Modell verarbeitet bereits eine andere Anfrage", "Il modello è occupato con un'altra richiesta", "模型正忙于处理另一个请求", "모델이 다른 요청을 처리 중입니다");
+        e("Model is busy", "Le modèle est occupé", "El modelo está ocupado", "O modelo está ocupado", "Das Modell ist beschäftigt", "Il modello è occupato", "模型正忙", "모델이 사용 중입니다");
+        e("Model init failed", "Échec de l'initialisation du modèle", "Error al inicializar el modelo", "Falha ao inicializar o modelo", "Modellinitialisierung fehlgeschlagen", "Inizializzazione del modello non riuscita", "模型初始化失败", "모델 초기화 실패");
+        e("Downloading model... ", "Téléchargement du modèle... ", "Descargando modelo... ", "Baixando modelo... ", "Modell wird heruntergeladen... ", "Download del modello... ", "正在下载模型... ", "모델 다운로드 중... ");
+        e("Log level set to ", "Niveau de journalisation défini sur ", "Nivel de registro establecido en ", "Nível de registro definido como ", "Protokollstufe gesetzt auf ", "Livello di log impostato su ", "日志级别已设置为 ", "로그 수준 설정: ");
+        e("License & Third-Party Notices", "Licence et mentions de tiers", "Licencia y avisos de terceros", "Licença e avisos de terceiros", "Lizenz und Hinweise zu Drittanbietern", "Licenza e note di terze parti", "许可证与第三方声明", "라이선스 및 제3자 고지");
+        e("Loaded configuration: ", "Configuration chargée : ", "Configuración cargada: ", "Configuração carregada: ", "Konfiguration geladen: ", "Configurazione caricata: ", "已加载配置：", "구성 로드됨: ");
+        e("Failed to load configuration: ", "Échec du chargement de la configuration : ", "Error al cargar la configuración: ", "Falha ao carregar a configuração: ", "Konfiguration konnte nicht geladen werden: ", "Impossibile caricare la configurazione: ", "加载配置失败：", "구성 로드 실패: ");
+        e("Configuration saved: ", "Configuration enregistrée : ", "Configuración guardada: ", "Configuração salva: ", "Konfiguration gespeichert: ", "Configurazione salvata: ", "已保存配置：", "구성 저장됨: ");
+        e("Failed to save: ", "Échec de l'enregistrement : ", "Error al guardar: ", "Falha ao salvar: ", "Speichern fehlgeschlagen: ", "Salvataggio non riuscito: ", "保存失败：", "저장 실패: ");
+        e("No configuration selected", "Aucune configuration sélectionnée", "Ninguna configuración seleccionada", "Nenhuma configuração selecionada", "Keine Konfiguration ausgewählt", "Nessuna configurazione selezionata", "未选择配置", "선택된 구성이 없습니다");
+        e("Cannot delete default configuration", "Impossible de supprimer la configuration par défaut", "No se puede eliminar la configuración predeterminada", "Não é possível excluir a configuração padrão", "Standardkonfiguration kann nicht gelöscht werden", "Impossibile eliminare la configurazione predefinita", "无法删除默认配置", "기본 구성은 삭제할 수 없습니다");
+        e("Deleted configuration: ", "Configuration supprimée : ", "Configuración eliminada: ", "Configuração excluída: ", "Konfiguration gelöscht: ", "Configurazione eliminata: ", "已删除配置：", "구성 삭제됨: ");
+        e("Failed to delete configuration", "Échec de la suppression de la configuration", "Error al eliminar la configuración", "Falha ao excluir a configuração", "Konfiguration konnte nicht gelöscht werden", "Impossibile eliminare la configurazione", "删除配置失败", "구성 삭제 실패");
+        e("Delete Model File", "Supprimer le fichier du modèle", "Eliminar archivo del modelo", "Excluir arquivo do modelo", "Modelldatei löschen", "Elimina file del modello", "删除模型文件", "모델 파일 삭제");
+        e("Delete this model file?\n\n", "Supprimer ce fichier de modèle ?\n\n", "¿Eliminar este archivo de modelo?\n\n", "Excluir este arquivo de modelo?\n\n", "Diese Modelldatei löschen?\n\n", "Eliminare questo file di modello?\n\n", "删除此模型文件？\n\n", "이 모델 파일을 삭제할까요?\n\n");
+        e("Deleted model file: ", "Fichier de modèle supprimé : ", "Archivo de modelo eliminado: ", "Arquivo de modelo excluído: ", "Modelldatei gelöscht: ", "File del modello eliminato: ", "已删除模型文件：", "모델 파일 삭제됨: ");
+        e("Failed to delete model file: ", "Échec de la suppression du fichier de modèle : ", "Error al eliminar el archivo de modelo: ", "Falha ao excluir o arquivo de modelo: ", "Modelldatei konnte nicht gelöscht werden: ", "Impossibile eliminare il file del modello: ", "删除模型文件失败：", "모델 파일 삭제 실패: ");
+        e("Model file: ", "Fichier du modèle : ", "Archivo del modelo: ", "Arquivo do modelo: ", "Modelldatei: ", "File del modello: ", "模型文件：", "모델 파일: ");
+        e("Model initialized successfully", "Modèle initialisé avec succès", "Modelo inicializado correctamente", "Modelo inicializado com sucesso", "Modell erfolgreich initialisiert", "Modello inizializzato correttamente", "模型初始化成功", "모델 초기화 성공");
+        e("Model initialization failed", "Échec de l'initialisation du modèle", "Error al inicializar el modelo", "Falha na inicialização do modelo", "Modellinitialisierung fehlgeschlagen", "Inizializzazione del modello non riuscita", "模型初始化失败", "모델 초기화 실패");
+        e("Model load error: ", "Erreur de chargement du modèle : ", "Error de carga del modelo: ", "Erro ao carregar o modelo: ", "Fehler beim Laden des Modells: ", "Errore di caricamento del modello: ", "模型加载错误：", "모델 로드 오류: ");
+        e("Failed to save configuration: ", "Échec de l'enregistrement de la configuration : ", "Error al guardar la configuración: ", "Falha ao salvar a configuração: ", "Konfiguration konnte nicht gespeichert werden: ", "Impossibile salvare la configurazione: ", "保存配置失败：", "구성 저장 실패: ");
+        e(" (checking...)", " (vérification...)", " (comprobando...)", " (verificando...)", " (wird geprüft...)", " (verifica...)", " （检查中...）", " (확인 중...)");
+        e("Model file: (unknown)", "Fichier du modèle : (inconnu)", "Archivo del modelo: (desconocido)", "Arquivo do modelo: (desconhecido)", "Modelldatei: (unbekannt)", "File del modello: (sconosciuto)", "模型文件：（未知）", "모델 파일: (알 수 없음)");
+        e("Model download error: ", "Erreur de téléchargement du modèle : ", "Error de descarga del modelo: ", "Erro de download do modelo: ", "Fehler beim Herunterladen des Modells: ", "Errore di download del modello: ", "模型下载错误：", "모델 다운로드 오류: ");
+        e("Initializing model...", "Initialisation du modèle...", "Inicializando modelo...", "Inicializando modelo...", "Modell wird initialisiert...", "Inizializzazione del modello...", "正在初始化模型...", "모델 초기화 중...");
+        e("Model init failed: ", "Échec de l'initialisation du modèle : ", "Error al inicializar el modelo: ", "Falha ao inicializar o modelo: ", "Modellinitialisierung fehlgeschlagen: ", "Inizializzazione del modello non riuscita: ", "模型初始化失败：", "모델 초기화 실패: ");
+        e("Model loaded: ", "Modèle chargé : ", "Modelo cargado: ", "Modelo carregado: ", "Modell geladen: ", "Modello caricato: ", "已加载模型：", "모델 로드됨: ");
+        e("Model init error: ", "Erreur d'initialisation du modèle : ", "Error de inicialización del modelo: ", "Erro de inicialização do modelo: ", "Fehler bei der Modellinitialisierung: ", "Errore di inizializzazione del modello: ", "模型初始化错误：", "모델 초기화 오류: ");
+
+        // Main screen Web AI Chat card (UI redesign).
+        e("Web AI Chat", "Chat IA Web", "Chat IA web", "Chat de IA na Web", "Web-KI-Chat", "Chat IA web", "Web AI 聊天", "웹 AI 채팅");
+        e("Open in browser", "Ouvrir dans le navigateur", "Abrir en el navegador", "Abrir no navegador", "Im Browser öffnen", "Apri nel browser", "在浏览器中打开", "브라우저에서 열기");
+        e("Continue", "Continuer", "Continuar", "Continuar", "Fortfahren", "Continua", "继续", "계속");
+        e("The model will be downloaded now. The first time only, this takes time and a large amount of data (possibly several GB). Wi-Fi is strongly recommended. Continue?", "Le modèle va maintenant être téléchargé. La première fois uniquement, cela prend du temps et une grande quantité de données (potentiellement plusieurs Go). Le Wi-Fi est fortement recommandé. Continuer ?", "El modelo se descargará ahora. Solo la primera vez, esto lleva tiempo y una gran cantidad de datos (posiblemente varios GB). Se recomienda encarecidamente Wi-Fi. ¿Continuar?", "O modelo será baixado agora. Apenas na primeira vez, isso leva tempo e uma grande quantidade de dados (possivelmente vários GB). Wi-Fi é altamente recomendado. Continuar?", "Das Modell wird jetzt heruntergeladen. Nur beim ersten Mal dauert dies und benötigt eine große Datenmenge (möglicherweise mehrere GB). WLAN wird dringend empfohlen. Fortfahren?", "Il modello verrà scaricato ora. Solo la prima volta, ciò richiede tempo e una grande quantità di dati (possibilmente diversi GB). Il Wi-Fi è vivamente consigliato. Continuare?", "现在将下载模型。仅首次会耗时并产生大量流量（可能达数 GB）。强烈建议使用 Wi-Fi。是否继续？", "이제 모델을 다운로드합니다. 최초 1회에 한해 시간이 걸리고 대용량 데이터(수 GB일 수 있음)가 발생합니다. Wi-Fi를 강력히 권장합니다. 계속할까요?");
+    }
+}

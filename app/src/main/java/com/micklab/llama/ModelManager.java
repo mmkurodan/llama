@@ -229,6 +229,19 @@ public class ModelManager {
     public boolean isModelLoaded() {
         return modelLoaded;
     }
+
+    /**
+     * True when the model file for the given reference is already present on the device
+     * (or the reference is empty, i.e. there is nothing to download). A remote URL that has
+     * not been fetched yet returns false — used to warn before the first large download.
+     */
+    public boolean isModelReferenceDownloaded(String modelReference) {
+        if (modelReference == null || modelReference.trim().isEmpty()) {
+            return true;
+        }
+        File file = ModelFileHelper.resolveStoredModelFile(context, modelReference);
+        return file != null && file.exists();
+    }
     
     public String getCurrentConfigName() {
         return currentConfigName;

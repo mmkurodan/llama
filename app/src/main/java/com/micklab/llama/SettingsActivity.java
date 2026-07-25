@@ -28,6 +28,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -75,8 +76,7 @@ public class SettingsActivity extends Activity {
     private ModelManager modelManager;
     
     // UI elements
-    private EditText configNameInput;
-    private Spinner configSpinner;
+    private AutoCompleteTextView configNameInput;
     private EditText modelUrlInput;
     private TextView multimodalProjectorInfo;
     private Button selectProjectorButton;
@@ -96,6 +96,7 @@ public class SettingsActivity extends Activity {
     private ProgressBar modelProgressBar;
     private Button importModelButton;
     private Button loadModelButton;
+    private Button selectModelButton;
     private Button maintainModelButton;
     
     // Penalty parameter inputs
@@ -252,7 +253,7 @@ public class SettingsActivity extends Activity {
             lastDownloadProgress = percent;
             runOnUiThread(() -> {
                 modelProgressBar.setProgress(percent);
-                modelFileInfo.setText("Downloading model... " + percent + "%");
+                modelFileInfo.setText(localizedText("モデルをダウンロード中... ", "Downloading model... ") + percent + "%");
             });
         });
         
@@ -268,7 +269,6 @@ public class SettingsActivity extends Activity {
     
     private void initViews() {
         configNameInput = findViewById(R.id.configNameInput);
-        configSpinner = findViewById(R.id.configSpinner);
         modelUrlInput = findViewById(R.id.modelUrlInput);
         multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
@@ -288,6 +288,7 @@ public class SettingsActivity extends Activity {
         modelProgressBar = findViewById(R.id.modelProgressBar);
         importModelButton = findViewById(R.id.importModelButton);
         loadModelButton = findViewById(R.id.loadModelButton);
+        selectModelButton = findViewById(R.id.selectModelButton);
         maintainModelButton = findViewById(R.id.maintainModelButton);
         
         // Penalty parameter inputs
@@ -431,6 +432,12 @@ public class SettingsActivity extends Activity {
             }
             startModelAction(true, null);
         });
+        selectModelButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showDownloadedModelPicker();
+        });
         importModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
                 return;
@@ -532,7 +539,7 @@ public class SettingsActivity extends Activity {
         }
         if (modelManager != null && modelManager.isBusy()) {
             updateActionButtonStateForBusy();
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return true;
         }
         return false;
@@ -549,6 +556,9 @@ public class SettingsActivity extends Activity {
         if (importModelButton != null) importModelButton.setEnabled(!isBusy);
         if (searchGgufButton != null) searchGgufButton.setEnabled(!isBusy);
         if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
+        if (selectModelButton != null) {
+            selectModelButton.setEnabled(!isBusy && getDownloadedModelFiles().length > 0);
+        }
         if (maintainModelButton != null) maintainModelButton.setEnabled(!isBusy);
         if (selectProjectorButton != null) selectProjectorButton.setEnabled(!isBusy);
         if (clearProjectorButton != null) {
@@ -585,7 +595,7 @@ public class SettingsActivity extends Activity {
     }
 
     private String localizedText(String ja, String en) {
-        return AppLanguageManager.isJapanese(this) ? ja : en;
+        return Translations.get(this, ja, en);
     }
 
     private void applyLocalizedUiText() {
@@ -624,112 +634,115 @@ public class SettingsActivity extends Activity {
     }
 
     private String translateSettingsHint(String hint) {
-        if (AppLanguageManager.isJapanese(this)) {
-            if ("Enter configuration name".equals(hint)) return "設定名を入力";
-            if ("https://... or filename.gguf".equals(hint)) return "https://... または filename.gguf";
-            if ("Enter system prompt (optional)".equals(hint)) return "システムプロンプトを入力（任意）";
-            if ("Enter custom chat template (optional)".equals(hint)) return "カスタムチャットテンプレートを入力（任意）";
-            if (hint.startsWith("Default: ")) return "既定値: " + hint.substring("Default: ".length());
-        } else {
-            if ("設定名を入力".equals(hint)) return "Enter configuration name";
-            if ("https://... または filename.gguf".equals(hint)) return "https://... or filename.gguf";
-            if ("システムプロンプトを入力（任意）".equals(hint)) return "Enter system prompt (optional)";
-            if ("カスタムチャットテンプレートを入力（任意）".equals(hint)) return "Enter custom chat template (optional)";
-            if (hint.startsWith("既定値: ")) return "Default: " + hint.substring("既定値: ".length());
+        if (hint.startsWith("Default: ")) {
+            return localizedText("既定値: ", "Default: ") + hint.substring("Default: ".length());
         }
-        return hint;
+        return Translations.get(this, settingsHintJa(hint), hint);
+    }
+
+    private String settingsHintJa(String hint) {
+        switch (hint) {
+            case "Enter configuration name": return "設定名を入力";
+            case "https://... or filename.gguf": return "https://... または filename.gguf";
+            case "Enter system prompt (optional)": return "システムプロンプトを入力（任意）";
+            case "Enter custom chat template (optional)": return "カスタムチャットテンプレートを入力（任意）";
+            default: return hint;
+        }
     }
 
     private String translateSettingsText(String text) {
-        if (AppLanguageManager.isJapanese(this)) {
-            switch (text) {
-                case "Configuration Management": return "設定管理";
-                case "Display Language / 表示言語": return "表示言語";
-                case "Configuration Name:": return "設定名:";
-                case "Save Config": return "設定を保存";
-                case "Delete Config": return "設定を削除";
-                case "Load Configuration:": return "設定を読み込み:";
-                case "Load Selected Config": return "選択した設定を読み込む";
-                case "Model Selection": return "モデル選択";
-                case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
-                case "Multimodal Projector (mmproj):": return "マルチモーダル Projector (mmproj):";
-                case "No multimodal projector selected": return "mmproj は未選択です";
-                case "Select mmproj": return "mmproj を選択";
-                case "Clear mmproj": return "mmproj を解除";
-                case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
-                case "gguf import from local device": return "ローカル端末からggufを取り込む";
-                case "Load Model": return "モデルを読み込む";
-                case "MAINTAIN MODEL": return "モデル管理";
-                case "Model file: (none)": return "モデルファイル: （なし）";
-                case "Model Parameters": return "モデルパラメータ";
-                case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
-                case "Threads (n_threads):": return "スレッド数 (n_threads):";
-                case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
-                case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
-                case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
-                case "Offload Layers (GPU):": return "オフロード層 (GPU):";
-                case "Temperature (temp):": return "温度 (temp):";
-                case "Top-p (top_p):": return "Top-p (top_p):";
-                case "Top-k (top_k):": return "Top-k (top_k):";
-                case "Penalty Parameters": return "ペナルティ設定";
-                case "Penalty Last N:": return "ペナルティ対象直近N:";
-                case "Penalty Repeat:": return "反復ペナルティ:";
-                case "Penalty Frequency:": return "頻度ペナルティ:";
-                case "Penalty Presence:": return "出現ペナルティ:";
-                case "Mirostat Parameters": return "Mirostat 設定";
-                case "Mirostat (0=disabled, 1=v1, 2=v2):": return "Mirostat (0=無効, 1=v1, 2=v2):";
-                case "Mirostat Tau:": return "Mirostat タウ:";
-                case "Mirostat Eta:": return "Mirostat イータ:";
-                case "Additional Sampling Parameters": return "追加サンプリング設定";
-                case "Min-p:": return "Min-p:";
-                case "Typical P:": return "Typical P:";
-                case "XTC Probability:": return "XTC 確率:";
-                case "XTC Threshold:": return "XTC しきい値:";
-                case "Top-N-Sigma:": return "Top-N-Sigma:";
-                case "Dynamic Temperature Range:": return "動的温度レンジ:";
-                case "Dynamic Temperature Exponent:": return "動的温度指数:";
-                case "DRY (Don't Repeat Yourself) Parameters": return "DRY (重複抑制) 設定";
-                case "DRY Multiplier:": return "DRY 乗数:";
-                case "DRY Base:": return "DRY 基底:";
-                case "DRY Allowed Length:": return "DRY 許容長:";
-                case "DRY Penalty Last N:": return "DRY ペナルティ直近N:";
-                case "DRY Sequence Breakers:": return "DRY シーケンス区切り:";
-                case "Output Settings": return "出力設定";
-                case "Enable Streaming:": return "ストリーミングを有効化:";
-                case "Show Performance Metrics:": return "性能指標を表示:";
-                case "Prompt Template": return "プロンプトテンプレート";
-                case "System Prompt:": return "システムプロンプト:";
-                case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
-                case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
-                case "Custom Chat Template:": return "カスタムチャットテンプレート:";
-                case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
-                case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
-                case "Based on custom template or model family detection.": return "カスタムテンプレートまたはモデル種別判定に基づきます。";
-                case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
-                case "Llama API Server": return "Llama APIサーバー";
-                case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
-                case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
-                case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
-                case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
-                case "MCP Settings": return "MCP設定";
-                case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
-                case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
-                case "Available only in Web UI when disabled.": return "無効時は Web UI でのみ利用されます。";
-                case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
-                case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
-                case "Log Settings": return "ログ設定";
-                case "Log Level:": return "ログレベル:";
-                case "Show License": return "ライセンス表示";
-                case "Documents": return "ドキュメント";
-                case "SAVE & CLOSE": return "保存して閉じる";
-                case "CLOSE": return "閉じる";
-                default: return text;
-            }
-        } else {
-            switch (text) {
-                case "表示言語": return "Display Language";
-                default: return text;
-            }
+        return Translations.get(this, settingsTextJa(text), text);
+    }
+
+    private String settingsTextJa(String text) {
+        switch (text) {
+            case "Configuration Management": return "設定管理";
+            case "Display Language": return "表示言語";
+            case "Profile:": return "プロファイル:";
+            case "Configuration Name:": return "設定名:";
+            case "Save Config": return "設定を保存";
+            case "Delete Config": return "設定を削除";
+            case "Load Configuration:": return "設定を読み込み:";
+            case "Load Selected Config": return "選択した設定を読み込む";
+            case "Model Loading": return "モデル読込み";
+            case "Model Management": return "モデル管理";
+            case "MTP Settings": return "MTP設定";
+            case "Model URL / Imported File:": return "モデルURL / 取込済みファイル:";
+            case "Multimodal Projector (mmproj):": return "マルチモーダル Projector (mmproj):";
+            case "No multimodal projector selected": return "mmproj は未選択です";
+            case "Select mmproj": return "mmproj を選択";
+            case "Clear mmproj": return "mmproj を解除";
+            case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
+            case "gguf import from local device": return "ローカル端末からggufを取り込む";
+            case "Load Model": return "モデルを読み込む";
+            case "Select downloaded model": return "ダウンロード済みモデルを選択";
+            case "Get models": return "モデル取得";
+            case "Rename / delete models": return "モデルの名称変更・削除";
+            case "MAINTAIN MODEL": return "モデル管理";
+            case "Model file: (none)": return "モデルファイル: （なし）";
+            case "Model Parameters": return "モデルパラメータ";
+            case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
+            case "Threads (n_threads):": return "スレッド数 (n_threads):";
+            case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
+            case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
+            case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
+            case "Offload Layers (GPU):": return "オフロード層 (GPU):";
+            case "Temperature (temp):": return "温度 (temp):";
+            case "Top-p (top_p):": return "Top-p (top_p):";
+            case "Top-k (top_k):": return "Top-k (top_k):";
+            case "Penalty Parameters": return "ペナルティ設定";
+            case "Penalty Last N:": return "ペナルティ対象直近N:";
+            case "Penalty Repeat:": return "反復ペナルティ:";
+            case "Penalty Frequency:": return "頻度ペナルティ:";
+            case "Penalty Presence:": return "出現ペナルティ:";
+            case "Mirostat Parameters": return "Mirostat 設定";
+            case "Mirostat (0=disabled, 1=v1, 2=v2):": return "Mirostat (0=無効, 1=v1, 2=v2):";
+            case "Mirostat Tau:": return "Mirostat タウ:";
+            case "Mirostat Eta:": return "Mirostat イータ:";
+            case "Additional Sampling Parameters": return "追加サンプリング設定";
+            case "Min-p:": return "Min-p:";
+            case "Typical P:": return "Typical P:";
+            case "XTC Probability:": return "XTC 確率:";
+            case "XTC Threshold:": return "XTC しきい値:";
+            case "Top-N-Sigma:": return "Top-N-Sigma:";
+            case "Dynamic Temperature Range:": return "動的温度レンジ:";
+            case "Dynamic Temperature Exponent:": return "動的温度指数:";
+            case "DRY (Don't Repeat Yourself) Parameters": return "DRY (重複抑制) 設定";
+            case "DRY Multiplier:": return "DRY 乗数:";
+            case "DRY Base:": return "DRY 基底:";
+            case "DRY Allowed Length:": return "DRY 許容長:";
+            case "DRY Penalty Last N:": return "DRY ペナルティ直近N:";
+            case "DRY Sequence Breakers:": return "DRY シーケンス区切り:";
+            case "Output Settings": return "出力設定";
+            case "Enable Streaming:": return "ストリーミングを有効化:";
+            case "Show Performance Metrics:": return "性能指標を表示:";
+            case "Prompt Template": return "プロンプトテンプレート";
+            case "System Prompt:": return "システムプロンプト:";
+            case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
+            case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
+            case "Custom Chat Template:": return "カスタムチャットテンプレート:";
+            case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
+            case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
+            case "Based on custom template or model family detection.": return "カスタムテンプレートまたはモデル種別判定に基づきます。";
+            case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
+            case "Llama API Server": return "Llama APIサーバー";
+            case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
+            case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
+            case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
+            case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
+            case "MCP Settings": return "MCP設定";
+            case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
+            case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
+            case "Available only in Web UI when disabled.": return "無効時は Web UI でのみ利用されます。";
+            case "MCP Config JSON (shared):": return "MCPコンフィグJSON（共通）:";
+            case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
+            case "Log Settings": return "ログ設定";
+            case "Log Level:": return "ログレベル:";
+            case "Show License": return "ライセンス表示";
+            case "Documents": return "ドキュメント";
+            case "SAVE & CLOSE": return "保存して閉じる";
+            case "CLOSE": return "閉じる";
+            default: return text;
         }
     }
 
@@ -741,6 +754,8 @@ public class SettingsActivity extends Activity {
         int[] headerIds = new int[]{
                 R.id.configurationManagementHeader,
                 R.id.modelSelectionHeader,
+                R.id.modelManagementHeader,
+                R.id.mtpSettingsHeader,
                 R.id.modelParametersHeader,
                 R.id.penaltyParametersHeader,
                 R.id.mirostatParametersHeader,
@@ -790,10 +805,11 @@ public class SettingsActivity extends Activity {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             );
-            if (i > 0) {
-                sectionParams.topMargin = dpToPx(8);
-            }
+            sectionParams.bottomMargin = dpToPx(10);
             sectionLayout.setLayoutParams(sectionParams);
+            // Card look: white rounded background with internal padding.
+            sectionLayout.setBackgroundResource(R.drawable.bg_card);
+            sectionLayout.setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12));
 
             LinearLayout headerRow = new LinearLayout(this);
             headerRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -809,18 +825,30 @@ public class SettingsActivity extends Activity {
                     1f
             ));
 
+            // Section icon (mockup style): glyph before the title.
+            TextView iconView = new TextView(this);
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            iconParams.rightMargin = dpToPx(8);
+            iconView.setLayoutParams(iconParams);
+            iconView.setText(sectionIconGlyph(headerIds[i]));
+            iconView.setTextSize(18f);
+
+            // Expand/collapse chevron, now placed on the right edge of the row.
             TextView indicatorView = new TextView(this);
             indicatorView.setLayoutParams(new LinearLayout.LayoutParams(
                     dpToPx(28),
                     ViewGroup.LayoutParams.WRAP_CONTENT
             ));
             indicatorView.setGravity(Gravity.CENTER);
-            indicatorView.setTextSize(20f);
+            indicatorView.setTextSize(16f);
             indicatorView.setTypeface(Typeface.DEFAULT_BOLD);
-            indicatorView.setPadding(0, 0, dpToPx(8), 0);
 
-            headerRow.addView(indicatorView);
+            headerRow.addView(iconView);
             headerRow.addView(headerView);
+            headerRow.addView(indicatorView);
 
             LinearLayout contentLayout = new LinearLayout(this);
             contentLayout.setOrientation(LinearLayout.VERTICAL);
@@ -860,7 +888,27 @@ public class SettingsActivity extends Activity {
                 || headerId == R.id.mirostatParametersHeader
                 || headerId == R.id.additionalSamplingParametersHeader
                 || headerId == R.id.dryParametersHeader
+                || headerId == R.id.mtpSettingsHeader
                 || headerId == R.id.mcpSettingsHeader;
+    }
+
+    // Emoji glyph shown before each collapsible section title (mockup card style).
+    private String sectionIconGlyph(int headerId) {
+        if (headerId == R.id.configurationManagementHeader) return "⚙";
+        if (headerId == R.id.modelSelectionHeader) return "📦";
+        if (headerId == R.id.modelManagementHeader) return "🗂";
+        if (headerId == R.id.mtpSettingsHeader) return "⚡";
+        if (headerId == R.id.modelParametersHeader) return "🎛";
+        if (headerId == R.id.penaltyParametersHeader) return "⚖";
+        if (headerId == R.id.mirostatParametersHeader) return "🎯";
+        if (headerId == R.id.additionalSamplingParametersHeader) return "🎲";
+        if (headerId == R.id.dryParametersHeader) return "🔁";
+        if (headerId == R.id.outputSettingsHeader) return "📤";
+        if (headerId == R.id.promptTemplateHeader) return "📝";
+        if (headerId == R.id.apiServerHeader) return "🌐";
+        if (headerId == R.id.mcpSettingsHeader) return "🔌";
+        if (headerId == R.id.logSettingsHeader) return "📄";
+        return "•";
     }
 
     private int findChildIndexById(List<View> children, int id) {
@@ -883,20 +931,25 @@ public class SettingsActivity extends Activity {
         if (languageLabel != null) {
             languageLabel.setText(localizedText("表示言語", "Display Language"));
         }
-        String[] languages = new String[] { "日本語", "English" };
+        String[] languages = AppLanguageManager.SUPPORTED_LANGUAGE_LABELS;
         ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, languages);
         languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         languageSpinner.setAdapter(languageAdapter);
 
         String currentLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
-        languageSpinner.setSelection(AppLanguageManager.LANGUAGE_JA.equals(currentLanguage) ? 0 : 1, false);
+        int currentIndex = AppLanguageManager.indexOf(currentLanguage);
+        if (currentIndex < 0) {
+            currentIndex = AppLanguageManager.indexOf(AppLanguageManager.LANGUAGE_EN);
+        }
+        languageSpinner.setSelection(currentIndex, false);
 
         languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
-                String selectedLanguage = (position == 0)
-                        ? AppLanguageManager.LANGUAGE_JA
-                        : AppLanguageManager.LANGUAGE_EN;
+                if (position < 0 || position >= AppLanguageManager.SUPPORTED_LANGUAGES.length) {
+                    return;
+                }
+                String selectedLanguage = AppLanguageManager.SUPPORTED_LANGUAGES[position];
                 String existingLanguage = AppLanguageManager.getOrInitDisplayLanguage(SettingsActivity.this);
                 if (!selectedLanguage.equals(existingLanguage)) {
                     AppLanguageManager.saveDisplayLanguage(SettingsActivity.this, selectedLanguage);
@@ -927,7 +980,7 @@ public class SettingsActivity extends Activity {
                 modelManager.getLlama().setLogLevel(level);
                 SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
                 prefs.edit().putInt(PREF_LOG_LEVEL, level).apply();
-                showToast("Log level set to " + levels[position]);
+                showToast(localizedText("ログレベルを設定: ", "Log level set to ") + levels[position]);
             }
 
             @Override
@@ -948,9 +1001,9 @@ public class SettingsActivity extends Activity {
         scrollView.addView(textView);
 
         new AlertDialog.Builder(this)
-            .setTitle("License & Third-Party Notices")
+            .setTitle(localizedText("ライセンスと第三者通知", "License & Third-Party Notices"))
             .setView(scrollView)
-            .setPositiveButton("Close", null)
+            .setPositiveButton(localizedText("閉じる", "Close"), null)
             .show();
     }
 
@@ -999,19 +1052,26 @@ public class SettingsActivity extends Activity {
     
     private void loadConfigList() {
         List<String> configs = configManager.listConfigurations();
-        configAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, configs);
-        configAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        configSpinner.setAdapter(configAdapter);
+        // Merged profile field: tapping/focusing shows the full list (no text filtering);
+        // typing a new name saves-as. A non-filtering adapter keeps the whole list visible.
+        configAdapter = new NoFilterArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, configs);
+        configNameInput.setAdapter(configAdapter);
+        configNameInput.setOnClickListener(v -> configNameInput.showDropDown());
+        configNameInput.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                configNameInput.showDropDown();
+            }
+        });
     }
     
     private void loadConfigurationByName(String name) {
         try {
             currentConfig = configManager.loadConfiguration(name);
             updateUIFromConfig(currentConfig);
-            showToast("Loaded configuration: " + name);
+            showToast(localizedText("設定を読み込みました: ", "Loaded configuration: ") + name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load configuration: " + name, e);
-            showToast("Failed to load configuration: " + e.getMessage());
+            showToast(localizedText("設定の読み込みに失敗しました: ", "Failed to load configuration: ") + e.getMessage());
             // Load default
             currentConfig = new ConfigurationManager.Configuration();
             updateUIFromConfig(currentConfig);
@@ -1019,7 +1079,7 @@ public class SettingsActivity extends Activity {
     }
     
     private void updateUIFromConfig(ConfigurationManager.Configuration config) {
-        configNameInput.setText(config.name);
+        configNameInput.setText(config.name, false);
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
         selectedProjectorDisabled = config.multimodalProjectorDisabled;
@@ -1550,47 +1610,44 @@ public class SettingsActivity extends Activity {
             // Refresh spinner list
             loadConfigList();
             
-            // Select the saved config in spinner
-            int position = configAdapter.getPosition(config.name);
-            if (position >= 0) {
-                configSpinner.setSelection(position);
-            }
-            
-            showToast("Configuration saved: " + config.name);
+            // Reflect the saved profile name in the merged field.
+            configNameInput.setText(config.name, false);
+
+            showToast(localizedText("設定を保存しました: ", "Configuration saved: ") + config.name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to save configuration", e);
-            showToast("Failed to save: " + e.getMessage());
+            showToast(localizedText("保存に失敗しました: ", "Failed to save: ") + e.getMessage());
         }
     }
     
     private void loadSelectedConfiguration() {
-        String selectedName = (String) configSpinner.getSelectedItem();
+        String selectedName = configNameInput.getText().toString().trim();
         if (selectedName == null || selectedName.isEmpty()) {
-            showToast("No configuration selected");
+            showToast(localizedText("設定が選択されていません", "No configuration selected"));
             return;
         }
         loadConfigurationByName(selectedName);
     }
     
     private void deleteSelectedConfiguration() {
-        String selectedName = (String) configSpinner.getSelectedItem();
+        String selectedName = configNameInput.getText().toString().trim();
         if (selectedName == null || selectedName.isEmpty()) {
-            showToast("No configuration selected");
+            showToast(localizedText("設定が選択されていません", "No configuration selected"));
             return;
         }
         
         if ("default".equals(selectedName)) {
-            showToast("Cannot delete default configuration");
+            showToast(localizedText("デフォルト設定は削除できません", "Cannot delete default configuration"));
             return;
         }
         
         if (configManager.deleteConfiguration(selectedName)) {
             loadConfigList();
-            showToast("Deleted configuration: " + selectedName);
+            showToast(localizedText("設定を削除しました: ", "Deleted configuration: ") + selectedName);
             // Load default after deletion
             loadConfigurationByName("default");
         } else {
-            showToast("Failed to delete configuration");
+            showToast(localizedText("設定の削除に失敗しました", "Failed to delete configuration"));
         }
     }
 
@@ -1680,10 +1737,10 @@ public class SettingsActivity extends Activity {
 
     private void confirmDeleteModelFile(File modelFile) {
         new AlertDialog.Builder(this)
-            .setTitle("Delete Model File")
-            .setMessage("Delete " + modelFile.getName() + "?")
-            .setPositiveButton("Delete", (dialog, which) -> deleteModelFile(modelFile))
-            .setNegativeButton("Cancel", null)
+            .setTitle(localizedText("モデルファイルを削除", "Delete Model File"))
+            .setMessage(localizedText("次のモデルファイルを削除しますか？\n\n", "Delete this model file?\n\n") + modelFile.getName())
+            .setPositiveButton(localizedText("削除", "Delete"), (dialog, which) -> deleteModelFile(modelFile))
+            .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
             .show();
     }
 
@@ -1706,22 +1763,19 @@ public class SettingsActivity extends Activity {
             currentConfig = config;
             loadConfigList();
 
-            int position = configAdapter != null ? configAdapter.getPosition(config.name) : -1;
-            if (position >= 0) {
-                configSpinner.setSelection(position);
-            }
+            configNameInput.setText(config.name, false);
 
             loadedModelPath = null;
             modelLoadedSuccessfully = false;
             modelFileInfo.setText(localizedText(
-                    "現在のプロファイルを変更しました: " + modelFile.getName(),
-                    "Current profile now uses: " + modelFile.getName()));
+                    "現在のプロファイルを変更しました: ",
+                    "Current profile now uses: ") + modelFile.getName());
             modelProgressBar.setProgress(0);
             lastDownloadProgress = 0;
             updateAutoTemplatePreview(config);
             showToast(localizedText(
-                    "現在のプロファイルを更新しました: " + config.name,
-                    "Updated current profile: " + config.name));
+                    "現在のプロファイルを更新しました: ",
+                    "Updated current profile: ") + config.name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to switch current profile to downloaded model", e);
             showToast(localizedText(
@@ -1732,7 +1786,7 @@ public class SettingsActivity extends Activity {
 
     private void deleteModelFile(File modelFile) {
         if (importInProgress || modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
 
@@ -1751,13 +1805,13 @@ public class SettingsActivity extends Activity {
                 removedLoadedModel = true;
             }
             if (removedLoadedModel) {
-                modelFileInfo.setText("Model file: (none)");
+                modelFileInfo.setText(localizedText("モデルファイル: （なし）", "Model file: (none)"));
                 modelProgressBar.setProgress(0);
                 lastDownloadProgress = 0;
             }
-            showToast("Deleted model file: " + modelFile.getName());
+            showToast(localizedText("モデルファイルを削除しました: ", "Deleted model file: ") + modelFile.getName());
         } else {
-            showToast("Failed to delete model file: " + modelFile.getName());
+            showToast(localizedText("モデルファイルの削除に失敗しました: ", "Failed to delete model file: ") + modelFile.getName());
         }
     }
 
@@ -1843,7 +1897,8 @@ public class SettingsActivity extends Activity {
         updateUiReferencesForRename(oldName, newName);
 
         String suffix = updatedProfiles > 0
-                ? localizedText("（更新したプロファイル: " + updatedProfiles + "）", " (updated profiles: " + updatedProfiles + ")")
+                ? localizedText("（更新したプロファイル: ", " (updated profiles: ") + updatedProfiles
+                        + localizedText("）", ")")
                 : "";
         showToast(localizedText("名前を変更しました: ", "Renamed to: ") + newName + suffix);
     }
@@ -1909,8 +1964,8 @@ public class SettingsActivity extends Activity {
     private void searchHuggingFaceRepositories(String rawQuery) {
         final String query = rawQuery != null ? rawQuery.trim() : "";
         setHuggingFaceSearchBusy(true, localizedText(
-                "Hugging Face を検索中... " + query,
-                "Searching Hugging Face... " + query));
+                "Hugging Face を検索中... ",
+                "Searching Hugging Face... ") + query);
 
         new Thread(() -> {
             try {
@@ -1959,8 +2014,8 @@ public class SettingsActivity extends Activity {
 
     private void fetchHuggingFaceRepositoryFiles(HuggingFaceApiClient.ModelSearchResult result) {
         setHuggingFaceSearchBusy(true, localizedText(
-                "GGUF 一覧を取得中... " + result.getRepoId(),
-                "Loading GGUF files... " + result.getRepoId()));
+                "GGUF 一覧を取得中... ",
+                "Loading GGUF files... ") + result.getRepoId());
 
         new Thread(() -> {
             try {
@@ -2022,8 +2077,8 @@ public class SettingsActivity extends Activity {
         updateAutoTemplatePreview(currentConfig);
 
         modelFileInfo.setText(localizedText(
-                "選択したモデル: " + selectedFile.getFilename(),
-                "Selected model: " + selectedFile.getFilename()));
+                "選択したモデル: ",
+                "Selected model: ") + selectedFile.getFilename());
         startModelAction(
                 true,
                 () -> {
@@ -2148,7 +2203,7 @@ public class SettingsActivity extends Activity {
         modelProgressBar.setIndeterminate(candidate.sizeBytes <= 0);
         modelProgressBar.setProgress(0);
         lastDownloadProgress = 0;
-        modelFileInfo.setText(localizedText("モデルを取り込み中... " + displayName, "Importing model... " + displayName));
+        modelFileInfo.setText(localizedText("モデルを取り込み中... ", "Importing model... ") + displayName);
 
         new Thread(() -> {
             String error = copyImportedModelToStorage(sourceUri, destFile, candidate.sizeBytes, displayName);
@@ -2168,9 +2223,8 @@ public class SettingsActivity extends Activity {
                 modelLoadedSuccessfully = false;
                 boolean importedProjector = ModelFileHelper.isLikelyProjectorFilename(displayName);
                 if (importedProjector) {
-                    modelFileInfo.setText(localizedText(
-                            "mmproj を取り込みました: " + displayName + " (" + destFile.length() + " bytes)",
-                            "Imported mmproj: " + displayName + " (" + destFile.length() + " bytes)"));
+                    modelFileInfo.setText(localizedText("mmproj を取り込みました: ", "Imported mmproj: ")
+                            + displayName + " (" + destFile.length() + " bytes)");
                     String modelReference = modelUrlInput.getText().toString().trim();
                     if (!modelReference.isEmpty()
                             && ModelFileHelper.canAutoApplyProjectorReference(modelReference, displayName)) {
@@ -2178,13 +2232,13 @@ public class SettingsActivity extends Activity {
                     }
                 } else {
                     modelUrlInput.setText(displayName);
-                    modelFileInfo.setText("Model file: " + displayName + " (" + destFile.length() + " bytes)");
+                    modelFileInfo.setText(localizedText("モデルファイル: ", "Model file: ") + displayName + " (" + destFile.length() + " bytes)");
                 }
                 modelProgressBar.setProgress(0);
                 currentConfig = getConfigFromUI();
                 showToast(importedProjector
-                        ? localizedText("mmproj を取り込みました: " + displayName, "Imported mmproj: " + displayName)
-                        : localizedText("モデルファイルを取り込みました: " + displayName, "Imported model file: " + displayName));
+                        ? localizedText("mmproj を取り込みました: ", "Imported mmproj: ") + displayName
+                        : localizedText("モデルファイルを取り込みました: ", "Imported model file: ") + displayName);
                 updateAutoTemplatePreview(currentConfig);
             });
         }).start();
@@ -2254,8 +2308,8 @@ public class SettingsActivity extends Activity {
                             selectedMtpReference.isEmpty()
                                 ? localizedText("MTP: 自モデルのヘッドを使用 (設定保存で反映)",
                                                 "MTP: using own head (save config to apply)")
-                                : localizedText("MTP: " + selectedMtpReference + " (設定保存で反映)",
-                                                "MTP: " + selectedMtpReference + " (save config to apply)"),
+                                : "MTP: " + selectedMtpReference
+                                                + localizedText(" (設定保存で反映)", " (save config to apply)"),
                             Toast.LENGTH_LONG).show();
                 })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
@@ -2271,10 +2325,12 @@ public class SettingsActivity extends Activity {
         // an actually-incompatible projector is also disabled automatically at load time (#6).
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("mmproj の互換性に注意", "mmproj may be incompatible"))
-                .setMessage(localizedText(
-                        "選択した mmproj (" + projectorFile.getName() + ") はこのモデルと互換でない可能性があります。"
+                .setMessage(localizedText("選択した mmproj (", "The selected mmproj (")
+                        + projectorFile.getName()
+                        + localizedText(
+                        ") はこのモデルと互換でない可能性があります。"
                                 + "互換性がない場合、読み込み時に自動で無効化されます。それでも設定しますか？",
-                        "The selected mmproj (" + projectorFile.getName() + ") may be incompatible with this model. "
+                        ") may be incompatible with this model. "
                                 + "If it is, it will be disabled automatically at load time. Set it anyway?"))
                 .setPositiveButton(localizedText("設定する", "Set anyway"),
                         (dialog, which) -> setSelectedProjectorReference(projectorFile.getName(), true))
@@ -2422,11 +2478,72 @@ public class SettingsActivity extends Activity {
                     "Projector: 未選択",
                     "Projector: not selected"));
         } else {
-            multimodalProjectorInfo.setText(localizedText(
-                    "Projector: " + extractFilenameFromUrl(selectedProjectorReference),
-                    "Projector: " + extractFilenameFromUrl(selectedProjectorReference)));
+            multimodalProjectorInfo.setText(localizedText("Projector: ", "Projector: ")
+                    + extractFilenameFromUrl(selectedProjectorReference));
         }
         updateActionButtonStateForBusy();
+    }
+
+    // Downloaded model GGUFs (all downloaded GGUFs minus likely mmproj/projector files).
+    private File[] getDownloadedModelFiles() {
+        File[] all = getDownloadedProjectorFiles();
+        List<File> models = new ArrayList<>();
+        for (File file : all) {
+            if (!ModelFileHelper.isLikelyProjectorFilename(file.getName())) {
+                models.add(file);
+            }
+        }
+        return models.toArray(new File[0]);
+    }
+
+    // "Select downloaded model": pick from already-downloaded models into the model field.
+    private void showDownloadedModelPicker() {
+        File[] files = getDownloadedModelFiles();
+        if (files.length == 0) {
+            showToast(localizedText("ダウンロード済みモデルがありません", "No downloaded models"));
+            return;
+        }
+        String[] names = new String[files.length];
+        for (int i = 0; i < files.length; i++) {
+            names[i] = files[i].getName();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("モデルを選択", "Select a model"))
+                .setItems(names, (dialog, which) -> {
+                    modelUrlInput.setText(names[which]);
+                    currentConfig = getConfigFromUI();
+                    updateAutoTemplatePreview(currentConfig);
+                })
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    /** ArrayAdapter that never filters, so the profile field shows the full list on tap. */
+    private static class NoFilterArrayAdapter extends ArrayAdapter<String> {
+        private final List<String> items;
+
+        NoFilterArrayAdapter(Context context, int resource, List<String> objects) {
+            super(context, resource, objects);
+            this.items = objects;
+        }
+
+        @Override
+        public android.widget.Filter getFilter() {
+            return new android.widget.Filter() {
+                @Override
+                protected FilterResults performFiltering(CharSequence constraint) {
+                    FilterResults results = new FilterResults();
+                    results.values = items;
+                    results.count = items.size();
+                    return results;
+                }
+
+                @Override
+                protected void publishResults(CharSequence constraint, FilterResults results) {
+                    notifyDataSetChanged();
+                }
+            };
+        }
     }
 
     private File[] getDownloadedProjectorFiles() {
@@ -2531,8 +2648,8 @@ public class SettingsActivity extends Activity {
                                 modelProgressBar.setIndeterminate(false);
                                 modelProgressBar.setProgress(progressValue);
                                 modelFileInfo.setText(localizedText(
-                                        "モデルを取り込み中... " + displayName + " (" + progressValue + "%)",
-                                        "Importing model... " + displayName + " (" + progressValue + "%)"));
+                                        "モデルを取り込み中... ",
+                                        "Importing model... ") + displayName + " (" + progressValue + "%)");
                             });
                         }
                     }
@@ -2578,14 +2695,14 @@ public class SettingsActivity extends Activity {
         }
 
         if (modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
 
         new Thread(() -> {
             // Acquire busy lock for load
             if (!modelManager.tryAcquire()) {
-                runOnUiThread(() -> showToast("Model is busy"));
+                runOnUiThread(() -> showToast(localizedText("モデルは処理中です", "Model is busy")));
                 return;
             }
 
@@ -2601,19 +2718,21 @@ public class SettingsActivity extends Activity {
                     modelProgressBar.setProgress(success ? 100 : 0);
                     lastDownloadProgress = success ? 100 : 0;
                     loadModelButton.setEnabled(true);
-                    showToast(success ? "Model initialized successfully" : "Model initialization failed");
+                    showToast(success
+                            ? localizedText("モデルの初期化に成功しました", "Model initialized successfully")
+                            : localizedText("モデルの初期化に失敗しました", "Model initialization failed"));
                     if (success && disabledMmproj != null) {
                         showToast(localizedText(
-                                "選択した mmproj はこのモデルと非互換のため無効化し、テキスト専用で読み込みました: " + disabledMmproj,
-                                "The selected mmproj is incompatible and was disabled; loaded text-only: " + disabledMmproj));
+                                "選択した mmproj はこのモデルと非互換のため無効化し、テキスト専用で読み込みました: ",
+                                "The selected mmproj is incompatible and was disabled; loaded text-only: ") + disabledMmproj);
                     }
                     updateAutoTemplatePreview(config);
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Model load error", t);
                 runOnUiThread(() -> {
-                    showToast("Model load error: " + t.getMessage());
-                    modelFileInfo.setText("Model init failed");
+                    showToast(localizedText("モデル読み込みエラー: ", "Model load error: ") + t.getMessage());
+                    modelFileInfo.setText(localizedText("モデルの初期化に失敗しました", "Model init failed"));
                     modelProgressBar.setProgress(0);
                     lastDownloadProgress = 0;
                     loadModelButton.setEnabled(true);
@@ -2650,10 +2769,12 @@ public class SettingsActivity extends Activity {
         String mmprojName = extractFilenameFromUrl(config.multimodalProjectorUrl);
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("mmproj をダウンロード", "Download mmproj"))
-                .setMessage(localizedText(
-                        "このマルチモーダルモデルは mmproj (" + mmprojName + ") も使用します。"
+                .setMessage(localizedText("このマルチモーダルモデルは mmproj (", "This multimodal model also uses an mmproj (")
+                        + mmprojName
+                        + localizedText(
+                        ") も使用します。"
                                 + "続けてダウンロードしますか？\nスキップした場合はテキスト専用で読み込みます。",
-                        "This multimodal model also uses an mmproj (" + mmprojName + "). "
+                        "). "
                                 + "Download it as well?\nIf you skip, the model loads text-only."))
                 .setPositiveButton(localizedText("ダウンロードする", "Download"),
                         (dialog, which) -> runModelAction(loadAfterDownload, true))
@@ -2750,18 +2871,18 @@ public class SettingsActivity extends Activity {
             configManager.saveConfiguration(config);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to save configuration before model action", e);
-            showToast("Failed to save configuration: " + e.getMessage());
+            showToast(localizedText("設定の保存に失敗しました: ", "Failed to save configuration: ") + e.getMessage());
             return null;
         }
 
         final String filename = extractFilenameFromUrl(config.modelUrl);
         if (filename != null && !filename.isEmpty()) {
             File destFile = new File(getModelStorageDir(), filename);
-            modelFileInfo.setText("Model file: " + filename + (destFile.exists()
+            modelFileInfo.setText(localizedText("モデルファイル: ", "Model file: ") + filename + (destFile.exists()
                     ? " (" + destFile.length() + " bytes)"
-                    : " (checking...)"));
+                    : localizedText(" (確認中...)", " (checking...)")));
         } else {
-            modelFileInfo.setText("Model file: (unknown)");
+            modelFileInfo.setText(localizedText("モデルファイル: （不明）", "Model file: (unknown)"));
         }
         modelProgressBar.setProgress(0);
         lastDownloadProgress = 0;
@@ -2775,13 +2896,13 @@ public class SettingsActivity extends Activity {
         }
 
         if (modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
 
         new Thread(() -> {
             if (!modelManager.tryAcquire()) {
-                runOnUiThread(() -> showToast("Model is busy"));
+                runOnUiThread(() -> showToast(localizedText("モデルは処理中です", "Model is busy")));
                 return;
             }
 
@@ -2790,9 +2911,8 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> {
                     String filename = extractFilenameFromUrl(config.modelUrl);
                     modelFileInfo.setText(success
-                            ? localizedText(
-                                    "ダウンロード完了: " + (filename == null ? config.name : filename),
-                                    "Download complete: " + (filename == null ? config.name : filename))
+                            ? localizedText("ダウンロード完了: ", "Download complete: ")
+                                    + (filename == null ? config.name : filename)
                             : localizedText("ダウンロードに失敗しました", "Download failed"));
                     modelProgressBar.setProgress(success ? 100 : 0);
                     lastDownloadProgress = success ? 100 : 0;
@@ -2804,7 +2924,7 @@ public class SettingsActivity extends Activity {
             } catch (Throwable t) {
                 Log.e(TAG, "Model download error", t);
                 runOnUiThread(() -> {
-                    showToast("Model download error: " + t.getMessage());
+                    showToast(localizedText("モデルのダウンロードエラー: ", "Model download error: ") + t.getMessage());
                     modelFileInfo.setText(localizedText("ダウンロードに失敗しました", "Download failed"));
                     modelProgressBar.setProgress(0);
                     lastDownloadProgress = 0;
@@ -2843,7 +2963,7 @@ public class SettingsActivity extends Activity {
     
     private void initModelInBackground(final String modelPath) {
         runOnUiThread(() -> {
-            modelFileInfo.setText("Initializing model...");
+            modelFileInfo.setText(localizedText("モデルを初期化中...", "Initializing model..."));
             modelProgressBar.setProgress(0);
             loadModelButton.setEnabled(false);
         });
@@ -2852,7 +2972,7 @@ public class SettingsActivity extends Activity {
             // Try to acquire the lock
             if (!modelManager.tryAcquire()) {
                 runOnUiThread(() -> {
-                    showToast("Model is busy");
+                    showToast(localizedText("モデルは処理中です", "Model is busy"));
                     loadModelButton.setEnabled(true);
                 });
                 return;
@@ -2864,8 +2984,8 @@ public class SettingsActivity extends Activity {
                 
                 if (!"ok".equals(initResult)) {
                     runOnUiThread(() -> {
-                        showToast("Model init failed: " + initResult);
-                        modelFileInfo.setText("Model init failed: " + initResult);
+                        showToast(localizedText("モデルの初期化に失敗しました: ", "Model init failed: ") + initResult);
+                        modelFileInfo.setText(localizedText("モデルの初期化に失敗しました: ", "Model init failed: ") + initResult);
                         loadModelButton.setEnabled(true);
                     });
                     return;
@@ -2878,17 +2998,17 @@ public class SettingsActivity extends Activity {
                 runOnUiThread(() -> {
                     loadedModelPath = modelPath;
                     modelLoadedSuccessfully = true;
-                    modelFileInfo.setText("Model loaded: " + (new File(modelPath).getName()));
+                    modelFileInfo.setText(localizedText("モデルを読み込みました: ", "Model loaded: ") + (new File(modelPath).getName()));
                     loadModelButton.setEnabled(true);
                     modelProgressBar.setProgress(100);
-                    showToast("Model initialized successfully");
+                    showToast(localizedText("モデルの初期化に成功しました", "Model initialized successfully"));
                     updateAutoTemplatePreview(config);
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Model init error", t);
                 runOnUiThread(() -> {
-                    showToast("Model init error: " + t.getMessage());
-                    modelFileInfo.setText("Model init failed");
+                    showToast(localizedText("モデル初期化エラー: ", "Model init error: ") + t.getMessage());
+                    modelFileInfo.setText(localizedText("モデルの初期化に失敗しました", "Model init failed"));
                     loadModelButton.setEnabled(true);
                 });
             } finally {

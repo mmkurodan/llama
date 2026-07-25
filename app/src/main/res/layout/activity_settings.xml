@@ -25,7 +25,7 @@
             android:id="@+id/languageLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Display Language / 表示言語"
+            android:text="Display Language"
             android:paddingTop="8dp" />
 
         <Spinner
@@ -37,15 +37,18 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Configuration Name:"
+            android:text="Profile:"
             android:paddingTop="8dp" />
 
-        <EditText
+        <AutoCompleteTextView
             android:id="@+id/configNameInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Enter configuration name"
-            android:inputType="text" />
+            android:inputType="text"
+            android:completionThreshold="1"
+            android:drawableEnd="@drawable/ic_arrow_drop_down"
+            android:drawablePadding="8dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -54,7 +57,7 @@
             android:paddingTop="8dp">
 
             <Button
-                android:id="@+id/saveConfigButton"
+                style="@style/PrimaryButton" android:id="@+id/saveConfigButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -62,7 +65,7 @@
                 android:layout_marginEnd="4dp" />
 
             <Button
-                android:id="@+id/deleteConfigButton"
+                style="@style/SecondaryButton" android:id="@+id/deleteConfigButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -70,22 +73,11 @@
                 android:layout_marginStart="4dp" />
         </LinearLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Load Configuration:"
-            android:paddingTop="8dp" />
-
-        <Spinner
-            android:id="@+id/configSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp" />
-
         <Button
-            android:id="@+id/loadConfigButton"
+            style="@style/SecondaryButton" android:id="@+id/loadConfigButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="Load Selected Config" />
 
         <!-- Divider -->
@@ -96,12 +88,12 @@
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
-        <!-- Model Selection Section -->
+        <!-- Model Loading Section -->
         <TextView
             android:id="@+id/modelSelectionHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Model Selection"
+            android:text="Model Loading"
             android:textSize="18sp"
             android:textStyle="bold"
             android:paddingBottom="8dp" />
@@ -120,10 +112,17 @@
             android:minLines="2" />
 
         <Button
-            android:id="@+id/loadModelButton"
+            style="@style/PrimaryButton" android:id="@+id/loadModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Load Model" />
+
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/selectModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Select downloaded model" />
 
         <TextView
             android:layout_width="match_parent"
@@ -145,7 +144,7 @@
             android:paddingTop="4dp">
 
             <Button
-                android:id="@+id/selectProjectorButton"
+                style="@style/SecondaryButton" android:id="@+id/selectProjectorButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -153,7 +152,7 @@
                 android:text="Select mmproj" />
 
             <Button
-                android:id="@+id/clearProjectorButton"
+                style="@style/SecondaryButton" android:id="@+id/clearProjectorButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -161,11 +160,78 @@
                 android:text="Clear mmproj" />
         </LinearLayout>
 
+        <!-- Model Management Section -->
+        <TextView
+            android:id="@+id/modelManagementHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model Management"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Get models"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <Button
+            style="@style/PrimaryButton" android:id="@+id/searchGgufButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Search GGUF on Hugging Face" />
+
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/importModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="gguf import from local device" />
+
+        <TextView
+            android:id="@+id/modelFileInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model file: (none)"
+            android:paddingTop="8dp" />
+
+        <ProgressBar
+            android:id="@+id/modelProgressBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rename / delete models"
+            android:textStyle="bold"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp" />
+
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/maintainModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MAINTAIN MODEL" />
+
+        <!-- MTP Settings Section -->
+        <TextView
+            android:id="@+id/mtpSettingsHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MTP Settings"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
         <Switch
             android:id="@+id/mtpEnableToggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
             android:text="MTP speculative decoding (experimental)" />
 
         <LinearLayout
@@ -191,44 +257,11 @@
         </LinearLayout>
 
         <Button
-            android:id="@+id/mtpModelButton"
+            style="@style/SecondaryButton" android:id="@+id/mtpModelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="MTP draft model (default: own head)" />
-
-        <Button
-            android:id="@+id/maintainModelButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="MAINTAIN MODEL" />
-
-        <Button
-            android:id="@+id/searchGgufButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Search GGUF on Hugging Face" />
-
-        <Button
-            android:id="@+id/importModelButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="gguf import from local device" />
-
-        <TextView
-            android:id="@+id/modelFileInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Model file: (none)"
-            android:paddingTop="8dp" />
-
-        <ProgressBar
-            android:id="@+id/modelProgressBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:max="100"
-            android:progress="0" />
 
         <!-- Divider -->
         <View
@@ -1119,13 +1152,13 @@
             android:layout_marginBottom="16dp" />
 
         <Button
-            android:id="@+id/licenseButton"
+            style="@style/SecondaryButton" android:id="@+id/licenseButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show License" />
 
         <Button
-            android:id="@+id/documentsButton"
+            style="@style/SecondaryButton" android:id="@+id/documentsButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Documents"
@@ -1133,7 +1166,7 @@
 
         <!-- Back Button -->
         <Button
-            android:id="@+id/backButton"
+            style="@style/PrimaryButton" android:id="@+id/backButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="SAVE &amp; CLOSE"
@@ -1141,7 +1174,7 @@
 
         <!-- Cancel Button -->
         <Button
-            android:id="@+id/cancelButton"
+            style="@style/SecondaryButton" android:id="@+id/cancelButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="CLOSE"
