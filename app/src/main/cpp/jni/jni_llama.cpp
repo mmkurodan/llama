@@ -3426,6 +3426,39 @@ static bool prefill_multimodal_prompt_locked(
     }
 
     n_prompt_tokens = mtmd_helper_get_n_tokens(chunks);
+    {
+        // [mm-diag] Confirm the media marker(s) matched the decoded media and that the
+        // multimodal chunks actually carry non-text (image/audio) tokens. If markers != media
+        // or there are no media chunks, mtmd would have embedded the media as plain text and
+        // the model will say it "cannot see/hear" the input.
+        const std::string mm_marker = "<__media__>";
+        size_t marker_count = 0, mpos = 0;
+        while ((mpos = prompt.find(mm_marker, mpos)) != std::string::npos) {
+            marker_count++;
+            mpos += mm_marker.size();
+        }
+        const size_t n_chunks = mtmd_input_chunks_size(chunks);
+        size_t n_media_chunks = 0;
+        for (size_t ci = 0; ci < n_chunks; ci++) {
+            const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks, ci);
+            if (chunk && mtmd_input_chunk_get_type(chunk) != MTMD_INPUT_CHUNK_TYPE_TEXT) {
+                n_media_chunks++;
+            }
+        }
+        std::ostringstream ss;
+        ss << "[mm-diag] prefill_multimodal: media=" << media_files.size()
+           << " markers=" << marker_count
+           << " chunks=" << n_chunks
+           << " media_chunks=" << n_media_chunks
+           << " n_prompt_tokens=" << n_prompt_tokens;
+        log_to_file(ss.str(), GGML_LOG_LEVEL_INFO);
+        if (marker_count != media_files.size()) {
+            log_to_file("[mm-diag] WARNING: media marker count != media file count", GGML_LOG_LEVEL_ERROR);
+        }
+        if (n_media_chunks == 0 && !media_files.empty()) {
+            log_to_file("[mm-diag] WARNING: no media chunks produced — media embedded as text; model will not perceive it", GGML_LOG_LEVEL_ERROR);
+        }
+    }
     const int32_t eval_rc = mtmd_helper_eval_chunks(
             g_mtmd,
             g_ctx,
@@ -3441,9 +3474,35 @@ static bool prefill_multimodal_prompt_locked(
         cleanup();
         return false;
     }
+    {
+        std::ostringstream ss;
+        ss << "[mm-diag] prefill_multimodal eval ok: n_past=" << n_past;
+        log_to_file(ss.str(), GGML_LOG_LEVEL_INFO);
+    }
 
     cleanup();
     return true;
+}
+
+// [mm-diag] Warn when the built prompt still carries media markers but no media reached native
+// (media dropped before the JNI call). The model then sees "<__media__>" as literal text and
+// reports it cannot see/hear the input — logged so an on-device repro pinpoints where it broke.
+static void log_media_marker_diag(const std::string & prompt, bool has_media, size_t media_count, const char * where) {
+    const std::string mm_marker = "<__media__>";
+    size_t marker_count = 0, mpos = 0;
+    while ((mpos = prompt.find(mm_marker, mpos)) != std::string::npos) {
+        marker_count++;
+        mpos += mm_marker.size();
+    }
+    std::ostringstream ss;
+    ss << "[mm-diag] " << where << ": has_media=" << (has_media ? 1 : 0)
+       << " media_count=" << media_count << " markers=" << marker_count;
+    log_to_file(ss.str(), GGML_LOG_LEVEL_INFO);
+    if (marker_count > 0 && !has_media) {
+        log_to_file(std::string("[mm-diag] WARNING: ") + where
+                    + ": prompt has media markers but NO media reached native — media dropped upstream; model sees it as text.",
+                    GGML_LOG_LEVEL_ERROR);
+    }
 }
 
 static jstring generate_locked(
@@ -3489,6 +3548,7 @@ static jstring generate_locked(
     }
 
     const bool has_media = media_files != nullptr && !media_files->empty();
+    log_media_marker_diag(prompt, has_media, media_files ? media_files->size() : 0, "generate");
     const bool prefill_ok = has_media
             ? prefill_multimodal_prompt_locked(prompt, *media_files, n_prompt_tokens, n_past, prefill_error)
             : prefill_text_prompt_locked(vocab, prompt, n_prompt_tokens, n_past, prefill_error);
@@ -3905,6 +3965,7 @@ static jstring generate_openai_chat_completion_locked(
         }
 
         const bool has_media = media_files != nullptr && !media_files->empty();
+        log_media_marker_diag(prompt, has_media, media_files ? media_files->size() : 0, "generateOpenAiChatCompletion");
         // Reuse the KV cache across turns (MCP) for the text path on CPU/GPU; otherwise full reset.
         const bool use_kv_cache = !has_media && kv_prefix_cache_allowed_locked();
         bool prefill_ok;

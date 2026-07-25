@@ -1921,11 +1921,19 @@ public class OllamaApiServer {
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
                 boolean enableThinking = config == null || config.enableThinking;
                 String modelPath = modelManager.getCurrentModelPath();
+                DiagnosticsLogger.logEvent(context, "mm-diag",
+                        "endpoint=/api/chat reqVision=" + requestedModalities.vision
+                                + " reqAudio=" + requestedModalities.audio
+                                + " supportsVision=" + modelManager.supportsVision()
+                                + " supportsAudio=" + modelManager.supportsAudio());
                 PreparedMessages preparedMessages = normalizeMessagesForMedia(
                         messages,
                         modelManager.supportsVision(),
                         modelManager.supportsAudio()
                 );
+                DiagnosticsLogger.logEvent(context, "mm-diag",
+                        "endpoint=/api/chat mediaExtracted="
+                                + (preparedMessages.hasMedia() ? preparedMessages.mediaFiles.size() : 0));
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
                         PromptTemplateManager.buildPromptFromMessagesWithSelection(
@@ -2235,11 +2243,19 @@ public class OllamaApiServer {
                 String customTemplate = config != null ? config.customChatTemplate : null;
                 String settingsSystemPrompt = config != null ? config.systemPrompt : null;
                 boolean enableThinking = config == null || config.enableThinking;
+                DiagnosticsLogger.logEvent(context, "mm-diag",
+                        "endpoint=/v1/chat reqVision=" + requestedModalities.vision
+                                + " reqAudio=" + requestedModalities.audio
+                                + " supportsVision=" + modelManager.supportsVision()
+                                + " supportsAudio=" + modelManager.supportsAudio());
                 PreparedMessages preparedMessages = normalizeMessagesForMedia(
                         messages,
                         modelManager.supportsVision(),
                         modelManager.supportsAudio()
                 );
+                DiagnosticsLogger.logEvent(context, "mm-diag",
+                        "endpoint=/v1/chat mediaExtracted="
+                                + (preparedMessages.hasMedia() ? preparedMessages.mediaFiles.size() : 0));
 
                 if (preEncodeOnly) {
                     sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, "").toString());
