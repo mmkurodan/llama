@@ -1093,13 +1093,30 @@ public class OllamaApiServer {
             JSONArray data = new JSONArray();
             JSONArray models = new JSONArray();
             long created = System.currentTimeMillis() / 1000L;
+            // During a mid-chat model switch, currentConfigName only flips to the new model AFTER
+            // its (slow) native load finishes. The bundled WebUI loads a model via POST
+            // /models/load then polls GET /v1/models with pollForModelStatus(), which THROWS
+            // "Model was unloaded unexpectedly during loading" if the target reports "unloaded"
+            // for more than ~1.5s. So every non-instant switch failed and the WebUI reverted the
+            // selector to the previously-loaded model (re-selecting worked because by then the
+            // model was already loaded and the WebUI skipped the poll). Report the in-progress
+            // load target as "loading" so the poll keeps waiting instead of throwing, and only
+            // reports "loaded" once the model is genuinely loaded.
+            String pendingConfig = modelManager.getPendingConfigName();
             String loadedConfig = modelManager.getCurrentConfigName();
             boolean isLoaded = modelManager.isModelLoaded();
 
             for (String configName : configNames) {
                 ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
                 File modelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
-                boolean thisConfigLoaded = isLoaded && configName.equals(loadedConfig);
+                String statusValue;
+                if (pendingConfig != null && configName.equals(pendingConfig)) {
+                    statusValue = "loading";
+                } else if (isLoaded && configName.equals(loadedConfig)) {
+                    statusValue = "loaded";
+                } else {
+                    statusValue = "unloaded";
+                }
                 PromptTemplateManager.ModelFamily family = PromptTemplateManager.detectModelFamily(
                         modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
 
@@ -1113,7 +1130,7 @@ public class OllamaApiServer {
                 dataEntry.put("path", modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
 
                 JSONObject status = new JSONObject();
-                status.put("value", thisConfigLoaded ? "loaded" : "unloaded");
+                status.put("value", statusValue);
                 dataEntry.put("status", status);
                 dataEntry.put("tags", new JSONArray());
                 data.put(dataEntry);

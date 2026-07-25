@@ -106,6 +106,12 @@ public class ModelManager {
     private boolean resetPending = false;
     private boolean reinitializing = false;
     private volatile String currentConfigName = null;
+    // Config name of a model whose (slow) load is currently in progress. While a switch to a
+    // different model is loading, currentConfigName still points at the OLD model, so the API
+    // would report the old model as "loaded". The WebUI auto-selects the loaded model from the
+    // last message, which reverts the user's mid-chat model switch. Exposing the pending target
+    // lets /v1/models report the model being switched TO, so the old one stops looking loaded.
+    private volatile String pendingConfigName = null;
     private volatile String currentModelPath = null;
     private volatile ConfigurationManager.Configuration lastLoadedConfig = null;
     private volatile String currentConfiguredMmprojPath = null;
@@ -245,6 +251,15 @@ public class ModelManager {
     
     public String getCurrentConfigName() {
         return currentConfigName;
+    }
+
+    /**
+     * Config name of a model load that is currently in progress (null when idle). Used by the
+     * API layer to report the model being switched TO as the effective/loaded model during the
+     * load window, instead of the still-loaded previous model.
+     */
+    public String getPendingConfigName() {
+        return pendingConfigName;
     }
 
     public ConfigurationManager.Configuration getCurrentConfig() {
@@ -525,6 +540,9 @@ public class ModelManager {
             boolean allowProjectorDownload) {
         lastDisabledMmprojMessage = null;
         boolean shouldClearPendingLoad = false;
+        // Mark this model as the switch target for the duration of the load so the API reports
+        // it (not the still-loaded previous model) as the effective model. Cleared in finally.
+        pendingConfigName = configName;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
             DiagnosticsLogger.logEvent(context, "model-load", "Loading configuration: " + configName);
@@ -717,6 +735,7 @@ public class ModelManager {
             }
             return false;
         } finally {
+            pendingConfigName = null;
             if (shouldClearPendingLoad) {
                 try {
                     PendingModelLoadStore.deletePendingLoad(context);
