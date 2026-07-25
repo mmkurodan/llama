@@ -1056,12 +1056,35 @@ public class SettingsActivity extends Activity {
         // typing a new name saves-as. A non-filtering adapter keeps the whole list visible.
         configAdapter = new NoFilterArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, configs);
         configNameInput.setAdapter(configAdapter);
-        configNameInput.setOnClickListener(v -> configNameInput.showDropDown());
+        configNameInput.setOnClickListener(v -> showConfigDropDownSafely());
         configNameInput.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) {
-                configNameInput.showDropDown();
+                showConfigDropDownSafely();
             }
         });
+    }
+
+    /**
+     * Show the profile dropdown only when it is safe to add a window. When the activity is
+     * recreated (e.g. after the process was killed under memory pressure), the framework restores
+     * focus to this AutoCompleteTextView inside onRestoreInstanceState — BEFORE the window token
+     * exists. Calling showDropDown() then throws WindowManager.BadTokenException on the main
+     * thread, which is uncaught and crashes the process in a restart loop ("app can't start").
+     * Skip the programmatic-restore case (window not attached / activity going away) and keep a
+     * try/catch as a final safety net.
+     */
+    private void showConfigDropDownSafely() {
+        if (configNameInput == null || isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (!configNameInput.isAttachedToWindow() || !configNameInput.hasWindowFocus()) {
+            return;
+        }
+        try {
+            configNameInput.showDropDown();
+        } catch (android.view.WindowManager.BadTokenException | IllegalStateException e) {
+            Log.w(TAG, "Skipped profile dropdown (window not ready)", e);
+        }
     }
     
     private void loadConfigurationByName(String name) {
