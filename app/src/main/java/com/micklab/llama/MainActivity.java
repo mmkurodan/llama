@@ -339,7 +339,7 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("モデルのダウンロード", "Download model"))
                 .setMessage(localizedText(
-                        "初回のみ、モデルのダウンロードに時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi での実行を推奨します。続行しますか？",
+                        "初回のみ、モデルのダウンロードに長時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi での実行を推奨します。続行しますか？",
                         "The model will be downloaded now. The first time only, this takes time and a large amount of data (possibly several GB). Wi-Fi is strongly recommended. Continue?"))
                 .setPositiveButton(localizedText("続行", "Continue"), (d, w) -> onConfirm.run())
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
