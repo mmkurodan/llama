@@ -277,6 +277,11 @@ public final class Translations {
         e("Model Loading", "Chargement du modèle", "Carga de modelo", "Carregamento de modelo", "Modell laden", "Caricamento del modello", "模型加载", "모델 로드");
         e("Model Management", "Gestion des modèles", "Gestión de modelos", "Gerenciamento de modelos", "Modellverwaltung", "Gestione modelli", "模型管理", "모델 관리");
         e("MTP Settings", "Paramètres MTP", "Configuración de MTP", "Configurações de MTP", "MTP-Einstellungen", "Impostazioni MTP", "MTP 设置", "MTP 설정");
+        e("Select downloaded model", "Sélectionner un modèle téléchargé", "Seleccionar modelo descargado", "Selecionar modelo baixado", "Heruntergeladenes Modell auswählen", "Seleziona un modello scaricato", "选择已下载的模型", "다운로드된 모델 선택");
+        e("Get models", "Obtenir des modèles", "Obtener modelos", "Obter modelos", "Modelle beziehen", "Ottieni modelli", "获取模型", "모델 가져오기");
+        e("Rename / delete models", "Renommer / supprimer des modèles", "Renombrar / eliminar modelos", "Renomear / excluir modelos", "Modelle umbenennen / löschen", "Rinomina / elimina modelli", "重命名 / 删除模型", "모델 이름 변경 / 삭제");
+        e("Select a model", "Sélectionner un modèle", "Seleccionar un modelo", "Selecionar um modelo", "Modell auswählen", "Seleziona un modello", "选择模型", "모델 선택");
+        e("No downloaded models", "Aucun modèle téléchargé", "No hay modelos descargados", "Nenhum modelo baixado", "Keine heruntergeladenen Modelle", "Nessun modello scaricato", "没有已下载的模型", "다운로드된 모델이 없습니다");
         e("Model URL / Imported File:", "URL du modèle / fichier importé :", "URL del modelo / archivo importado:", "URL do modelo / arquivo importado:", "Modell-URL / importierte Datei:", "URL del modello / file importato:", "模型 URL / 导入的文件：", "모델 URL / 가져온 파일:");
         e("Multimodal Projector (mmproj):", "Projecteur multimodal (mmproj) :", "Proyector multimodal (mmproj):", "Projetor multimodal (mmproj):", "Multimodaler Projektor (mmproj):", "Proiettore multimodale (mmproj):", "多模态投影器 (mmproj)：", "멀티모달 프로젝터 (mmproj):");
         e("No multimodal projector selected", "Aucun projecteur multimodal sélectionné", "Ningún proyector multimodal seleccionado", "Nenhum projetor multimodal selecionado", "Kein multimodaler Projektor ausgewählt", "Nessun proiettore multimodale selezionato", "未选择多模态投影器", "선택된 멀티모달 프로젝터 없음");

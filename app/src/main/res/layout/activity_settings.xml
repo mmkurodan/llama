@@ -115,6 +115,13 @@
             android:layout_height="wrap_content"
             android:text="Load Model" />
 
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/selectModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Select downloaded model" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -161,11 +168,12 @@
             android:textStyle="bold"
             android:paddingBottom="8dp" />
 
-        <Button
-            style="@style/SecondaryButton" android:id="@+id/maintainModelButton"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="MAINTAIN MODEL" />
+            android:text="Get models"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
 
         <Button
             style="@style/PrimaryButton" android:id="@+id/searchGgufButton"
@@ -193,6 +201,20 @@
             style="?android:attr/progressBarStyleHorizontal"
             android:max="100"
             android:progress="0" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rename / delete models"
+            android:textStyle="bold"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp" />
+
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/maintainModelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MAINTAIN MODEL" />
 
         <!-- MTP Settings Section -->
         <TextView

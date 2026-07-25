@@ -96,6 +96,7 @@ public class SettingsActivity extends Activity {
     private ProgressBar modelProgressBar;
     private Button importModelButton;
     private Button loadModelButton;
+    private Button selectModelButton;
     private Button maintainModelButton;
     
     // Penalty parameter inputs
@@ -287,6 +288,7 @@ public class SettingsActivity extends Activity {
         modelProgressBar = findViewById(R.id.modelProgressBar);
         importModelButton = findViewById(R.id.importModelButton);
         loadModelButton = findViewById(R.id.loadModelButton);
+        selectModelButton = findViewById(R.id.selectModelButton);
         maintainModelButton = findViewById(R.id.maintainModelButton);
         
         // Penalty parameter inputs
@@ -430,6 +432,12 @@ public class SettingsActivity extends Activity {
             }
             startModelAction(true, null);
         });
+        selectModelButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showDownloadedModelPicker();
+        });
         importModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
                 return;
@@ -548,6 +556,9 @@ public class SettingsActivity extends Activity {
         if (importModelButton != null) importModelButton.setEnabled(!isBusy);
         if (searchGgufButton != null) searchGgufButton.setEnabled(!isBusy);
         if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
+        if (selectModelButton != null) {
+            selectModelButton.setEnabled(!isBusy && getDownloadedModelFiles().length > 0);
+        }
         if (maintainModelButton != null) maintainModelButton.setEnabled(!isBusy);
         if (selectProjectorButton != null) selectProjectorButton.setEnabled(!isBusy);
         if (clearProjectorButton != null) {
@@ -664,6 +675,9 @@ public class SettingsActivity extends Activity {
             case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
             case "gguf import from local device": return "ローカル端末からggufを取り込む";
             case "Load Model": return "モデルを読み込む";
+            case "Select downloaded model": return "ダウンロード済みモデルを選択";
+            case "Get models": return "モデル取得";
+            case "Rename / delete models": return "モデルの名称変更・削除";
             case "MAINTAIN MODEL": return "モデル管理";
             case "Model file: (none)": return "モデルファイル: （なし）";
             case "Model Parameters": return "モデルパラメータ";
@@ -1038,11 +1052,16 @@ public class SettingsActivity extends Activity {
     
     private void loadConfigList() {
         List<String> configs = configManager.listConfigurations();
-        // The merged profile field is an editable dropdown: type a new name to
-        // save-as, or tap/type to pick an existing profile to load.
-        configAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, configs);
+        // Merged profile field: tapping/focusing shows the full list (no text filtering);
+        // typing a new name saves-as. A non-filtering adapter keeps the whole list visible.
+        configAdapter = new NoFilterArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, configs);
         configNameInput.setAdapter(configAdapter);
         configNameInput.setOnClickListener(v -> configNameInput.showDropDown());
+        configNameInput.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                configNameInput.showDropDown();
+            }
+        });
     }
     
     private void loadConfigurationByName(String name) {
@@ -2463,6 +2482,68 @@ public class SettingsActivity extends Activity {
                     + extractFilenameFromUrl(selectedProjectorReference));
         }
         updateActionButtonStateForBusy();
+    }
+
+    // Downloaded model GGUFs (all downloaded GGUFs minus likely mmproj/projector files).
+    private File[] getDownloadedModelFiles() {
+        File[] all = getDownloadedProjectorFiles();
+        List<File> models = new ArrayList<>();
+        for (File file : all) {
+            if (!ModelFileHelper.isLikelyProjectorFilename(file.getName())) {
+                models.add(file);
+            }
+        }
+        return models.toArray(new File[0]);
+    }
+
+    // "Select downloaded model": pick from already-downloaded models into the model field.
+    private void showDownloadedModelPicker() {
+        File[] files = getDownloadedModelFiles();
+        if (files.length == 0) {
+            showToast(localizedText("ダウンロード済みモデルがありません", "No downloaded models"));
+            return;
+        }
+        String[] names = new String[files.length];
+        for (int i = 0; i < files.length; i++) {
+            names[i] = files[i].getName();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("モデルを選択", "Select a model"))
+                .setItems(names, (dialog, which) -> {
+                    modelUrlInput.setText(names[which]);
+                    currentConfig = getConfigFromUI();
+                    updateAutoTemplatePreview(currentConfig);
+                })
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    /** ArrayAdapter that never filters, so the profile field shows the full list on tap. */
+    private static class NoFilterArrayAdapter extends ArrayAdapter<String> {
+        private final List<String> items;
+
+        NoFilterArrayAdapter(Context context, int resource, List<String> objects) {
+            super(context, resource, objects);
+            this.items = objects;
+        }
+
+        @Override
+        public android.widget.Filter getFilter() {
+            return new android.widget.Filter() {
+                @Override
+                protected FilterResults performFiltering(CharSequence constraint) {
+                    FilterResults results = new FilterResults();
+                    results.values = items;
+                    results.count = items.size();
+                    return results;
+                }
+
+                @Override
+                protected void publishResults(CharSequence constraint, FilterResults results) {
+                    notifyDataSetChanged();
+                }
+            };
+        }
     }
 
     private File[] getDownloadedProjectorFiles() {
