@@ -28,6 +28,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -75,8 +76,7 @@ public class SettingsActivity extends Activity {
     private ModelManager modelManager;
     
     // UI elements
-    private EditText configNameInput;
-    private Spinner configSpinner;
+    private AutoCompleteTextView configNameInput;
     private EditText modelUrlInput;
     private TextView multimodalProjectorInfo;
     private Button selectProjectorButton;
@@ -268,7 +268,6 @@ public class SettingsActivity extends Activity {
     
     private void initViews() {
         configNameInput = findViewById(R.id.configNameInput);
-        configSpinner = findViewById(R.id.configSpinner);
         modelUrlInput = findViewById(R.id.modelUrlInput);
         multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
@@ -648,6 +647,7 @@ public class SettingsActivity extends Activity {
         switch (text) {
             case "Configuration Management": return "設定管理";
             case "Display Language": return "表示言語";
+            case "Profile:": return "プロファイル:";
             case "Configuration Name:": return "設定名:";
             case "Save Config": return "設定を保存";
             case "Delete Config": return "設定を削除";
@@ -1031,9 +1031,11 @@ public class SettingsActivity extends Activity {
     
     private void loadConfigList() {
         List<String> configs = configManager.listConfigurations();
-        configAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, configs);
-        configAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        configSpinner.setAdapter(configAdapter);
+        // The merged profile field is an editable dropdown: type a new name to
+        // save-as, or tap/type to pick an existing profile to load.
+        configAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, configs);
+        configNameInput.setAdapter(configAdapter);
+        configNameInput.setOnClickListener(v -> configNameInput.showDropDown());
     }
     
     private void loadConfigurationByName(String name) {
@@ -1051,7 +1053,7 @@ public class SettingsActivity extends Activity {
     }
     
     private void updateUIFromConfig(ConfigurationManager.Configuration config) {
-        configNameInput.setText(config.name);
+        configNameInput.setText(config.name, false);
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
         selectedProjectorDisabled = config.multimodalProjectorDisabled;
@@ -1582,12 +1584,9 @@ public class SettingsActivity extends Activity {
             // Refresh spinner list
             loadConfigList();
             
-            // Select the saved config in spinner
-            int position = configAdapter.getPosition(config.name);
-            if (position >= 0) {
-                configSpinner.setSelection(position);
-            }
-            
+            // Reflect the saved profile name in the merged field.
+            configNameInput.setText(config.name, false);
+
             showToast(localizedText("設定を保存しました: ", "Configuration saved: ") + config.name);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to save configuration", e);
@@ -1596,7 +1595,7 @@ public class SettingsActivity extends Activity {
     }
     
     private void loadSelectedConfiguration() {
-        String selectedName = (String) configSpinner.getSelectedItem();
+        String selectedName = configNameInput.getText().toString().trim();
         if (selectedName == null || selectedName.isEmpty()) {
             showToast(localizedText("設定が選択されていません", "No configuration selected"));
             return;
@@ -1605,7 +1604,7 @@ public class SettingsActivity extends Activity {
     }
     
     private void deleteSelectedConfiguration() {
-        String selectedName = (String) configSpinner.getSelectedItem();
+        String selectedName = configNameInput.getText().toString().trim();
         if (selectedName == null || selectedName.isEmpty()) {
             showToast(localizedText("設定が選択されていません", "No configuration selected"));
             return;
@@ -1738,10 +1737,7 @@ public class SettingsActivity extends Activity {
             currentConfig = config;
             loadConfigList();
 
-            int position = configAdapter != null ? configAdapter.getPosition(config.name) : -1;
-            if (position >= 0) {
-                configSpinner.setSelection(position);
-            }
+            configNameInput.setText(config.name, false);
 
             loadedModelPath = null;
             modelLoadedSuccessfully = false;

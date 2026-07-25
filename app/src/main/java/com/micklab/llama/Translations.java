@@ -259,6 +259,7 @@ public final class Translations {
 
         // Settings screen labels/hints from the layout XML (batch #4).
         e("Configuration Management", "Gestion des configurations", "Gestión de configuraciones", "Gerenciamento de configurações", "Konfigurationsverwaltung", "Gestione configurazioni", "配置管理", "구성 관리");
+        e("Profile:", "Profil :", "Perfil:", "Perfil:", "Profil:", "Profilo:", "配置文件：", "프로필:");
         e("Configuration Name:", "Nom de la configuration :", "Nombre de la configuración:", "Nome da configuração:", "Konfigurationsname:", "Nome configurazione:", "配置名称：", "구성 이름:");
         e("Save Config", "Enregistrer la config", "Guardar config", "Salvar config", "Konfiguration speichern", "Salva config", "保存配置", "구성 저장");
         e("Delete Config", "Supprimer la config", "Eliminar config", "Excluir config", "Konfiguration löschen", "Elimina config", "删除配置", "구성 삭제");
