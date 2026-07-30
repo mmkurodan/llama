@@ -190,6 +190,7 @@ public final class Translations {
         e("Privacy Policy", "Politique de confidentialité", "Política de privacidad", "Política de privacidade", "Datenschutzrichtlinie", "Informativa sulla privacy", "隐私政策", "개인정보 처리방침");
         e("Profile selected: ", "Profil sélectionné : ", "Perfil seleccionado: ", "Perfil selecionado: ", "Profil ausgewählt: ", "Profilo selezionato: ", "已选择配置文件：", "선택된 프로필: ");
         e("Projector: not selected", "Projecteur : non sélectionné", "Proyector: no seleccionado", "Projetor: não selecionado", "Projektor: nicht ausgewählt", "Proiettore: non selezionato", "投影器：未选择", "프로젝터: 선택 안 됨");
+        e("Projector: cleared (manual)", "Projecteur : désactivé (manuel)", "Proyector: desactivado (manual)", "Projetor: desativado (manual)", "Projektor: deaktiviert (manuell)", "Proiettore: disattivato (manuale)", "投影器：已手动解除", "프로젝터: 수동 해제됨");
         e("Quick Start", "Démarrage rapide", "Inicio rápido", "Início rápido", "Schnellstart", "Avvio rapido", "快速入门", "빠른 시작");
         e("Rename file", "Renommer le fichier", "Renombrar archivo", "Renomear arquivo", "Datei umbenennen", "Rinomina file", "重命名文件", "파일 이름 변경");
         e("Rename", "Renommer", "Renombrar", "Renomear", "Umbenennen", "Rinomina", "重命名", "이름 변경");

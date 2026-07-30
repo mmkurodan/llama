@@ -2523,13 +2523,18 @@ public class SettingsActivity extends Activity {
 
     private void clearIncompatibleProjectorSelection() {
         String modelReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
-        if (selectedProjectorReference.isEmpty() || modelReference.isEmpty()) {
+        if (modelReference.isEmpty()) {
             return;
         }
-        if (!selectedProjectorManualSelection
+        // When the auto-populated (non-manual) projector no longer matches the current model URL,
+        // clear the reference so updateMultimodalProjectorInfo can re-discover for the new model.
+        // Also reset selectedProjectorDisabled so the new model gets a fresh auto-discovery pass.
+        if (!selectedProjectorReference.isEmpty()
+                && !selectedProjectorManualSelection
                 && !ModelFileHelper.canAutoApplyProjectorReference(modelReference, selectedProjectorReference)) {
             selectedProjectorReference = "";
             selectedProjectorManualSelection = false;
+            selectedProjectorDisabled = false;
         }
     }
 
@@ -2553,28 +2558,39 @@ public class SettingsActivity extends Activity {
             return;
         }
         String modelReference = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
-        boolean projectorAvailable = !selectedProjectorReference.isEmpty()
-                || findAutoDetectedProjectorFile(modelReference) != null;
         boolean likelyMultimodalModel =
                 !modelReference.isEmpty() && ModelFileHelper.isLikelyMultimodalModelReference(modelReference);
 
-        if (likelyMultimodalModel) {
-            // For gguf models that can accept an mmproj, show availability and the configured mmproj model name below
-            String availableText = localizedText("利用可能", "Available");
-            String mmprojModelName = "";
-            if (!selectedProjectorReference.isEmpty()) {
-                mmprojModelName = extractFilenameFromUrl(selectedProjectorReference);
-            } else {
-                File autoDetected = findAutoDetectedProjectorFile(modelReference);
-                if (autoDetected != null) {
-                    mmprojModelName = autoDetected.getName();
-                }
-            }
+        // When the user explicitly cleared the projector: show the disabled state and stop.
+        // Do NOT show the auto-detected file — that would make it look like the clear had no effect.
+        if (selectedProjectorDisabled && selectedProjectorReference.isEmpty()) {
+            multimodalProjectorInfo.setText(localizedText(
+                    "Projector: 解除済み（手動）",
+                    "Projector: cleared (manual)"));
+            updateActionButtonStateForBusy();
+            return;
+        }
 
-            if (!mmprojModelName.isEmpty()) {
-                multimodalProjectorInfo.setText(availableText + "\n" + mmprojModelName);
-            } else if (projectorAvailable) {
-                multimodalProjectorInfo.setText(availableText);
+        // Auto-populate selectedProjectorReference from the co-located mmproj when:
+        //   • no explicit selection yet (empty reference)
+        //   • user has not disabled it
+        //   • a co-located projector file exists on disk
+        // Storing the name here makes it explicit so the Clear button becomes enabled,
+        // and saving the profile persists the auto-detected choice explicitly —
+        // future loads no longer need runtime auto-discovery for this profile.
+        if (selectedProjectorReference.isEmpty() && !selectedProjectorDisabled && likelyMultimodalModel) {
+            File autoDetected = findAutoDetectedProjectorFile(modelReference);
+            if (autoDetected != null) {
+                selectedProjectorReference = autoDetected.getName();
+                selectedProjectorManualSelection = false;
+            }
+        }
+
+        if (likelyMultimodalModel) {
+            String availableText = localizedText("利用可能", "Available");
+            if (!selectedProjectorReference.isEmpty()) {
+                multimodalProjectorInfo.setText(
+                        availableText + "\n" + extractFilenameFromUrl(selectedProjectorReference));
             } else {
                 multimodalProjectorInfo.setText(localizedText(
                         "Projector: 未選択",
