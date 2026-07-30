@@ -172,6 +172,13 @@ public class PromptTemplateManager {
         "<|im_start|>assistant\n";
 
     private static final String NO_THINKING_BLOCK = "<think>\n\n</think>\n\n";
+
+    // WebUI internal markers for reasoning content (llama.cpp WebUI convention)
+    public static final String WEBUI_REASONING_START = "<<<reasoning_content_start>>>";
+    public static final String WEBUI_REASONING_END   = "<<<reasoning_content_end>>>";
+
+    public static final String THINK_OPEN_TAG  = "<think>";
+    public static final String THINK_CLOSE_TAG = "</think>";
     
     /**
      * Detect model family from model filename or path.
@@ -389,13 +396,63 @@ public class PromptTemplateManager {
         if (enableThinking || prompt == null || prompt.isEmpty() || selection == null) {
             return prompt;
         }
-        if ("custom".equals(selection.source) || selection.family != ModelFamily.QWEN) {
+        if ("custom".equals(selection.source)) {
             return prompt;
         }
+        // Suppress thinking for ALL ChatML/im_start models (Qwen, DeepSeek-R1, LLaMA-thinking, etc.)
         if (prompt.endsWith("<|im_start|>assistant\n")) {
             return prompt + NO_THINKING_BLOCK;
         }
+        // Suppress thinking for Gemma thinking variants
+        if (prompt.endsWith("<start_of_turn>model\n")) {
+            return prompt + NO_THINKING_BLOCK;
+        }
         return prompt;
+    }
+
+    /**
+     * Strip {@code <think>...</think>} blocks from text (enableThinking=false output path).
+     * Handles the full block including leading/trailing whitespace after the closing tag.
+     */
+    public static String stripThinkingBlocks(String text) {
+        if (text == null || text.isEmpty() || !text.contains(THINK_OPEN_TAG)) {
+            return text;
+        }
+        StringBuilder result = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            int openIdx = text.indexOf(THINK_OPEN_TAG, i);
+            if (openIdx < 0) {
+                result.append(text, i, text.length());
+                break;
+            }
+            result.append(text, i, openIdx);
+            int closeIdx = text.indexOf(THINK_CLOSE_TAG, openIdx + THINK_OPEN_TAG.length());
+            if (closeIdx < 0) {
+                // Unclosed block — discard the rest (model didn't finish thinking)
+                break;
+            }
+            i = closeIdx + THINK_CLOSE_TAG.length();
+            // Skip blank lines that separate the think block from the answer
+            while (i < text.length() && (text.charAt(i) == '\n' || text.charAt(i) == '\r')) {
+                i++;
+            }
+        }
+        return result.toString().trim();
+    }
+
+    /**
+     * Convert {@code <think>...</think>} blocks to the WebUI internal reasoning markers
+     * (enableThinking=true output path). The WebUI accumulates the markers and post-processes
+     * them after streaming ends to render reasoning as a collapsible section.
+     */
+    public static String wrapThinkingBlocksForWebUi(String text) {
+        if (text == null || text.isEmpty() || !text.contains(THINK_OPEN_TAG)) {
+            return text;
+        }
+        return text
+                .replace(THINK_OPEN_TAG,  WEBUI_REASONING_START)
+                .replace(THINK_CLOSE_TAG, WEBUI_REASONING_END);
     }
     
     /**
