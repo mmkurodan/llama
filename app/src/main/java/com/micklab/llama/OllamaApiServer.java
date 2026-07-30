@@ -1348,6 +1348,7 @@ public class OllamaApiServer {
 
     private JSONObject buildPropsParams(ConfigurationManager.Configuration config) throws JSONException {
         int nPredict = config.nPredict > 0 ? config.nPredict : config.nCtx;
+        String reasoningFormat = config.enableThinking ? "auto" : "none";
         JSONObject params = new JSONObject();
         params.put("n_predict", nPredict);
         params.put("seed", -1);
@@ -1387,7 +1388,7 @@ public class OllamaApiServer {
         params.put("grammar_triggers", new JSONArray());
         params.put("preserved_tokens", new JSONArray());
         params.put("chat_format", PromptTemplateManager.detectModelFamily(config.modelUrl).name().toLowerCase(Locale.US));
-        params.put("reasoning_format", "none");
+        params.put("reasoning_format", reasoningFormat);
         params.put("reasoning_in_content", false);
         params.put("generation_prompt", "");
         params.put("samplers", stringListToJsonArray(defaultSamplers()));
@@ -1455,6 +1456,7 @@ public class OllamaApiServer {
 
     private JSONObject buildSlotParams(ConfigurationManager.Configuration config) throws JSONException {
         int nPredict = config.nPredict > 0 ? config.nPredict : config.nCtx;
+        String reasoningFormat = config.enableThinking ? "auto" : "none";
         JSONObject params = new JSONObject();
         params.put("n_predict", nPredict);
         params.put("seed", -1);
@@ -1487,7 +1489,7 @@ public class OllamaApiServer {
         params.put("n_probs", 0);
         params.put("min_keep", 0);
         params.put("chat_format", PromptTemplateManager.detectModelFamily(config.modelUrl).name().toLowerCase(Locale.US));
-        params.put("reasoning_format", "none");
+        params.put("reasoning_format", reasoningFormat);
         params.put("reasoning_in_content", false);
         params.put("generation_prompt", "");
         params.put("samplers", stringListToJsonArray(defaultSamplers()));
@@ -1598,6 +1600,27 @@ public class OllamaApiServer {
         try {
             modelManager.getLlama().setNPredict(effective);
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Resolve the effective {@code enableThinking} for this request.
+     * <p>
+     * Priority (highest first):
+     * <ol>
+     *   <li>{@code reasoning_format} field in the request body:
+     *       {@code "none"} → thinking disabled, {@code "auto"} → thinking enabled.</li>
+     *   <li>The model config's {@code enableThinking} flag.</li>
+     * </ol>
+     * This lets the WebUI's "Disable reasoning content parsing" toggle
+     * ({@code reasoning_format=none}) override the per-profile setting on a
+     * per-request basis, without touching the saved configuration.
+     */
+    private static boolean resolveEnableThinking(JSONObject request, ConfigurationManager.Configuration config) {
+        boolean configDefault = config == null || config.enableThinking;
+        if (request == null) return configDefault;
+        String fmt = request.optString("reasoning_format", null);
+        if (fmt == null) return configDefault;
+        return !"none".equalsIgnoreCase(fmt);
     }
 
     private void applyRequestOverrides(ConfigurationManager.Configuration config, JSONObject request) {
@@ -1766,7 +1789,7 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
-                boolean enableThinking = config == null || config.enableThinking;
+                boolean enableThinking = resolveEnableThinking(request, config);
                 String modelPath = modelManager.getCurrentModelPath();
 
                 if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
@@ -2063,7 +2086,7 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
                 String settingsSystemPrompt = (config != null) ? config.systemPrompt : null;
-                boolean enableThinking = config == null || config.enableThinking;
+                boolean enableThinking = resolveEnableThinking(request, config);
                 String modelPath = modelManager.getCurrentModelPath();
                 DiagnosticsLogger.logEvent(context, "mm-diag",
                         "endpoint=/api/chat reqVision=" + requestedModalities.vision
@@ -2393,7 +2416,7 @@ public class OllamaApiServer {
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = config != null ? config.customChatTemplate : null;
                 String settingsSystemPrompt = config != null ? config.systemPrompt : null;
-                boolean enableThinking = config == null || config.enableThinking;
+                boolean enableThinking = resolveEnableThinking(request, config);
                 DiagnosticsLogger.logEvent(context, "mm-diag",
                         "endpoint=/v1/chat reqVision=" + requestedModalities.vision
                                 + " reqAudio=" + requestedModalities.audio

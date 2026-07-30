@@ -532,13 +532,23 @@ public class PromptTemplateManager {
             JSONObject msg = messages.getJSONObject(i);
             String role = msg.optString("role", "");
             String content = msg.optString("content", "");
-            
+
             // Strip existing template markers to prevent double-templating
             content = stripTemplateMarkers(content);
-            
+
             if ("system".equals(role)) {
                 apiSystemPrompt = content;
             } else {
+                // When excludeReasoningFromContext=false the WebUI sends back the model's
+                // previous reasoning as a separate reasoning_content field. Re-wrap it in
+                // <think>…</think> so the model can see its own chain-of-thought in context.
+                if ("assistant".equals(role)) {
+                    String reasoningContent = msg.optString("reasoning_content", null);
+                    if (reasoningContent != null && !reasoningContent.isEmpty()) {
+                        content = THINK_OPEN_TAG + "\n" + reasoningContent + "\n" + THINK_CLOSE_TAG
+                                + "\n\n" + content;
+                    }
+                }
                 conversationHistory.add(new Message(role, content));
             }
         }
