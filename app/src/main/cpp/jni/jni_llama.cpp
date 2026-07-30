@@ -186,6 +186,13 @@ static int   g_dry_allowed_length   = 2;
 static int   g_dry_penalty_last_n   = -1;
 static std::string g_dry_sequence_breakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
 
+// Generation length limit: -1 means use remaining context (n_ctx - n_past).
+static int g_n_predict = -1;
+
+// KV cache quantization types (GGML type IDs). Default 1 = GGML_TYPE_F16.
+static int g_kv_type_k = 1;
+static int g_kv_type_v = 1;
+
 // Common stop sequences for chat templates to prevent runaway generation
 static const std::vector<std::string> DEFAULT_STOP_SEQUENCES = {
         "<|end|>",
@@ -676,6 +683,8 @@ static llama_context_params build_context_params_locked() {
     cparams.n_ubatch        = g_n_batch;
     cparams.n_threads_batch = g_n_threads;
     cparams.no_perf         = false;  // 計測を有効化 (既定 true だと t_eval=0 で tok/s 不能)
+    cparams.type_k          = static_cast<ggml_type>(g_kv_type_k);
+    cparams.type_v          = static_cast<ggml_type>(g_kv_type_v);
     return cparams;
 }
 
@@ -3527,7 +3536,7 @@ static jstring generate_locked(
         log_to_file(std::string("generate: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
     }
 
-    const int max_tokens = 1024;
+    const int max_tokens = (g_n_predict > 0) ? g_n_predict : (g_n_ctx - 32);
     std::string context_error;
     if (!reset_generation_context_locked("generate", context_error)) {
         log_to_file(std::string("generate: ") + context_error, GGML_LOG_LEVEL_ERROR);
@@ -3996,12 +4005,12 @@ static jstring generate_openai_chat_completion_locked(
         }
 
         const llama_pos generation_base_pos = n_past;
-        const int max_tokens = 1024;
+        const int max_tokens = (g_n_predict > 0) ? g_n_predict : (g_n_ctx - (int)n_past - 32);
 
         std::string output;
-        output.reserve(max_tokens * 4);
+        output.reserve(std::max(max_tokens, 1) * 4);
         std::vector<llama_token> out_tokens;
-        out_tokens.reserve(max_tokens);
+        out_tokens.reserve(std::max(max_tokens, 1));
         std::string prev_text;
 
         for (int i = 0; i < max_tokens; ++i) {
@@ -4367,6 +4376,92 @@ Java_com_micklab_llama_LlamaNative_setBackendConfig(
        << " configVersion=" << g_backend_config_version
        << (changed ? " [config changed]" : " [no change]");
     log_to_file(ss.str());
+}
+
+// ---------------- JNI: setNPredict ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setNPredict(JNIEnv *, jobject, jint n) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_n_predict = (int) n;
+    std::ostringstream ss;
+    ss << "setNPredict: n_predict=" << g_n_predict;
+    log_to_file(ss.str());
+}
+
+// ---------------- JNI: setKvCacheType ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setKvCacheType(JNIEnv *, jobject, jint typeK, jint typeV) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_kv_type_k = (int) typeK;
+    g_kv_type_v = (int) typeV;
+    std::ostringstream ss;
+    ss << "setKvCacheType: type_k=" << g_kv_type_k << " type_v=" << g_kv_type_v;
+    log_to_file(ss.str());
+}
+
+// ---------------- JNI: tokenize ----------------
+// Returns JSON: {"tokens":["tok1","tok2",...],"count":N,"ids":[1,2,...]}
+// or {"error":"..."} if no model is loaded.
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_tokenize(JNIEnv *env, jobject, jstring jText) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_model || !g_ctx) {
+        return new_java_string_utf8(env, "{\"error\":\"no model loaded\"}");
+    }
+    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    if (!vocab) {
+        return new_java_string_utf8(env, "{\"error\":\"vocab unavailable\"}");
+    }
+    std::string text = jText ? jstring_to_std(env, jText) : "";
+
+    // Tokenize with add_special=true, parse_special=true to handle BOS/EOS.
+    std::vector<llama_token> ids(text.size() + 16);
+    int n = llama_tokenize(vocab, text.c_str(), (int32_t)text.size(),
+                           ids.data(), (int32_t)ids.size(), true, true);
+    if (n < 0) {
+        // Buffer too small — retry with exact size
+        ids.resize(-n + 4);
+        n = llama_tokenize(vocab, text.c_str(), (int32_t)text.size(),
+                           ids.data(), (int32_t)ids.size(), true, true);
+    }
+    if (n < 0) {
+        return new_java_string_utf8(env, "{\"error\":\"tokenize failed\"}");
+    }
+    ids.resize(n);
+
+    // Build JSON manually for speed
+    std::ostringstream json;
+    json << "{\"tokens\":[";
+    for (int i = 0; i < n; ++i) {
+        if (i > 0) json << ",";
+        char buf[256];
+        int len = llama_token_to_piece(vocab, ids[i], buf, (int)sizeof(buf) - 1, 0, true);
+        if (len < 0) len = 0;
+        buf[len] = '\0';
+        // JSON-escape the piece
+        json << "\"";
+        for (int c = 0; c < len; ++c) {
+            unsigned char ch = (unsigned char) buf[c];
+            if (ch == '\"') json << "\\\"";
+            else if (ch == '\\') json << "\\\\";
+            else if (ch == '\n') json << "\\n";
+            else if (ch == '\r') json << "\\r";
+            else if (ch == '\t') json << "\\t";
+            else if (ch < 0x20) { json << "\\u00"; json << "0123456789abcdef"[ch >> 4]; json << "0123456789abcdef"[ch & 0xf]; }
+            else json << (char)ch;
+        }
+        json << "\"";
+    }
+    json << "],\"count\":" << n << ",\"ids\":[";
+    for (int i = 0; i < n; ++i) {
+        if (i > 0) json << ",";
+        json << ids[i];
+    }
+    json << "]}";
+    return new_java_string_utf8(env, json.str());
 }
 
 extern "C"

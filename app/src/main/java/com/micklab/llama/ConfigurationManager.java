@@ -60,6 +60,16 @@ public class ConfigurationManager {
         public String  mtpModelReference;   // draft source: "" = model's own embedded MTP head; else a GGUF reference
         public int     mtpNDraft;           // max tokens drafted per step
 
+        // Max output tokens per generation. -1 = unlimited (fill remaining context).
+        public int nPredict;
+
+        // KV cache quantization (GGML type IDs). 1=F16 (default), 8=Q8_0, 7=Q5_1, 6=Q5_0, 3=Q4_1, 2=Q4_0, 20=IQ4_NL.
+        public int kvCacheTypeK;
+        public int kvCacheTypeV;
+
+        // GPU backend switch stabilization level: 0=Off, 1=Low(200ms), 2=Medium(500ms), 3=High(1000ms).
+        public int gpuSwitchStabilization;
+
         // Penalty parameters
         public int penaltyLastN;
         public double penaltyRepeat;
@@ -161,6 +171,10 @@ public class ConfigurationManager {
             mtpEnabled = false;
             mtpModelReference = "";
             mtpNDraft = 2;
+            nPredict = -1;
+            kvCacheTypeK = 1;
+            kvCacheTypeV = 1;
+            gpuSwitchStabilization = 0;
         }
         
         public Configuration(String name) {
@@ -228,6 +242,10 @@ public class ConfigurationManager {
             json.put("mtpEnabled", mtpEnabled);
             json.put("mtpModelReference", mtpModelReference);
             json.put("mtpNDraft", mtpNDraft);
+            json.put("nPredict", nPredict);
+            json.put("kvCacheTypeK", kvCacheTypeK);
+            json.put("kvCacheTypeV", kvCacheTypeV);
+            json.put("gpuSwitchStabilization", gpuSwitchStabilization);
 
             return json;
         }
@@ -306,6 +324,10 @@ public class ConfigurationManager {
             config.mtpEnabled = json.optBoolean("mtpEnabled", false);
             config.mtpModelReference = json.optString("mtpModelReference", "");
             config.mtpNDraft = json.optInt("mtpNDraft", 2);
+            config.nPredict = json.optInt("nPredict", -1);
+            config.kvCacheTypeK = json.optInt("kvCacheTypeK", 1);
+            config.kvCacheTypeV = json.optInt("kvCacheTypeV", 1);
+            config.gpuSwitchStabilization = json.optInt("gpuSwitchStabilization", 0);
 
             return config;
         }

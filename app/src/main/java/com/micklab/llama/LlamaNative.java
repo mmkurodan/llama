@@ -71,6 +71,15 @@ public class LlamaNative {
     // Mean-pools per-token hidden states for generative models; best with an embedding model.
     public native String embed(String text);
 
+    // Tokenize text; returns JSON {"tokens":[...],"count":N,"ids":[...]} or {"error":"..."}.
+    public native String tokenize(String text);
+
+    // Set max output tokens per generation (-1 = use remaining context).
+    public native void setNPredict(int n);
+
+    // Set KV cache quantization types (GGML type IDs; 1=F16, 8=Q8_0, 7=Q5_1, 6=Q5_0, 3=Q4_1, 2=Q4_0, 20=IQ4_NL).
+    public native void setKvCacheType(int typeK, int typeV);
+
     // Token listener registration (native will keep a global ref)
     public native void setTokenListener(TokenListener listener);
 

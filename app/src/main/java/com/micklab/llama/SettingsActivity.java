@@ -126,6 +126,17 @@ public class SettingsActivity extends Activity {
     private EditText dryPenaltyLastNInput;
     private EditText drySequenceBreakersInput;
     
+    // Max output tokens
+    private EditText nPredictInput;
+
+    // KV cache quantization
+    private Spinner kvCacheTypeSpinner;
+    private static final int[] KV_CACHE_TYPE_IDS = { 1, 8, 7, 6, 3, 2, 20 };
+    private static final String[] KV_CACHE_TYPE_NAMES = { "F16 (default)", "Q8.0", "Q5.1", "Q5.0", "Q4.1", "Q4.0", "IQ4_NL" };
+
+    // GPU switch stabilization
+    private Spinner gpuStabSpinner;
+
     // Runtime switches
     private Switch streamingSwitch;
     private Switch showPerfMetricsSwitch;
@@ -318,6 +329,33 @@ public class SettingsActivity extends Activity {
         dryPenaltyLastNInput = findViewById(R.id.dryPenaltyLastNInput);
         drySequenceBreakersInput = findViewById(R.id.drySequenceBreakersInput);
         
+        // Max output tokens
+        nPredictInput = findViewById(R.id.nPredictInput);
+
+        // KV cache quantization spinner
+        kvCacheTypeSpinner = findViewById(R.id.kvCacheTypeSpinner);
+        if (kvCacheTypeSpinner != null) {
+            ArrayAdapter<String> kvAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, KV_CACHE_TYPE_NAMES);
+            kvAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            kvCacheTypeSpinner.setAdapter(kvAdapter);
+        }
+
+        // GPU switch stabilization spinner
+        gpuStabSpinner = findViewById(R.id.gpuStabSpinner);
+        if (gpuStabSpinner != null) {
+            String[] stabLabels = {
+                localizedText("Off（無効）", "Off"),
+                localizedText("Low（200ms）", "Low (200ms)"),
+                localizedText("Medium（500ms）", "Medium (500ms)"),
+                localizedText("High（1000ms）", "High (1000ms)")
+            };
+            ArrayAdapter<String> stabAdapter = new ArrayAdapter<>(this,
+                    android.R.layout.simple_spinner_item, stabLabels);
+            stabAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            gpuStabSpinner.setAdapter(stabAdapter);
+        }
+
         // Streaming switch
         streamingSwitch = findViewById(R.id.streamingSwitch);
         showPerfMetricsSwitch = findViewById(R.id.showPerfMetricsSwitch);
@@ -684,6 +722,9 @@ public class SettingsActivity extends Activity {
             case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
             case "Threads (n_threads):": return "スレッド数 (n_threads):";
             case "Batch Size (n_batch):": return "バッチサイズ (n_batch):";
+            case "Max Output Tokens (n_predict, -1 = unlimited):": return "最大出力トークン数 (n_predict, -1=無制限):";
+            case "KV Cache Quantization:": return "KVキャッシュ量子化:";
+            case "GPU Switch Stabilization:": return "GPU切替安定化:";
             case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
             case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
             case "Offload Layers (GPU):": return "オフロード層 (GPU):";
@@ -1152,6 +1193,20 @@ public class SettingsActivity extends Activity {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             showPerfMetricsSwitch.setChecked(prefs.getBoolean(PREF_SHOW_PERF_METRICS, false));
         }
+        // Max output tokens
+        if (nPredictInput != null) {
+            nPredictInput.setText(String.valueOf(config.nPredict));
+        }
+
+        // KV cache quantization
+        if (kvCacheTypeSpinner != null) {
+            int selIdx = 0;
+            for (int i = 0; i < KV_CACHE_TYPE_IDS.length; i++) {
+                if (KV_CACHE_TYPE_IDS[i] == config.kvCacheTypeK) { selIdx = i; break; }
+            }
+            kvCacheTypeSpinner.setSelection(selIdx);
+        }
+
         int layers = config.gpuOffloadLayers;
         int displayLayers = (layers < 0) ? 40 : layers;
         gpuLayersSeekBar.setProgress(displayLayers);
@@ -1162,6 +1217,12 @@ public class SettingsActivity extends Activity {
         boolean gpuOn = (config.backendType == ConfigurationManager.Configuration.BACKEND_GPU);
         if (gpuEnabledSwitch != null) gpuEnabledSwitch.setChecked(gpuOn);
         updateBackendDependentUi();
+
+        // GPU stabilization
+        if (gpuStabSpinner != null) {
+            int stab = Math.max(0, Math.min(3, config.gpuSwitchStabilization));
+            gpuStabSpinner.setSelection(stab);
+        }
         
         // New prompt settings
         systemPromptInput.setText(config.systemPrompt != null ? config.systemPrompt : "");
@@ -1369,6 +1430,24 @@ public class SettingsActivity extends Activity {
             config.drySequenceBreakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
         }
         
+        // Max output tokens
+        if (nPredictInput != null) {
+            try {
+                config.nPredict = Integer.parseInt(nPredictInput.getText().toString());
+            } catch (NumberFormatException e) {
+                config.nPredict = -1;
+            }
+        }
+
+        // KV cache quantization
+        if (kvCacheTypeSpinner != null) {
+            int idx = kvCacheTypeSpinner.getSelectedItemPosition();
+            if (idx >= 0 && idx < KV_CACHE_TYPE_IDS.length) {
+                config.kvCacheTypeK = KV_CACHE_TYPE_IDS[idx];
+                config.kvCacheTypeV = KV_CACHE_TYPE_IDS[idx];
+            }
+        }
+
         // Streaming
         config.streaming = streamingSwitch.isChecked();
         int progress = gpuLayersSeekBar.getProgress();
@@ -1381,6 +1460,11 @@ public class SettingsActivity extends Activity {
                 ? ConfigurationManager.Configuration.BACKEND_GPU
                 : ConfigurationManager.Configuration.BACKEND_CPU;
         config.npuEnabled = false;
+
+        // GPU stabilization
+        if (gpuStabSpinner != null) {
+            config.gpuSwitchStabilization = gpuStabSpinner.getSelectedItemPosition();
+        }
 
         // New prompt settings
         config.systemPrompt = systemPromptInput.getText().toString();

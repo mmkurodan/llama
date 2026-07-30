@@ -322,6 +322,31 @@
             android:inputType="number"
             android:text="16" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Max Output Tokens (n_predict, -1 = unlimited):"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/nPredictInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Default: -1 (unlimited)"
+            android:inputType="numberSigned"
+            android:text="-1" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="KV Cache Quantization:"
+            android:paddingTop="8dp" />
+
+        <Spinner
+            android:id="@+id/kvCacheTypeSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <!-- Compute Backend Selection: CPU is the base; toggle GPU.
              backendType is derived from this switch (off = CPU, on = GPU). -->
         <TextView
@@ -388,6 +413,17 @@
                     android:gravity="center" />
             </LinearLayout>
         </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GPU Switch Stabilization:"
+            android:paddingTop="8dp" />
+
+        <Spinner
+            android:id="@+id/gpuStabSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
 
         <TextView
             android:layout_width="match_parent"

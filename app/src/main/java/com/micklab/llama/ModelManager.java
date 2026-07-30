@@ -652,9 +652,24 @@ public class ModelManager {
             }
 
             if (requiresModelInit) {
+                // GPU backend switch stabilization: insert pre-reset wait to reduce crash rate.
+                int stabilLevel = config.gpuSwitchStabilization;
+                boolean backendChanged = currentBackendType != config.backendType
+                        || currentGpuOffloadLayers != config.gpuOffloadLayers;
+                if (stabilLevel > 0 && backendChanged && (currentModelPath != null || modelLoaded)) {
+                    int waitMs = stabilLevel == 1 ? 200 : stabilLevel == 2 ? 500 : 1000;
+                    Log.i(TAG, "GPU stabilization level=" + stabilLevel + " waiting " + waitMs + "ms before reload");
+                    try { Thread.sleep(waitMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                }
+
                 if (currentModelPath != null || modelLoaded) {
                     clearTransientLoadReferences();
                     unloadCurrentModelLocked();
+                    if (stabilLevel >= 2 && backendChanged) {
+                        int postFreeWaitMs = stabilLevel == 2 ? 300 : 500;
+                        Log.i(TAG, "GPU stabilization post-free wait " + postFreeWaitMs + "ms");
+                        try { Thread.sleep(postFreeWaitMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    }
                 } else {
                     clearLoadedModelState();
                 }
@@ -751,6 +766,7 @@ public class ModelManager {
      * Apply configuration parameters to the model.
      */
     public void applyConfiguration(ConfigurationManager.Configuration config) {
+        llama.setNPredict(config.nPredict);
         llama.setParameters(
             config.penaltyLastN,
             (float)config.penaltyRepeat,
@@ -792,6 +808,9 @@ public class ModelManager {
                        : Math.max(0, config.gpuOffloadLayers);
         }
         llama.setLoadParameters(nCtx, nThreads, nBatch, temp, topP, topK, nGpuLayers);
+
+        // KV cache quantization types (applied at next model init)
+        llama.setKvCacheType(config.kvCacheTypeK, config.kvCacheTypeV);
 
         // Compute backend を JNI へ通知 (ADSP_LIBRARY_PATH 設定含む)
         String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;

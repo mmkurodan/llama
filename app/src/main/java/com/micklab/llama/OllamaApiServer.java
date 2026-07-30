@@ -962,6 +962,10 @@ public class OllamaApiServer {
                     handleEmbeddings(outputStream, body);
                 } else if ("/v1/embeddings".equals(path)) {
                     handleOpenAiEmbeddings(outputStream, body);
+                } else if ("/api/tokenize".equals(path)) {
+                    handleOllamaTokenize(outputStream, body);
+                } else if ("/v1/tokenize".equals(path)) {
+                    handleOpenAiTokenize(outputStream, body);
                 } else if ("/models/load".equals(path)) {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
@@ -1235,8 +1239,9 @@ public class OllamaApiServer {
     }
 
     private JSONObject buildPropsParams(ConfigurationManager.Configuration config) throws JSONException {
+        int nPredict = config.nPredict > 0 ? config.nPredict : config.nCtx;
         JSONObject params = new JSONObject();
-        params.put("n_predict", 1024);
+        params.put("n_predict", nPredict);
         params.put("seed", -1);
         params.put("temperature", config.temp);
         params.put("dynatemp_range", config.dynatempRange);
@@ -1261,7 +1266,7 @@ public class OllamaApiServer {
         params.put("mirostat_tau", config.mirostatTau);
         params.put("mirostat_eta", config.mirostatEta);
         params.put("stop", new JSONArray());
-        params.put("max_tokens", 1024);
+        params.put("max_tokens", nPredict);
         params.put("n_keep", 0);
         params.put("n_discard", 0);
         params.put("ignore_eos", false);
@@ -1335,8 +1340,9 @@ public class OllamaApiServer {
     }
 
     private JSONObject buildSlotParams(ConfigurationManager.Configuration config) throws JSONException {
+        int nPredict = config.nPredict > 0 ? config.nPredict : config.nCtx;
         JSONObject params = new JSONObject();
-        params.put("n_predict", 1024);
+        params.put("n_predict", nPredict);
         params.put("seed", -1);
         params.put("temperature", config.temp);
         params.put("dynatemp_range", config.dynatempRange);
@@ -1359,7 +1365,7 @@ public class OllamaApiServer {
         params.put("mirostat", config.mirostat);
         params.put("mirostat_tau", config.mirostatTau);
         params.put("mirostat_eta", config.mirostatEta);
-        params.put("max_tokens", 1024);
+        params.put("max_tokens", nPredict);
         params.put("n_keep", 0);
         params.put("n_discard", 0);
         params.put("ignore_eos", false);
@@ -1462,6 +1468,22 @@ public class OllamaApiServer {
             Log.e(TAG, "Invalid unload-model request", e);
             sendErrorResponse(outputStream, 400, "Invalid JSON");
         }
+    }
+
+    private void applyNPredictOverride(JSONObject request, ConfigurationManager.Configuration config) {
+        if (request == null || config == null) return;
+        int override = -1;
+        if (request.has("num_predict")) {
+            override = request.optInt("num_predict", -1);
+        } else if (request.has("n_predict")) {
+            override = request.optInt("n_predict", -1);
+        } else if (request.has("max_tokens")) {
+            override = request.optInt("max_tokens", -1);
+        }
+        int effective = override > 0 ? override : config.nPredict;
+        try {
+            modelManager.getLlama().setNPredict(effective);
+        } catch (Exception ignored) {}
     }
 
     private void applyRequestOverrides(ConfigurationManager.Configuration config, JSONObject request) {
@@ -1620,10 +1642,12 @@ public class OllamaApiServer {
                     Log.w(TAG, "Could not load config for template", e);
                 }
                 
+                applyNPredictOverride(request, config);
+
                 if (listener != null) {
                     listener.onGenerating(model);
                 }
-                
+
                 // Use PromptTemplateManager for prompt generation
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
@@ -1915,6 +1939,8 @@ public class OllamaApiServer {
                     Log.w(TAG, "Could not load config for template", e);
                 }
                 
+                applyNPredictOverride(request, config);
+
                 // Use PromptTemplateManager for prompt generation
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = (config != null) ? config.customChatTemplate : null;
@@ -2238,6 +2264,8 @@ public class OllamaApiServer {
                 } catch (Exception e) {
                     Log.w(TAG, "Could not apply OpenAI request overrides", e);
                 }
+
+                applyNPredictOverride(request, config);
 
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = config != null ? config.customChatTemplate : null;
@@ -2649,6 +2677,74 @@ public class OllamaApiServer {
             arr.put(Float.isFinite(v) ? (double) v : 0.0);
         }
         return arr;
+    }
+
+    /** Ollama /api/tokenize : { "model", "content": string } -> { "tokens": [...] } */
+    private void handleOllamaTokenize(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = request.optString("model", "default");
+            String content = request.optString("content", "");
+            if (content.isEmpty()) {
+                sendErrorResponse(outputStream, 400, "'content' is required");
+                return;
+            }
+            if (!acquireGenerationSlot(outputStream, "/api/tokenize")) {
+                return;
+            }
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+                    return;
+                }
+                String resultJson = modelManager.getLlama().tokenize(content);
+                JSONObject parsed = new JSONObject(resultJson);
+                if (parsed.has("error")) {
+                    sendErrorResponse(outputStream, 500, parsed.getString("error"));
+                    return;
+                }
+                JSONObject result = new JSONObject();
+                result.put("tokens", parsed.getJSONArray("ids"));
+                sendJsonResponse(outputStream, 200, result.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
+        }
+    }
+
+    /** OpenAI /v1/tokenize : { "model", "input": string } -> { "tokens": [...], "count": N, "ids": [...] } */
+    private void handleOpenAiTokenize(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            String input = request.optString("input", "");
+            if (input.isEmpty()) {
+                sendOpenAiErrorResponse(outputStream, 400, "'input' is required", "invalid_request_error");
+                return;
+            }
+            if (!acquireGenerationSlot(outputStream, "/v1/tokenize", true)) {
+                return;
+            }
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
+                    return;
+                }
+                String resultJson = modelManager.getLlama().tokenize(input);
+                JSONObject parsed = new JSONObject(resultJson);
+                if (parsed.has("error")) {
+                    sendOpenAiErrorResponse(outputStream, 500, parsed.getString("error"), "server_error");
+                    return;
+                }
+                sendJsonResponse(outputStream, 200, resultJson);
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendOpenAiErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage(), "invalid_request_error");
+        }
     }
 
     /**

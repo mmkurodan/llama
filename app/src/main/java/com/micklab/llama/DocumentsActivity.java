@@ -207,6 +207,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- コンテキストサイズ (n_ctx): モデルが一度に処理できるトークン数です。大きいほど長い文脈を扱えますが、メモリ消費が増加します。\n");
         sb.append("- スレッド数 (n_threads): 推論に使用するCPUスレッド数です。端末のコア数に合わせて調整してください。\n");
         sb.append("- バッチサイズ (n_batch): 一度に処理するトークン数です。大きくすると高速ですがメモリを多く使用します。\n");
+        sb.append("- 最大出力トークン数 (n_predict): 1回の生成で出力するトークン数の上限です。-1は無制限（コンテキストの残り全体）を意味します。WebUIから送信するmax_tokens/num_predictも優先して反映されます。\n");
+        sb.append("- KVキャッシュ量子化: KVキャッシュの量子化方式を選択します。F16（既定）が標準です。Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NLを選択するとメモリ使用量が削減されますが、精度が若干低下します。変更はモデル再読み込み後に有効になります。\n");
+        sb.append("- GPU切替安定化: GPUバックエンド切替時のクラッシュ低減オプションです。Off（既定）/Low（200ms待機）/Medium（解放後500ms待機）/High（解放後1000ms待機）の4段階を選べます。切替時に不安定な場合はMedium以上を試してください。\n");
         sb.append("- GPUオフロード層: GPUへオフロードする層数です。0は無効、1〜39は指定層数、-1は利用可能な全層を対象にします。\n");
         sb.append("- 温度 (temp): 出力のランダム性を制御します。0に近いほど決定的、高いほど多様な出力になります。\n");
         sb.append("- Top-p: 累積確率がこの値に達するまでのトークンから選択します（nucleus sampling）。\n");
@@ -248,7 +251,8 @@ public class DocumentsActivity extends Activity {
         sb.append("生成時に一般的なチャットテンプレートの区切り文字を検出すると自動的に生成を停止します。\n\n");
         sb.append("8. API/WebUIサーバー（任意）\n");
         sb.append("- アプリ起動時にローカルAPI/WebUIサーバーを有効化するかどうか確認するポップアップが表示されます。\n");
-        sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots と WebUI の静的ファイルを提供します。\n");
+        sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots と WebUI の静的ファイルを提供します。\n");
+        sb.append("- トークナイズAPI: /api/tokenize（Ollama互換, body: {\"model\":\"...\",\"content\":\"テキスト\"}）および /v1/tokenize（OpenAI互換, body: {\"model\":\"...\",\"input\":\"テキスト\"}）で入力テキストのトークン列・トークン数・トークンIDを取得できます。\n");
         sb.append("- WebUIは同じポートの http://<端末IP>:<ポート>/ で利用できます。\n");
         sb.append("- WebUIはPWA対応で、ブラウザのメニューからホーム画面に追加してアプリのように利用できます（自動のインストール案内は表示しません）。端末上でインストールする場合は http://127.0.0.1:<ポート>/ で開いてください（ホーム追加やオフライン表示にはセキュアコンテキストが必要で、LAN IP では利用できません）。\n");
         sb.append("- アプリ設定で保存したMCPコンフィグJSONは共通設定として /props 経由でWebUIにも渡され、WebUIのローカルMCP設定と合わせて利用されます。\n");
@@ -346,6 +350,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): Number of tokens the model can process at once. Larger values handle longer contexts but use more memory.\n");
         sb.append("- Threads (n_threads): Number of CPU threads for inference. Adjust based on your device's core count.\n");
         sb.append("- Batch Size (n_batch): Number of tokens processed at once. Larger is faster but uses more memory.\n");
+        sb.append("- Max Output Tokens (n_predict): Maximum tokens to generate per response. -1 means unlimited (fills remaining context). The max_tokens / num_predict from WebUI requests take precedence.\n");
+        sb.append("- KV Cache Quantization: Sets the quantization type for the KV cache. F16 (default) is standard. Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL reduce memory usage with a slight quality trade-off. Takes effect after the model is reloaded.\n");
+        sb.append("- GPU Switch Stabilization: Reduces crash rate when switching GPU backends. Off (default) / Low (200ms wait) / Medium (free + 500ms wait) / High (free + 1000ms wait). Try Medium or higher if you experience instability during GPU toggle.\n");
         sb.append("- GPU Offload Layers: Number of layers to offload to GPU. 0 disables offload, 1-39 offloads that many layers, and -1 targets all available layers.\n");
         sb.append("- Temperature (temp): Controls output randomness. Lower is more deterministic, higher is more diverse.\n");
         sb.append("- Top-p: Select from tokens until cumulative probability reaches this value (nucleus sampling).\n");
@@ -387,7 +394,8 @@ public class DocumentsActivity extends Activity {
         sb.append("Generation automatically stops when common chat template delimiters are detected in the output.\n\n");
         sb.append("8. API/WebUI Server (Optional)\n");
         sb.append("- On app launch, a popup asks whether to enable the local API/WebUI server, and you can check \"Don't show next time\" to skip it on future launches.\n");
-        sb.append("- Provides /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots, and the bundled WebUI on device.\n");
+        sb.append("- Provides /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots, and the bundled WebUI on device.\n");
+        sb.append("- Tokenize API: POST /api/tokenize (Ollama-compatible, body: {\"model\":\"...\",\"content\":\"text\"}) and POST /v1/tokenize (OpenAI-compatible, body: {\"model\":\"...\",\"input\":\"text\"}) return token strings, count, and IDs for the given input.\n");
         sb.append("- The WebUI is available at http://<device-ip>:<port>/ on the same port.\n");
         sb.append("- The WebUI is a PWA: you can add it to your home screen from the browser menu and use it like an app (no automatic install prompt is shown). To install it on-device, open http://127.0.0.1:<port>/ (home-screen install and offline use require a secure context and are not available over the LAN IP).\n");
         sb.append("- MCP config JSON saved in the app settings is exposed to the WebUI through /props as a shared setting and is used together with the WebUI's local MCP settings.\n");
@@ -485,6 +493,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx) : nombre de jetons que le modèle peut traiter à la fois. Des valeurs plus élevées gèrent des contextes plus longs mais utilisent plus de mémoire.\n");
         sb.append("- Threads (n_threads) : nombre de threads CPU pour l'inférence. Ajustez selon le nombre de cœurs de votre appareil.\n");
         sb.append("- Batch Size (n_batch) : nombre de jetons traités à la fois. Plus grand est plus rapide mais utilise plus de mémoire.\n");
+        sb.append("- Jetons max (n_predict) : limite de jetons de sortie par génération. -1 = illimité (remplit le contexte restant). max_tokens/num_predict envoyés par la WebUI ont la priorité.\n");
+        sb.append("- Quantification du cache KV : type de quantification pour le cache KV. F16 (défaut). Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL réduisent la mémoire avec une légère perte de qualité. Nécessite un rechargement du modèle.\n");
+        sb.append("- Stabilisation GPU Switch : réduit les crashs lors du changement de backend GPU. Off/Low (200ms)/Medium (500ms)/High (1000ms).\n");
         sb.append("- GPU Offload Layers : nombre de couches à déléguer au GPU. 0 désactive la délégation, 1-39 délègue ce nombre de couches, et -1 cible toutes les couches disponibles.\n");
         sb.append("- Temperature (temp) : contrôle l'aléa de la sortie. Plus bas est plus déterministe, plus haut est plus varié.\n");
         sb.append("- Top-p : sélectionne parmi les jetons jusqu'à ce que la probabilité cumulée atteigne cette valeur (échantillonnage nucleus).\n");
@@ -526,7 +537,8 @@ public class DocumentsActivity extends Activity {
         sb.append("La génération s'arrête automatiquement lorsque des délimiteurs de modèle de chat courants sont détectés dans la sortie.\n\n");
         sb.append("8. Serveur API/WebUI (facultatif)\n");
         sb.append("- Au lancement de l'application, une fenêtre demande s'il faut activer le serveur API/WebUI local, et vous pouvez cocher \"Don't show next time\" pour l'ignorer aux lancements futurs.\n");
-        sb.append("- Fournit /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots et la WebUI intégrée sur l'appareil.\n");
+        sb.append("- Fournit /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots et la WebUI intégrée sur l'appareil.\n");
+        sb.append("- API Tokenize : POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"texte\"}) et POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"texte\"}) retournent les tokens, leur nombre et leurs IDs.\n");
         sb.append("- La WebUI est disponible à http://<device-ip>:<port>/ sur le même port.\n");
         sb.append("- La WebUI est une PWA : vous pouvez l'ajouter à votre écran d'accueil depuis le menu du navigateur et l'utiliser comme une application (aucune invite d'installation automatique n'est affichée). Pour l'installer sur l'appareil, ouvrez http://127.0.0.1:<port>/ (l'installation sur l'écran d'accueil et l'usage hors ligne nécessitent un contexte sécurisé et ne sont pas disponibles via l'IP LAN).\n");
         sb.append("- Le JSON de configuration MCP enregistré dans les paramètres de l'application est exposé à la WebUI via /props en tant que réglage partagé et est utilisé avec les réglages MCP locaux de la WebUI.\n");
@@ -624,6 +636,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): número de tokens que el modelo puede procesar a la vez. Valores mayores manejan contextos más largos pero usan más memoria.\n");
         sb.append("- Threads (n_threads): número de hilos de CPU para la inferencia. Ajústelo según el número de núcleos de su dispositivo.\n");
         sb.append("- Batch Size (n_batch): número de tokens procesados a la vez. Mayor es más rápido pero usa más memoria.\n");
+        sb.append("- Tokens máx (n_predict): límite de tokens de salida por generación. -1 = ilimitado. max_tokens/num_predict de la WebUI tienen prioridad.\n");
+        sb.append("- Cuantización caché KV: tipo de cuantización para el caché KV. F16 (defecto). Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL reducen la memoria con leve pérdida de calidad. Requiere recarga del modelo.\n");
+        sb.append("- Estabilización GPU Switch: reduce fallos al cambiar backend GPU. Off/Low (200ms)/Medium (500ms)/High (1000ms).\n");
         sb.append("- GPU Offload Layers: número de capas a delegar a la GPU. 0 desactiva la delegación, 1-39 delega esa cantidad de capas y -1 abarca todas las capas disponibles.\n");
         sb.append("- Temperature (temp): controla la aleatoriedad de la salida. Más bajo es más determinista, más alto es más diverso.\n");
         sb.append("- Top-p: selecciona entre los tokens hasta que la probabilidad acumulada alcanza este valor (muestreo nucleus).\n");
@@ -665,7 +680,8 @@ public class DocumentsActivity extends Activity {
         sb.append("La generación se detiene automáticamente cuando se detectan en la salida delimitadores comunes de la plantilla de chat.\n\n");
         sb.append("8. Servidor API/WebUI (opcional)\n");
         sb.append("- Al iniciar la aplicación, una ventana pregunta si activar el servidor local de API/WebUI, y puede marcar \"Don't show next time\" para omitirla en el futuro.\n");
-        sb.append("- Proporciona /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots y la WebUI incluida en el dispositivo.\n");
+        sb.append("- Proporciona /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots y la WebUI incluida en el dispositivo.\n");
+        sb.append("- API Tokenize: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"texto\"}) y POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"texto\"}) devuelven tokens, cantidad e IDs.\n");
         sb.append("- La WebUI está disponible en http://<device-ip>:<puerto>/ en el mismo puerto.\n");
         sb.append("- La WebUI es una PWA: puede añadirla a su pantalla de inicio desde el menú del navegador y usarla como una aplicación (no se muestra ningún aviso de instalación automática). Para instalarla en el dispositivo, abra http://127.0.0.1:<puerto>/ (la instalación en la pantalla de inicio y el uso sin conexión requieren un contexto seguro y no están disponibles a través de la IP de LAN).\n");
         sb.append("- El JSON de configuración de MCP guardado en los ajustes de la aplicación se expone a la WebUI a través de /props como ajuste compartido y se usa junto con los ajustes locales de MCP de la WebUI.\n");
@@ -763,6 +779,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): número de tokens que o modelo pode processar de uma vez. Valores maiores lidam com contextos mais longos, mas usam mais memória.\n");
         sb.append("- Threads (n_threads): número de threads de CPU para a inferência. Ajuste conforme o número de núcleos do seu dispositivo.\n");
         sb.append("- Batch Size (n_batch): número de tokens processados de uma vez. Maior é mais rápido, mas usa mais memória.\n");
+        sb.append("- Tokens máx (n_predict): limite de tokens de saída por geração. -1 = ilimitado. max_tokens/num_predict da WebUI têm prioridade.\n");
+        sb.append("- Quantização cache KV: tipo de quantização do cache KV. F16 (padrão). Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL reduzem memória com leve perda de qualidade. Requer recarga do modelo.\n");
+        sb.append("- Estabilização GPU Switch: reduz falhas ao trocar backend GPU. Off/Low (200ms)/Medium (500ms)/High (1000ms).\n");
         sb.append("- GPU Offload Layers: número de camadas a delegar à GPU. 0 desativa a delegação, 1-39 delega essa quantidade de camadas e -1 abrange todas as camadas disponíveis.\n");
         sb.append("- Temperature (temp): controla a aleatoriedade da saída. Mais baixo é mais determinístico, mais alto é mais diverso.\n");
         sb.append("- Top-p: seleciona entre os tokens até que a probabilidade acumulada atinja este valor (amostragem nucleus).\n");
@@ -804,7 +823,8 @@ public class DocumentsActivity extends Activity {
         sb.append("A geração para automaticamente quando delimitadores comuns do modelo de chat são detectados na saída.\n\n");
         sb.append("8. Servidor API/WebUI (opcional)\n");
         sb.append("- Ao iniciar o aplicativo, uma janela pergunta se deve ativar o servidor local de API/WebUI, e você pode marcar \"Don't show next time\" para ignorá-la em execuções futuras.\n");
-        sb.append("- Fornece /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots e a WebUI incluída no dispositivo.\n");
+        sb.append("- Fornece /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots e a WebUI incluída no dispositivo.\n");
+        sb.append("- API Tokenize: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"texto\"}) e POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"texto\"}) retornam tokens, quantidade e IDs.\n");
         sb.append("- A WebUI está disponível em http://<device-ip>:<porta>/ na mesma porta.\n");
         sb.append("- A WebUI é um PWA: você pode adicioná-la à sua tela inicial pelo menu do navegador e usá-la como um aplicativo (nenhum aviso de instalação automática é mostrado). Para instalá-la no dispositivo, abra http://127.0.0.1:<porta>/ (a instalação na tela inicial e o uso off-line exigem um contexto seguro e não estão disponíveis pelo IP da LAN).\n");
         sb.append("- O JSON de configuração do MCP salvo nas configurações do aplicativo é exposto à WebUI por meio de /props como configuração compartilhada e é usado junto com as configurações locais de MCP da WebUI.\n");
@@ -902,6 +922,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): Anzahl der Tokens, die das Modell gleichzeitig verarbeiten kann. Größere Werte bewältigen längere Kontexte, benötigen aber mehr Speicher.\n");
         sb.append("- Threads (n_threads): Anzahl der CPU-Threads für die Inferenz. Passen Sie sie an die Kernanzahl Ihres Geräts an.\n");
         sb.append("- Batch Size (n_batch): Anzahl der gleichzeitig verarbeiteten Tokens. Größer ist schneller, benötigt aber mehr Speicher.\n");
+        sb.append("- Max. Ausgabetokens (n_predict): Limit der Ausgabetokens pro Generation. -1 = unbegrenzt. max_tokens/num_predict der WebUI haben Vorrang.\n");
+        sb.append("- KV-Cache-Quantisierung: Quantisierungstyp für den KV-Cache. F16 (Standard). Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL reduzieren den Speicher mit leichtem Qualitätsverlust. Erfordert Neuladen des Modells.\n");
+        sb.append("- GPU-Switch-Stabilisierung: Reduziert Abstürze beim GPU-Backend-Wechsel. Off/Low (200ms)/Medium (500ms)/High (1000ms).\n");
         sb.append("- GPU Offload Layers: Anzahl der auf die GPU auszulagernden Schichten. 0 deaktiviert die Auslagerung, 1-39 lagert so viele Schichten aus, und -1 erfasst alle verfügbaren Schichten.\n");
         sb.append("- Temperature (temp): steuert die Zufälligkeit der Ausgabe. Niedriger ist deterministischer, höher ist vielfältiger.\n");
         sb.append("- Top-p: wählt aus den Tokens aus, bis die kumulierte Wahrscheinlichkeit diesen Wert erreicht (Nucleus-Sampling).\n");
@@ -943,7 +966,8 @@ public class DocumentsActivity extends Activity {
         sb.append("Die Generierung stoppt automatisch, wenn in der Ausgabe gängige Trennzeichen der Chat-Vorlage erkannt werden.\n\n");
         sb.append("8. API/WebUI-Server (optional)\n");
         sb.append("- Beim Start der App fragt ein Fenster, ob der lokale API/WebUI-Server aktiviert werden soll, und Sie können \"Don't show next time\" aktivieren, um es künftig zu überspringen.\n");
-        sb.append("- Stellt /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots und die integrierte WebUI auf dem Gerät bereit.\n");
+        sb.append("- Stellt /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots und die integrierte WebUI auf dem Gerät bereit.\n");
+        sb.append("- Tokenize-API: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"Text\"}) und POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"Text\"}) geben Tokens, Anzahl und IDs zurück.\n");
         sb.append("- Die WebUI ist unter http://<device-ip>:<Port>/ auf demselben Port verfügbar.\n");
         sb.append("- Die WebUI ist eine PWA: Sie können sie über das Browsermenü zum Startbildschirm hinzufügen und wie eine App verwenden (es wird keine automatische Installationsaufforderung angezeigt). Um sie auf dem Gerät zu installieren, öffnen Sie http://127.0.0.1:<Port>/ (Installation auf dem Startbildschirm und Offline-Nutzung erfordern einen sicheren Kontext und sind über die LAN-IP nicht verfügbar).\n");
         sb.append("- Das in den App-Einstellungen gespeicherte MCP-Konfigurations-JSON wird der WebUI über /props als gemeinsame Einstellung bereitgestellt und zusammen mit den lokalen MCP-Einstellungen der WebUI verwendet.\n");
@@ -1041,6 +1065,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): numero di token che il modello può elaborare in una volta. Valori più grandi gestiscono contesti più lunghi ma usano più memoria.\n");
         sb.append("- Threads (n_threads): numero di thread CPU per l'inferenza. Regolalo in base al numero di core del tuo dispositivo.\n");
         sb.append("- Batch Size (n_batch): numero di token elaborati in una volta. Più grande è più veloce ma usa più memoria.\n");
+        sb.append("- Token max (n_predict): limite di token di uscita per generazione. -1 = illimitato. max_tokens/num_predict della WebUI hanno la priorità.\n");
+        sb.append("- Quantizzazione cache KV: tipo di quantizzazione per la cache KV. F16 (predefinito). Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL riducono la memoria con lieve calo di qualità. Richiede ricaricamento del modello.\n");
+        sb.append("- Stabilizzazione GPU Switch: riduce i crash durante il cambio di backend GPU. Off/Low (200ms)/Medium (500ms)/High (1000ms).\n");
         sb.append("- GPU Offload Layers: numero di livelli da delegare alla GPU. 0 disattiva la delega, 1-39 delega quel numero di livelli e -1 comprende tutti i livelli disponibili.\n");
         sb.append("- Temperature (temp): controlla la casualità dell'output. Più basso è più deterministico, più alto è più vario.\n");
         sb.append("- Top-p: seleziona tra i token finché la probabilità cumulativa raggiunge questo valore (campionamento nucleus).\n");
@@ -1082,7 +1109,8 @@ public class DocumentsActivity extends Activity {
         sb.append("La generazione si arresta automaticamente quando nell'output vengono rilevati delimitatori comuni del modello di chat.\n\n");
         sb.append("8. Server API/WebUI (facoltativo)\n");
         sb.append("- All'avvio dell'app, una finestra chiede se attivare il server locale API/WebUI, e puoi selezionare \"Don't show next time\" per ignorarla agli avvii futuri.\n");
-        sb.append("- Fornisce /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots e la WebUI integrata sul dispositivo.\n");
+        sb.append("- Fornisce /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots e la WebUI integrata sul dispositivo.\n");
+        sb.append("- API Tokenize: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"testo\"}) e POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"testo\"}) restituiscono token, conteggio e IDs.\n");
         sb.append("- La WebUI è disponibile su http://<device-ip>:<porta>/ sulla stessa porta.\n");
         sb.append("- La WebUI è una PWA: puoi aggiungerla alla schermata Home dal menu del browser e usarla come un'app (non viene mostrato alcun avviso di installazione automatica). Per installarla sul dispositivo, apri http://127.0.0.1:<porta>/ (l'installazione nella schermata Home e l'uso offline richiedono un contesto sicuro e non sono disponibili tramite l'IP LAN).\n");
         sb.append("- Il JSON di configurazione MCP salvato nelle impostazioni dell'app viene esposto alla WebUI tramite /props come impostazione condivisa ed è usato insieme alle impostazioni MCP locali della WebUI.\n");
@@ -1180,6 +1208,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx)：模型一次可处理的 token 数。数值越大可处理越长的上下文，但占用更多内存。\n");
         sb.append("- Threads (n_threads)：推理使用的 CPU 线程数。请根据设备的核心数调整。\n");
         sb.append("- Batch Size (n_batch)：一次处理的 token 数。越大越快，但占用更多内存。\n");
+        sb.append("- 最大输出 token 数 (n_predict)：每次生成的输出 token 上限。-1 表示无限制。WebUI 的 max_tokens/num_predict 优先生效。\n");
+        sb.append("- KV 缓存量化：KV 缓存的量化类型。F16（默认）。Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL 可减少内存，但略有精度损失。需要重新加载模型。\n");
+        sb.append("- GPU 切换稳定化：降低 GPU 后端切换时的崩溃率。Off/Low (200ms)/Medium (500ms)/High (1000ms)。\n");
         sb.append("- GPU Offload Layers：卸载到 GPU 的层数。0 关闭卸载，1-39 卸载相应层数，-1 面向所有可用层。\n");
         sb.append("- Temperature (temp)：控制输出的随机性。越低越确定，越高越多样。\n");
         sb.append("- Top-p：从 token 中选择，直到累计概率达到该值（nucleus 采样）。\n");
@@ -1221,7 +1252,8 @@ public class DocumentsActivity extends Activity {
         sb.append("当输出中检测到常见的聊天模板分隔符时，生成会自动停止。\n\n");
         sb.append("8. API/WebUI 服务器（可选）\n");
         sb.append("- 应用启动时，会弹窗询问是否启用本地 API/WebUI 服务器，可勾选 \"Don't show next time\" 以后不再提示。\n");
-        sb.append("- 在设备上提供 /api/chat、/api/generate、/api/tags、/v1/chat/completions、/v1/models、/props、/slots 以及内置的 WebUI。\n");
+        sb.append("- 在设备上提供 /api/chat、/api/generate、/api/tags、/api/tokenize、/v1/chat/completions、/v1/models、/v1/tokenize、/props、/slots 以及内置的 WebUI。\n");
+        sb.append("- Tokenize API：POST /api/tokenize（Ollama，body: {\"model\":\"...\",\"content\":\"文本\"}）和 POST /v1/tokenize（OpenAI，body: {\"model\":\"...\",\"input\":\"文本\"}）返回 token 列表、数量和 ID。\n");
         sb.append("- WebUI 在同一端口的 http://<device-ip>:<端口>/ 上可用。\n");
         sb.append("- WebUI 是一个 PWA：您可以从浏览器菜单将其添加到主屏幕，像应用一样使用（不会显示自动安装提示）。若要在设备上安装，请打开 http://127.0.0.1:<端口>/（主屏幕安装和离线使用需要安全上下文，无法通过 LAN IP 使用）。\n");
         sb.append("- 保存在应用设置中的 MCP 配置 JSON 会通过 /props 作为共享设置暴露给 WebUI，并与 WebUI 的本地 MCP 设置一起使用。\n");
@@ -1319,6 +1351,9 @@ public class DocumentsActivity extends Activity {
         sb.append("- Context Size (n_ctx): 모델이 한 번에 처리할 수 있는 토큰 수입니다. 값이 클수록 더 긴 컨텍스트를 처리하지만 메모리를 더 많이 사용합니다.\n");
         sb.append("- Threads (n_threads): 추론에 사용할 CPU 스레드 수입니다. 기기의 코어 수에 맞게 조정하세요.\n");
         sb.append("- Batch Size (n_batch): 한 번에 처리하는 토큰 수입니다. 클수록 빠르지만 메모리를 더 많이 사용합니다.\n");
+        sb.append("- 최대 출력 토큰 수 (n_predict): 생성당 출력 토큰 상한입니다. -1=무제한. WebUI의 max_tokens/num_predict가 우선 적용됩니다.\n");
+        sb.append("- KV 캐시 양자화: KV 캐시 양자화 유형입니다. F16(기본). Q8.0/Q5.1/Q5.0/Q4.1/Q4.0/IQ4_NL은 메모리를 줄이지만 약간의 품질 저하가 있습니다. 모델 재로드 후 적용됩니다.\n");
+        sb.append("- GPU 전환 안정화: GPU 백엔드 전환 시 충돌률을 낮춥니다. Off/Low (200ms)/Medium (500ms)/High (1000ms).\n");
         sb.append("- GPU Offload Layers: GPU로 오프로드할 레이어 수입니다. 0은 오프로드를 끄고, 1-39는 해당 수만큼 오프로드하며, -1은 사용 가능한 모든 레이어를 대상으로 합니다.\n");
         sb.append("- Temperature (temp): 출력의 무작위성을 제어합니다. 낮을수록 더 결정적이고, 높을수록 더 다양합니다.\n");
         sb.append("- Top-p: 누적 확률이 이 값에 도달할 때까지 토큰 중에서 선택합니다(nucleus 샘플링).\n");
@@ -1360,7 +1395,8 @@ public class DocumentsActivity extends Activity {
         sb.append("출력에서 일반적인 채팅 템플릿 구분자가 감지되면 생성이 자동으로 중지됩니다.\n\n");
         sb.append("8. API/WebUI 서버(선택)\n");
         sb.append("- 앱 시작 시 로컬 API/WebUI 서버를 활성화할지 묻는 팝업이 표시되며, \"Don't show next time\"을 선택하여 이후 실행에서 건너뛸 수 있습니다.\n");
-        sb.append("- 기기에서 /api/chat, /api/generate, /api/tags, /v1/chat/completions, /v1/models, /props, /slots 및 내장 WebUI를 제공합니다.\n");
+        sb.append("- 기기에서 /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots 및 내장 WebUI를 제공합니다.\n");
+        sb.append("- Tokenize API: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"텍스트\"}) 및 POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"텍스트\"})로 토큰 목록·수·ID를 반환합니다.\n");
         sb.append("- WebUI는 같은 포트의 http://<device-ip>:<포트>/ 에서 사용할 수 있습니다.\n");
         sb.append("- WebUI는 PWA입니다: 브라우저 메뉴에서 홈 화면에 추가하여 앱처럼 사용할 수 있습니다(자동 설치 안내는 표시되지 않음). 기기에 설치하려면 http://127.0.0.1:<포트>/ 를 여세요(홈 화면 설치와 오프라인 사용은 보안 컨텍스트가 필요하며 LAN IP로는 사용할 수 없습니다).\n");
         sb.append("- 앱 설정에 저장된 MCP 구성 JSON은 /props를 통해 공유 설정으로 WebUI에 노출되며 WebUI의 로컬 MCP 설정과 함께 사용됩니다.\n");
