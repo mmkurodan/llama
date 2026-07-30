@@ -99,7 +99,11 @@ public class ModelManager {
     private final LlamaNative llama;
     private final ConfigurationManager configManager;
     private final AtomicInteger generationCounter = new AtomicInteger(0);
-    
+    // Incremented whenever the model is fully (re)initialized. The WebUI reads this via
+    // /props webui_settings.settings_version and resets its settings to the app defaults
+    // on any change, then tracks the version per session to preserve user overrides afterwards.
+    private final AtomicInteger modelLoadVersion = new AtomicInteger(0);
+
     // State tracking
     private final AtomicBoolean busy = new AtomicBoolean(false);
     private final Object stateLock = new Object();
@@ -213,7 +217,12 @@ public class ModelManager {
     public LlamaNative getLlama() {
         return llama;
     }
-    
+
+    /** Version counter that increments each time the model is fully (re)initialized. */
+    public int getModelLoadVersion() {
+        return modelLoadVersion.get();
+    }
+
     public boolean isBusy() {
         synchronized (stateLock) {
             return busy.get() || resetPending || reinitializing;
@@ -707,6 +716,10 @@ public class ModelManager {
             currentConfigName = configName;
             lastLoadedConfig = config;
             modelLoaded = true;
+            // Notify the WebUI that the model has changed → it will reset settings to app defaults.
+            if (requiresModelInit) {
+                modelLoadVersion.incrementAndGet();
+            }
             // この設定でモデルを構築したことを記録 (再ロード判定に使用)
             currentBackendType = config.backendType;
             currentNpuEnabled = config.npuEnabled;

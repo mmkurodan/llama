@@ -1415,6 +1415,12 @@ public class OllamaApiServer {
         settings.put(
                 McpSettingsHelper.WEBUI_SHARED_FUNCTION_DEFINITIONS_KEY,
                 McpSettingsHelper.getSharedFunctionDefinitionsJson(context));
+        // Version counter that the WebUI uses to detect model (re)loads. When this value
+        // changes, the WebUI resets its settings to the app-side defaults (force-sync),
+        // so the loaded model's profile settings (system prompt, thinking toggle, etc.)
+        // become the WebUI's initial state. Subsequent user changes in the WebUI are then
+        // preserved until the next model load or reset.
+        settings.put("settings_version", modelManager.getModelLoadVersion());
         return settings;
     }
 
