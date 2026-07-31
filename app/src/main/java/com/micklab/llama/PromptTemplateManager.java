@@ -8,6 +8,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Manages prompt template selection and application for the inference engine.
@@ -179,6 +180,45 @@ public class PromptTemplateManager {
 
     public static final String THINK_OPEN_TAG  = "<think>";
     public static final String THINK_CLOSE_TAG = "</think>";
+
+    // ── Reasoning-tag removal patterns (used when Thinking is OFF) ──────────────────────
+    // Tag names recognised as reasoning/thinking containers
+    private static final String REASONING_TAG_NAMES =
+            "think|analysis|commentary|deliberate|final|answer|tool_call|tool_response|tool_result";
+
+    // Paired named blocks: <tagname> … </tagname>  (optional attrs, case-insensitive, dotall)
+    // Backreference \1 ensures the same name is used for open and close.
+    private static final Pattern NAMED_REASONING_BLOCK = Pattern.compile(
+            "<(" + REASONING_TAG_NAMES + ")(?:\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>",
+            Pattern.CASE_INSENSITIVE);
+
+    // Paired pipe-token blocks: <|word|> … </|word|>
+    private static final Pattern PIPE_TOKEN_REASONING_BLOCK = Pattern.compile(
+            "<\\|([a-zA-Z_]+)\\|>([\\s\\S]*?)<\\/\\|\\1\\|>");
+
+    // Paired bracket blocks: [THINK] … [/THINK]  and  [FINAL] … [/FINAL]
+    private static final Pattern BRACKET_REASONING_BLOCK = Pattern.compile(
+            "\\[(THINK|FINAL)\\]([\\s\\S]*?)\\[\\/\\1\\]",
+            Pattern.CASE_INSENSITIVE);
+
+    // Orphaned (unmatched) tags left after paired-block removal
+    private static final Pattern ORPHANED_REASONING_TAG = Pattern.compile(
+            "<\\/?>(" + REASONING_TAG_NAMES + ")(?:\\s[^>]*)?>|" +  // named open/close
+            "<\\/?\\|[a-zA-Z_]+\\|>|" +                              // pipe tokens
+            "\\[\\/?(?:THINK|FINAL)\\]",                             // bracket tags
+            Pattern.CASE_INSENSITIVE);
+
+    // Blank paired blocks (content is whitespace only) — used regardless of Thinking state
+    // to suppress spurious empty tags that some models emit.
+    private static final Pattern BLANK_NAMED_BLOCK = Pattern.compile(
+            "<(" + REASONING_TAG_NAMES + ")(?:\\s[^>]*)?>\\s*<\\/\\1>",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern BLANK_PIPE_TOKEN_BLOCK = Pattern.compile(
+            "<\\|([a-zA-Z_]+)\\|>\\s*<\\/\\|\\1\\|>");
+    private static final Pattern BLANK_BRACKET_BLOCK = Pattern.compile(
+            "\\[(THINK|FINAL)\\]\\s*\\[\\/\\1\\]",
+            Pattern.CASE_INSENSITIVE);
+    // ────────────────────────────────────────────────────────────────────────────────────
     
     /**
      * Detect model family from model filename or path.
@@ -414,69 +454,37 @@ public class PromptTemplateManager {
      * Strip {@code <think>...</think>} blocks from text (enableThinking=false output path).
      * Handles the full block including leading/trailing whitespace after the closing tag.
      */
+    /**
+     * Strip ALL reasoning blocks when Thinking is disabled.
+     * Handles: {@code <think>}, {@code <analysis>}, {@code <commentary>}, {@code <deliberate>},
+     * {@code <final>}, {@code <answer>}, {@code <tool_call>}, {@code <tool_response>},
+     * {@code <tool_result>} (with optional attributes), pipe-token pairs {@code <|word|>…</|word|>},
+     * and bracket pairs {@code [THINK]…[/THINK]} / {@code [FINAL]…[/FINAL]}.
+     * Orphaned (unmatched) open/close tags are also removed.
+     */
     public static String stripThinkingBlocks(String text) {
-        if (text == null || text.isEmpty() || !text.contains(THINK_OPEN_TAG)) {
-            return text;
-        }
-        StringBuilder result = new StringBuilder(text.length());
-        int i = 0;
-        while (i < text.length()) {
-            int openIdx = text.indexOf(THINK_OPEN_TAG, i);
-            if (openIdx < 0) {
-                result.append(text, i, text.length());
-                break;
-            }
-            result.append(text, i, openIdx);
-            int closeIdx = text.indexOf(THINK_CLOSE_TAG, openIdx + THINK_OPEN_TAG.length());
-            if (closeIdx < 0) {
-                // Unclosed block — discard the rest (model didn't finish thinking)
-                break;
-            }
-            i = closeIdx + THINK_CLOSE_TAG.length();
-            // Skip blank lines that separate the think block from the answer
-            while (i < text.length() && (text.charAt(i) == '\n' || text.charAt(i) == '\r')) {
-                i++;
-            }
-        }
-        return result.toString().trim();
+        if (text == null || text.isEmpty()) return text;
+        String result = NAMED_REASONING_BLOCK.matcher(text).replaceAll("");
+        result = PIPE_TOKEN_REASONING_BLOCK.matcher(result).replaceAll("");
+        result = BRACKET_REASONING_BLOCK.matcher(result).replaceAll("");
+        result = ORPHANED_REASONING_TAG.matcher(result).replaceAll("");
+        // Collapse runs of 3+ blank lines left behind by removed blocks
+        result = result.replaceAll("(\r?\n){3,}", "\n\n").trim();
+        return result;
     }
 
     /**
-     * Remove {@code <think>...</think>} blocks whose content is entirely whitespace.
-     * Called before {@link #wrapThinkingBlocksForWebUi} / {@link #stripThinkingBlocks} in all
-     * non-streaming paths so models that emit empty {@code <think></think>} tags do not
-     * produce noise in API responses or direct-input output.
+     * Remove reasoning blocks whose content is entirely whitespace — applied regardless
+     * of Thinking state so spurious empty tags emitted by the model never appear in
+     * API responses or direct-input output.
+     * Covers all reasoning tag formats (named, pipe-token, bracket).
      */
     public static String stripBlankThinkingBlocks(String text) {
-        if (text == null || text.isEmpty() || !text.contains(THINK_OPEN_TAG)) {
-            return text;
-        }
-        StringBuilder result = new StringBuilder(text.length());
-        int i = 0;
-        while (i < text.length()) {
-            int openIdx = text.indexOf(THINK_OPEN_TAG, i);
-            if (openIdx < 0) {
-                result.append(text, i, text.length());
-                break;
-            }
-            int closeIdx = text.indexOf(THINK_CLOSE_TAG, openIdx + THINK_OPEN_TAG.length());
-            if (closeIdx < 0) {
-                result.append(text, i, text.length());
-                break;
-            }
-            String inside = text.substring(openIdx + THINK_OPEN_TAG.length(), closeIdx);
-            if (inside.trim().isEmpty()) {
-                result.append(text, i, openIdx);
-                i = closeIdx + THINK_CLOSE_TAG.length();
-                while (i < text.length() && (text.charAt(i) == '\n' || text.charAt(i) == '\r')) {
-                    i++;
-                }
-            } else {
-                result.append(text, i, closeIdx + THINK_CLOSE_TAG.length());
-                i = closeIdx + THINK_CLOSE_TAG.length();
-            }
-        }
-        return result.toString();
+        if (text == null || text.isEmpty()) return text;
+        String result = BLANK_NAMED_BLOCK.matcher(text).replaceAll("");
+        result = BLANK_PIPE_TOKEN_BLOCK.matcher(result).replaceAll("");
+        result = BLANK_BRACKET_BLOCK.matcher(result).replaceAll("");
+        return result;
     }
 
     /**

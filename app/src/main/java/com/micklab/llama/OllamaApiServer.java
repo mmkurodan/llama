@@ -514,15 +514,45 @@ public class OllamaApiServer {
      * </ul>
      */
     private static final class ThinkBlockStreamFilter {
-        private static final String OPEN_TAG  = PromptTemplateManager.THINK_OPEN_TAG;   // "<think>"
-        private static final String CLOSE_TAG = PromptTemplateManager.THINK_CLOSE_TAG;  // "</think>"
-        // Hold-back length so a partial tag at the end of the buffer is not prematurely emitted.
+        private static final String OPEN_TAG  = PromptTemplateManager.THINK_OPEN_TAG;
+        private static final String CLOSE_TAG = PromptTemplateManager.THINK_CLOSE_TAG;
+        // Hold-back for the enableThinking=true path (only <think>)
         private static final int HOLDBACK = Math.max(OPEN_TAG.length(), CLOSE_TAG.length()) - 1;
+
+        // Extended tag pairs stripped when enableThinking=false.
+        // Each row: { openTag, closeTag } – lowercase; detection is case-insensitive.
+        private static final String[][] REASONING_PAIRS = {
+            {"<think>",         "</think>"},
+            {"<analysis>",      "</analysis>"},
+            {"<commentary>",    "</commentary>"},
+            {"<deliberate>",    "</deliberate>"},
+            {"<final>",         "</final>"},
+            {"<answer>",        "</answer>"},
+            {"<tool_call>",     "</tool_call>"},
+            {"<tool_response>", "</tool_response>"},
+            {"<tool_result>",   "</tool_result>"},
+            {"[think]",         "[/think]"},
+            {"[THINK]",         "[/THINK]"},
+            {"[final]",         "[/final]"},
+            {"[FINAL]",         "[/FINAL]"},
+        };
+        // Named tag stems used to detect attribute-bearing opens, e.g. <think token_budget="N">
+        private static final String[] ATTR_TAG_STEMS = {
+            "think", "analysis", "commentary", "deliberate", "final",
+            "answer", "tool_call", "tool_response", "tool_result"
+        };
+        // Hold-back for the multi-tag strip path – must cover the longest open/close tag
+        // plus extra room for attribute-bearing tags (e.g. <think token_budget="8192">)
+        private static final int MULTI_HOLDBACK = 64;
 
         private final StreamTokenFilter inner;
         private final boolean enableThinking;
         private final StringBuilder pending = new StringBuilder();
+
+        // enableThinking=true state
         private boolean inThinkBlock = false;
+        // enableThinking=false state: null = NORMAL, non-null = inside a reasoning block
+        private String activeCloseTag = null;
 
         ThinkBlockStreamFilter(StreamTokenFilter inner, boolean enableThinking) {
             this.inner = inner;
@@ -545,69 +575,182 @@ public class OllamaApiServer {
             inner.onError(error);
         }
 
+        // ── Helpers for the multi-tag strip path ───────────────────────────────────────
+
+        /** Result of locating the earliest reasoning open tag in the pending buffer. */
+        private static final class TagMatch {
+            final int start;    // index of first char of open tag in text
+            final int end;      // index just after the last char of open tag
+            final String close; // corresponding close tag (lowercase)
+            TagMatch(int start, int end, String close) {
+                this.start = start;
+                this.end   = end;
+                this.close = close;
+            }
+        }
+
+        /**
+         * Case-insensitive search of {@code needle} in {@code haystack}.
+         * Returns -1 if not found.
+         */
+        private static int indexOfCI(String haystack, String needle) {
+            return haystack.toLowerCase(Locale.ROOT).indexOf(needle.toLowerCase(Locale.ROOT));
+        }
+
+        /**
+         * Find the earliest reasoning open tag in {@code text} and return a {@link TagMatch},
+         * or {@code null} if none found.  Handles:
+         * <ul>
+         *   <li>Exact simple tags from {@link #REASONING_PAIRS}</li>
+         *   <li>Attribute-bearing named tags, e.g. {@code <think token_budget="N">}</li>
+         *   <li>Pipe-token pairs {@code <|word|>}</li>
+         * </ul>
+         */
+        private static TagMatch findEarliestOpenTag(String text) {
+            TagMatch best = null;
+
+            // Exact simple pairs (case-insensitive)
+            for (String[] pair : REASONING_PAIRS) {
+                int idx = indexOfCI(text, pair[0]);
+                if (idx >= 0 && (best == null || idx < best.start)) {
+                    best = new TagMatch(idx, idx + pair[0].length(), pair[1]);
+                }
+            }
+
+            // Attribute-bearing named tags: <stem ...>
+            for (String stem : ATTR_TAG_STEMS) {
+                String prefix = "<" + stem;
+                int idx = indexOfCI(text, prefix);
+                if (idx >= 0 && (best == null || idx < best.start)) {
+                    int afterPrefix = idx + prefix.length();
+                    if (afterPrefix < text.length()) {
+                        char next = text.charAt(afterPrefix);
+                        if (next == ' ' || next == '\t' || next == '\r' || next == '\n') {
+                            int gt = text.indexOf('>', afterPrefix);
+                            if (gt >= 0) {
+                                best = new TagMatch(idx, gt + 1, "</" + stem + ">");
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Pipe-token pairs: <|word|> … </|word|>
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("<\\|([a-zA-Z_]+)\\|>")
+                    .matcher(text);
+            if (m.find()) {
+                int idx = m.start();
+                if (best == null || idx < best.start) {
+                    best = new TagMatch(idx, m.end(), "</|" + m.group(1) + "|>");
+                }
+            }
+
+            return best;
+        }
+
+        // ── Main flush logic ────────────────────────────────────────────────────────────
+
         private void flush(boolean flushAll) {
             while (pending.length() > 0) {
                 String text = pending.toString();
-                if (inThinkBlock) {
-                    int endIdx = text.indexOf(CLOSE_TAG);
-                    if (endIdx >= 0) {
-                        // Emit the chunk inside the think block (if converting) then the end marker
-                        if (enableThinking) {
+
+                if (enableThinking) {
+                    // ── enableThinking=true: only wrap <think> for WebUI ──────────────
+                    if (inThinkBlock) {
+                        int endIdx = text.indexOf(CLOSE_TAG);
+                        if (endIdx >= 0) {
                             String inside = text.substring(0, endIdx);
                             if (!inside.isEmpty()) inner.onToken(inside);
                             inner.onToken(PromptTemplateManager.WEBUI_REASONING_END);
+                            inThinkBlock = false;
+                            int after = endIdx + CLOSE_TAG.length();
+                            while (after < text.length()
+                                    && (text.charAt(after) == '\n' || text.charAt(after) == '\r')) {
+                                after++;
+                            }
+                            pending.setLength(0);
+                            pending.append(text, after, text.length());
+                        } else if (flushAll) {
+                            if (!text.isEmpty()) inner.onToken(text);
+                            pending.setLength(0);
+                            break;
+                        } else {
+                            int safe = Math.max(0, text.length() - HOLDBACK);
+                            if (safe > 0) inner.onToken(text.substring(0, safe));
+                            pending.setLength(0);
+                            pending.append(text, safe, text.length());
+                            break;
                         }
-                        // else STRIP: discard the inside content
-                        inThinkBlock = false;
-                        int after = endIdx + CLOSE_TAG.length();
-                        // Skip blank lines separating thinking from answer
-                        while (after < text.length()
-                                && (text.charAt(after) == '\n' || text.charAt(after) == '\r')) {
-                            after++;
-                        }
-                        pending.setLength(0);
-                        pending.append(text, after, text.length());
-                    } else if (flushAll) {
-                        // Unclosed block at end of generation
-                        if (enableThinking && !text.isEmpty()) inner.onToken(text);
-                        pending.setLength(0);
-                        break;
                     } else {
-                        // Hold back enough chars to detect the closing tag
-                        int safe = Math.max(0, text.length() - HOLDBACK);
-                        if (enableThinking && safe > 0) inner.onToken(text.substring(0, safe));
-                        pending.setLength(0);
-                        pending.append(text, safe, text.length());
-                        break;
-                    }
-                } else {
-                    int openIdx = text.indexOf(OPEN_TAG);
-                    if (openIdx >= 0) {
-                        // Emit everything before <think>
-                        if (openIdx > 0) inner.onToken(text.substring(0, openIdx));
-                        inThinkBlock = true;
-                        if (enableThinking) {
+                        int openIdx = text.indexOf(OPEN_TAG);
+                        if (openIdx >= 0) {
+                            if (openIdx > 0) inner.onToken(text.substring(0, openIdx));
+                            inThinkBlock = true;
                             inner.onToken(PromptTemplateManager.WEBUI_REASONING_START);
+                            pending.setLength(0);
+                            pending.append(text, openIdx + OPEN_TAG.length(), text.length());
+                        } else if (flushAll) {
+                            if (!text.isEmpty()) inner.onToken(text);
+                            pending.setLength(0);
+                            break;
+                        } else {
+                            int safe = Math.max(0, text.length() - HOLDBACK);
+                            if (safe > 0) inner.onToken(text.substring(0, safe));
+                            pending.setLength(0);
+                            pending.append(text, safe, text.length());
+                            break;
                         }
-                        // else STRIP: skip the <think> tag
-                        pending.setLength(0);
-                        pending.append(text, openIdx + OPEN_TAG.length(), text.length());
-                    } else if (flushAll) {
-                        if (!text.isEmpty()) inner.onToken(text);
-                        pending.setLength(0);
-                        break;
+                    }
+
+                } else {
+                    // ── enableThinking=false: strip ALL reasoning tags ────────────────
+                    if (activeCloseTag != null) {
+                        int endIdx = indexOfCI(text, activeCloseTag);
+                        if (endIdx >= 0) {
+                            // Discard block content and close tag
+                            int after = endIdx + activeCloseTag.length();
+                            while (after < text.length()
+                                    && (text.charAt(after) == '\n' || text.charAt(after) == '\r')) {
+                                after++;
+                            }
+                            activeCloseTag = null;
+                            pending.setLength(0);
+                            pending.append(text, after, text.length());
+                        } else if (flushAll) {
+                            // Unclosed block at end — discard
+                            pending.setLength(0);
+                            break;
+                        } else {
+                            // Hold back to catch partial close tag at tail
+                            int safe = Math.max(0, text.length() - MULTI_HOLDBACK);
+                            pending.setLength(0);
+                            pending.append(text, safe, text.length());
+                            break;
+                        }
                     } else {
-                        // Hold back to catch a partial <think> at the buffer's tail
-                        int safe = Math.max(0, text.length() - HOLDBACK);
-                        if (safe > 0) inner.onToken(text.substring(0, safe));
-                        pending.setLength(0);
-                        pending.append(text, safe, text.length());
-                        break;
+                        TagMatch match = findEarliestOpenTag(text);
+                        if (match != null) {
+                            if (match.start > 0) inner.onToken(text.substring(0, match.start));
+                            activeCloseTag = match.close;
+                            pending.setLength(0);
+                            pending.append(text, match.end, text.length());
+                        } else if (flushAll) {
+                            if (!text.isEmpty()) inner.onToken(text);
+                            pending.setLength(0);
+                            break;
+                        } else {
+                            int safe = Math.max(0, text.length() - MULTI_HOLDBACK);
+                            if (safe > 0) inner.onToken(text.substring(0, safe));
+                            pending.setLength(0);
+                            pending.append(text, safe, text.length());
+                            break;
+                        }
                     }
                 }
             }
         }
-    }
+    } // end ThinkBlockStreamFilter
 
     private static class StreamTokenFilter {
         private static class ParseResult {
