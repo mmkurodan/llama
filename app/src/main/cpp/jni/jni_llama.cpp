@@ -186,6 +186,11 @@ static int   g_dry_allowed_length   = 2;
 static int   g_dry_penalty_last_n   = -1;
 static std::string g_dry_sequence_breakers = DEFAULT_DRY_SEQUENCE_BREAKERS;
 
+// Sampler chain order: semicolon-delimited names (e.g. "top_k;top_p;temperature").
+// Empty = use built-in default order.  Reset to "" after each generation so that
+// direct-input calls that do not supply an order fall back to the default.
+static std::string g_sampler_order = "";
+
 // Generation length limit: -1 means use remaining context (n_ctx - n_past).
 static int g_n_predict = -1;
 
@@ -2949,6 +2954,22 @@ Java_com_micklab_llama_LlamaNative_setTokenListener(
     }
 }
 
+// ---------------- JNI: setSamplerOrder ----------------
+// Sets the sampler chain order for the NEXT generate() call only.
+// The order is a semicolon-delimited list of sampler names recognised by the WebUI,
+// e.g. "top_k;top_p;min_p;temperature".  An empty string resets to the built-in default
+// (top_k → typ_p → top_p → min_p → temperature).
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setSamplerOrder(
+        JNIEnv *env, jobject, jstring jorder) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_sampler_order = jorder != nullptr ? jstring_to_std(env, jorder) : "";
+    if (should_log_debug()) {
+        LOGD("setSamplerOrder: order='%s'", g_sampler_order.c_str());
+    }
+}
+
 // ---------------- JNI: setGrammar ----------------
 // Sets the GBNF grammar applied by the next generate() call. Precedence: a non-empty raw
 // GBNF string is used directly; otherwise a non-empty JSON Schema string is converted via
@@ -3647,28 +3668,51 @@ static jstring generate_locked(
     if (g_top_n_sigma > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_top_n_sigma(g_top_n_sigma));
     }
-    if (g_top_k > 0) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_top_k));
-    }
-    if (g_typical_p < 1.0f) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_typical(g_typical_p, 1));
-    }
-    if (g_top_p < 1.0f) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_top_p(g_top_p, 1));
-    }
-    if (g_min_p > 0.0f) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_min_p(g_min_p, 1));
-    }
-    if (g_xtc_probability > 0.0f) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_xtc(
-                g_xtc_probability, g_xtc_threshold, 1, LLAMA_DEFAULT_SEED));
-    }
-    if (g_dynatemp_range > 0.0f) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_temp_ext(
-                g_temp, g_dynatemp_range, g_dynatemp_exponent));
+
+    // Build the ordered sampler list from g_sampler_order (if set) or the default order.
+    // Penalties, DRY, and top_n_sigma are always applied first (above); the list here
+    // covers the probabilistic samplers that the WebUI "Samplers" setting can reorder.
+    std::vector<std::string> sampler_names;
+    if (!g_sampler_order.empty()) {
+        std::stringstream ss(g_sampler_order);
+        std::string token;
+        while (std::getline(ss, token, ';')) {
+            if (!token.empty()) sampler_names.push_back(token);
+        }
     } else {
-        llama_sampler_chain_add(smpl, llama_sampler_init_temp(g_temp));
+        sampler_names = {"top_k", "typ_p", "top_p", "min_p", "temperature"};
     }
+    // Reset order after reading so that subsequent calls without an explicit order
+    // fall back to the default (avoids stale order leaking into direct-input calls).
+    g_sampler_order = "";
+
+    for (const auto& name : sampler_names) {
+        if (name == "top_k") {
+            if (g_top_k > 0)
+                llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_top_k));
+        } else if (name == "typ_p" || name == "typical_p") {
+            if (g_typical_p < 1.0f)
+                llama_sampler_chain_add(smpl, llama_sampler_init_typical(g_typical_p, 1));
+        } else if (name == "top_p") {
+            if (g_top_p < 1.0f)
+                llama_sampler_chain_add(smpl, llama_sampler_init_top_p(g_top_p, 1));
+        } else if (name == "min_p") {
+            if (g_min_p > 0.0f)
+                llama_sampler_chain_add(smpl, llama_sampler_init_min_p(g_min_p, 1));
+        } else if (name == "xtc") {
+            if (g_xtc_probability > 0.0f)
+                llama_sampler_chain_add(smpl, llama_sampler_init_xtc(
+                        g_xtc_probability, g_xtc_threshold, 1, LLAMA_DEFAULT_SEED));
+        } else if (name == "temperature" || name == "temp") {
+            if (g_dynatemp_range > 0.0f)
+                llama_sampler_chain_add(smpl, llama_sampler_init_temp_ext(
+                        g_temp, g_dynatemp_range, g_dynatemp_exponent));
+            else
+                llama_sampler_chain_add(smpl, llama_sampler_init_temp(g_temp));
+        }
+    }
+
+    // Final sampler: mirostat or dist (always last)
     if (g_mirostat == 1) {
         llama_sampler_chain_add(smpl, llama_sampler_init_mirostat(
                 n_vocab, LLAMA_DEFAULT_SEED, g_mirostat_tau, g_mirostat_eta, 100));

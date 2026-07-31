@@ -499,10 +499,18 @@ public class MainActivity extends Activity {
                         }
                         final String tail = streamOutputFilter.onComplete();
                         final String metrics = buildPerfMetricsSuffix();
+                        final boolean thinkingOff = currentConfig == null || !currentConfig.enableThinking;
                         runIfDirectGenerationSessionActive(generationSessionId, () -> {
                             if (!tail.isEmpty()) {
                                 logMaxDebugPayload("direct.stream.tail", tail);
                                 outputView.append(tail);
+                            }
+                            // Strip <think> blocks from the accumulated output when Thinking is off.
+                            // Applied at completion so we don't disrupt the streaming display mid-token.
+                            if (thinkingOff) {
+                                String full = PromptTemplateManager.stripThinkingBlocks(
+                                        outputView.getText().toString());
+                                outputView.setText(full);
                             }
                             if (!metrics.isEmpty()) {
                                 outputView.append(metrics);
@@ -532,7 +540,12 @@ public class MainActivity extends Activity {
             }
             String gen = modelManager.generate(chatPrompt);
             logMaxDebugPayload("direct.nonstream.model.raw", gen);
-            final String finalGen = gen;
+            final boolean thinkingEnabled = currentConfig != null && currentConfig.enableThinking;
+            // Strip blank/all <think> blocks for direct input when Thinking is off
+            final String processedGen = thinkingEnabled
+                    ? PromptTemplateManager.stripBlankThinkingBlocks(gen)
+                    : PromptTemplateManager.stripThinkingBlocks(gen);
+            final String finalGen = processedGen;
             final String metrics = buildPerfMetricsSuffix();
             runIfDirectGenerationSessionActive(generationSessionId, () -> {
                 appendMessage("generate() returned.");

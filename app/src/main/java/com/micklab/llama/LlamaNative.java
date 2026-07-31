@@ -96,6 +96,10 @@ public class LlamaNative {
      */
     public native void setBackendConfig(int backendType, boolean npuEnabled, String nativeLibDir);
     
+    // Set sampler chain order (semicolon-delimited names, e.g. "top_k;top_p;temperature").
+    // Empty string resets to the built-in default order.
+    public native void setSamplerOrder(String order);
+
     // Set sampling parameters
     public native void setParameters(
         int penaltyLastN, float penaltyRepeat, float penaltyFreq, float penaltyPresent,

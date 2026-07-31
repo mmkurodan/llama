@@ -1407,6 +1407,13 @@ public class OllamaApiServer {
         settings.put("systemMessage", config.systemPrompt != null ? config.systemPrompt : "");
         settings.put("showSystemMessage", config.systemPrompt != null && !config.systemPrompt.isEmpty());
         settings.put("showThoughtInProgress", config.enableThinking);
+        // Problem 1: sync disableReasoningParsing so the WebUI sends reasoning_format=none
+        // when the app's Thinking toggle is off, preventing reasoning extraction and
+        // ensuring <think> blocks are stripped server-side rather than sent back to the API.
+        settings.put("disableReasoningParsing", !config.enableThinking);
+        // Problem 2: surface the raw thinking flag so the bundle can derive
+        // chat_template_kwargs.enable_thinking for the generation request.
+        settings.put("enableThinking", config.enableThinking);
         settings.put("excludeReasoningFromContext", false);
         settings.put("sendOnEnter", false);
         settings.put("showRawModelNames", false);
@@ -1540,6 +1547,26 @@ public class OllamaApiServer {
         samplers.add("min_p");
         samplers.add("temperature");
         return samplers;
+    }
+
+    /**
+     * Problem 4: apply the {@code samplers} array from the request body to the native
+     * sampler chain.  An absent or empty field resets to the built-in default order.
+     * Must be called AFTER {@link #applyRequestOverrides} / {@link ModelManager#applyConfiguration}.
+     */
+    private void applySamplerOrderOverride(JSONObject request) {
+        if (request == null) return;
+        JSONArray arr = request.optJSONArray("samplers");
+        String order = "";
+        if (arr != null && arr.length() > 0) {
+            List<String> parts = new ArrayList<>(arr.length());
+            for (int i = 0; i < arr.length(); i++) {
+                String s = arr.optString(i, "").trim();
+                if (!s.isEmpty()) parts.add(s);
+            }
+            order = String.join(";", parts);
+        }
+        modelManager.getLlama().setSamplerOrder(order);
     }
 
     private void handleLoadModel(OutputStream outputStream, String body) throws IOException {
@@ -1775,10 +1802,15 @@ public class OllamaApiServer {
                 ConfigurationManager.Configuration config = null;
                 try {
                     config = configManager.loadConfiguration(model);
+                    // Problem 3: apply per-request sampling overrides (temperature, top_k, …)
+                    applyRequestOverrides(config, request);
+                    modelManager.applyConfiguration(config);
                 } catch (Exception e) {
-                    Log.w(TAG, "Could not load config for template", e);
+                    Log.w(TAG, "Could not apply /api/generate request overrides", e);
                 }
-                
+                // Problem 4: apply custom sampler chain order from request
+                applySamplerOrderOverride(request);
+
                 applyNPredictOverride(request, config);
 
                 if (listener != null) {
@@ -2005,9 +2037,11 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse);
                     logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
+                    // Strip blank <think> blocks before branching so empty tags never leak
+                    String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
                     String processedResponse = enableThinking
-                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(rawResponse)
-                            : PromptTemplateManager.stripThinkingBlocks(rawResponse);
+                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned)
+                            : PromptTemplateManager.stripThinkingBlocks(cleaned);
                     String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
                     logMaxDebugPayload("api.generate.nonstream.response", response);
                     JSONObject result = new JSONObject();
@@ -2076,10 +2110,15 @@ public class OllamaApiServer {
                 ConfigurationManager.Configuration config = null;
                 try {
                     config = configManager.loadConfiguration(model);
+                    // Problem 3: apply per-request sampling overrides (temperature, top_k, …)
+                    applyRequestOverrides(config, request);
+                    modelManager.applyConfiguration(config);
                 } catch (Exception e) {
-                    Log.w(TAG, "Could not load config for template", e);
+                    Log.w(TAG, "Could not apply /api/chat request overrides", e);
                 }
-                
+                // Problem 4: apply custom sampler chain order from request
+                applySamplerOrderOverride(request);
+
                 applyNPredictOverride(request, config);
 
                 // Use PromptTemplateManager for prompt generation
@@ -2330,9 +2369,10 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
+                    String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
                     String processedResponse = enableThinking
-                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(rawResponse)
-                            : PromptTemplateManager.stripThinkingBlocks(rawResponse);
+                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned)
+                            : PromptTemplateManager.stripThinkingBlocks(cleaned);
                     String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
                     logMaxDebugPayload("api.chat.nonstream.response", response);
 
@@ -2410,6 +2450,8 @@ public class OllamaApiServer {
                 } catch (Exception e) {
                     Log.w(TAG, "Could not apply OpenAI request overrides", e);
                 }
+                // Problem 4: apply custom sampler chain order from request
+                applySamplerOrderOverride(request);
 
                 applyNPredictOverride(request, config);
 
@@ -2634,9 +2676,10 @@ public class OllamaApiServer {
                     }
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                    String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
                     String processedResponse = enableThinking
-                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(rawResponse)
-                            : PromptTemplateManager.stripThinkingBlocks(rawResponse);
+                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned)
+                            : PromptTemplateManager.stripThinkingBlocks(cleaned);
                     String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
                     sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, response).toString());
                 }

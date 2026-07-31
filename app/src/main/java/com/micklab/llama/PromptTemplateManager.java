@@ -442,6 +442,44 @@ public class PromptTemplateManager {
     }
 
     /**
+     * Remove {@code <think>...</think>} blocks whose content is entirely whitespace.
+     * Called before {@link #wrapThinkingBlocksForWebUi} / {@link #stripThinkingBlocks} in all
+     * non-streaming paths so models that emit empty {@code <think></think>} tags do not
+     * produce noise in API responses or direct-input output.
+     */
+    public static String stripBlankThinkingBlocks(String text) {
+        if (text == null || text.isEmpty() || !text.contains(THINK_OPEN_TAG)) {
+            return text;
+        }
+        StringBuilder result = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            int openIdx = text.indexOf(THINK_OPEN_TAG, i);
+            if (openIdx < 0) {
+                result.append(text, i, text.length());
+                break;
+            }
+            int closeIdx = text.indexOf(THINK_CLOSE_TAG, openIdx + THINK_OPEN_TAG.length());
+            if (closeIdx < 0) {
+                result.append(text, i, text.length());
+                break;
+            }
+            String inside = text.substring(openIdx + THINK_OPEN_TAG.length(), closeIdx);
+            if (inside.trim().isEmpty()) {
+                result.append(text, i, openIdx);
+                i = closeIdx + THINK_CLOSE_TAG.length();
+                while (i < text.length() && (text.charAt(i) == '\n' || text.charAt(i) == '\r')) {
+                    i++;
+                }
+            } else {
+                result.append(text, i, closeIdx + THINK_CLOSE_TAG.length());
+                i = closeIdx + THINK_CLOSE_TAG.length();
+            }
+        }
+        return result.toString();
+    }
+
+    /**
      * Convert {@code <think>...</think>} blocks to the WebUI internal reasoning markers
      * (enableThinking=true output path). The WebUI accumulates the markers and post-processes
      * them after streaming ends to render reasoning as a collapsible section.
