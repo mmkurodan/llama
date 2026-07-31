@@ -2029,8 +2029,13 @@ public class OllamaApiServer {
                             tokenQueue,
                             () -> modelManager.getLlama().cancelGeneration()
                     );
+                    // Use WebUI markers only when the client explicitly sends reasoning_format=auto
+                    // (the WebUI does this). External clients receive stripped output instead of
+                    // raw WebUI internal markers.
+                    final boolean useWebUiMarkersGenerate = enableThinking
+                            && "auto".equalsIgnoreCase(request.optString("reasoning_format", ""));
                     final ThinkBlockStreamFilter thinkBlockFilter =
-                            new ThinkBlockStreamFilter(streamTokenFilter, enableThinking);
+                            new ThinkBlockStreamFilter(streamTokenFilter, useWebUiMarkersGenerate);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -2180,11 +2185,10 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse);
                     logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
-                    // Strip blank <think> blocks before branching so empty tags never leak
+                    // Always strip think blocks from API response content.
+                    // WebUI marker wrapping only applies to the streaming path.
                     String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
-                    String processedResponse = enableThinking
-                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned)
-                            : PromptTemplateManager.stripThinkingBlocks(cleaned);
+                    String processedResponse = PromptTemplateManager.stripThinkingBlocks(cleaned);
                     String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
                     logMaxDebugPayload("api.generate.nonstream.response", response);
                     JSONObject result = new JSONObject();
@@ -2349,8 +2353,13 @@ public class OllamaApiServer {
                             tokenQueue,
                             () -> modelManager.getLlama().cancelGeneration()
                     );
+                    // Use WebUI markers only when the client explicitly sends reasoning_format=auto
+                    // (the WebUI does this). External clients receive stripped output instead of
+                    // raw WebUI internal markers.
+                    final boolean useWebUiMarkersChat = enableThinking
+                            && "auto".equalsIgnoreCase(request.optString("reasoning_format", ""));
                     final ThinkBlockStreamFilter thinkBlockFilter =
-                            new ThinkBlockStreamFilter(streamTokenFilter, enableThinking);
+                            new ThinkBlockStreamFilter(streamTokenFilter, useWebUiMarkersChat);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -2512,10 +2521,10 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
+                    // Always strip think blocks from API response content.
+                    // WebUI marker wrapping only applies to the streaming path.
                     String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
-                    String processedResponse = enableThinking
-                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned)
-                            : PromptTemplateManager.stripThinkingBlocks(cleaned);
+                    String processedResponse = PromptTemplateManager.stripThinkingBlocks(cleaned);
                     String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
                     logMaxDebugPayload("api.chat.nonstream.response", response);
 
@@ -2730,8 +2739,13 @@ public class OllamaApiServer {
                             tokenQueue,
                             () -> modelManager.getLlama().cancelGeneration()
                     );
+                    // Use WebUI markers only when the client explicitly sends reasoning_format=auto
+                    // (the WebUI does this). External clients receive stripped output instead of
+                    // raw WebUI internal markers.
+                    final boolean useWebUiMarkersOai = enableThinking
+                            && "auto".equalsIgnoreCase(request.optString("reasoning_format", ""));
                     final ThinkBlockStreamFilter thinkBlockFilter =
-                            new ThinkBlockStreamFilter(streamTokenFilter, enableThinking);
+                            new ThinkBlockStreamFilter(streamTokenFilter, useWebUiMarkersOai);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -2819,10 +2833,10 @@ public class OllamaApiServer {
                     }
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                    // Always strip think blocks from API response content.
+                    // WebUI marker wrapping only applies to the streaming path.
                     String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
-                    String processedResponse = enableThinking
-                            ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned)
-                            : PromptTemplateManager.stripThinkingBlocks(cleaned);
+                    String processedResponse = PromptTemplateManager.stripThinkingBlocks(cleaned);
                     String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
                     sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, response).toString());
                 }

@@ -1,5 +1,0 @@
-2026-06-12 20:46:39.247 pid=13235 [generation-end] id=14 resultLen=14
-  javaUsed=4.8MB javaTotal=27.9MB javaMax=256.0MB nativeHeap=417.9MB nativeHeapFree=67.6MB nativeHeapSize=489.1MB
-  pssTotal=2.5GB privateDirty=157.5MB sharedDirty=43.8MB nativePss=111.5MB dalvikPss=3.4MB otherPss=2.4GB
-  systemAvail=12.0GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=100 fdCount=224
-  procStatus VmRSS=2755540 kB VmHWM=3288696 kB VmSize=21672716 kB VmSwap=2052 kB Threads=41 FDSize=512
