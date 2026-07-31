@@ -499,16 +499,17 @@ public class MainActivity extends Activity {
                         }
                         final String tail = streamOutputFilter.onComplete();
                         final String metrics = buildPerfMetricsSuffix();
+                        final boolean thinkingOff = currentConfig == null || !currentConfig.enableThinking;
                         runIfDirectGenerationSessionActive(generationSessionId, () -> {
                             if (!tail.isEmpty()) {
                                 logMaxDebugPayload("direct.stream.tail", tail);
                                 outputView.append(tail);
                             }
-                            // Always strip think blocks from the accumulated output.
-                            // The plain TextView has no renderer for collapsible thought sections.
-                            String full = PromptTemplateManager.stripThinkingBlocks(
-                                    outputView.getText().toString());
-                            outputView.setText(full);
+                            if (thinkingOff) {
+                                String full = PromptTemplateManager.stripThinkingBlocks(
+                                        outputView.getText().toString());
+                                outputView.setText(full);
+                            }
                             if (!metrics.isEmpty()) {
                                 outputView.append(metrics);
                             }
@@ -537,8 +538,10 @@ public class MainActivity extends Activity {
             }
             String gen = modelManager.generate(chatPrompt);
             logMaxDebugPayload("direct.nonstream.model.raw", gen);
-            // Always strip think blocks from direct-input output (TextView has no thought renderer).
-            final String processedGen = PromptTemplateManager.stripThinkingBlocks(gen);
+            final boolean thinkingEnabled = currentConfig != null && currentConfig.enableThinking;
+            final String processedGen = thinkingEnabled
+                    ? PromptTemplateManager.stripBlankThinkingBlocks(gen)
+                    : PromptTemplateManager.stripThinkingBlocks(gen);
             final String finalGen = processedGen;
             final String metrics = buildPerfMetricsSuffix();
             runIfDirectGenerationSessionActive(generationSessionId, () -> {
