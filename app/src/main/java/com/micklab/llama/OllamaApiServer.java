@@ -1584,7 +1584,7 @@ public class OllamaApiServer {
         // so the loaded model's profile settings (system prompt, thinking toggle, etc.)
         // become the WebUI's initial state. Subsequent user changes in the WebUI are then
         // preserved until the next model load or reset.
-        settings.put("settings_version", modelManager.getModelLoadVersion());
+        settings.put("settings_version", modelManager.getWebUiVersion());
         return settings;
     }
 

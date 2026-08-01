@@ -604,6 +604,8 @@ public class MainActivity extends Activity {
                     setupProfileSpinner();   // 設定画面での追加/改名/選択を反映
                     // 設定保存後は次回実行(直接/API)で必ずモデルを再ロードして反映する
                     modelManager.requestReloadOnNextLoad();
+                    // Notify WebUI that settings changed so it re-applies the new profile values.
+                    modelManager.notifySettingsChanged();
                     
                     // Apply configuration immediately only when selected model already matches.
                     if (modelManager.isModelLoaded()) {
@@ -1161,6 +1163,7 @@ public class MainActivity extends Activity {
                     ConfigurationManager.Configuration loaded = configManager.loadConfiguration(name);
                     if (loaded != null) {
                         currentConfig = loaded;
+                        modelManager.notifySettingsChanged();
                         appendMessage(localizedText("プロファイル選択: ", "Profile selected: ") + name
                                 + localizedText("（次回プロンプトで適用）", " (applied on next prompt)"));
                     }

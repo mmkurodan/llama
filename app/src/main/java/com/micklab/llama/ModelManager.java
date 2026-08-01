@@ -103,6 +103,9 @@ public class ModelManager {
     // /props webui_settings.settings_version and resets its settings to the app defaults
     // on any change, then tracks the version per session to preserve user overrides afterwards.
     private final AtomicInteger modelLoadVersion = new AtomicInteger(0);
+    // Incremented on model load AND on settings changes that affect the WebUI (e.g. enableThinking).
+    // /props exposes this as settings_version so the WebUI can detect either kind of change.
+    private final AtomicInteger webUiVersion = new AtomicInteger(0);
 
     // State tracking
     private final AtomicBoolean busy = new AtomicBoolean(false);
@@ -221,6 +224,15 @@ public class ModelManager {
     /** Version counter that increments each time the model is fully (re)initialized. */
     public int getModelLoadVersion() {
         return modelLoadVersion.get();
+    }
+
+    /** Increment the WebUI settings version due to a settings change (not a model reload). */
+    public void notifySettingsChanged() {
+        webUiVersion.incrementAndGet();
+    }
+
+    public int getWebUiVersion() {
+        return webUiVersion.get();
     }
 
     public boolean isBusy() {
@@ -719,6 +731,7 @@ public class ModelManager {
             // Notify the WebUI that the model has changed → it will reset settings to app defaults.
             if (requiresModelInit) {
                 modelLoadVersion.incrementAndGet();
+                webUiVersion.incrementAndGet();
             }
             // この設定でモデルを構築したことを記録 (再ロード判定に使用)
             currentBackendType = config.backendType;
