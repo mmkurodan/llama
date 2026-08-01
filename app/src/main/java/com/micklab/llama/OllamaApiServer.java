@@ -1531,7 +1531,10 @@ public class OllamaApiServer {
         params.put("mirostat_tau", config.mirostatTau);
         params.put("mirostat_eta", config.mirostatEta);
         params.put("stop", new JSONArray());
-        params.put("max_tokens", nPredict);
+        // Only advertise max_tokens when nPredict is explicitly capped. When nPredict=0
+        // (unlimited), omitting max_tokens lets the WebUI treat the limit as unset and
+        // avoids sending nCtx back in requests which would wrongly cap generation.
+        if (config.nPredict > 0) params.put("max_tokens", config.nPredict);
         params.put("n_keep", 0);
         params.put("n_discard", 0);
         params.put("ignore_eos", false);
@@ -1644,7 +1647,7 @@ public class OllamaApiServer {
         params.put("mirostat", config.mirostat);
         params.put("mirostat_tau", config.mirostatTau);
         params.put("mirostat_eta", config.mirostatEta);
-        params.put("max_tokens", nPredict);
+        if (config.nPredict > 0) params.put("max_tokens", config.nPredict);
         params.put("n_keep", 0);
         params.put("n_discard", 0);
         params.put("ignore_eos", false);
