@@ -501,22 +501,27 @@ public class OllamaApiServer {
         return deltas;
     }
 
+    /** Marker placed in tokenQueue to distinguish reasoning content from regular content. */
+    private static final class ReasoningToken {
+        final String content;
+        ReasoningToken(String c) { content = c; }
+    }
+
     /**
-     * Wraps a StreamTokenFilter and intercepts &lt;think&gt;…&lt;/think&gt; blocks before they
-     * reach the downstream filter.
+     * Wraps a StreamTokenFilter and intercepts &lt;think&gt;…&lt;/think&gt; blocks.
      *
      * <ul>
-     *   <li>enableThinking=false → strip: tokens inside the block are suppressed entirely.</li>
-     *   <li>enableThinking=true  → wrap: &lt;think&gt; is replaced with the WebUI
-     *       {@code <<<reasoning_content_start>>>} marker and &lt;/think&gt; with the end marker.
-     *       The WebUI accumulates these during streaming and re-renders them as a collapsible
-     *       "Thought" section once streaming finishes.</li>
+     *   <li>Structured mode ({@code reasoningSink != null}): thinking content is routed to
+     *       {@code reasoningSink} (which enqueues it as {@link ReasoningToken}); regular content
+     *       goes to the downstream {@link StreamTokenFilter} as before.</li>
+     *   <li>Strip mode ({@code reasoningSink == null}): all recognised reasoning tags and their
+     *       content are suppressed entirely.</li>
      * </ul>
      */
     private static final class ThinkBlockStreamFilter {
         private static final String OPEN_TAG  = PromptTemplateManager.THINK_OPEN_TAG;
         private static final String CLOSE_TAG = PromptTemplateManager.THINK_CLOSE_TAG;
-        // Hold-back for the enableThinking=true path (only <think>)
+        // Hold-back to avoid splitting the close tag across two flush cycles
         private static final int HOLDBACK = Math.max(OPEN_TAG.length(), CLOSE_TAG.length()) - 1;
 
         // Extended tag pairs stripped when enableThinking=false.
@@ -546,17 +551,26 @@ public class OllamaApiServer {
         private static final int MULTI_HOLDBACK = 64;
 
         private final StreamTokenFilter inner;
-        private final boolean enableThinking;
+        // Non-null = structured mode; null = strip mode.
+        private final java.util.function.Consumer<String> reasoningSink;
         private final StringBuilder pending = new StringBuilder();
 
-        // enableThinking=true state
+        // Structured-mode state
         private boolean inThinkBlock = false;
-        // enableThinking=false state: null = NORMAL, non-null = inside a reasoning block
+        // Strip-mode state: null = NORMAL, non-null = inside a reasoning block
         private String activeCloseTag = null;
 
-        ThinkBlockStreamFilter(StreamTokenFilter inner, boolean enableThinking) {
+        /** Structured mode: route thinking content to {@code reasoningSink}. */
+        ThinkBlockStreamFilter(StreamTokenFilter inner,
+                               java.util.function.Consumer<String> reasoningSink) {
             this.inner = inner;
-            this.enableThinking = enableThinking;
+            this.reasoningSink = java.util.Objects.requireNonNull(reasoningSink);
+        }
+
+        /** Strip mode: suppress all recognised reasoning blocks. */
+        ThinkBlockStreamFilter(StreamTokenFilter inner) {
+            this.inner = inner;
+            this.reasoningSink = null;
         }
 
         void onToken(String token) {
@@ -655,14 +669,13 @@ public class OllamaApiServer {
             while (pending.length() > 0) {
                 String text = pending.toString();
 
-                if (enableThinking) {
-                    // ── enableThinking=true: only wrap <think> for WebUI ──────────────
+                if (reasoningSink != null) {
+                    // ── Structured mode: route <think> content to reasoningSink ──────
                     if (inThinkBlock) {
                         int endIdx = text.indexOf(CLOSE_TAG);
                         if (endIdx >= 0) {
                             String inside = text.substring(0, endIdx);
-                            if (!inside.isEmpty()) inner.onToken(inside);
-                            inner.onToken(PromptTemplateManager.WEBUI_REASONING_END);
+                            if (!inside.isEmpty()) reasoningSink.accept(inside);
                             inThinkBlock = false;
                             int after = endIdx + CLOSE_TAG.length();
                             while (after < text.length()
@@ -672,12 +685,12 @@ public class OllamaApiServer {
                             pending.setLength(0);
                             pending.append(text, after, text.length());
                         } else if (flushAll) {
-                            if (!text.isEmpty()) inner.onToken(text);
+                            if (!text.isEmpty()) reasoningSink.accept(text);
                             pending.setLength(0);
                             break;
                         } else {
                             int safe = Math.max(0, text.length() - HOLDBACK);
-                            if (safe > 0) inner.onToken(text.substring(0, safe));
+                            if (safe > 0) reasoningSink.accept(text.substring(0, safe));
                             pending.setLength(0);
                             pending.append(text, safe, text.length());
                             break;
@@ -687,7 +700,7 @@ public class OllamaApiServer {
                         if (openIdx >= 0) {
                             if (openIdx > 0) inner.onToken(text.substring(0, openIdx));
                             inThinkBlock = true;
-                            inner.onToken(PromptTemplateManager.WEBUI_REASONING_START);
+                            // <think> itself is not forwarded to either channel
                             pending.setLength(0);
                             pending.append(text, openIdx + OPEN_TAG.length(), text.length());
                         } else if (flushAll) {
@@ -2029,14 +2042,12 @@ public class OllamaApiServer {
                             tokenQueue,
                             () -> modelManager.getLlama().cancelGeneration()
                     );
-                    // Think ON + WebUI (reasoning_format=auto) → wrap in WebUI markers.
-                    // Think ON + external (no reasoning_format) → pass through as-is (null filter).
-                    // Think OFF → strip all reasoning tags.
-                    final boolean webUiClientGenerate = "auto".equalsIgnoreCase(
-                            request.optString("reasoning_format", ""));
-                    final ThinkBlockStreamFilter thinkBlockFilter = (!enableThinking || webUiClientGenerate)
-                            ? new ThinkBlockStreamFilter(streamTokenFilter, enableThinking && webUiClientGenerate)
-                            : null;
+                    // Think ON → structured mode: <think> content → delta.reasoning_content.
+                    // Think OFF → strip mode: all reasoning blocks suppressed.
+                    final ThinkBlockStreamFilter thinkBlockFilter = enableThinking
+                            ? new ThinkBlockStreamFilter(streamTokenFilter,
+                                    tok -> tokenQueue.offer(new ReasoningToken(tok)))
+                            : new ThinkBlockStreamFilter(streamTokenFilter);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -2101,15 +2112,19 @@ public class OllamaApiServer {
                                      }
                                      break;
                                  } else {
-                                     String tokenStr = (String) ev;
                                      try {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
-                                        String safeToken = stripResponseMarkers(tokenStr);
-                                        chunk.put("response", safeToken);
+                                        if (ev instanceof ReasoningToken) {
+                                            chunk.put("reasoning_content", ((ReasoningToken) ev).content);
+                                            chunk.put("response", "");
+                                        } else {
+                                            String safeToken = stripResponseMarkers((String) ev);
+                                            chunk.put("response", safeToken);
+                                            logMaxDebugPayload("api.generate.stream.chunk.response", safeToken);
+                                        }
                                         chunk.put("done", false);
-                                        logMaxDebugPayload("api.generate.stream.chunk.response", safeToken);
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
                                             String chunkSize = Integer.toHexString(chunkBytes.length) + "\r\n";
@@ -2144,8 +2159,7 @@ public class OllamaApiServer {
                                 Log.d(TAG, "generate stream tokens=" + tokenCount);
                             }
                             logMaxDebugPayload("api.generate.stream.model.token", token);
-                            if (thinkBlockFilter != null) thinkBlockFilter.onToken(token);
-                            else streamTokenFilter.onToken(token);
+                            thinkBlockFilter.onToken(token);
                         }
 
                         @Override
@@ -2153,8 +2167,7 @@ public class OllamaApiServer {
                             if (BuildConfig.DEBUG) {
                                 Log.d(TAG, "generate stream complete tokens=" + tokenCount);
                             }
-                            if (thinkBlockFilter != null) thinkBlockFilter.onComplete();
-                            else streamTokenFilter.onComplete();
+                            thinkBlockFilter.onComplete();
                         }
 
                         @Override
@@ -2162,8 +2175,7 @@ public class OllamaApiServer {
                             if (BuildConfig.DEBUG) {
                                 Log.d(TAG, "generate stream error: " + error);
                             }
-                            if (thinkBlockFilter != null) thinkBlockFilter.onError(error);
-                            else streamTokenFilter.onError(error);
+                            thinkBlockFilter.onError(error);
                         }
                     });
 
@@ -2189,21 +2201,25 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse);
                     logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
-                    String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
-                    final String processedResponse;
+                    final String genReasoning;
+                    final String genContent;
                     if (enableThinking) {
-                        boolean webUiClient = "auto".equalsIgnoreCase(request.optString("reasoning_format", ""));
-                        processedResponse = webUiClient
-                                ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned) : cleaned;
+                        String[] parts = PromptTemplateManager.extractThinkingContent(rawResponse);
+                        genReasoning = parts[0];
+                        genContent   = parts[1];
                     } else {
-                        processedResponse = PromptTemplateManager.stripThinkingBlocks(cleaned);
+                        genReasoning = null;
+                        genContent   = PromptTemplateManager.stripThinkingBlocks(rawResponse);
                     }
-                    String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
+                    String response = appendPerfMetrics(stripResponseMarkers(genContent));
                     logMaxDebugPayload("api.generate.nonstream.response", response);
                     JSONObject result = new JSONObject();
                     result.put("model", model);
                     result.put("created_at", getTimestamp());
                     result.put("response", response);
+                    if (genReasoning != null && !genReasoning.isEmpty()) {
+                        result.put("reasoning_content", genReasoning);
+                    }
                     result.put("done", true);
                     putOllamaMetrics(result);
                     logMaxDebugPayload("api.generate.nonstream.response.json", result.toString());
@@ -2362,14 +2378,12 @@ public class OllamaApiServer {
                             tokenQueue,
                             () -> modelManager.getLlama().cancelGeneration()
                     );
-                    // Think ON + WebUI (reasoning_format=auto) → wrap in WebUI markers.
-                    // Think ON + external (no reasoning_format) → pass through as-is (null filter).
-                    // Think OFF → strip all reasoning tags.
-                    final boolean webUiClientChat = "auto".equalsIgnoreCase(
-                            request.optString("reasoning_format", ""));
-                    final ThinkBlockStreamFilter thinkBlockFilter = (!enableThinking || webUiClientChat)
-                            ? new ThinkBlockStreamFilter(streamTokenFilter, enableThinking && webUiClientChat)
-                            : null;
+                    // Think ON → structured mode: <think> content → message.reasoning_content.
+                    // Think OFF → strip mode: all reasoning blocks suppressed.
+                    final ThinkBlockStreamFilter thinkBlockFilter = enableThinking
+                            ? new ThinkBlockStreamFilter(streamTokenFilter,
+                                    tok -> tokenQueue.offer(new ReasoningToken(tok)))
+                            : new ThinkBlockStreamFilter(streamTokenFilter);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -2442,7 +2456,6 @@ public class OllamaApiServer {
                                      }
                                      break;
                                  } else {
-                                     String tokenStr = (String) ev;
                                      try {
                                         JSONObject chunk = new JSONObject();
                                         chunk.put("model", model);
@@ -2450,11 +2463,16 @@ public class OllamaApiServer {
 
                                         JSONObject message = new JSONObject();
                                         message.put("role", "assistant");
-                                        String safeToken = stripResponseMarkers(tokenStr);
-                                        message.put("content", safeToken);
+                                        if (ev instanceof ReasoningToken) {
+                                            message.put("content", "");
+                                            message.put("reasoning_content", ((ReasoningToken) ev).content);
+                                        } else {
+                                            String safeToken = stripResponseMarkers((String) ev);
+                                            message.put("content", safeToken);
+                                            logMaxDebugPayload("api.chat.stream.chunk.content", safeToken);
+                                        }
                                         chunk.put("message", message);
                                         chunk.put("done", false);
-                                        logMaxDebugPayload("api.chat.stream.chunk.content", safeToken);
 
                                         byte[] chunkBytes = (chunk.toString() + "\n").getBytes(StandardCharsets.UTF_8);
                                         synchronized (writeLock) {
@@ -2490,8 +2508,7 @@ public class OllamaApiServer {
                                 Log.d(TAG, "chat stream tokens=" + tokenCount);
                             }
                             logMaxDebugPayload("api.chat.stream.model.token", token);
-                            if (thinkBlockFilter != null) thinkBlockFilter.onToken(token);
-                            else streamTokenFilter.onToken(token);
+                            thinkBlockFilter.onToken(token);
                         }
 
                         @Override
@@ -2499,8 +2516,7 @@ public class OllamaApiServer {
                             if (BuildConfig.DEBUG) {
                                 Log.d(TAG, "chat stream complete tokens=" + tokenCount);
                             }
-                            if (thinkBlockFilter != null) thinkBlockFilter.onComplete();
-                            else streamTokenFilter.onComplete();
+                            thinkBlockFilter.onComplete();
                         }
 
                         @Override
@@ -2508,8 +2524,7 @@ public class OllamaApiServer {
                             if (BuildConfig.DEBUG) {
                                 Log.d(TAG, "chat stream error: " + error);
                             }
-                            if (thinkBlockFilter != null) thinkBlockFilter.onError(error);
-                            else streamTokenFilter.onError(error);
+                            thinkBlockFilter.onError(error);
                         }
                     });
 
@@ -2534,16 +2549,17 @@ public class OllamaApiServer {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
-                    String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
-                    final String processedResponse;
+                    final String chatReasoning;
+                    final String chatContent;
                     if (enableThinking) {
-                        boolean webUiClient = "auto".equalsIgnoreCase(request.optString("reasoning_format", ""));
-                        processedResponse = webUiClient
-                                ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned) : cleaned;
+                        String[] parts = PromptTemplateManager.extractThinkingContent(rawResponse);
+                        chatReasoning = parts[0];
+                        chatContent   = parts[1];
                     } else {
-                        processedResponse = PromptTemplateManager.stripThinkingBlocks(cleaned);
+                        chatReasoning = null;
+                        chatContent   = PromptTemplateManager.stripThinkingBlocks(rawResponse);
                     }
-                    String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
+                    String response = appendPerfMetrics(stripResponseMarkers(chatContent));
                     logMaxDebugPayload("api.chat.nonstream.response", response);
 
                     JSONObject result = new JSONObject();
@@ -2553,6 +2569,9 @@ public class OllamaApiServer {
                     JSONObject message = new JSONObject();
                     message.put("role", "assistant");
                     message.put("content", response);
+                    if (chatReasoning != null && !chatReasoning.isEmpty()) {
+                        message.put("reasoning_content", chatReasoning);
+                    }
                     result.put("message", message);
                     result.put("done", true);
                     putOllamaMetrics(result);
@@ -2757,14 +2776,12 @@ public class OllamaApiServer {
                             tokenQueue,
                             () -> modelManager.getLlama().cancelGeneration()
                     );
-                    // Think ON + WebUI (reasoning_format=auto) → wrap in WebUI markers.
-                    // Think ON + external (no reasoning_format) → pass through as-is (null filter).
-                    // Think OFF → strip all reasoning tags.
-                    final boolean webUiClientOai = "auto".equalsIgnoreCase(
-                            request.optString("reasoning_format", ""));
-                    final ThinkBlockStreamFilter thinkBlockFilter = (!enableThinking || webUiClientOai)
-                            ? new ThinkBlockStreamFilter(streamTokenFilter, enableThinking && webUiClientOai)
-                            : null;
+                    // Think ON → structured mode: <think> content → delta.reasoning_content.
+                    // Think OFF → strip mode: all reasoning blocks suppressed.
+                    final ThinkBlockStreamFilter thinkBlockFilter = enableThinking
+                            ? new ThinkBlockStreamFilter(streamTokenFilter,
+                                    tok -> tokenQueue.offer(new ReasoningToken(tok)))
+                            : new ThinkBlockStreamFilter(streamTokenFilter);
                     final Thread writerThread = new Thread(() -> {
                         try {
                             while (true) {
@@ -2790,6 +2807,12 @@ public class OllamaApiServer {
                                         sendSseEvent(outputStream, "[DONE]");
                                     }
                                     break;
+                                } else if (ev instanceof ReasoningToken) {
+                                    synchronized (writeLock) {
+                                        sendSseEvent(outputStream,
+                                                buildOpenAiStreamChunk(model, null,
+                                                        ((ReasoningToken) ev).content, null, null).toString());
+                                    }
                                 } else {
                                     String token = stripResponseMarkers((String) ev);
                                     if (token.isEmpty()) {
@@ -2818,20 +2841,17 @@ public class OllamaApiServer {
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         @Override
                         public void onToken(String token) {
-                            if (thinkBlockFilter != null) thinkBlockFilter.onToken(token);
-                            else streamTokenFilter.onToken(token);
+                            thinkBlockFilter.onToken(token);
                         }
 
                         @Override
                         public void onComplete() {
-                            if (thinkBlockFilter != null) thinkBlockFilter.onComplete();
-                            else streamTokenFilter.onComplete();
+                            thinkBlockFilter.onComplete();
                         }
 
                         @Override
                         public void onError(String error) {
-                            if (thinkBlockFilter != null) thinkBlockFilter.onError(error);
-                            else streamTokenFilter.onError(error);
+                            thinkBlockFilter.onError(error);
                         }
                     });
 
@@ -2855,17 +2875,21 @@ public class OllamaApiServer {
                     }
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
-                    String cleaned = PromptTemplateManager.stripBlankThinkingBlocks(rawResponse);
-                    final String processedResponse;
+                    final String oaiReasoning;
+                    final String oaiContent;
                     if (enableThinking) {
-                        boolean webUiClient = "auto".equalsIgnoreCase(request.optString("reasoning_format", ""));
-                        processedResponse = webUiClient
-                                ? PromptTemplateManager.wrapThinkingBlocksForWebUi(cleaned) : cleaned;
+                        String[] parts = PromptTemplateManager.extractThinkingContent(rawResponse);
+                        oaiReasoning = parts[0];
+                        oaiContent   = parts[1];
                     } else {
-                        processedResponse = PromptTemplateManager.stripThinkingBlocks(cleaned);
+                        oaiReasoning = null;
+                        oaiContent   = PromptTemplateManager.stripThinkingBlocks(rawResponse);
                     }
-                    String response = appendPerfMetrics(stripResponseMarkers(processedResponse));
-                    sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, response).toString());
+                    String response = appendPerfMetrics(stripResponseMarkers(oaiContent));
+                    sendJsonResponse(outputStream, 200,
+                            buildOpenAiChatResponse(model, response,
+                                    (oaiReasoning != null && !oaiReasoning.isEmpty()) ? oaiReasoning : null,
+                                    null, "stop").toString());
                 }
             } finally {
                 modelManager.release();

@@ -488,10 +488,10 @@ public class PromptTemplateManager {
     }
 
     /**
-     * Convert {@code <think>...</think>} blocks to the WebUI internal reasoning markers
-     * (enableThinking=true output path). The WebUI accumulates the markers and post-processes
-     * them after streaming ends to render reasoning as a collapsible section.
+     * @deprecated Use {@link #extractThinkingContent(String)} instead.
+     * Convert {@code <think>...</think>} blocks to the legacy WebUI internal reasoning markers.
      */
+    @Deprecated
     public static String wrapThinkingBlocksForWebUi(String text) {
         if (text == null || text.isEmpty() || !text.contains(THINK_OPEN_TAG)) {
             return text;
@@ -499,6 +499,74 @@ public class PromptTemplateManager {
         return text
                 .replace(THINK_OPEN_TAG,  WEBUI_REASONING_START)
                 .replace(THINK_CLOSE_TAG, WEBUI_REASONING_END);
+    }
+
+    /**
+     * Splits model output into reasoning content and regular content.
+     *
+     * <p>All recognised reasoning block formats (named tags, pipe-token, bracket) are extracted
+     * into {@code result[0]}; the remaining text (cleaned of blank blocks and trimmed) is
+     * returned in {@code result[1]}.
+     *
+     * @param text raw model output (may contain {@code <think>…</think>} or similar blocks)
+     * @return {@code String[2]} where {@code [0]} = reasoning content, {@code [1]} = clean text
+     */
+    public static String[] extractThinkingContent(String text) {
+        if (text == null || text.isEmpty()) return new String[]{"", text != null ? text : ""};
+
+        // First remove blank blocks so they don't pollute reasoning content
+        String cleaned = stripBlankThinkingBlocks(text);
+
+        final StringBuilder reasoning = new StringBuilder();
+
+        // Extract named blocks: <think>…</think>, <analysis>…</analysis>, etc.
+        StringBuffer sb = new StringBuffer();
+        Matcher m = NAMED_REASONING_BLOCK.matcher(cleaned);
+        while (m.find()) {
+            String inner = m.group(2).trim();
+            if (!inner.isEmpty()) {
+                if (reasoning.length() > 0) reasoning.append('\n');
+                reasoning.append(inner);
+            }
+            m.appendReplacement(sb, "");
+        }
+        m.appendTail(sb);
+        cleaned = sb.toString();
+
+        // Extract pipe-token blocks: <|word|>…</|word|>
+        sb = new StringBuffer();
+        m = PIPE_TOKEN_REASONING_BLOCK.matcher(cleaned);
+        while (m.find()) {
+            String inner = m.group(2).trim();
+            if (!inner.isEmpty()) {
+                if (reasoning.length() > 0) reasoning.append('\n');
+                reasoning.append(inner);
+            }
+            m.appendReplacement(sb, "");
+        }
+        m.appendTail(sb);
+        cleaned = sb.toString();
+
+        // Extract bracket blocks: [THINK]…[/THINK]
+        sb = new StringBuffer();
+        m = BRACKET_REASONING_BLOCK.matcher(cleaned);
+        while (m.find()) {
+            String inner = m.group(2).trim();
+            if (!inner.isEmpty()) {
+                if (reasoning.length() > 0) reasoning.append('\n');
+                reasoning.append(inner);
+            }
+            m.appendReplacement(sb, "");
+        }
+        m.appendTail(sb);
+        cleaned = sb.toString();
+
+        // Remove orphaned tags left by the extractions above
+        cleaned = ORPHANED_REASONING_TAG.matcher(cleaned).replaceAll("");
+        // Collapse runs of 3+ blank lines
+        cleaned = cleaned.replaceAll("(\r?\n){3,}", "\n\n").trim();
+
+        return new String[]{reasoning.toString(), cleaned};
     }
     
     /**
