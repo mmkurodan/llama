@@ -47,7 +47,7 @@ public class PromptTemplateManager {
      * <ul>
      *   <li>NONE                – model has no toggleable reasoning channel</li>
      *   <li>GEMMA_THINKING      – Gemma-3 thinking variants; kwarg: {@code enable_thinking}</li>
-     *   <li>CHATML_REASONING    – Qwen-QwQ/DeepSeek-R*/LLaMA-Reasoning (ChatML base);
+     *   <li>CHATML_REASONING    – Qwen-QwQ / DeepSeek-R1/R2 / LLaMA-Reasoning (ChatML base);
      *                             kwarg: {@code enable_reasoning}</li>
      *   <li>PHI_REASONING       – Phi-4 reasoning variants; kwarg: {@code reasoning} ("on"/"off")</li>
      *   <li>MISTRAL_REASONING   – Mistral reasoning variants; kwarg: {@code enable_reasoning}</li>
