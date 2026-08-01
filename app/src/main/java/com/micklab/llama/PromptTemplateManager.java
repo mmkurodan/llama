@@ -39,6 +39,27 @@ public class PromptTemplateManager {
         ZEPHYR,
         HERMES
     }
+
+    /**
+     * Reasoning capability of a model — determines which {@code chat_template_kwargs}
+     * key controls the thinking toggle and how prompt-level suppression works.
+     *
+     * <ul>
+     *   <li>NONE                – model has no toggleable reasoning channel</li>
+     *   <li>GEMMA_THINKING      – Gemma-3 thinking variants; kwarg: {@code enable_thinking}</li>
+     *   <li>CHATML_REASONING    – Qwen-QwQ/DeepSeek-R*/LLaMA-Reasoning (ChatML base);
+     *                             kwarg: {@code enable_reasoning}</li>
+     *   <li>PHI_REASONING       – Phi-4 reasoning variants; kwarg: {@code reasoning} ("on"/"off")</li>
+     *   <li>MISTRAL_REASONING   – Mistral reasoning variants; kwarg: {@code enable_reasoning}</li>
+     * </ul>
+     */
+    public enum ReasoningCapability {
+        NONE,
+        GEMMA_THINKING,
+        CHATML_REASONING,
+        PHI_REASONING,
+        MISTRAL_REASONING,
+    }
     
     // Message class for chat format
     public static class Message {
@@ -252,6 +273,101 @@ public class PromptTemplateManager {
         return ModelFamily.CHATML;
     }
     
+    // ── Reasoning-capability detection ──────────────────────────────────────────────────────
+
+    /** Keywords in the model filename that indicate a reasoning/thinking variant. */
+    private static boolean hasReasoningKeyword(String lower) {
+        return lower.contains("think")  || lower.contains("reason")
+            || lower.contains("-r1")    || lower.contains("-r2")    || lower.contains("-r3")
+            || lower.contains("_r1")    || lower.contains("_r2")
+            || lower.contains("qwq")    || lower.contains("-o1")    || lower.contains("-o3")
+            || lower.contains("cot")    || lower.contains("insight");
+    }
+
+    /**
+     * Infer the {@link ReasoningCapability} of a model from its filename/path.
+     * Pass the GGUF file name or the full path; detection is case-insensitive.
+     */
+    public static ReasoningCapability detectReasoningCapability(String modelPath) {
+        if (modelPath == null || modelPath.isEmpty()) return ReasoningCapability.NONE;
+        String lower = modelPath.toLowerCase(Locale.US);
+
+        // Gemma thinking/reasoning variants (e.g. gemma-3-1b-thinking, gemma-3-4b-it-reasoning)
+        if (lower.contains("gemma") && hasReasoningKeyword(lower))
+            return ReasoningCapability.GEMMA_THINKING;
+
+        // Qwen QwQ or Qwen-Thinking variants
+        if (lower.contains("qwq") || (lower.contains("qwen") && hasReasoningKeyword(lower)))
+            return ReasoningCapability.CHATML_REASONING;
+
+        // DeepSeek-R1, DeepSeek-R2, etc.
+        if (lower.contains("deepseek") && hasReasoningKeyword(lower))
+            return ReasoningCapability.CHATML_REASONING;
+
+        // LLaMA reasoning variants (e.g. llama-3.1-r, llama-3-thinking)
+        if ((lower.contains("llama")) && hasReasoningKeyword(lower))
+            return ReasoningCapability.CHATML_REASONING;
+
+        // Phi reasoning variants (e.g. phi-4-reasoning, phi-4-mini-reasoning)
+        if (lower.contains("phi") && hasReasoningKeyword(lower))
+            return ReasoningCapability.PHI_REASONING;
+
+        // Mistral reasoning variants (e.g. mistral-large-reasoning, pixtral-reasoning)
+        if ((lower.contains("mistral") || lower.contains("pixtral") || lower.contains("mixtral"))
+                && hasReasoningKeyword(lower))
+            return ReasoningCapability.MISTRAL_REASONING;
+
+        return ReasoningCapability.NONE;
+    }
+
+    /**
+     * Return the {@code chat_template_kwargs} JSON object that toggles reasoning for
+     * the given capability.  Returns an empty object for {@link ReasoningCapability#NONE}.
+     *
+     * <ul>
+     *   <li>GEMMA_THINKING   → {@code {"enable_thinking": true/false}}</li>
+     *   <li>CHATML_REASONING / MISTRAL_REASONING → {@code {"enable_reasoning": true/false}}</li>
+     *   <li>PHI_REASONING    → {@code {"reasoning": "on"/"off"}}</li>
+     * </ul>
+     */
+    public static JSONObject buildThinkingKwargs(ReasoningCapability capability, boolean enableThinking)
+            throws JSONException {
+        JSONObject kwargs = new JSONObject();
+        switch (capability) {
+            case GEMMA_THINKING:
+                kwargs.put("enable_thinking", enableThinking);
+                break;
+            case CHATML_REASONING:
+            case MISTRAL_REASONING:
+                kwargs.put("enable_reasoning", enableThinking);
+                break;
+            case PHI_REASONING:
+                kwargs.put("reasoning", enableThinking ? "on" : "off");
+                break;
+            case NONE:
+            default:
+                break;
+        }
+        return kwargs;
+    }
+
+    /**
+     * Return the {@code chat_template_kwargs} key that controls thinking for the
+     * capability, or {@code null} if the model has no reasoning toggle.
+     * Used to inform the WebUI which kwarg key to include in its requests.
+     */
+    public static String getThinkingKwargsKey(ReasoningCapability capability) {
+        switch (capability) {
+            case GEMMA_THINKING:   return "enable_thinking";
+            case CHATML_REASONING:
+            case MISTRAL_REASONING: return "enable_reasoning";
+            case PHI_REASONING:    return "reasoning";
+            default:               return null;
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────────────────
+
     /**
      * Get the template for a model family.
      */

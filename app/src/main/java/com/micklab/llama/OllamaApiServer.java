@@ -1558,6 +1558,11 @@ public class OllamaApiServer {
         params.put("timings_per_token", false);
         params.put("post_sampling_probs", false);
         params.put("lora", new JSONArray());
+        // Model-specific chat_template_kwargs for reasoning toggle
+        PromptTemplateManager.ReasoningCapability cap =
+                PromptTemplateManager.detectReasoningCapability(config.modelUrl);
+        params.put("chat_template_kwargs",
+                PromptTemplateManager.buildThinkingKwargs(cap, config.enableThinking));
         return params;
     }
 
@@ -1571,8 +1576,16 @@ public class OllamaApiServer {
         // ensuring <think> blocks are stripped server-side rather than sent back to the API.
         settings.put("disableReasoningParsing", !config.enableThinking);
         // Problem 2: surface the raw thinking flag so the bundle can derive
-        // chat_template_kwargs.enable_thinking for the generation request.
+        // chat_template_kwargs for the generation request.
         settings.put("enableThinking", config.enableThinking);
+        // Inform the WebUI which chat_template_kwargs key to use for this model family
+        // so it sends the model-appropriate reasoning-toggle parameter.
+        PromptTemplateManager.ReasoningCapability webUiCap =
+                PromptTemplateManager.detectReasoningCapability(config.modelUrl);
+        String kwargsKey = PromptTemplateManager.getThinkingKwargsKey(webUiCap);
+        if (kwargsKey != null) {
+            settings.put("thinkingKwargsKey", kwargsKey);
+        }
         settings.put("excludeReasoningFromContext", false);
         settings.put("sendOnEnter", false);
         settings.put("showRawModelNames", false);
@@ -1666,6 +1679,10 @@ public class OllamaApiServer {
         params.put("timings_per_token", false);
         params.put("post_sampling_probs", false);
         params.put("lora", new JSONArray());
+        PromptTemplateManager.ReasoningCapability slotCap =
+                PromptTemplateManager.detectReasoningCapability(config.modelUrl);
+        params.put("chat_template_kwargs",
+                PromptTemplateManager.buildThinkingKwargs(slotCap, config.enableThinking));
         return params;
     }
 
@@ -1804,9 +1821,24 @@ public class OllamaApiServer {
     private static boolean resolveEnableThinking(JSONObject request, ConfigurationManager.Configuration config) {
         boolean configDefault = config == null || config.enableThinking;
         if (request == null) return configDefault;
+
+        // 1st priority: reasoning_format (set by our WebUI patch and compatible clients)
         String fmt = request.optString("reasoning_format", null);
-        if (fmt == null) return configDefault;
-        return !"none".equalsIgnoreCase(fmt);
+        if (fmt != null) return !"none".equalsIgnoreCase(fmt);
+
+        // 2nd priority: chat_template_kwargs — model-specific thinking keys sent by
+        // well-behaved clients that know the model family.
+        JSONObject kwargs = request.optJSONObject("chat_template_kwargs");
+        if (kwargs != null) {
+            if (kwargs.has("enable_thinking"))
+                return kwargs.optBoolean("enable_thinking", configDefault);
+            if (kwargs.has("enable_reasoning"))
+                return kwargs.optBoolean("enable_reasoning", configDefault);
+            if (kwargs.has("reasoning"))
+                return !"off".equalsIgnoreCase(kwargs.optString("reasoning", ""));
+        }
+
+        return configDefault;
     }
 
     private void applyRequestOverrides(ConfigurationManager.Configuration config, JSONObject request) {
