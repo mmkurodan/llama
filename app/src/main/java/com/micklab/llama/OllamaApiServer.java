@@ -2691,6 +2691,10 @@ public class OllamaApiServer {
 
                 applyNPredictOverride(request, config);
 
+                // Structured output: handle "response_format" (json_object / json_schema) and
+                // also clear any grammar left over from a previous request.
+                applyStructuredOutputConstraint(request);
+
                 String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
                 String customTemplate = config != null ? config.customChatTemplate : null;
                 String settingsSystemPrompt = config != null ? config.systemPrompt : null;
@@ -3214,11 +3218,24 @@ public class OllamaApiServer {
      * (Ollama: the string "json" or a JSON Schema object). Always set-or-clears, so a constraint
      * from a previous request never leaks into the next one.
      */
+    /**
+     * Reads structured-output fields from the request and applies (or clears) the grammar
+     * constraint for the next native generate() call.
+     *
+     * Ollama fields:  "grammar" (raw GBNF)  /  "format" ("json" | JSON-Schema object)
+     * OpenAI fields:  "response_format" → type "json_object" | "json_schema" | "text"
+     *
+     * Always calls setGrammarConstraint so a constraint from a previous request is cleared
+     * when the new request does not include one.
+     */
     private void applyStructuredOutputConstraint(JSONObject request) {
         String gbnf = "";
         String schema = "";
         try {
+            // Ollama: "grammar" (raw GBNF)
             gbnf = request.optString("grammar", "");
+
+            // Ollama: "format" — "json" or JSON-Schema object
             Object format = request.opt("format");
             if (format instanceof JSONObject) {
                 schema = format.toString();
@@ -3228,6 +3245,27 @@ public class OllamaApiServer {
                     schema = "{\"type\":\"object\"}";
                 } else if (f.startsWith("{")) {
                     schema = f;
+                }
+            }
+
+            // OpenAI: "response_format" → { "type": "json_object" | "json_schema" | "text" }
+            if (schema.isEmpty() && gbnf.isEmpty()) {
+                JSONObject rf = request.optJSONObject("response_format");
+                if (rf != null) {
+                    String rfType = rf.optString("type", "").trim();
+                    if ("json_object".equalsIgnoreCase(rfType)) {
+                        schema = "{\"type\":\"object\"}";
+                    } else if ("json_schema".equalsIgnoreCase(rfType)) {
+                        // { "type": "json_schema", "json_schema": { "name": "...", "schema": {...} } }
+                        JSONObject jsPkg = rf.optJSONObject("json_schema");
+                        if (jsPkg != null) {
+                            JSONObject jsSchema = jsPkg.optJSONObject("schema");
+                            if (jsSchema != null) {
+                                schema = jsSchema.toString();
+                            }
+                        }
+                    }
+                    // "text" → no constraint; schema stays ""
                 }
             }
         } catch (Throwable t) {

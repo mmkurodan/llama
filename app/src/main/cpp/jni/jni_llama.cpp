@@ -2971,10 +2971,11 @@ Java_com_micklab_llama_LlamaNative_setSamplerOrder(
 }
 
 // ---------------- JNI: setGrammar ----------------
-// Sets the GBNF grammar applied by the next generate() call. Precedence: a non-empty raw
-// GBNF string is used directly; otherwise a non-empty JSON Schema string is converted via
-// json_schema_to_grammar; otherwise the constraint is cleared. OllamaApiServer calls this
-// from the /api/chat and /api/generate "format"/"grammar" fields.
+// Sets the grammar constraint applied by the next generate() call.
+// Precedence: a non-empty GBNF string is used as-is (TYPE_USER); otherwise a non-empty JSON
+// Schema is converted to GBNF via json_schema_to_grammar (TYPE_OUTPUT_FORMAT, same as arg.cpp);
+// otherwise the constraint is cleared. OllamaApiServer calls this from the /api/chat and
+// /api/generate "format"/"grammar" fields.
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_micklab_llama_LlamaNative_setGrammar(
@@ -2993,8 +2994,17 @@ Java_com_micklab_llama_LlamaNative_setGrammar(
     if (!gbnf.empty()) {
         g_grammar = { COMMON_GRAMMAR_TYPE_USER, gbnf };
     } else if (!schema.empty()) {
-        // Pass the JSON schema as-is; common_sampler converts it to a grammar internally.
-        g_grammar = { COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, schema };
+        // Convert the JSON schema to GBNF now, the same way arg.cpp does it.
+        // common_sampler_init passes grammar.grammar directly to llama_sampler_init_grammar,
+        // which expects GBNF — storing the raw JSON schema there causes "failed to parse grammar".
+        try {
+            const std::string gbnf_from_schema = json_schema_to_grammar(json::parse(schema));
+            g_grammar = { COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, gbnf_from_schema };
+        } catch (const std::exception & e) {
+            log_to_file(std::string("setGrammar: json_schema_to_grammar failed: ") + e.what(),
+                        GGML_LOG_LEVEL_ERROR);
+            g_grammar = {};
+        }
     } else {
         g_grammar = {};
     }
