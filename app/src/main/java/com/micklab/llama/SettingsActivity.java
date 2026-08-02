@@ -3,6 +3,7 @@ package com.micklab.llama;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ContentValues;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -16,8 +17,11 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -43,6 +47,7 @@ import android.widget.Toast;
 import org.json.JSONException;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -69,6 +74,7 @@ public class SettingsActivity extends Activity {
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_PERF_METRICS = "show_perf_metrics";
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
+    private static final int REQUEST_RESTORE_DIR = 1002;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
     
@@ -168,6 +174,8 @@ public class SettingsActivity extends Activity {
     private Button saveConfigButton;
     private Button loadConfigButton;
     private Button deleteConfigButton;
+    private Button backupProfilesButton;
+    private Button restoreProfilesButton;
     private Button backButton;
     private Button cancelButton;
     private LinearLayout settingsContentContainer;
@@ -443,14 +451,20 @@ public class SettingsActivity extends Activity {
         saveConfigButton = findViewById(R.id.saveConfigButton);
         loadConfigButton = findViewById(R.id.loadConfigButton);
         deleteConfigButton = findViewById(R.id.deleteConfigButton);
+        backupProfilesButton = findViewById(R.id.backupProfilesButton);
+        restoreProfilesButton = findViewById(R.id.restoreProfilesButton);
         backButton = findViewById(R.id.backButton);
         cancelButton = findViewById(R.id.cancelButton);
-        
+
         saveConfigButton.setOnClickListener(v -> {
-            if (isBusyActionBlocked()) {
-                return;
-            }
-            saveCurrentConfiguration();
+            if (isBusyActionBlocked()) return;
+            String name = configNameInput.getText().toString().trim();
+            new AlertDialog.Builder(this)
+                .setTitle(localizedText("設定を保存", "Save Configuration"))
+                .setMessage(localizedText("「" + name + "」を保存しますか？", "Save \"" + name + "\"?"))
+                .setPositiveButton(localizedText("保存", "Save"), (d, w) -> saveCurrentConfiguration())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
         });
         loadConfigButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
@@ -459,11 +473,21 @@ public class SettingsActivity extends Activity {
             loadSelectedConfiguration();
         });
         deleteConfigButton.setOnClickListener(v -> {
-            if (isBusyActionBlocked()) {
+            if (isBusyActionBlocked()) return;
+            String name = configNameInput.getText().toString().trim();
+            if (name.isEmpty()) {
+                showToast(localizedText("設定が選択されていません", "No configuration selected"));
                 return;
             }
-            deleteSelectedConfiguration();
+            new AlertDialog.Builder(this)
+                .setTitle(localizedText("設定を削除", "Delete Configuration"))
+                .setMessage(localizedText("「" + name + "」を削除しますか？この操作は取り消せません。", "Delete \"" + name + "\"? This cannot be undone."))
+                .setPositiveButton(localizedText("削除", "Delete"), (d, w) -> deleteSelectedConfiguration())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
         });
+        backupProfilesButton.setOnClickListener(v -> performBackup());
+        restoreProfilesButton.setOnClickListener(v -> performRestore());
         loadModelButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) {
                 return;
@@ -591,6 +615,8 @@ public class SettingsActivity extends Activity {
         if (saveConfigButton != null) saveConfigButton.setEnabled(!isBusy);
         if (loadConfigButton != null) loadConfigButton.setEnabled(!isBusy);
         if (deleteConfigButton != null) deleteConfigButton.setEnabled(!isBusy);
+        if (backupProfilesButton != null) backupProfilesButton.setEnabled(!isBusy);
+        if (restoreProfilesButton != null) restoreProfilesButton.setEnabled(!isBusy);
         if (importModelButton != null) importModelButton.setEnabled(!isBusy);
         if (searchGgufButton != null) searchGgufButton.setEnabled(!isBusy);
         if (loadModelButton != null) loadModelButton.setEnabled(!isBusy);
@@ -702,6 +728,9 @@ public class SettingsActivity extends Activity {
             case "Delete Config": return "設定を削除";
             case "Load Configuration:": return "設定を読み込み:";
             case "Load Selected Config": return "選択した設定を読み込む";
+            case "Backup &amp; Restore": return "バックアップ・復元";
+            case "Backup Profiles": return "プロファイルをバックアップ";
+            case "Restore Profiles": return "プロファイルを復元";
             case "Model Loading": return "モデル読込み";
             case "Model Management": return "モデル管理";
             case "MTP Settings": return "MTP設定";
@@ -3148,6 +3177,161 @@ public class SettingsActivity extends Activity {
         return ModelFileHelper.getModelStorageDir(this);
     }
     
+    private void performBackup() {
+        String ts = String.format(Locale.US, "%1$tY-%1$tm-%1$td_%1$tH%1$tM%1$tS", new java.util.Date());
+        String folderName = "LlamaBackup_" + ts;
+        showToast(localizedText("バックアップを開始しています...", "Starting backup..."));
+        new Thread(() -> {
+            try {
+                File configDir = new File(getExternalFilesDir(null), "configs");
+                File[] configFiles = configDir.listFiles((d, n) -> n.endsWith(".json"));
+                File[] modelFiles = getManagedGgufFiles();
+                int profileCount = 0, modelCount = 0;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    if (configFiles != null) {
+                        for (File f : configFiles) {
+                            if (insertToDownloads(f, "Download/" + folderName + "/profiles/", "application/json")) profileCount++;
+                        }
+                    }
+                    for (File f : modelFiles) {
+                        if (insertToDownloads(f, "Download/" + folderName + "/models/", "application/octet-stream")) modelCount++;
+                    }
+                    final int pc = profileCount, mc = modelCount;
+                    showToast(localizedText(
+                        "バックアップ完了: Download/" + folderName + " (" + pc + " プロファイル, " + mc + " モデル)",
+                        "Backup complete: Download/" + folderName + " (" + pc + " profiles, " + mc + " models)"
+                    ));
+                } else {
+                    File backupDir = new File(getExternalFilesDir(null), "backups/" + folderName);
+                    File profilesDir = new File(backupDir, "profiles");
+                    File modelsDir = new File(backupDir, "models");
+                    profilesDir.mkdirs();
+                    modelsDir.mkdirs();
+                    if (configFiles != null) {
+                        for (File f : configFiles) { streamCopyFile(f, new File(profilesDir, f.getName())); profileCount++; }
+                    }
+                    for (File f : modelFiles) { streamCopyFile(f, new File(modelsDir, f.getName())); modelCount++; }
+                    final int pc = profileCount, mc = modelCount;
+                    showToast(localizedText(
+                        "バックアップ完了: " + backupDir.getAbsolutePath() + " (" + pc + " プロファイル, " + mc + " モデル)",
+                        "Backup complete: " + backupDir.getAbsolutePath() + " (" + pc + " profiles, " + mc + " models)"
+                    ));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Backup failed", e);
+                showToast(localizedText("バックアップに失敗しました: ", "Backup failed: ") + e.getMessage());
+            }
+        }).start();
+    }
+
+    @android.annotation.SuppressLint("InlinedApi")
+    private boolean insertToDownloads(File src, String relativePath, String mimeType) throws IOException {
+        ContentValues cv = new ContentValues();
+        cv.put(MediaStore.Downloads.DISPLAY_NAME, src.getName());
+        cv.put(MediaStore.Downloads.RELATIVE_PATH, relativePath);
+        cv.put(MediaStore.Downloads.MIME_TYPE, mimeType);
+        Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+        if (uri == null) return false;
+        try (OutputStream os = getContentResolver().openOutputStream(uri);
+             InputStream is = new FileInputStream(src)) {
+            streamCopy(is, os);
+        }
+        return true;
+    }
+
+    private void performRestore() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        startActivityForResult(intent, REQUEST_RESTORE_DIR);
+    }
+
+    private void restoreFromTree(Uri treeUri) {
+        showToast(localizedText("復元を開始しています...", "Starting restore..."));
+        new Thread(() -> {
+            try {
+                int profileCount = 0, modelCount = 0;
+                String rootDocId = DocumentsContract.getTreeDocumentId(treeUri);
+                Uri rootChildrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocId);
+                String[] proj = {
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE
+                };
+
+                String profilesFolderId = null, modelsFolderId = null;
+                try (Cursor c = getContentResolver().query(rootChildrenUri, proj, null, null, null)) {
+                    while (c != null && c.moveToNext()) {
+                        String id = c.getString(0), name = c.getString(1), mime = c.getString(2);
+                        if ("profiles".equals(name) && DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) profilesFolderId = id;
+                        if ("models".equals(name) && DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) modelsFolderId = id;
+                    }
+                }
+
+                File configDir = new File(getExternalFilesDir(null), "configs");
+                if (profilesFolderId != null) {
+                    Uri childUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, profilesFolderId);
+                    try (Cursor c = getContentResolver().query(childUri, proj, null, null, null)) {
+                        while (c != null && c.moveToNext()) {
+                            String id = c.getString(0), name = c.getString(1);
+                            if (name.endsWith(".json")) {
+                                Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id);
+                                try (InputStream is = getContentResolver().openInputStream(fileUri);
+                                     OutputStream os = new FileOutputStream(new File(configDir, name))) {
+                                    streamCopy(is, os);
+                                }
+                                profileCount++;
+                            }
+                        }
+                    }
+                }
+
+                File modelDir = ModelFileHelper.getModelStorageDir(this);
+                if (modelsFolderId != null) {
+                    Uri childUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, modelsFolderId);
+                    try (Cursor c = getContentResolver().query(childUri, proj, null, null, null)) {
+                        while (c != null && c.moveToNext()) {
+                            String id = c.getString(0), name = c.getString(1);
+                            if (ModelFileHelper.isGgufFilename(name)) {
+                                Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id);
+                                File dest = new File(modelDir, name);
+                                if (!dest.exists()) {
+                                    try (InputStream is = getContentResolver().openInputStream(fileUri);
+                                         OutputStream os = new FileOutputStream(dest)) {
+                                        streamCopy(is, os);
+                                    }
+                                    modelCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                final int pc = profileCount, mc = modelCount;
+                showToast(localizedText(
+                    "復元完了: " + pc + " プロファイル, " + mc + " モデル",
+                    "Restore complete: " + pc + " profiles, " + mc + " models"
+                ));
+                runOnUiThread(() -> loadConfigList());
+            } catch (Exception e) {
+                Log.e(TAG, "Restore failed", e);
+                showToast(localizedText("復元に失敗しました: ", "Restore failed: ") + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void streamCopy(InputStream is, OutputStream os) throws IOException {
+        byte[] buf = new byte[65536];
+        int n;
+        while ((n = is.read(buf)) != -1) os.write(buf, 0, n);
+    }
+
+    private void streamCopyFile(File src, File dst) throws IOException {
+        try (InputStream is = new FileInputStream(src);
+             OutputStream os = new FileOutputStream(dst)) {
+            streamCopy(is, os);
+        }
+    }
+
     private void showToast(final String msg) {
         runOnUiThread(() -> {
             Toast toast = Toast.makeText(SettingsActivity.this, msg, Toast.LENGTH_LONG);
@@ -3187,6 +3371,21 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_RESTORE_DIR) {
+            if (resultCode == RESULT_OK && data != null) {
+                Uri treeUri = data.getData();
+                if (treeUri != null) {
+                    try {
+                        getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (SecurityException e) {
+                        Log.w(TAG, "Cannot persist read permission for restore dir", e);
+                    }
+                    restoreFromTree(treeUri);
+                }
+            }
+            return;
+        }
 
         if (requestCode != REQUEST_IMPORT_MODEL_LOCAL_DEVICE || resultCode != RESULT_OK) {
             return;

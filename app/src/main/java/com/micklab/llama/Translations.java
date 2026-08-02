@@ -275,6 +275,9 @@ public final class Translations {
         e("Delete Config", "Supprimer la config", "Eliminar config", "Excluir config", "Konfiguration löschen", "Elimina config", "删除配置", "구성 삭제");
         e("Load Configuration:", "Charger une configuration :", "Cargar configuración:", "Carregar configuração:", "Konfiguration laden:", "Carica configurazione:", "加载配置：", "구성 로드:");
         e("Load Selected Config", "Charger la config sélectionnée", "Cargar la config seleccionada", "Carregar a config selecionada", "Ausgewählte Konfiguration laden", "Carica la config selezionata", "加载所选配置", "선택한 구성 로드");
+        e("Backup Profiles", "Sauvegarder les profils", "Hacer copia de seguridad de perfiles", "Fazer backup dos perfis", "Profile sichern", "Backup dei profili", "备份配置文件", "프로필 백업");
+        e("Restore Profiles", "Restaurer les profils", "Restaurar perfiles", "Restaurar perfis", "Profile wiederherstellen", "Ripristina profili", "恢复配置文件", "프로필 복원");
+        e("Backup & Restore", "Sauvegarde et restauration", "Copia de seguridad y restauración", "Backup e restauração", "Sichern und Wiederherstellen", "Backup e ripristino", "备份与恢复", "백업 및 복원");
         e("Model Loading", "Chargement du modèle", "Carga de modelo", "Carregamento de modelo", "Modell laden", "Caricamento del modello", "模型加载", "모델 로드");
         e("Model Management", "Gestion des modèles", "Gestión de modelos", "Gerenciamento de modelos", "Modellverwaltung", "Gestione modelli", "模型管理", "모델 관리");
         e("MTP Settings", "Paramètres MTP", "Configuración de MTP", "Configurações de MTP", "MTP-Einstellungen", "Impostazioni MTP", "MTP 设置", "MTP 설정");

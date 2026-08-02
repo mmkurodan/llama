@@ -50,6 +50,13 @@
             android:drawableEnd="@drawable/ic_arrow_drop_down"
             android:drawablePadding="8dp" />
 
+        <Button
+            style="@style/PrimaryButton" android:id="@+id/loadConfigButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Load Selected Config" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -72,13 +79,6 @@
                 android:text="Delete Config"
                 android:layout_marginStart="4dp" />
         </LinearLayout>
-
-        <Button
-            style="@style/PrimaryButton" android:id="@+id/loadConfigButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Load Selected Config" />
 
         <!-- Divider -->
         <View
@@ -1178,6 +1178,44 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="48dp" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#CCCCCC"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Backup & Restore Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Backup &amp; Restore"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <Button
+            style="@style/PrimaryButton" android:id="@+id/backupProfilesButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Backup Profiles" />
+
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/restoreProfilesButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Restore Profiles" />
 
         <!-- Divider -->
         <View
