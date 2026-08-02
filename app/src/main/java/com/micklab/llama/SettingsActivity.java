@@ -3187,15 +3187,18 @@ public class SettingsActivity extends Activity {
                 File[] configFiles = configDir.listFiles((d, n) -> n.endsWith(".json"));
                 File[] modelFiles = getManagedGgufFiles();
                 int profileCount = 0, modelCount = 0;
+                String settingsJson = buildSharedSettingsJson().toString(2);
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    String root = "Download/" + folderName + "/";
+                    insertJsonToDownloads(settingsJson, "settings.json", root);
                     if (configFiles != null) {
                         for (File f : configFiles) {
-                            if (insertToDownloads(f, "Download/" + folderName + "/profiles/", "application/json")) profileCount++;
+                            if (insertToDownloads(f, root + "profiles/", "application/json")) profileCount++;
                         }
                     }
                     for (File f : modelFiles) {
-                        if (insertToDownloads(f, "Download/" + folderName + "/models/", "application/octet-stream")) modelCount++;
+                        if (insertToDownloads(f, root + "models/", "application/octet-stream")) modelCount++;
                     }
                     final int pc = profileCount, mc = modelCount;
                     showToast(localizedText(
@@ -3208,6 +3211,7 @@ public class SettingsActivity extends Activity {
                     File modelsDir = new File(backupDir, "models");
                     profilesDir.mkdirs();
                     modelsDir.mkdirs();
+                    writeTextFile(new File(backupDir, "settings.json"), settingsJson);
                     if (configFiles != null) {
                         for (File f : configFiles) { streamCopyFile(f, new File(profilesDir, f.getName())); profileCount++; }
                     }
@@ -3225,6 +3229,38 @@ public class SettingsActivity extends Activity {
         }).start();
     }
 
+    private org.json.JSONObject buildSharedSettingsJson() throws JSONException {
+        org.json.JSONObject json = new org.json.JSONObject();
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String lang = prefs.getString("display_language", null);
+        if (lang != null) json.put("display_language", lang);
+        json.put(PREF_API_PORT, prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT));
+        if (prefs.contains(PREF_LOG_LEVEL)) json.put(PREF_LOG_LEVEL, prefs.getInt(PREF_LOG_LEVEL, 2));
+        json.put(PREF_SHOW_PERF_METRICS, prefs.getBoolean(PREF_SHOW_PERF_METRICS, false));
+        json.put(McpSettingsHelper.PREF_SHARED_MCP_SERVERS_JSON, McpSettingsHelper.getSharedMcpServersJson(this));
+        json.put(McpSettingsHelper.PREF_SHARED_FUNCTION_DEFINITIONS_JSON, McpSettingsHelper.getSharedFunctionDefinitionsJson(this));
+        json.put(McpSettingsHelper.PREF_SHARED_MCP_ENABLED, McpSettingsHelper.isSharedMcpEnabledOutsideWebUi(this));
+        json.put(McpSettingsHelper.PREF_SHARED_FUNCTION_DEFINITIONS_ENABLED, McpSettingsHelper.isSharedFunctionDefinitionsEnabledOutsideWebUi(this));
+        return json;
+    }
+
+    private void applySharedSettingsJson(org.json.JSONObject json) {
+        SharedPreferences.Editor ed = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
+        if (json.has("display_language")) ed.putString("display_language", json.optString("display_language"));
+        if (json.has(PREF_API_PORT)) ed.putInt(PREF_API_PORT, json.optInt(PREF_API_PORT));
+        if (json.has(PREF_LOG_LEVEL)) ed.putInt(PREF_LOG_LEVEL, json.optInt(PREF_LOG_LEVEL));
+        if (json.has(PREF_SHOW_PERF_METRICS)) ed.putBoolean(PREF_SHOW_PERF_METRICS, json.optBoolean(PREF_SHOW_PERF_METRICS));
+        ed.apply();
+        if (json.has(McpSettingsHelper.PREF_SHARED_MCP_SERVERS_JSON))
+            McpSettingsHelper.saveSharedMcpServersJson(this, json.optString(McpSettingsHelper.PREF_SHARED_MCP_SERVERS_JSON));
+        if (json.has(McpSettingsHelper.PREF_SHARED_FUNCTION_DEFINITIONS_JSON))
+            McpSettingsHelper.saveSharedFunctionDefinitionsJson(this, json.optString(McpSettingsHelper.PREF_SHARED_FUNCTION_DEFINITIONS_JSON));
+        if (json.has(McpSettingsHelper.PREF_SHARED_MCP_ENABLED))
+            McpSettingsHelper.saveSharedMcpEnabledOutsideWebUi(this, json.optBoolean(McpSettingsHelper.PREF_SHARED_MCP_ENABLED));
+        if (json.has(McpSettingsHelper.PREF_SHARED_FUNCTION_DEFINITIONS_ENABLED))
+            McpSettingsHelper.saveSharedFunctionDefinitionsEnabledOutsideWebUi(this, json.optBoolean(McpSettingsHelper.PREF_SHARED_FUNCTION_DEFINITIONS_ENABLED));
+    }
+
     @android.annotation.SuppressLint("InlinedApi")
     private boolean insertToDownloads(File src, String relativePath, String mimeType) throws IOException {
         ContentValues cv = new ContentValues();
@@ -3238,6 +3274,25 @@ public class SettingsActivity extends Activity {
             streamCopy(is, os);
         }
         return true;
+    }
+
+    @android.annotation.SuppressLint("InlinedApi")
+    private void insertJsonToDownloads(String content, String filename, String relativePath) throws IOException {
+        ContentValues cv = new ContentValues();
+        cv.put(MediaStore.Downloads.DISPLAY_NAME, filename);
+        cv.put(MediaStore.Downloads.RELATIVE_PATH, relativePath);
+        cv.put(MediaStore.Downloads.MIME_TYPE, "application/json");
+        Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+        if (uri == null) return;
+        try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+            os.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+    }
+
+    private void writeTextFile(File dst, String content) throws IOException {
+        try (OutputStream os = new FileOutputStream(dst)) {
+            os.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
     }
 
     private void performRestore() {
@@ -3258,12 +3313,30 @@ public class SettingsActivity extends Activity {
                     DocumentsContract.Document.COLUMN_MIME_TYPE
                 };
 
-                String profilesFolderId = null, modelsFolderId = null;
+                String profilesFolderId = null, modelsFolderId = null, settingsDocId = null;
                 try (Cursor c = getContentResolver().query(rootChildrenUri, proj, null, null, null)) {
                     while (c != null && c.moveToNext()) {
                         String id = c.getString(0), name = c.getString(1), mime = c.getString(2);
                         if ("profiles".equals(name) && DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) profilesFolderId = id;
                         if ("models".equals(name) && DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) modelsFolderId = id;
+                        if ("settings.json".equals(name)) settingsDocId = id;
+                    }
+                }
+
+                // Restore shared settings
+                if (settingsDocId != null) {
+                    Uri settingsUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, settingsDocId);
+                    try (InputStream is = getContentResolver().openInputStream(settingsUri);
+                         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+                        if (is != null) {
+                            byte[] buf = new byte[4096];
+                            int n;
+                            while ((n = is.read(buf)) != -1) baos.write(buf, 0, n);
+                            org.json.JSONObject json = new org.json.JSONObject(baos.toString("UTF-8"));
+                            runOnUiThread(() -> applySharedSettingsJson(json));
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to restore settings.json", e);
                     }
                 }
 
@@ -3307,9 +3380,10 @@ public class SettingsActivity extends Activity {
                 }
 
                 final int pc = profileCount, mc = modelCount;
+                final boolean restoredSettings = settingsDocId != null;
                 showToast(localizedText(
-                    "復元完了: " + pc + " プロファイル, " + mc + " モデル",
-                    "Restore complete: " + pc + " profiles, " + mc + " models"
+                    "復元完了: " + pc + " プロファイル, " + mc + " モデル" + (restoredSettings ? ", 共通設定" : ""),
+                    "Restore complete: " + pc + " profiles, " + mc + " models" + (restoredSettings ? ", shared settings" : "")
                 ));
                 runOnUiThread(() -> loadConfigList());
             } catch (Exception e) {
