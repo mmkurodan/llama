@@ -1228,8 +1228,8 @@ public class OllamaApiServer {
                     handleOpenAiEmbeddings(outputStream, body);
                 } else if ("/api/tokenize".equals(path)) {
                     handleOllamaTokenize(outputStream, body);
-                } else if ("/v1/tokenize".equals(path)) {
-                    handleOpenAiTokenize(outputStream, body);
+                } else if ("/v1/responses/input_tokens".equals(path)) {
+                    handleOpenAiInputTokens(outputStream, body);
                 } else if ("/models/load".equals(path)) {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
@@ -3151,8 +3151,8 @@ public class OllamaApiServer {
         }
     }
 
-    /** OpenAI /v1/tokenize : { "model", "input": string } -> { "tokens": [...], "count": N, "ids": [...] } */
-    private void handleOpenAiTokenize(OutputStream outputStream, String body) throws IOException {
+    /** OpenAI /v1/responses/input_tokens : { "model", "input": string } -> { "input_tokens": N, "object": "response.input_tokens" } */
+    private void handleOpenAiInputTokens(OutputStream outputStream, String body) throws IOException {
         try {
             JSONObject request = new JSONObject(body);
             String model = resolveRequestedModel(request.optString("model", null));
@@ -3161,7 +3161,7 @@ public class OllamaApiServer {
                 sendOpenAiErrorResponse(outputStream, 400, "'input' is required", "invalid_request_error");
                 return;
             }
-            if (!acquireGenerationSlot(outputStream, "/v1/tokenize", true)) {
+            if (!acquireGenerationSlot(outputStream, "/v1/responses/input_tokens", true)) {
                 return;
             }
             try {
@@ -3175,7 +3175,10 @@ public class OllamaApiServer {
                     sendOpenAiErrorResponse(outputStream, 500, parsed.getString("error"), "server_error");
                     return;
                 }
-                sendJsonResponse(outputStream, 200, resultJson);
+                JSONObject result = new JSONObject();
+                result.put("input_tokens", parsed.getInt("count"));
+                result.put("object", "response.input_tokens");
+                sendJsonResponse(outputStream, 200, result.toString());
             } finally {
                 modelManager.release();
             }
