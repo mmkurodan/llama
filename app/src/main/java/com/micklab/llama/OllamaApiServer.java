@@ -28,8 +28,11 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -1822,12 +1825,19 @@ public class OllamaApiServer {
         boolean configDefault = config == null || config.enableThinking;
         if (request == null) return configDefault;
 
-        // 1st priority: reasoning_format (set by our WebUI patch and compatible clients)
+        // 1st priority: "think" (Ollama standard — boolean or level string)
+        Object think = request.opt("think");
+        if (think instanceof Boolean) return (Boolean) think;
+        if (think instanceof String) {
+            String s = (String) think;
+            if (!s.isEmpty()) return !"false".equalsIgnoreCase(s);
+        }
+
+        // 2nd priority: reasoning_format (our WebUI and compatible clients)
         String fmt = request.optString("reasoning_format", null);
         if (fmt != null) return !"none".equalsIgnoreCase(fmt);
 
-        // 2nd priority: chat_template_kwargs — model-specific thinking keys sent by
-        // well-behaved clients that know the model family.
+        // 3rd priority: chat_template_kwargs — model-specific thinking keys
         JSONObject kwargs = request.optJSONObject("chat_template_kwargs");
         if (kwargs != null) {
             if (kwargs.has("enable_thinking"))
@@ -2152,7 +2162,7 @@ public class OllamaApiServer {
                                         chunk.put("model", model);
                                         chunk.put("created_at", getTimestamp());
                                         if (ev instanceof ReasoningToken) {
-                                            chunk.put("reasoning_content", ((ReasoningToken) ev).content);
+                                            chunk.put("thinking", ((ReasoningToken) ev).content);
                                             chunk.put("response", "");
                                         } else {
                                             String safeToken = stripResponseMarkers((String) ev);
@@ -2253,7 +2263,7 @@ public class OllamaApiServer {
                     result.put("created_at", getTimestamp());
                     result.put("response", response);
                     if (genReasoning != null && !genReasoning.isEmpty()) {
-                        result.put("reasoning_content", genReasoning);
+                        result.put("thinking", genReasoning);
                     }
                     result.put("done", true);
                     putOllamaMetrics(result);
@@ -2500,7 +2510,7 @@ public class OllamaApiServer {
                                         message.put("role", "assistant");
                                         if (ev instanceof ReasoningToken) {
                                             message.put("content", "");
-                                            message.put("reasoning_content", ((ReasoningToken) ev).content);
+                                            message.put("thinking", ((ReasoningToken) ev).content);
                                         } else {
                                             String safeToken = stripResponseMarkers((String) ev);
                                             message.put("content", safeToken);
@@ -2605,7 +2615,7 @@ public class OllamaApiServer {
                     message.put("role", "assistant");
                     message.put("content", response);
                     if (chatReasoning != null && !chatReasoning.isEmpty()) {
-                        message.put("reasoning_content", chatReasoning);
+                        message.put("thinking", chatReasoning);
                     }
                     result.put("message", message);
                     result.put("done", true);
@@ -2637,6 +2647,8 @@ public class OllamaApiServer {
             JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
             boolean preEncodeOnly = request.has("n_predict") && request.optInt("n_predict", -1) == 0;
+            final String chatId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
+            final long createdAt = System.currentTimeMillis() / 1000L;
 
             if (messages == null || messages.length() == 0) {
                 sendOpenAiErrorResponse(outputStream, 400, "No messages provided", "invalid_request_error");
@@ -2698,7 +2710,9 @@ public class OllamaApiServer {
                                 + (preparedMessages.hasMedia() ? preparedMessages.mediaFiles.size() : 0));
 
                 if (preEncodeOnly) {
-                    sendJsonResponse(outputStream, 200, buildOpenAiChatResponse(model, "").toString());
+                    JSONObject preResp = buildOpenAiChatResponse(model, "");
+                    putChatMeta(preResp, chatId, createdAt);
+                    sendJsonResponse(outputStream, 200, preResp.toString());
                     return;
                 }
 
@@ -2728,46 +2742,39 @@ public class OllamaApiServer {
                                     "\r\n";
                             outputStream.write(header.getBytes(StandardCharsets.UTF_8));
                             outputStream.flush();
-                            sendSseEvent(outputStream, buildOpenAiRoleChunk(model).toString());
+                            JSONObject roleChunk = buildOpenAiRoleChunk(model);
+                            putChatMeta(roleChunk, chatId, createdAt);
+                            sendSseEvent(outputStream, roleChunk.toString());
 
                             if ((toolResult.content != null && !toolResult.content.isEmpty())
                                     || (toolResult.reasoningContent != null && !toolResult.reasoningContent.isEmpty())
                                     || (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0)) {
-                                sendSseEvent(
-                                        outputStream,
-                                        buildOpenAiStreamChunk(
-                                                model,
-                                                toolResult.content,
-                                                toolResult.reasoningContent,
-                                                buildToolCallDeltas(toolResult.toolCalls),
-                                                null
-                                        ).toString()
+                                JSONObject contentChunk = buildOpenAiStreamChunk(
+                                        model,
+                                        toolResult.content,
+                                        toolResult.reasoningContent,
+                                        buildToolCallDeltas(toolResult.toolCalls),
+                                        null
                                 );
+                                putChatMeta(contentChunk, chatId, createdAt);
+                                sendSseEvent(outputStream, contentChunk.toString());
                             }
 
-                            sendSseEvent(
-                                    outputStream,
-                                    buildOpenAiStreamChunk(
-                                            model,
-                                            "",
-                                            null,
-                                            null,
-                                            toolResult.finishReason
-                                    ).toString()
-                            );
+                            JSONObject finalChunk = buildOpenAiStreamChunk(
+                                    model, "", null, null, toolResult.finishReason);
+                            putChatMeta(finalChunk, chatId, createdAt);
+                            sendSseEvent(outputStream, finalChunk.toString());
                             sendSseEvent(outputStream, "[DONE]");
                         } else {
-                            sendJsonResponse(
-                                    outputStream,
-                                    200,
-                                    buildOpenAiChatResponse(
-                                            model,
-                                            toolResult.content,
-                                            toolResult.reasoningContent,
-                                            toolResult.toolCalls,
-                                            toolResult.finishReason
-                                    ).toString()
+                            JSONObject toolResp = buildOpenAiChatResponse(
+                                    model,
+                                    toolResult.content,
+                                    toolResult.reasoningContent,
+                                    toolResult.toolCalls,
+                                    toolResult.finishReason
                             );
+                            putChatMeta(toolResp, chatId, createdAt);
+                            sendJsonResponse(outputStream, 200, toolResp.toString());
                         }
                         return;
                     }
@@ -2795,7 +2802,9 @@ public class OllamaApiServer {
                             "\r\n";
                     outputStream.write(header.getBytes(StandardCharsets.UTF_8));
                     outputStream.flush();
-                    sendSseEvent(outputStream, buildOpenAiRoleChunk(model).toString());
+                    JSONObject roleChunkNonTool = buildOpenAiRoleChunk(model);
+                    putChatMeta(roleChunkNonTool, chatId, createdAt);
+                    sendSseEvent(outputStream, roleChunkNonTool.toString());
 
                     final Object writeLock = new Object();
                     final boolean[] errorSent = { false };
@@ -2825,12 +2834,13 @@ public class OllamaApiServer {
                                     synchronized (writeLock) {
                                         String metricsSuffix = buildPerfMetricsSuffix();
                                         if (!metricsSuffix.isEmpty()) {
-                                            sendSseEvent(outputStream, buildOpenAiStreamChunk(model, metricsSuffix, null, null, null).toString());
+                                            JSONObject metricsChunk = buildOpenAiStreamChunk(model, metricsSuffix, null, null, null);
+                                            putChatMeta(metricsChunk, chatId, createdAt);
+                                            sendSseEvent(outputStream, metricsChunk.toString());
                                         }
-                                        sendSseEvent(
-                                                outputStream,
-                                                buildOpenAiStreamChunk(model, "", null, null, "stop").toString()
-                                        );
+                                        JSONObject stopChunk = buildOpenAiStreamChunk(model, "", null, null, "stop");
+                                        putChatMeta(stopChunk, chatId, createdAt);
+                                        sendSseEvent(outputStream, stopChunk.toString());
                                         sendSseEvent(outputStream, "[DONE]");
                                     }
                                     break;
@@ -2844,9 +2854,10 @@ public class OllamaApiServer {
                                     break;
                                 } else if (ev instanceof ReasoningToken) {
                                     synchronized (writeLock) {
-                                        sendSseEvent(outputStream,
-                                                buildOpenAiStreamChunk(model, null,
-                                                        ((ReasoningToken) ev).content, null, null).toString());
+                                        JSONObject reasoningChunk = buildOpenAiStreamChunk(model, null,
+                                                ((ReasoningToken) ev).content, null, null);
+                                        putChatMeta(reasoningChunk, chatId, createdAt);
+                                        sendSseEvent(outputStream, reasoningChunk.toString());
                                     }
                                 } else {
                                     String token = stripResponseMarkers((String) ev);
@@ -2854,10 +2865,9 @@ public class OllamaApiServer {
                                         continue;
                                     }
                                     synchronized (writeLock) {
-                                        sendSseEvent(
-                                                outputStream,
-                                                buildOpenAiStreamChunk(model, token, null, null, null).toString()
-                                        );
+                                        JSONObject tokenChunk = buildOpenAiStreamChunk(model, token, null, null, null);
+                                        putChatMeta(tokenChunk, chatId, createdAt);
+                                        sendSseEvent(outputStream, tokenChunk.toString());
                                     }
                                 }
                             }
@@ -2921,10 +2931,11 @@ public class OllamaApiServer {
                         oaiContent   = PromptTemplateManager.stripThinkingBlocks(rawResponse);
                     }
                     String response = appendPerfMetrics(stripResponseMarkers(oaiContent));
-                    sendJsonResponse(outputStream, 200,
-                            buildOpenAiChatResponse(model, response,
-                                    (oaiReasoning != null && !oaiReasoning.isEmpty()) ? oaiReasoning : null,
-                                    null, "stop").toString());
+                    JSONObject finalResp = buildOpenAiChatResponse(model, response,
+                            (oaiReasoning != null && !oaiReasoning.isEmpty()) ? oaiReasoning : null,
+                            null, "stop");
+                    putChatMeta(finalResp, chatId, createdAt);
+                    sendJsonResponse(outputStream, 200, finalResp.toString());
                 }
             } finally {
                 modelManager.release();
@@ -2947,7 +2958,7 @@ public class OllamaApiServer {
 
     // ==================== Embeddings ====================
 
-    /** Ollama /api/embed : { "model", "input": string | [string,...] } -> { "model", "embeddings": [[...]] } */
+    /** Ollama /api/embed : { "model", "input": string | [string,...] } -> { "model", "embeddings": [[...]], "total_duration", "load_duration", "prompt_eval_count" } */
     private void handleEmbed(OutputStream outputStream, String body) throws IOException {
         try {
             JSONObject request = new JSONObject(body);
@@ -2960,12 +2971,16 @@ public class OllamaApiServer {
             if (!acquireGenerationSlot(outputStream, "/api/embed")) {
                 return;
             }
+            long startNs = System.nanoTime();
             try {
+                long loadStartNs = System.nanoTime();
                 if (!modelManager.loadConfiguration(model)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
+                long loadDurationNs = System.nanoTime() - loadStartNs;
                 JSONArray embeddings = new JSONArray();
+                int totalPromptTokens = 0;
                 for (String in : inputs) {
                     float[] vec = computeEmbeddingOrNull(in);
                     if (vec == null) {
@@ -2973,10 +2988,16 @@ public class OllamaApiServer {
                         return;
                     }
                     embeddings.put(floatArrayToJson(vec));
+                    LlamaNative llama = modelManager.getLlama();
+                    if (llama != null) totalPromptTokens += llama.getLastNPromptTokens();
                 }
+                long totalDurationNs = System.nanoTime() - startNs;
                 JSONObject result = new JSONObject();
                 result.put("model", model);
                 result.put("embeddings", embeddings);
+                result.put("total_duration", totalDurationNs);
+                result.put("load_duration", loadDurationNs);
+                result.put("prompt_eval_count", totalPromptTokens);
                 sendJsonResponse(outputStream, 200, result.toString());
             } finally {
                 modelManager.release();
@@ -3297,31 +3318,60 @@ public class OllamaApiServer {
         try {
             List<String> configs = configManager.listConfigurations();
             JSONArray models = new JSONArray();
-            
+
             for (String configName : configs) {
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                File modelFile = config != null
+                        ? ModelFileHelper.resolveStoredModelFile(context, config.modelUrl)
+                        : null;
+                PromptTemplateManager.ModelFamily family = PromptTemplateManager.detectModelFamily(
+                        modelFile != null ? modelFile.getAbsolutePath() : configName);
+                String familyName = family.name().toLowerCase(Locale.US);
+                boolean fileExists = modelFile != null && modelFile.exists();
+
                 JSONObject model = new JSONObject();
                 model.put("name", configName);
                 model.put("model", configName);
                 model.put("modified_at", getTimestamp());
-                model.put("size", 0);
-                
+                model.put("size", fileExists ? modelFile.length() : 0);
+                model.put("digest", fileExists ? computeModelDigest(modelFile) : "");
+
                 JSONObject details = new JSONObject();
+                details.put("parent_model", "");
                 details.put("format", "gguf");
-                details.put("family", "llama");
+                details.put("family", familyName);
+                JSONArray families = new JSONArray();
+                families.put(familyName);
+                details.put("families", families);
                 details.put("parameter_size", "unknown");
                 details.put("quantization_level", "unknown");
                 model.put("details", details);
-                
+
                 models.put(model);
             }
-            
+
             JSONObject response = new JSONObject();
             response.put("models", models);
-            
+
             sendJsonResponse(outputStream, 200, response.toString());
         } catch (JSONException e) {
             Log.e(TAG, "Error building tags response", e);
             sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    private static String computeModelDigest(File modelFile) {
+        try {
+            String input = modelFile.getAbsolutePath() + ":" + modelFile.length() + ":" + modelFile.lastModified();
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder("sha256:");
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            return "";
         }
     }
 
@@ -3414,6 +3464,11 @@ public class OllamaApiServer {
         outputStream.flush();
     }
 
+    private static void putChatMeta(JSONObject obj, String id, long created) throws JSONException {
+        obj.put("id", id);
+        obj.put("created", created);
+    }
+
     private JSONObject buildOpenAiChatResponse(String model, String content) throws JSONException {
         return buildOpenAiChatResponse(model, content, null, null, "stop");
     }
@@ -3488,7 +3543,7 @@ public class OllamaApiServer {
         message.put("role", "assistant");
         message.put("content", toolResult.content != null ? toolResult.content : "");
         if (toolResult.reasoningContent != null && !toolResult.reasoningContent.isEmpty()) {
-            message.put("reasoning_content", toolResult.reasoningContent);
+            message.put("thinking", toolResult.reasoningContent);
         }
         if (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0) {
             message.put("tool_calls", toolResult.toolCalls);
@@ -3513,7 +3568,7 @@ public class OllamaApiServer {
                 stripResponseMarkers(toolResult.content != null ? toolResult.content : "")
         );
         if (toolResult.reasoningContent != null && !toolResult.reasoningContent.isEmpty()) {
-            result.put("reasoning_content", toolResult.reasoningContent);
+            result.put("thinking", toolResult.reasoningContent);
         }
         if (toolResult.toolCalls != null && toolResult.toolCalls.length() > 0) {
             result.put("tool_calls", toolResult.toolCalls);
