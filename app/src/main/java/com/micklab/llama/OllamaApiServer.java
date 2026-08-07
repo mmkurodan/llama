@@ -1795,17 +1795,42 @@ public class OllamaApiServer {
     private void applyNPredictOverride(JSONObject request, ConfigurationManager.Configuration config) {
         if (request == null || config == null) return;
         int override = -1;
+        // Check top-level and options sub-object (Ollama API uses options.num_predict)
+        JSONObject options = request.optJSONObject("options");
         if (request.has("num_predict")) {
             override = request.optInt("num_predict", -1);
+        } else if (options != null && options.has("num_predict")) {
+            override = options.optInt("num_predict", -1);
         } else if (request.has("n_predict")) {
             override = request.optInt("n_predict", -1);
+        } else if (options != null && options.has("n_predict")) {
+            override = options.optInt("n_predict", -1);
         } else if (request.has("max_tokens")) {
             override = request.optInt("max_tokens", -1);
         }
-        int effective = override > 0 ? override : config.nPredict;
+        int effective = override >= -1 && override != 0 ? override : config.nPredict;
         try {
             modelManager.getLlama().setNPredict(effective);
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Extract options.num_ctx from the request and notify ModelManager.
+     * If the requested n_ctx differs from the currently loaded one, a model reload is triggered.
+     * Must be called BEFORE modelManager.loadConfiguration().
+     */
+    private void applyNumCtxOverride(JSONObject request) {
+        if (request == null) return;
+        JSONObject options = request.optJSONObject("options");
+        int numCtx = 0;
+        if (options != null && options.has("num_ctx")) {
+            numCtx = options.optInt("num_ctx", 0);
+        } else if (request.has("num_ctx")) {
+            numCtx = request.optInt("num_ctx", 0);
+        }
+        if (numCtx > 0) {
+            modelManager.setNCtxOverrideForNextLoad(numCtx);
+        }
     }
 
     /**
@@ -1854,6 +1879,37 @@ public class OllamaApiServer {
     private void applyRequestOverrides(ConfigurationManager.Configuration config, JSONObject request) {
         if (config == null || request == null) {
             return;
+        }
+
+        // Merge options sub-object (Ollama API convention) into request for uniform handling
+        JSONObject options = request.optJSONObject("options");
+
+        if (options != null && options.has("temperature") && !request.has("temperature")) {
+            try { request.put("temperature", options.get("temperature")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("top_k") && !request.has("top_k")) {
+            try { request.put("top_k", options.get("top_k")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("top_p") && !request.has("top_p")) {
+            try { request.put("top_p", options.get("top_p")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("min_p") && !request.has("min_p")) {
+            try { request.put("min_p", options.get("min_p")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("repeat_penalty") && !request.has("repeat_penalty")) {
+            try { request.put("repeat_penalty", options.get("repeat_penalty")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("repeat_last_n") && !request.has("repeat_last_n")) {
+            try { request.put("repeat_last_n", options.get("repeat_last_n")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("mirostat") && !request.has("mirostat")) {
+            try { request.put("mirostat", options.get("mirostat")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("mirostat_tau") && !request.has("mirostat_tau")) {
+            try { request.put("mirostat_tau", options.get("mirostat_tau")); } catch (Exception ignored) {}
+        }
+        if (options != null && options.has("mirostat_eta") && !request.has("mirostat_eta")) {
+            try { request.put("mirostat_eta", options.get("mirostat_eta")); } catch (Exception ignored) {}
         }
 
         if (request.has("temperature")) {
@@ -1986,8 +2042,9 @@ public class OllamaApiServer {
             if (!acquireGenerationSlot(outputStream, "/api/generate")) {
                 return;
             }
-            
+
             try {
+                applyNumCtxOverride(request);
                 // Load model/configuration if needed (will be fast if same config already loaded)
                 if (!modelManager.loadConfiguration(model)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
@@ -2304,8 +2361,9 @@ public class OllamaApiServer {
             if (!acquireGenerationSlot(outputStream, "/api/chat")) {
                 return;
             }
-            
+
             try {
+                applyNumCtxOverride(request);
                 RequestedModalities requestedModalities = detectRequestedModalities(messages);
 
                 // Load model/configuration if needed (will be fast if same config already loaded)
@@ -2662,6 +2720,7 @@ public class OllamaApiServer {
             if (!acquireGenerationSlot(outputStream, "/v1/chat/completions", true)) {
                 return;
             }
+            applyNumCtxOverride(request);
 
             try {
                 RequestedModalities requestedModalities = detectRequestedModalities(messages);

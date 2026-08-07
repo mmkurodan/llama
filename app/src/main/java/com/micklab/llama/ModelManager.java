@@ -124,6 +124,10 @@ public class ModelManager {
     // Set when settings are saved: force a model reload on the next load so any config
     // change (incl. GPU/NPU backend) takes effect for both direct and API runs.
     private volatile boolean reloadRequested = false;
+    // n_ctx actually used by the currently loaded llama_context.
+    private volatile int currentNCtx = 0;
+    // Per-request n_ctx override from options.num_ctx; 0 = use config value.
+    private volatile int nCtxOverrideForNextLoad = 0;
     private volatile String currentMmprojPath = null;
     private volatile boolean currentSupportsVision = false;
     private volatile boolean currentSupportsAudio = false;
@@ -289,6 +293,25 @@ public class ModelManager {
     /** Force the next load() to actually reload (e.g. after settings are saved). */
     public void requestReloadOnNextLoad() {
         reloadRequested = true;
+    }
+
+    /** n_ctx of the currently loaded llama_context (0 if nothing is loaded yet). */
+    public int getCurrentNCtx() {
+        return currentNCtx;
+    }
+
+    /**
+     * Override n_ctx for the next loadConfiguration() call.
+     * If the requested value differs from the loaded context, a model reload is triggered
+     * automatically so the new context window takes effect immediately.
+     */
+    public void setNCtxOverrideForNextLoad(int nCtx) {
+        if (nCtx > 0) {
+            nCtxOverrideForNextLoad = nCtx;
+            if (nCtx != currentNCtx) {
+                reloadRequested = true;
+            }
+        }
     }
 
     public boolean isLoadedConfigurationMatching(ConfigurationManager.Configuration config) {
@@ -548,6 +571,11 @@ public class ModelManager {
         boolean shouldClearPendingLoad = false;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+            // Apply per-request n_ctx override (from options.num_ctx) if set.
+            if (nCtxOverrideForNextLoad > 0) {
+                config.nCtx = nCtxOverrideForNextLoad;
+                nCtxOverrideForNextLoad = 0;
+            }
             DiagnosticsLogger.logEvent(context, "model-load", "Loading configuration: " + configName);
             
             // Extract filename from URL or imported local model reference
@@ -818,6 +846,7 @@ public class ModelManager {
 
     private void applyLoadParameters(ConfigurationManager.Configuration config, int nCtxOverride) {
         int nCtx = safePositive(nCtxOverride > 0 ? nCtxOverride : config.nCtx, DEFAULT_N_CTX);
+        currentNCtx = nCtx;
         int nThreads = safePositive(config.nThreads, DEFAULT_N_THREADS);
         int nBatch = safePositive(config.nBatch, DEFAULT_N_BATCH);
         float temp = safeFinite((float) config.temp, DEFAULT_TEMP);
