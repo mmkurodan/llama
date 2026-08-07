@@ -3041,6 +3041,11 @@ Java_com_micklab_llama_LlamaNative_embed(
     if ((int) tokens.size() > g_n_ctx) {
         tokens.resize(g_n_ctx);
     }
+    // llama_decode asserts n_tokens <= n_batch; truncate so long texts don't SIGABRT.
+    // Mean-pooling over the first n_batch tokens is acceptable for embedding quality.
+    if ((int) tokens.size() > g_n_batch) {
+        tokens.resize(g_n_batch);
+    }
 
     const int n_embd = llama_model_n_embd_out(g_model);
     if (n_embd <= 0) {
