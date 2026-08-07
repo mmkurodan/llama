@@ -1,0 +1,100 @@
+2026-08-07 12:42:12 [JNI] setNPredict: n_predict=-1
+2026-08-07 12:42:12 [JNI] setParameters: penalty_last_n=64 penalty_repeat=1.1 penalty_freq=0 penalty_present=0 mirostat=0 mirostat_tau=5 mirostat_eta=0.1 min_p=0.01 typical_p=1 dynatemp_range=0 dynatemp_exponent=1 xtc_probability=0 xtc_threshold=0.1 top_n_sigma=-1 dry_multiplier=0 dry_base=1.75 dry_allowed_length=2 dry_penalty_last_n=-1 dry_sequence_breakers="\n,:,",*"
+2026-08-07 12:42:12 [JNI] setNPredict: n_predict=-1
+2026-08-07 12:42:12 [JNI] getChatTemplate: found template, len=7816
+2026-08-07 12:42:12.276 pid=1785 [mm-diag] endpoint=/api/chat reqVision=false reqAudio=false supportsVision=false supportsAudio=false
+2026-08-07 12:42:12.277 pid=1785 [mm-diag] endpoint=/api/chat mediaExtracted=0
+2026-08-07 12:42:12.279 pid=1785 [generation-start] id=1 config=Qwen model=Qwen3.5-4B-Q4_K_M.gguf promptLen=222 mediaCount=0
+  javaUsed=4.3MB javaTotal=11.9MB javaMax=256.0MB nativeHeap=396.9MB nativeHeapFree=80.4MB nativeHeapSize=481.8MB
+  pssTotal=701.3MB privateDirty=172.2MB sharedDirty=41.4MB nativePss=152.5MB dalvikPss=3.0MB otherPss=545.8MB
+  systemAvail=11.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=157
+  procStatus VmRSS=872684 kB VmHWM=3529800 kB VmSize=21624676 kB VmSwap=4336 kB Threads=34 FDSize=512
+2026-08-07 12:42:12.342 pid=1785 [generation-pending] id=1 config=Qwen model=Qwen3.5-4B-Q4_K_M.gguf promptLen=222 mediaCount=0
+2026-08-07 12:42:12.343 pid=1785 [generation-stage] id=1 stage=native-call-start
+2026-08-07 12:42:12 [JNI] generate: prompt_len=422 media_count=0
+2026-08-07 12:42:12 [JNI] generate: generation context reset n_ctx=2048 n_batch=128 n_threads=4
+2026-08-07 12:42:12 [JNI] [mm-diag] generate: has_media=0 media_count=0 markers=0
+2026-08-07 12:42:12 [JNI] generate: prefill start n_prompt_tokens=79 n_batch=128
+2026-08-07 12:42:12 [JNI] llama.cpp: ggml_opencl: lazy-compiling flash_attn prepass for DK=256 DV=256
+
+2026-08-07 12:42:12 [JNI] llama.cpp: ggml_opencl: compiling fa prepass f16
+
+2026-08-07 12:42:12 [JNI] llama.cpp: ggml_opencl: compiling fa q4_0
+
+2026-08-07 12:42:16 [JNI] llama.cpp: ggml_opencl: compiling fa q4_0 MQ_GQA=8
+
+2026-08-07 12:42:20 [JNI] llama.cpp: ggml_opencl: compiling fa q4_0 c8 GQA4 NSG2
+
+2026-08-07 12:42:23 [JNI] llama.cpp: ggml_opencl: compiling fa q4_0 c8 NSG2
+
+2026-08-07 12:42:28 [JNI] llama.cpp: ggml_opencl: compiling fa q4_0 split DK=256
+
+2026-08-07 12:42:31 [JNI] generate: prefill complete n_prompt_tokens=79
+2026-08-07 12:42:31 [JNI] generate: sampling first token
+2026-08-07 12:42:31 [JNI] generate: first token sampled id=42106
+2026-08-07 12:42:31 [JNI] generate: decoding first sampled token
+2026-08-07 12:42:31 [JNI] generate: first sampled token decode complete
+2026-08-07 12:42:32 [JNI] generate: speed: gen 9.85 tok/s (11 tok / 1.12 s), prompt 4.18 tok/s (79 tok / 18.90 s)
+2026-08-07 12:42:32.423 pid=1785 [generation-stage] id=1 stage=native-call-end resultLen=18
+2026-08-07 12:42:32.425 pid=1785 [generation-end] id=1 resultLen=18
+  javaUsed=4.0MB javaTotal=11.9MB javaMax=256.0MB nativeHeap=400.9MB nativeHeapFree=127.2MB nativeHeapSize=532.7MB
+  pssTotal=731.8MB privateDirty=201.0MB sharedDirty=41.4MB nativePss=175.8MB dalvikPss=2.7MB otherPss=553.3MB
+  systemAvail=11.1GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=157
+  procStatus VmRSS=903896 kB VmHWM=3529800 kB VmSize=21739704 kB VmSwap=4336 kB Threads=34 FDSize=512
+2026-08-07 12:42:34.101 pid=1785 [model-load] Loading configuration: Qwen
+2026-08-07 12:42:34 [JNI] setNPredict: n_predict=-1
+2026-08-07 12:42:34 [JNI] setParameters: penalty_last_n=64 penalty_repeat=1.1 penalty_freq=0 penalty_present=0 mirostat=0 mirostat_tau=5 mirostat_eta=0.1 min_p=0.01 typical_p=1 dynatemp_range=0 dynatemp_exponent=1 xtc_probability=0 xtc_threshold=0.1 top_n_sigma=-1 dry_multiplier=0 dry_base=1.75 dry_allowed_length=2 dry_penalty_last_n=-1 dry_sequence_breakers="\n,:,",*"
+2026-08-07 12:42:34.102 pid=1785 [model-load-skip] config=Qwen model already loaded audioRequested=false audioActive=false projectorActive=false
+  javaUsed=4.3MB javaTotal=11.9MB javaMax=256.0MB nativeHeap=400.9MB nativeHeapFree=127.2MB nativeHeapSize=532.7MB
+  pssTotal=732.0MB privateDirty=201.2MB sharedDirty=41.4MB nativePss=175.8MB dalvikPss=2.9MB otherPss=553.3MB
+  systemAvail=11.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=157
+  procStatus VmRSS=904024 kB VmHWM=3529800 kB VmSize=21739704 kB VmSwap=4336 kB Threads=34 FDSize=512
+2026-08-07 12:42:34 [JNI] llama.cpp: set_embeddings: value = 1
+
+2026-08-07 12:42:34 [JNI] llama.cpp: set_embeddings: value = 0
+
+2026-08-07 12:42:34.713 pid=1785 [model-load] Loading configuration: Qwen
+2026-08-07 12:42:34 [JNI] setNPredict: n_predict=-1
+2026-08-07 12:42:34 [JNI] setParameters: penalty_last_n=64 penalty_repeat=1.1 penalty_freq=0 penalty_present=0 mirostat=0 mirostat_tau=5 mirostat_eta=0.1 min_p=0.01 typical_p=1 dynatemp_range=0 dynatemp_exponent=1 xtc_probability=0 xtc_threshold=0.1 top_n_sigma=-1 dry_multiplier=0 dry_base=1.75 dry_allowed_length=2 dry_penalty_last_n=-1 dry_sequence_breakers="\n,:,",*"
+2026-08-07 12:42:34.713 pid=1785 [model-load-skip] config=Qwen model already loaded audioRequested=false audioActive=false projectorActive=false
+  javaUsed=5.6MB javaTotal=11.9MB javaMax=256.0MB nativeHeap=414.3MB nativeHeapFree=127.2MB nativeHeapSize=546.1MB
+  pssTotal=757.8MB privateDirty=213.6MB sharedDirty=41.4MB nativePss=186.9MB dalvikPss=4.1MB otherPss=566.7MB
+  systemAvail=11.2GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=125 fdCount=157
+  procStatus VmRSS=930484 kB VmHWM=3529800 kB VmSize=21754416 kB VmSwap=4336 kB Threads=34 FDSize=512
+2026-08-07 12:42:34 [JNI] llama.cpp: set_embeddings: value = 1
+
+2026-08-07 12:42:35 [JNI] llama.cpp: set_embeddings: value = 0
+
+2026-08-07 12:42:35 [JNI] llama.cpp: set_embeddings: value = 1
+
+2026-08-07 12:42:36 [JNI] llama.cpp: set_embeddings: value = 0
+
+2026-08-07 12:42:36 [JNI] llama.cpp: set_embeddings: value = 1
+
+2026-08-07 12:42:37 [JNI] llama.cpp: set_embeddings: value = 0
+
+2026-08-07 12:42:37 [JNI] llama.cpp: set_embeddings: value = 1
+
+
+=== Native fatal signal ===
+Signal: SIGABRT (6)
+The process aborted before Java crash handlers could run.
+See ollama.log for the preceding JNI/llama.cpp lines.
+2026-08-07 12:42:38 [JNI] Log opened: /storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log
+2026-08-07 12:42:38 [JNI] Native crash log path: /storage/emulated/0/Android/data/com.micklab.llama/files/native_crash.txt
+2026-08-07 12:42:38 [JNI] Signal crash capture ready: signal_log_fd=open signal_crash_fd=open
+2026-08-07 12:42:38.490 pid=3385 [app] Application created
+2026-08-07 12:42:38.490 pid=3385 [app-start] Application onCreate
+  javaUsed=12.5MB javaTotal=256.0MB javaMax=256.0MB nativeHeap=6.6MB nativeHeapFree=1.8MB nativeHeapSize=12.8MB
+  pssTotal=13.3MB privateDirty=6.4MB sharedDirty=42.5MB nativePss=2.1MB dalvikPss=835.0KB otherPss=9.5MB
+  systemAvail=14.6GB systemThreshold=216.0MB lowMemory=false trimLevel=0 importance=400 fdCount=112
+  procStatus VmRSS=114132 kB VmHWM=114132 kB VmSize=17063084 kB VmSwap=6172 kB Threads=13 FDSize=128
+2026-08-07 12:42:38.520 pid=3385 [previous-exit] pid=1785 reason=EXIT_SELF(1) status=134 importance=125 pss=0.0B rss=937.6MB time=2026-08-07 12:42:37.409 desc=
+2026-08-07 12:42:38.520 pid=3385 [previous-exit] pid=24309 reason=EXIT_SELF(1) status=134 importance=125 pss=0.0B rss=876.4MB time=2026-08-07 12:39:41.022 desc=
+2026-08-07 12:42:38.521 pid=3385 [previous-exit] pid=16227 reason=EXIT_SELF(1) status=134 importance=125 pss=0.0B rss=809.8MB time=2026-08-07 12:18:57.461 desc=
+2026-08-07 12:42:38.521 pid=3385 [previous-exit] pid=15791 reason=EXIT_SELF(1) status=134 importance=125 pss=0.0B rss=978.0MB time=2026-08-07 11:50:49.408 desc=
+2026-08-07 12:42:38.522 pid=3385 [previous-exit] pid=25502 reason=EXIT_SELF(1) status=134 importance=125 pss=0.0B rss=293.2MB time=2026-08-07 11:49:18.825 desc=
+2026-08-07 12:42:38.522 pid=3385 [previous-exit] pid=22201 reason=SIGNALED(2) status=9 importance=125 pss=0.0B rss=114.6MB time=2026-08-06 22:16:13.345 desc=
+2026-08-07 12:42:38.522 pid=3385 [previous-exit] pid=32154 reason=SIGNALED(2) status=9 importance=125 pss=0.0B rss=289.5MB time=2026-08-06 12:15:51.331 desc=
+2026-08-07 12:42:38.523 pid=3385 [previous-exit] pid=17075 reason=SIGNALED(2) status=9 importance=125 pss=0.0B rss=855.7MB time=2026-08-05 23:00:12.866 desc=
+2026-08-07 12:42:38 [JNI] log level set to 1

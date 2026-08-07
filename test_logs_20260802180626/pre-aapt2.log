@@ -1,0 +1,739 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.12/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: The option setting 'android.aapt2FromMavenOverride=/root/android-sdk/build-tools/35.0.0/aapt2' is experimental.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:javaPreCompileDebug
+> Task :app:checkDebugAarMetadata
+> Task :app:generateDebugResValues
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:mergeDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+
+> Task :app:compileDebugJavaWithJavac
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+3 warnings
+
+> Task :app:bundleDebugClassesToCompileJar
+
+> Task :app:compileDebugUnitTestJavaWithJavac FAILED
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:3: error: package org.junit does not exist
+import org.junit.Test;
+                ^
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:4: error: package org.junit does not exist
+import static org.junit.Assert.*;
+                       ^
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:15: error: cannot find symbol
+    @Test public void gemmaThinking_byThinkKeyword() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:19: error: cannot find symbol
+    @Test public void gemmaThinking_byReasonKeyword() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:23: error: cannot find symbol
+    @Test public void gemmaPlain_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:28: error: cannot find symbol
+    @Test public void deepSeekR1_isChatmlReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:32: error: cannot find symbol
+    @Test public void deepSeekR2_isChatmlReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:36: error: cannot find symbol
+    @Test public void deepSeekPlain_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:41: error: cannot find symbol
+    @Test public void qwq_isChatmlReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:45: error: cannot find symbol
+    @Test public void qwenThinking_isChatmlReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:49: error: cannot find symbol
+    @Test public void qwenPlain_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:54: error: cannot find symbol
+    @Test public void llamaReasoning_isChatmlReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:58: error: cannot find symbol
+    @Test public void llamaThinking_isChatmlReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:62: error: cannot find symbol
+    @Test public void llamaPlain_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:67: error: cannot find symbol
+    @Test public void phiReasoning_isPhiReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:71: error: cannot find symbol
+    @Test public void phiMiniReasoning_isPhiReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:75: error: cannot find symbol
+    @Test public void phiPlain_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:80: error: cannot find symbol
+    @Test public void mistralReasoning_isMistralReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:84: error: cannot find symbol
+    @Test public void mistralPlain_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:89: error: cannot find symbol
+    @Test public void nullPath_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:93: error: cannot find symbol
+    @Test public void emptyPath_isNone() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:100: error: cannot find symbol
+    @Test public void gemmaKey_isEnableThinking() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:105: error: cannot find symbol
+    @Test public void chatMLKey_isEnableReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:110: error: cannot find symbol
+    @Test public void phiKey_isReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:115: error: cannot find symbol
+    @Test public void mistralKey_isEnableReasoning() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:120: error: cannot find symbol
+    @Test public void noneKey_isNull() {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:127: error: cannot find symbol
+    @Test public void gemmaKwargs_thinkingOn() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:133: error: cannot find symbol
+    @Test public void gemmaKwargs_thinkingOff() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:139: error: cannot find symbol
+    @Test public void chatMLKwargs_thinkingOn() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:145: error: cannot find symbol
+    @Test public void chatMLKwargs_thinkingOff() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:151: error: cannot find symbol
+    @Test public void phiKwargs_thinkingOn() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:157: error: cannot find symbol
+    @Test public void phiKwargs_thinkingOff() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:163: error: cannot find symbol
+    @Test public void noneKwargs_isEmpty() throws Exception {
+     ^
+  symbol:   class Test
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:16: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.GEMMA_THINKING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:20: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.GEMMA_THINKING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:24: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:29: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:33: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:37: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:42: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:46: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:50: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:55: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:59: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:63: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:68: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.PHI_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:72: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.PHI_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:76: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:81: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.MISTRAL_REASONING,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:85: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:90: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:94: error: cannot find symbol
+        assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+        ^
+  symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:101: error: cannot find symbol
+        assertEquals("enable_thinking",
+        ^
+  symbol:   method assertEquals(String,String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:106: error: cannot find symbol
+        assertEquals("enable_reasoning",
+        ^
+  symbol:   method assertEquals(String,String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:111: error: cannot find symbol
+        assertEquals("reasoning",
+        ^
+  symbol:   method assertEquals(String,String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:116: error: cannot find symbol
+        assertEquals("enable_reasoning",
+        ^
+  symbol:   method assertEquals(String,String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:121: error: cannot find symbol
+        assertNull(PromptTemplateManager.getThinkingKwargsKey(
+        ^
+  symbol:   method assertNull(String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:130: error: cannot find symbol
+        assertTrue(kwargs.getBoolean("enable_thinking"));
+        ^
+  symbol:   method assertTrue(boolean)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:131: error: cannot find symbol
+        assertEquals(1, kwargs.length());
+        ^
+  symbol:   method assertEquals(int,int)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:136: error: cannot find symbol
+        assertFalse(kwargs.getBoolean("enable_thinking"));
+        ^
+  symbol:   method assertFalse(boolean)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:142: error: cannot find symbol
+        assertTrue(kwargs.getBoolean("enable_reasoning"));
+        ^
+  symbol:   method assertTrue(boolean)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:143: error: cannot find symbol
+        assertEquals(1, kwargs.length());
+        ^
+  symbol:   method assertEquals(int,int)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:148: error: cannot find symbol
+        assertFalse(kwargs.getBoolean("enable_reasoning"));
+        ^
+  symbol:   method assertFalse(boolean)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:154: error: cannot find symbol
+        assertEquals("on", kwargs.getString("reasoning"));
+        ^
+  symbol:   method assertEquals(String,String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:155: error: cannot find symbol
+        assertEquals(1, kwargs.length());
+        ^
+  symbol:   method assertEquals(int,int)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:160: error: cannot find symbol
+        assertEquals("off", kwargs.getString("reasoning"));
+        ^
+  symbol:   method assertEquals(String,String)
+  location: class ReasoningCapabilityTest
+/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:166: error: cannot find symbol
+        assertEquals(0, kwargs.length());
+        ^
+  symbol:   method assertEquals(int,int)
+  location: class ReasoningCapabilityTest
+67 errors
+3 warnings
+
+[Incubating] Problems report is available at: file:///root/llama/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugUnitTestJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  warning: [options] To suppress warnings about obsolete options, use -Xlint:-options./root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:3: error: package org.junit does not exist
+  import org.junit.Test;
+                  ^
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:4: error: package org.junit does not exist
+  import static org.junit.Assert.*;
+                         ^/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:15: error: cannot find symbol
+      @Test public void gemmaThinking_byThinkKeyword() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:19: error: cannot find symbol
+      @Test public void gemmaThinking_byReasonKeyword() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:23: error: cannot find symbol
+      @Test public void gemmaPlain_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:28: error: cannot find symbol
+      @Test public void deepSeekR1_isChatmlReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:32: error: cannot find symbol
+      @Test public void deepSeekR2_isChatmlReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:36: error: cannot find symbol
+      @Test public void deepSeekPlain_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:41: error: cannot find symbol
+      @Test public void qwq_isChatmlReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:45: error: cannot find symbol
+      @Test public void qwenThinking_isChatmlReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:49: error: cannot find symbol
+      @Test public void qwenPlain_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:54: error: cannot find symbol
+      @Test public void llamaReasoning_isChatmlReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:58: error: cannot find symbol
+      @Test public void llamaThinking_isChatmlReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:62: error: cannot find symbol
+      @Test public void llamaPlain_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:67: error: cannot find symbol
+      @Test public void phiReasoning_isPhiReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:71: error: cannot find symbol
+      @Test public void phiMiniReasoning_isPhiReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:75: error: cannot find symbol
+      @Test public void phiPlain_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:80: error: cannot find symbol
+      @Test public void mistralReasoning_isMistralReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:84: error: cannot find symbol
+      @Test public void mistralPlain_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:89: error: cannot find symbol
+      @Test public void nullPath_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:93: error: cannot find symbol
+      @Test public void emptyPath_isNone() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:100: error: cannot find symbol
+      @Test public void gemmaKey_isEnableThinking() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:105: error: cannot find symbol
+      @Test public void chatMLKey_isEnableReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:110: error: cannot find symbol
+      @Test public void phiKey_isReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:115: error: cannot find symbol
+      @Test public void mistralKey_isEnableReasoning() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:120: error: cannot find symbol
+      @Test public void noneKey_isNull() {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:127: error: cannot find symbol
+      @Test public void gemmaKwargs_thinkingOn() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:133: error: cannot find symbol
+      @Test public void gemmaKwargs_thinkingOff() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:139: error: cannot find symbol
+      @Test public void chatMLKwargs_thinkingOn() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:145: error: cannot find symbol
+      @Test public void chatMLKwargs_thinkingOff() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:151: error: cannot find symbol
+      @Test public void phiKwargs_thinkingOn() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:157: error: cannot find symbol
+      @Test public void phiKwargs_thinkingOff() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:163: error: cannot find symbol
+      @Test public void noneKwargs_isEmpty() throws Exception {
+       ^
+    symbol:   class Test
+    location: class ReasoningCapabilityTestwarning: [options] source value 8 is obsolete and will be removed in a future release/root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:16: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.GEMMA_THINKING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:20: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.GEMMA_THINKING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:24: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:29: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:33: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:37: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:42: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:46: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:50: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:55: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:59: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.CHATML_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:63: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:68: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.PHI_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:72: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.PHI_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:76: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:81: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.MISTRAL_REASONING,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:85: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:90: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:94: error: cannot find symbol
+          assertEquals(PromptTemplateManager.ReasoningCapability.NONE,
+          ^
+    symbol:   method assertEquals(ReasoningCapability,ReasoningCapability)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:101: error: cannot find symbol
+          assertEquals("enable_thinking",
+          ^
+    symbol:   method assertEquals(String,String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:106: error: cannot find symbol
+          assertEquals("enable_reasoning",
+          ^
+    symbol:   method assertEquals(String,String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:111: error: cannot find symbol
+          assertEquals("reasoning",
+          ^
+    symbol:   method assertEquals(String,String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:116: error: cannot find symbol
+          assertEquals("enable_reasoning",
+          ^
+    symbol:   method assertEquals(String,String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:121: error: cannot find symbol
+          assertNull(PromptTemplateManager.getThinkingKwargsKey(
+          ^
+    symbol:   method assertNull(String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:130: error: cannot find symbol
+          assertTrue(kwargs.getBoolean("enable_thinking"));
+          ^
+    symbol:   method assertTrue(boolean)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:131: error: cannot find symbol
+          assertEquals(1, kwargs.length());
+          ^
+    symbol:   method assertEquals(int,int)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:136: error: cannot find symbol
+          assertFalse(kwargs.getBoolean("enable_thinking"));
+          ^
+    symbol:   method assertFalse(boolean)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:142: error: cannot find symbol
+          assertTrue(kwargs.getBoolean("enable_reasoning"));
+          ^
+    symbol:   method assertTrue(boolean)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:143: error: cannot find symbol
+          assertEquals(1, kwargs.length());
+          ^
+    symbol:   method assertEquals(int,int)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:148: error: cannot find symbol
+          assertFalse(kwargs.getBoolean("enable_reasoning"));
+          ^
+    symbol:   method assertFalse(boolean)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:154: error: cannot find symbol
+          assertEquals("on", kwargs.getString("reasoning"));
+          ^
+    symbol:   method assertEquals(String,String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:155: error: cannot find symbol
+          assertEquals(1, kwargs.length());
+          ^
+    symbol:   method assertEquals(int,int)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:160: error: cannot find symbol
+          assertEquals("off", kwargs.getString("reasoning"));
+          ^
+    symbol:   method assertEquals(String,String)
+    location: class ReasoningCapabilityTest
+  /root/llama/app/src/test/java/com/micklab/llama/ReasoningCapabilityTest.java:166: error: cannot find symbol
+          assertEquals(0, kwargs.length());
+          ^
+    symbol:   method assertEquals(int,int)
+    location: class ReasoningCapabilityTestwarning: [options] target value 8 is obsolete and will be removed in a future release
+  67 errors
+  3 warnings
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.12/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 25s
+19 actionable tasks: 19 executed

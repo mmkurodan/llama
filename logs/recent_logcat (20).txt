@@ -1,0 +1,2 @@
+2026-06-19 19:40:29.862 pid=14403 [logcat] reason=previous-crash
+exitCode=0
