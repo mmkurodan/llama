@@ -192,7 +192,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- モデル管理: 「モデル取得」（Hugging FaceでGGUFを検索／ローカル端末からGGUFを取り込む）と「モデルの名称変更・削除」に分かれています。一覧のモデルや mmproj をタップすると「このモデルを使用 / 名前を変更 / 削除」を選べます（mmproj は使用以外）。名前を変更すると、そのファイルを参照する保存済みプロファイルも自動更新され、不要な再ダウンロードを防ぎます。\n");
         sb.append("- MTP設定（投機デコード・実験的）: 独立したカードになりました。「MTP speculative decoding」トグルで有効化します（既定OFF）。有効時は n_draft（1ステップあたりのドラフト数・既定2）とドラフト元（「このモデル自身のMTPヘッドを使用（推奨）」または別GGUF）を指定できます。設定はモデルごとのプロファイルに保存され、設定保存後のモデル読み込みで反映されます。Qwen3.5-MTP や Gemma 4 など MTPヘッドを内蔵するモデルでは「自ヘッド使用」を選ぶだけで、追加ファイル不要・メモリ二重消費なしで生成が高速化する場合があります（効果は端末・モデル・n_draft に依存。OFF時は従来と同一動作。推論中は各操作が無効化されます）。\n");
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
-        sb.append("- 出力設定: ストリーミング出力の有効/無効を切り替えます。\n");
+        sb.append("- 出力設定: ストリーミング出力の有効/無効、および性能指標（速度・温度）の表示を切り替えます。\n");
         sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
         sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURL(http://127.0.0.1:ポート番号)を表示し、Wi-Fi接続中はLAN URLも表示します。各URLはタップで既定ブラウザを開き、長押しでURLをコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
         sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。各スイッチをオフにした場合は WebUI でのみ利用され、メイン画面のプロンプト入力や /api/chat、/api/generate、/v1/chat/completions では未設定として扱われます。オンにした場合のみ、それぞれ共有MCP設定と共有 function calling 定義として利用されます。\n");
@@ -200,6 +200,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- ログ設定: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
         sb.append("- ライセンス表示: ライセンス文面（サードパーティ通知を含む）を表示します。\n");
         sb.append("- ドキュメント: 操作マニュアルとプライバシーポリシーを確認できます。\n");
+        sb.append("- バックアップ・復元: 「プロファイルをバックアップ」を押すと、全プロファイル（設定JSON）・ダウンロード済みモデル・アプリ共通設定をDownloadフォルダの LlamaBackup_日時/ フォルダへ一括エクスポートします。「プロファイルを復元」を押すと、フォルダ選択ダイアログでバックアップフォルダを指定してインポートします（既存のモデルファイルは上書きしません）。\n");
         sb.append("- 保存して閉じる: 現在の入力値を保存し、モデルに即時適用してメイン画面に戻ります。\n");
         sb.append("- 閉じる: 何も保存せずメイン画面に戻ります。\n\n");
         sb.append("5. モデルパラメータの詳細説明\n\n");
@@ -238,7 +239,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: DRYペナルティを適用するトークン数です。-1で全体に適用します。\n");
         sb.append("- DRY Sequence Breakers: DRYの区切り文字です。\n\n");
         sb.append("【出力設定】\n");
-        sb.append("- ストリーミングを有効化: 有効にするとトークンが生成されるたびに出力が更新されます。無効にすると生成完了後に一括表示されます。\n\n");
+        sb.append("- ストリーミングを有効化: 有効にするとトークンが生成されるたびに出力が更新されます。無効にすると生成完了後に一括表示されます。\n");
+        sb.append("- 性能指標を表示: 有効にするとダイレクト実行エリアに生成速度(tok/s)とデバイス温度を表示します（既定OFF）。\n\n");
         sb.append("【Think設定】\n");
         sb.append("- Thinkを有効化 (chat-template-kwargs.enable_thinking): chat-template-kwargs の enable_thinking を切り替えます。無効時はモデルの思考出力を抑制する形式でプロンプトを生成します。\n\n");
         sb.append("6. プロンプトテンプレートの自動選択\n");
@@ -335,7 +337,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management: Grouped into \"Get models\" (Search GGUF on Hugging Face / import a GGUF from the device) and \"Rename / delete models\". Tap a listed model or mmproj file to choose \"Use as model / Rename / Delete\" (mmproj files offer everything except Use). Renaming also updates saved profiles that reference the file to the new local filename, preventing unnecessary re-downloads.\n");
         sb.append("- MTP Settings (speculative decoding, experimental): now its own card. Enable via the \"MTP speculative decoding\" toggle (off by default). When on, you can set n_draft (draft tokens per step, default 2) and the draft source (\"Use this model's own MTP head (recommended)\" or a separate GGUF). MTP settings are stored per-model profile and take effect after saving the config and reloading the model. For models that embed an MTP head (Qwen3.5-MTP, Gemma 4), just pick \"own head\" — no extra file and no double memory use, and generation can be faster (the gain depends on device, model and n_draft; behaviour is identical to before when off; controls are disabled while inference is running).\n");
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
-        sb.append("- Output Settings: Toggle streaming output on/off.\n");
+        sb.append("- Output Settings: Toggle streaming output on/off and show/hide performance metrics.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
         sb.append("- Llama API Server: Set the server port. The Local URL (http://127.0.0.1:<port>) is shown, and while connected to Wi-Fi the LAN URL is shown too. Tap a URL to open it in the default browser and long-press to copy it. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
         sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. When the new switches are off, they are available only in the WebUI and are treated as absent everywhere else. When enabled, they are also used as shared MCP and function-calling settings for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
@@ -343,6 +345,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");
         sb.append("- Show License: Display license text (including third-party notices).\n");
         sb.append("- Documents: View the user manual and the privacy policy.\n");
+        sb.append("- Backup & Restore: \"Backup Profiles\" exports all profiles (config JSON), downloaded models, and shared app settings to a LlamaBackup_timestamp/ folder in Downloads. \"Restore Profiles\" opens a folder picker to import from a backup folder (existing model files are not overwritten).\n");
         sb.append("- SAVE & CLOSE: Save current settings and apply them to the model immediately.\n");
         sb.append("- CLOSE: Return to the main screen without saving any changes.\n\n");
         sb.append("5. Model Parameter Details\n\n");
@@ -381,7 +384,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: Number of tokens for DRY penalty. -1 applies to all.\n");
         sb.append("- DRY Sequence Breakers: Characters that break DRY sequences.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming: When enabled, output updates as tokens are generated. When disabled, output shows all at once after generation completes.\n\n");
+        sb.append("- Enable Streaming: When enabled, output updates as tokens are generated. When disabled, output shows all at once after generation completes.\n");
+        sb.append("- Show Performance Metrics: When enabled, generation speed (tok/s) and device temperature are shown in the Direct Run area (default off).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think: Toggles chat-template-kwargs enable_thinking. When disabled, prompts are formatted to suppress visible thinking output.\n\n");
         sb.append("6. Prompt Template Auto-Selection\n");
@@ -478,7 +482,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management : regroupé en « Get models » (Search GGUF on Hugging Face / importer un GGUF depuis l'appareil) et « Rename / delete models ». Appuyez sur un modèle ou un fichier mmproj de la liste pour choisir \"Use as model / Rename / Delete\" (les fichiers mmproj proposent tout sauf Use). Le renommage met aussi à jour les profils enregistrés qui référencent ce fichier vers le nouveau nom local, évitant les retéléchargements inutiles.\n");
         sb.append("- MTP Settings (décodage spéculatif, expérimental) : désormais sa propre carte. Activez-le via le commutateur \"MTP speculative decoding\" (désactivé par défaut). Une fois activé, vous pouvez définir n_draft (jetons de brouillon par étape, 2 par défaut) et la source du brouillon (\"Use this model's own MTP head (recommended)\" ou un GGUF séparé). Les réglages MTP sont enregistrés par profil de modèle et prennent effet après l'enregistrement de la configuration et le rechargement du modèle. Pour les modèles qui intègrent une tête MTP (Qwen3.5-MTP, Gemma 4), choisissez simplement \"own head\" — aucun fichier supplémentaire ni double utilisation de mémoire, et la génération peut être plus rapide (le gain dépend de l'appareil, du modèle et de n_draft ; le comportement est identique à avant lorsqu'il est désactivé ; les commandes sont désactivées pendant l'inférence).\n");
         sb.append("- Model Parameters : définir les paramètres de génération (y compris GPU Offload Layers).\n");
-        sb.append("- Output Settings : activer/désactiver la sortie en streaming.\n");
+        sb.append("- Output Settings : activer/désactiver la sortie en streaming et afficher/masquer les métriques de performance.\n");
         sb.append("- Prompt Template : définir le System Prompt, Think activé/désactivé (chat-template-kwargs.enable_thinking) et un modèle de chat personnalisé. Sans modèle personnalisé, l'application utilise d'abord les métadonnées chat_template du GGUF, sinon elle sélectionne automatiquement selon la famille du modèle. Un modèle de repli Bonsai est inclus.\n");
         sb.append("- Llama API Server : définir le port du serveur. L'URL locale (http://127.0.0.1:<port>) est affichée, et lorsqu'il est connecté au Wi-Fi, l'URL LAN l'est aussi. Appuyez sur une URL pour l'ouvrir dans le navigateur par défaut et appui long pour la copier. L'activer depuis la fenêtre de démarrage ou l'écran principal rend l'API et la WebUI disponibles sur ce port.\n");
         sb.append("- MCP Settings : enregistrer le JSON de configuration MCP et le JSON des définitions de fonctions comme réglages partagés à l'échelle de l'application, distincts des profils de modèle. Lorsque les nouveaux commutateurs sont désactivés, ils ne sont disponibles que dans la WebUI et sont considérés comme absents partout ailleurs. Une fois activés, ils servent aussi de réglages MCP et d'appel de fonctions partagés pour l'entrée d'invite principale, /api/chat, /api/generate et /v1/chat/completions.\n");
@@ -486,6 +490,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings : sélectionner le niveau de journalisation (par défaut au premier lancement : INFO).\n");
         sb.append("- Show License : afficher le texte de licence (y compris les mentions de tiers).\n");
         sb.append("- Documents : consulter le manuel d'utilisation et la politique de confidentialité.\n");
+        sb.append("- Sauvegarde et restauration : « Sauvegarder les profils » exporte tous les profils (JSON de configuration), les modèles téléchargés et les réglages partagés de l'application dans un dossier LlamaBackup_horodatage/ dans Downloads. « Restaurer les profils » ouvre un sélecteur de dossier pour importer depuis un dossier de sauvegarde (les fichiers de modèles existants ne sont pas écrasés).\n");
         sb.append("- SAVE & CLOSE : enregistrer les paramètres actuels et les appliquer immédiatement au modèle.\n");
         sb.append("- CLOSE : revenir à l'écran principal sans enregistrer les modifications.\n\n");
         sb.append("5. Détails des paramètres du modèle\n\n");
@@ -524,7 +529,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N : nombre de jetons pour la pénalité DRY. -1 s'applique à tous.\n");
         sb.append("- DRY Sequence Breakers : caractères qui interrompent les séquences DRY.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming : lorsqu'il est activé, la sortie se met à jour au fur et à mesure de la génération des jetons. Désactivé, la sortie s'affiche en une fois une fois la génération terminée.\n\n");
+        sb.append("- Enable Streaming : lorsqu'il est activé, la sortie se met à jour au fur et à mesure de la génération des jetons. Désactivé, la sortie s'affiche en une fois une fois la génération terminée.\n");
+        sb.append("- Show Performance Metrics : lorsqu'il est activé, la vitesse de génération (tok/s) et la température de l'appareil sont affichées dans la zone Direct Run (désactivé par défaut).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think : bascule chat-template-kwargs enable_thinking. Désactivé, les invites sont formatées pour supprimer la sortie de réflexion visible.\n\n");
         sb.append("6. Sélection automatique du modèle d'invite\n");
@@ -621,7 +627,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management: agrupado en «Get models» (Search GGUF on Hugging Face / importar un GGUF desde el dispositivo) y «Rename / delete models». Toque un modelo o archivo mmproj de la lista para elegir \"Use as model / Rename / Delete\" (los archivos mmproj ofrecen todo excepto Use). Cambiar el nombre también actualiza los perfiles guardados que referencian ese archivo al nuevo nombre local, evitando descargas repetidas innecesarias.\n");
         sb.append("- MTP Settings (decodificación especulativa, experimental): ahora es su propia tarjeta. Actívela con el interruptor \"MTP speculative decoding\" (desactivado por defecto). Cuando está activado, puede establecer n_draft (tokens de borrador por paso, 2 por defecto) y la fuente del borrador (\"Use this model's own MTP head (recommended)\" o un GGUF por separado). La configuración de MTP se guarda por perfil de modelo y surte efecto tras guardar la configuración y recargar el modelo. Para modelos que incorporan una cabeza MTP (Qwen3.5-MTP, Gemma 4), solo elija \"own head\": sin archivo adicional ni doble uso de memoria, y la generación puede ser más rápida (la ganancia depende del dispositivo, el modelo y n_draft; el comportamiento es idéntico al anterior cuando está desactivado; los controles se desactivan durante la inferencia).\n");
         sb.append("- Model Parameters: establecer los parámetros de generación (incluido GPU Offload Layers).\n");
-        sb.append("- Output Settings: activar/desactivar la salida en streaming.\n");
+        sb.append("- Output Settings: activar/desactivar la salida en streaming y mostrar/ocultar las métricas de rendimiento.\n");
         sb.append("- Prompt Template: establecer el System Prompt, Think activado/desactivado (chat-template-kwargs.enable_thinking) y una plantilla de chat personalizada. Cuando no hay plantilla personalizada, la aplicación usa primero los metadatos chat_template del GGUF y, de lo contrario, selecciona automáticamente según la familia del modelo. Se incluye una plantilla de reserva Bonsai.\n");
         sb.append("- Llama API Server: establecer el puerto del servidor. Se muestra la URL local (http://127.0.0.1:<puerto>) y, mientras está conectado a Wi-Fi, también la URL de LAN. Toque una URL para abrirla en el navegador predeterminado y mantenga pulsado para copiarla. Activarla desde la ventana de inicio o la pantalla principal hace que la API y la WebUI estén disponibles en ese puerto.\n");
         sb.append("- MCP Settings: guardar el JSON de configuración de MCP y el JSON de definiciones de funciones como ajustes compartidos de toda la aplicación, separados de los perfiles de modelo. Cuando los nuevos interruptores están desactivados, solo están disponibles en la WebUI y se tratan como ausentes en todas partes. Cuando se activan, también se usan como ajustes compartidos de MCP y llamada a funciones para la entrada principal de indicaciones, /api/chat, /api/generate y /v1/chat/completions.\n");
@@ -629,6 +635,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: seleccionar el nivel de registro (predeterminado en el primer inicio: INFO).\n");
         sb.append("- Show License: mostrar el texto de la licencia (incluidos los avisos de terceros).\n");
         sb.append("- Documents: ver el manual de usuario y la política de privacidad.\n");
+        sb.append("- Copia de seguridad y restauración: «Backup Profiles» exporta todos los perfiles (JSON de configuración), los modelos descargados y los ajustes compartidos de la aplicación a una carpeta LlamaBackup_marca-de-tiempo/ en Downloads. «Restore Profiles» abre un selector de carpeta para importar desde una carpeta de copia de seguridad (los archivos de modelos existentes no se sobreescriben).\n");
         sb.append("- SAVE & CLOSE: guardar la configuración actual y aplicarla al modelo de inmediato.\n");
         sb.append("- CLOSE: volver a la pantalla principal sin guardar los cambios.\n\n");
         sb.append("5. Detalles de los parámetros del modelo\n\n");
@@ -667,7 +674,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: número de tokens para la penalización DRY. -1 se aplica a todos.\n");
         sb.append("- DRY Sequence Breakers: caracteres que rompen las secuencias DRY.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming: cuando está activado, la salida se actualiza a medida que se generan los tokens. Cuando está desactivado, la salida se muestra de una vez al completarse la generación.\n\n");
+        sb.append("- Enable Streaming: cuando está activado, la salida se actualiza a medida que se generan los tokens. Cuando está desactivado, la salida se muestra de una vez al completarse la generación.\n");
+        sb.append("- Show Performance Metrics: cuando está activado, la velocidad de generación (tok/s) y la temperatura del dispositivo se muestran en el área Direct Run (desactivado por defecto).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think: alterna chat-template-kwargs enable_thinking. Cuando está desactivado, las indicaciones se formatean para suprimir la salida de razonamiento visible.\n\n");
         sb.append("6. Selección automática de la plantilla de indicación\n");
@@ -764,7 +772,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management: agrupado em \"Get models\" (Search GGUF on Hugging Face / importar um GGUF do dispositivo) e \"Rename / delete models\". Toque em um modelo ou arquivo mmproj da lista para escolher \"Use as model / Rename / Delete\" (os arquivos mmproj oferecem tudo, exceto Use). Renomear também atualiza os perfis salvos que referenciam esse arquivo para o novo nome local, evitando downloads repetidos desnecessários.\n");
         sb.append("- MTP Settings (decodificação especulativa, experimental): agora é seu próprio cartão. Ative-a pelo interruptor \"MTP speculative decoding\" (desativado por padrão). Quando ativado, você pode definir n_draft (tokens de rascunho por passo, 2 por padrão) e a fonte do rascunho (\"Use this model's own MTP head (recommended)\" ou um GGUF separado). As configurações de MTP são salvas por perfil de modelo e entram em vigor após salvar a configuração e recarregar o modelo. Para modelos que incorporam uma cabeça MTP (Qwen3.5-MTP, Gemma 4), basta escolher \"own head\" — sem arquivo extra nem uso duplo de memória, e a geração pode ser mais rápida (o ganho depende do dispositivo, do modelo e de n_draft; o comportamento é idêntico ao anterior quando desativado; os controles ficam desativados durante a inferência).\n");
         sb.append("- Model Parameters: definir os parâmetros de geração (incluindo GPU Offload Layers).\n");
-        sb.append("- Output Settings: ativar/desativar a saída em streaming.\n");
+        sb.append("- Output Settings: ativar/desativar a saída em streaming e mostrar/ocultar as métricas de desempenho.\n");
         sb.append("- Prompt Template: definir o System Prompt, Think ativado/desativado (chat-template-kwargs.enable_thinking) e um modelo de chat personalizado. Quando nenhum modelo personalizado é definido, o aplicativo usa primeiro os metadados chat_template do GGUF e, caso contrário, seleciona automaticamente pela família do modelo. Um modelo de reserva Bonsai está incluído.\n");
         sb.append("- Llama API Server: definir a porta do servidor. A URL local (http://127.0.0.1:<porta>) é mostrada e, enquanto conectado ao Wi-Fi, a URL da LAN também é mostrada. Toque em uma URL para abri-la no navegador padrão e pressione e segure para copiá-la. Ativá-la pela janela de inicialização ou pela tela principal torna a API e a WebUI disponíveis nessa porta.\n");
         sb.append("- MCP Settings: salvar o JSON de configuração do MCP e o JSON de definições de funções como configurações compartilhadas de todo o aplicativo, separadas dos perfis de modelo. Quando os novos interruptores estão desativados, eles ficam disponíveis apenas na WebUI e são tratados como ausentes em todos os outros lugares. Quando ativados, também são usados como configurações compartilhadas de MCP e chamada de funções para a entrada principal de prompt, /api/chat, /api/generate e /v1/chat/completions.\n");
@@ -772,6 +780,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: selecionar o nível de registro (padrão na primeira execução: INFO).\n");
         sb.append("- Show License: exibir o texto da licença (incluindo avisos de terceiros).\n");
         sb.append("- Documents: ver o manual do usuário e a política de privacidade.\n");
+        sb.append("- Backup e restauração: \"Backup Profiles\" exporta todos os perfis (JSON de configuração), modelos baixados e configurações compartilhadas do aplicativo para uma pasta LlamaBackup_timestamp/ em Downloads. \"Restore Profiles\" abre um seletor de pasta para importar de uma pasta de backup (arquivos de modelos existentes não são substituídos).\n");
         sb.append("- SAVE & CLOSE: salvar as configurações atuais e aplicá-las ao modelo imediatamente.\n");
         sb.append("- CLOSE: voltar à tela principal sem salvar as alterações.\n\n");
         sb.append("5. Detalhes dos parâmetros do modelo\n\n");
@@ -810,7 +819,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: número de tokens para a penalidade DRY. -1 aplica a todos.\n");
         sb.append("- DRY Sequence Breakers: caracteres que quebram as sequências DRY.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming: quando ativado, a saída é atualizada à medida que os tokens são gerados. Quando desativado, a saída é mostrada de uma vez após a geração terminar.\n\n");
+        sb.append("- Enable Streaming: quando ativado, a saída é atualizada à medida que os tokens são gerados. Quando desativado, a saída é mostrada de uma vez após a geração terminar.\n");
+        sb.append("- Show Performance Metrics: quando ativado, a velocidade de geração (tok/s) e a temperatura do dispositivo são mostradas na área Direct Run (desativado por padrão).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think: alterna chat-template-kwargs enable_thinking. Quando desativado, os prompts são formatados para suprimir a saída de raciocínio visível.\n\n");
         sb.append("6. Seleção automática do modelo de prompt\n");
@@ -907,7 +917,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management: gruppiert in \"Get models\" (Search GGUF on Hugging Face / ein GGUF vom Gerät importieren) und \"Rename / delete models\". Tippen Sie auf ein Modell oder eine mmproj-Datei in der Liste, um \"Use as model / Rename / Delete\" zu wählen (mmproj-Dateien bieten alles außer Use). Das Umbenennen aktualisiert auch gespeicherte Profile, die auf die Datei verweisen, auf den neuen lokalen Dateinamen und verhindert unnötige erneute Downloads.\n");
         sb.append("- MTP Settings (spekulatives Decodieren, experimentell): jetzt eine eigene Karte. Aktivieren Sie es über den Schalter \"MTP speculative decoding\" (standardmäßig aus). Wenn aktiviert, können Sie n_draft (Entwurfs-Tokens pro Schritt, Standard 2) und die Entwurfsquelle festlegen (\"Use this model's own MTP head (recommended)\" oder ein separates GGUF). MTP-Einstellungen werden pro Modellprofil gespeichert und wirken nach dem Speichern der Konfiguration und dem erneuten Laden des Modells. Für Modelle mit eingebettetem MTP-Kopf (Qwen3.5-MTP, Gemma 4) wählen Sie einfach \"own head\" — keine zusätzliche Datei, kein doppelter Speicherverbrauch, und die Generierung kann schneller sein (der Gewinn hängt von Gerät, Modell und n_draft ab; das Verhalten ist im ausgeschalteten Zustand identisch mit vorher; die Steuerelemente sind während der Inferenz deaktiviert).\n");
         sb.append("- Model Parameters: Generierungsparameter festlegen (einschließlich GPU Offload Layers).\n");
-        sb.append("- Output Settings: Streaming-Ausgabe ein-/ausschalten.\n");
+        sb.append("- Output Settings: Streaming-Ausgabe ein-/ausschalten und Leistungsmetriken anzeigen/verbergen.\n");
         sb.append("- Prompt Template: System Prompt, Think ein/aus (chat-template-kwargs.enable_thinking) und eine benutzerdefinierte Chat-Vorlage festlegen. Ohne benutzerdefinierte Vorlage verwendet die App zuerst die chat_template-Metadaten des GGUF und wählt andernfalls automatisch nach Modellfamilie. Eine Bonsai-Rückfallvorlage ist enthalten.\n");
         sb.append("- Llama API Server: den Server-Port festlegen. Die lokale URL (http://127.0.0.1:<Port>) wird angezeigt, und solange eine WLAN-Verbindung besteht, wird auch die LAN-URL angezeigt. Tippen Sie auf eine URL, um sie im Standardbrowser zu öffnen, und drücken lange, um sie zu kopieren. Durch Aktivieren über das Startfenster oder den Hauptbildschirm werden sowohl die API als auch die WebUI auf diesem Port verfügbar.\n");
         sb.append("- MCP Settings: MCP-Konfigurations-JSON und Funktionsdefinitions-JSON als app-weite gemeinsame Einstellungen getrennt von den Modellprofilen speichern. Wenn die neuen Schalter aus sind, sind sie nur in der WebUI verfügbar und werden überall sonst als nicht vorhanden behandelt. Wenn aktiviert, werden sie auch als gemeinsame MCP- und Function-Calling-Einstellungen für die Haupteingabe, /api/chat, /api/generate und /v1/chat/completions verwendet.\n");
@@ -915,6 +925,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: die Protokollstufe auswählen (Standard beim ersten Start: INFO).\n");
         sb.append("- Show License: den Lizenztext anzeigen (einschließlich Hinweisen zu Drittanbietern).\n");
         sb.append("- Documents: das Benutzerhandbuch und die Datenschutzrichtlinie ansehen.\n");
+        sb.append("- Sichern und Wiederherstellen: \"Profile sichern\" exportiert alle Profile (Konfigurations-JSON), heruntergeladene Modelle und gemeinsame App-Einstellungen in einen Ordner LlamaBackup_Zeitstempel/ in Downloads. \"Profile wiederherstellen\" öffnet einen Ordner-Auswähler zum Importieren aus einem Backup-Ordner (vorhandene Modelldateien werden nicht überschrieben).\n");
         sb.append("- SAVE & CLOSE: die aktuellen Einstellungen speichern und sofort auf das Modell anwenden.\n");
         sb.append("- CLOSE: ohne Speichern von Änderungen zum Hauptbildschirm zurückkehren.\n\n");
         sb.append("5. Details zu den Modellparametern\n\n");
@@ -953,7 +964,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: Anzahl der Tokens für die DRY-Strafe. -1 gilt für alle.\n");
         sb.append("- DRY Sequence Breakers: Zeichen, die DRY-Sequenzen unterbrechen.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming: Wenn aktiviert, wird die Ausgabe aktualisiert, während die Tokens generiert werden. Wenn deaktiviert, wird die Ausgabe nach Abschluss der Generierung auf einmal angezeigt.\n\n");
+        sb.append("- Enable Streaming: Wenn aktiviert, wird die Ausgabe aktualisiert, während die Tokens generiert werden. Wenn deaktiviert, wird die Ausgabe nach Abschluss der Generierung auf einmal angezeigt.\n");
+        sb.append("- Show Performance Metrics: Wenn aktiviert, werden Generierungsgeschwindigkeit (tok/s) und Gerätetemperatur im Direct-Run-Bereich angezeigt (standardmäßig deaktiviert).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think: schaltet chat-template-kwargs enable_thinking um. Wenn deaktiviert, werden Eingaben so formatiert, dass die sichtbare Denk-Ausgabe unterdrückt wird.\n\n");
         sb.append("6. Automatische Auswahl der Prompt-Vorlage\n");
@@ -1050,7 +1062,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management: raggruppato in \"Get models\" (Search GGUF on Hugging Face / importa un GGUF dal dispositivo) e \"Rename / delete models\". Tocca un modello o file mmproj dell'elenco per scegliere \"Use as model / Rename / Delete\" (i file mmproj offrono tutto tranne Use). La rinomina aggiorna anche i profili salvati che fanno riferimento a quel file al nuovo nome locale, evitando download ripetuti inutili.\n");
         sb.append("- MTP Settings (decodifica speculativa, sperimentale): ora è una scheda a sé. Attivala tramite l'interruttore \"MTP speculative decoding\" (disattivato per impostazione predefinita). Quando è attivo, puoi impostare n_draft (token di bozza per passo, 2 per impostazione predefinita) e la sorgente della bozza (\"Use this model's own MTP head (recommended)\" o un GGUF separato). Le impostazioni MTP sono salvate per profilo di modello e hanno effetto dopo aver salvato la configurazione e ricaricato il modello. Per i modelli che incorporano una testa MTP (Qwen3.5-MTP, Gemma 4), basta scegliere \"own head\" — nessun file aggiuntivo né doppio uso di memoria, e la generazione può essere più veloce (il guadagno dipende da dispositivo, modello e n_draft; il comportamento è identico a prima quando è disattivato; i controlli sono disattivati durante l'inferenza).\n");
         sb.append("- Model Parameters: impostare i parametri di generazione (incluso GPU Offload Layers).\n");
-        sb.append("- Output Settings: attivare/disattivare l'output in streaming.\n");
+        sb.append("- Output Settings: attivare/disattivare l'output in streaming e mostrare/nascondere le metriche di prestazioni.\n");
         sb.append("- Prompt Template: impostare il System Prompt, Think attivato/disattivato (chat-template-kwargs.enable_thinking) e un modello di chat personalizzato. Quando non è impostato alcun modello personalizzato, l'app usa prima i metadati chat_template del GGUF e altrimenti seleziona automaticamente in base alla famiglia del modello. È incluso un modello di riserva Bonsai.\n");
         sb.append("- Llama API Server: impostare la porta del server. Viene mostrato l'URL locale (http://127.0.0.1:<porta>) e, mentre è connesso al Wi-Fi, viene mostrato anche l'URL LAN. Tocca un URL per aprirlo nel browser predefinito e tieni premuto per copiarlo. Attivarlo dalla finestra di avvio o dalla schermata principale rende sia l'API sia la WebUI disponibili su quella porta.\n");
         sb.append("- MCP Settings: salvare il JSON di configurazione MCP e il JSON delle definizioni di funzione come impostazioni condivise a livello di app, separate dai profili di modello. Quando i nuovi interruttori sono disattivati, sono disponibili solo nella WebUI e vengono trattati come assenti ovunque. Quando sono attivati, vengono usati anche come impostazioni condivise di MCP e chiamata di funzioni per l'input principale del prompt, /api/chat, /api/generate e /v1/chat/completions.\n");
@@ -1058,6 +1070,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: selezionare il livello di log (predefinito al primo avvio: INFO).\n");
         sb.append("- Show License: mostrare il testo della licenza (comprese le note di terze parti).\n");
         sb.append("- Documents: consultare il manuale utente e l'informativa sulla privacy.\n");
+        sb.append("- Backup e ripristino: \"Backup dei profili\" esporta tutti i profili (JSON di configurazione), i modelli scaricati e le impostazioni condivise dell'app in una cartella LlamaBackup_timestamp/ in Downloads. \"Ripristina profili\" apre un selettore di cartelle per importare da una cartella di backup (i file di modelli esistenti non vengono sovrascritti).\n");
         sb.append("- SAVE & CLOSE: salvare le impostazioni correnti e applicarle immediatamente al modello.\n");
         sb.append("- CLOSE: tornare alla schermata principale senza salvare le modifiche.\n\n");
         sb.append("5. Dettagli dei parametri del modello\n\n");
@@ -1096,7 +1109,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: numero di token per la penalità DRY. -1 si applica a tutti.\n");
         sb.append("- DRY Sequence Breakers: caratteri che interrompono le sequenze DRY.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming: quando è attivo, l'output si aggiorna man mano che i token vengono generati. Quando è disattivato, l'output viene mostrato tutto in una volta al termine della generazione.\n\n");
+        sb.append("- Enable Streaming: quando è attivo, l'output si aggiorna man mano che i token vengono generati. Quando è disattivato, l'output viene mostrato tutto in una volta al termine della generazione.\n");
+        sb.append("- Show Performance Metrics: quando è attivo, la velocità di generazione (tok/s) e la temperatura del dispositivo vengono mostrate nell'area Direct Run (disattivato per impostazione predefinita).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think: commuta chat-template-kwargs enable_thinking. Quando è disattivato, i prompt vengono formattati per sopprimere l'output di ragionamento visibile.\n\n");
         sb.append("6. Selezione automatica del modello di prompt\n");
@@ -1193,7 +1207,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management：分为\"Get models\"（Search GGUF on Hugging Face / 从设备导入 GGUF）与\"Rename / delete models\"。点按列表中的模型或 mmproj 文件可选择 \"Use as model / Rename / Delete\"（mmproj 文件提供除 Use 以外的全部选项）。重命名还会将引用该文件的已保存配置更新为新的本地文件名，避免不必要的重复下载。\n");
         sb.append("- MTP Settings（投机解码，实验性）：现在是独立卡片。通过 \"MTP speculative decoding\" 开关启用（默认关闭）。开启后可设置 n_draft（每步草稿 token 数，默认 2）和草稿来源（\"Use this model's own MTP head (recommended)\" 或单独的 GGUF）。MTP 设置按模型配置文件保存，保存配置并重新加载模型后生效。对于内置 MTP 头的模型（Qwen3.5-MTP、Gemma 4），只需选择 \"own head\"——无需额外文件，也不会占用双倍内存，且生成可能更快（增益取决于设备、模型和 n_draft；关闭时行为与之前完全一致；推理运行时控件被禁用）。\n");
         sb.append("- Model Parameters：设置生成参数（包括 GPU Offload Layers）。\n");
-        sb.append("- Output Settings：开启/关闭流式输出。\n");
+        sb.append("- Output Settings：开启/关闭流式输出，以及显示/隐藏性能指标。\n");
         sb.append("- Prompt Template：设置 System Prompt、Think 开/关（chat-template-kwargs.enable_thinking）以及自定义聊天模板。未设置自定义模板时，应用会先使用 GGUF 的 chat_template 元数据，否则按模型家族自动选择。内置 Bonsai 回退模板。\n");
         sb.append("- Llama API Server：设置服务器端口。会显示本地 URL（http://127.0.0.1:<端口>），连接 Wi-Fi 时也会显示 LAN URL。点按 URL 在默认浏览器中打开，长按复制。通过启动弹窗或主界面启用后，API 与 WebUI 都会在该端口上可用。\n");
         sb.append("- MCP Settings：将 MCP 配置 JSON 和函数定义 JSON 作为独立于模型配置文件的应用级共享设置保存。当新开关关闭时，它们仅在 WebUI 中可用，在其他任何地方都视为不存在。启用后，它们还会作为共享的 MCP 与函数调用设置，用于主提示输入、/api/chat、/api/generate 和 /v1/chat/completions。\n");
@@ -1201,6 +1215,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings：选择日志级别（首次启动默认：INFO）。\n");
         sb.append("- Show License：显示许可证文本（包括第三方声明）。\n");
         sb.append("- Documents：查看用户手册和隐私政策。\n");
+        sb.append("- 备份与恢复：\"备份配置文件\" 将所有配置文件（配置 JSON）、已下载的模型及应用共享设置导出到 Downloads 中的 LlamaBackup_时间戳/ 文件夹。\"恢复配置文件\" 打开文件夹选择器以从备份文件夹导入（已存在的模型文件不会被覆盖）。\n");
         sb.append("- SAVE & CLOSE：保存当前设置并立即应用到模型。\n");
         sb.append("- CLOSE：不保存任何更改并返回主界面。\n\n");
         sb.append("5. 模型参数详解\n\n");
@@ -1239,7 +1254,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N：DRY 惩罚的 token 数。-1 应用于全部。\n");
         sb.append("- DRY Sequence Breakers：中断 DRY 序列的字符。\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming：启用时，输出会随 token 生成而更新。关闭时，生成完成后一次性显示全部输出。\n\n");
+        sb.append("- Enable Streaming：启用时，输出会随 token 生成而更新。关闭时，生成完成后一次性显示全部输出。\n");
+        sb.append("- Show Performance Metrics：启用时，Direct Run 区域会显示生成速度（tok/s）和设备温度（默认关闭）。\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think：切换 chat-template-kwargs enable_thinking。关闭时，提示会被格式化以抑制可见的思考输出。\n\n");
         sb.append("6. 提示模板自动选择\n");
@@ -1336,7 +1352,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Management: \"Get models\"(Search GGUF on Hugging Face / 기기에서 GGUF 가져오기)와 \"Rename / delete models\"로 나뉩니다. 목록의 모델이나 mmproj 파일을 눌러 \"Use as model / Rename / Delete\"를 선택합니다(mmproj 파일은 Use를 제외한 모든 항목 제공). 이름을 바꾸면 해당 파일을 참조하는 저장된 프로필도 새 로컬 파일 이름으로 업데이트되어 불필요한 재다운로드를 방지합니다.\n");
         sb.append("- MTP Settings(추측 디코딩, 실험적): 이제 별도의 카드입니다. \"MTP speculative decoding\" 토글로 활성화합니다(기본 꺼짐). 켜면 n_draft(단계당 드래프트 토큰 수, 기본 2)와 드래프트 소스(\"Use this model's own MTP head (recommended)\" 또는 별도의 GGUF)를 설정할 수 있습니다. MTP 설정은 모델 프로필별로 저장되며 구성을 저장하고 모델을 다시 로드한 후에 적용됩니다. MTP 헤드가 내장된 모델(Qwen3.5-MTP, Gemma 4)의 경우 \"own head\"만 선택하면 됩니다 — 추가 파일이 없고 메모리를 두 배로 쓰지 않으며 생성이 더 빨라질 수 있습니다(이득은 기기, 모델, n_draft에 따라 다르며, 꺼져 있을 때의 동작은 이전과 동일하고, 추론 중에는 컨트롤이 비활성화됩니다).\n");
         sb.append("- Model Parameters: 생성 매개변수를 설정합니다(GPU Offload Layers 포함).\n");
-        sb.append("- Output Settings: 스트리밍 출력을 켜거나 끕니다.\n");
+        sb.append("- Output Settings: 스트리밍 출력을 켜거나 끄고, 성능 지표를 표시하거나 숨깁니다.\n");
         sb.append("- Prompt Template: System Prompt, Think 켜기/끄기(chat-template-kwargs.enable_thinking), 사용자 지정 채팅 템플릿을 설정합니다. 사용자 지정 템플릿이 없으면 앱은 먼저 GGUF의 chat_template 메타데이터를 사용하고, 그렇지 않으면 모델 계열에 따라 자동으로 선택합니다. Bonsai 대체 템플릿이 포함되어 있습니다.\n");
         sb.append("- Llama API Server: 서버 포트를 설정합니다. 로컬 URL(http://127.0.0.1:<포트>)이 표시되며, Wi-Fi에 연결된 동안에는 LAN URL도 표시됩니다. URL을 눌러 기본 브라우저에서 열고, 길게 눌러 복사합니다. 시작 팝업이나 메인 화면에서 활성화하면 해당 포트에서 API와 WebUI가 모두 사용 가능해집니다.\n");
         sb.append("- MCP Settings: MCP 구성 JSON과 함수 정의 JSON을 모델 프로필과 별개인 앱 전역 공유 설정으로 저장합니다. 새 스위치가 꺼져 있으면 WebUI에서만 사용할 수 있고 다른 모든 곳에서는 없는 것으로 처리됩니다. 켜면 메인 프롬프트 입력, /api/chat, /api/generate, /v1/chat/completions에 대한 공유 MCP 및 함수 호출 설정으로도 사용됩니다.\n");
@@ -1344,6 +1360,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Log Settings: 로그 수준을 선택합니다(첫 실행 기본값: INFO).\n");
         sb.append("- Show License: 라이선스 텍스트를 표시합니다(제3자 고지 포함).\n");
         sb.append("- Documents: 사용 설명서와 개인정보 처리방침을 봅니다.\n");
+        sb.append("- 백업 및 복원: \"프로필 백업\"은 모든 프로필(구성 JSON), 다운로드된 모델, 앱 공유 설정을 Downloads의 LlamaBackup_타임스탬프/ 폴더로 내보냅니다. \"프로필 복원\"은 폴더 선택기를 열어 백업 폴더에서 가져옵니다(기존 모델 파일은 덮어쓰지 않습니다).\n");
         sb.append("- SAVE & CLOSE: 현재 설정을 저장하고 모델에 즉시 적용합니다.\n");
         sb.append("- CLOSE: 변경 사항을 저장하지 않고 메인 화면으로 돌아갑니다.\n\n");
         sb.append("5. 모델 매개변수 상세\n\n");
@@ -1382,7 +1399,8 @@ public class DocumentsActivity extends Activity {
         sb.append("- DRY Penalty Last N: DRY 페널티의 토큰 수입니다. -1은 전체에 적용됩니다.\n");
         sb.append("- DRY Sequence Breakers: DRY 시퀀스를 끊는 문자입니다.\n\n");
         sb.append("[Output Settings]\n");
-        sb.append("- Enable Streaming: 활성화하면 토큰이 생성되는 대로 출력이 갱신됩니다. 비활성화하면 생성이 완료된 후 출력이 한 번에 표시됩니다.\n\n");
+        sb.append("- Enable Streaming: 활성화하면 토큰이 생성되는 대로 출력이 갱신됩니다. 비활성화하면 생성이 완료된 후 출력이 한 번에 표시됩니다.\n");
+        sb.append("- Show Performance Metrics: 활성화하면 Direct Run 영역에 생성 속도(tok/s)와 기기 온도가 표시됩니다(기본 꺼짐).\n\n");
         sb.append("[Think Settings]\n");
         sb.append("- Enable Think: chat-template-kwargs enable_thinking을 전환합니다. 비활성화하면 보이는 사고 출력을 억제하도록 프롬프트가 포맷됩니다.\n\n");
         sb.append("6. 프롬프트 템플릿 자동 선택\n");
