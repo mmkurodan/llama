@@ -26,6 +26,8 @@ public class OllamaForegroundService extends Service {
     public static final String ACTION_STOP = "com.micklab.llama.STOP_SERVICE";
     public static final String ACTION_EXIT = "com.micklab.llama.EXIT_APP";
     public static final String ACTION_DISCONNECT_ALL = "com.micklab.llama.DISCONNECT_ALL";
+    // Re-read power-related prefs (keep-awake) and apply them without restarting the server.
+    public static final String ACTION_APPLY_POWER = "com.micklab.llama.APPLY_POWER";
 
     // Persisted API-enable intent: once the user enables the server it stays enabled across process
     // death / task removal / reboot until an explicit Stop/Exit. Shared with MainActivity, the boot
@@ -33,6 +35,9 @@ public class OllamaForegroundService extends Service {
     public static final String PREFS_NAME = "ollama_prefs";
     public static final String PREF_API_ENABLED = "api_enabled";
     public static final String PREF_API_PORT = "api_port";
+    // "Keep awake" high-availability toggle (default false): hold a wake lock + Wi-Fi lock continuously
+    // while the API is enabled so the device does not suspend and stays instantly responsive in sleep.
+    public static final String PREF_KEEP_AWAKE = "keep_awake";
     
     // Broadcast actions for communicating with MainActivity
     public static final String ACTION_LOG = "com.micklab.llama.LOG";
@@ -44,6 +49,13 @@ public class OllamaForegroundService extends Service {
     private OllamaApiServer apiServer;
     private ModelManager modelManager;
     private int port = OllamaApiServer.DEFAULT_PORT;
+
+    // Background execution: a partial wake lock + Wi-Fi lock held (a) while a generation/model-load is
+    // in progress (via the ModelManager busy listener) so a screen-off does not stall inference, and
+    // (b) continuously when the keep-awake toggle is on. Reference-counted inside PowerLocks.
+    private PowerLocks powerLocks;
+    private boolean keepAwakeHeld = false;
+    private ModelManager.BusyStateListener busyWakeListener;
     
     @Override
     public void onCreate() {
@@ -52,6 +64,18 @@ public class OllamaForegroundService extends Service {
         
         createNotificationChannel();
         modelManager = ModelManager.getInstance(this);
+
+        // Hold a wake lock (+ Wi-Fi lock) while the model is busy so inference does not stall when the
+        // screen turns off. Acquire/release is balanced by the busy-state transitions. (default path)
+        powerLocks = new PowerLocks(this, "Llama");
+        busyWakeListener = isBusy -> {
+            if (isBusy) {
+                powerLocks.acquire();
+            } else {
+                powerLocks.release();
+            }
+        };
+        modelManager.addBusyStateListener(busyWakeListener);
     }
     
     @Override
@@ -88,6 +112,11 @@ public class OllamaForegroundService extends Service {
                 }
                 return START_STICKY;
             }
+            if (ACTION_APPLY_POWER.equals(action)) {
+                // Keep-awake toggle changed in Settings: apply without restarting the server.
+                applyKeepAwake();
+                return START_STICKY;
+            }
         }
 
         // Resolve the port. On a START_STICKY restart the intent is null (its extras are lost), so
@@ -116,6 +145,9 @@ public class OllamaForegroundService extends Service {
 
         // Start API/WebUI server
         startApiServer();
+
+        // Apply the keep-awake (high-availability) preference now that the server is up.
+        applyKeepAwake();
 
         return START_STICKY;
     }
@@ -185,6 +217,12 @@ public class OllamaForegroundService extends Service {
     public void onDestroy() {
         Log.i(TAG, "Service onDestroy");
         stopApiServer();
+        if (busyWakeListener != null && modelManager != null) {
+            modelManager.removeBusyStateListener(busyWakeListener);
+        }
+        if (powerLocks != null) {
+            powerLocks.releaseAll();
+        }
         super.onDestroy();
     }
     
@@ -330,6 +368,36 @@ public class OllamaForegroundService extends Service {
             apiServer.stop();
             apiServer = null;
         }
+        // Drop the continuous keep-awake hold when the server stops.
+        if (keepAwakeHeld) {
+            keepAwakeHeld = false;
+            if (powerLocks != null) {
+                powerLocks.release();
+            }
+        }
+    }
+
+    /** Apply the persisted keep-awake preference: hold or drop the continuous wake/Wi-Fi lock. */
+    private void applyKeepAwake() {
+        if (powerLocks == null) {
+            return;
+        }
+        boolean wanted = isKeepAwakeEnabled(this);
+        if (wanted && !keepAwakeHeld) {
+            keepAwakeHeld = true;
+            powerLocks.acquire();
+            sendLog("Keep-awake ON: holding wake + Wi-Fi lock while the API is enabled");
+        } else if (!wanted && keepAwakeHeld) {
+            keepAwakeHeld = false;
+            powerLocks.release();
+            sendLog("Keep-awake OFF");
+        }
+    }
+
+    /** Whether the keep-awake (high-availability) toggle is on (persisted; default false). */
+    public static boolean isKeepAwakeEnabled(Context context) {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(PREF_KEEP_AWAKE, false);
     }
     
     public boolean isServerRunning() {

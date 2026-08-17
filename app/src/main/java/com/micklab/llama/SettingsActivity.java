@@ -17,6 +17,8 @@ import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -156,6 +158,8 @@ public class SettingsActivity extends Activity {
     private TextView gpuLayersValue;
     private SeekBar busyTimeoutSeekBar;
     private TextView busyTimeoutValue;
+    private Switch keepAwakeSwitch;
+    private Button batteryOptButton;
     private Switch enableThinkingSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
@@ -434,6 +438,20 @@ public class SettingsActivity extends Activity {
             if (busyTimeoutValue != null) {
                 busyTimeoutValue.setText(formatBusyTimeoutLabel(initialProgress));
             }
+        }
+
+        // Background execution: keep-awake toggle + battery-optimization exemption.
+        keepAwakeSwitch = findViewById(R.id.keepAwakeSwitch);
+        if (keepAwakeSwitch != null) {
+            keepAwakeSwitch.setText(localizedText(
+                    "端末を起こし続ける（スリープ中も即応／電池消費大）",
+                    "Keep the device awake (instant response during sleep; uses more battery)"));
+            keepAwakeSwitch.setChecked(OllamaForegroundService.isKeepAwakeEnabled(this));
+        }
+        batteryOptButton = findViewById(R.id.batteryOptButton);
+        if (batteryOptButton != null) {
+            batteryOptButton.setText(localizedText("電池最適化を無効化", "Ignore battery optimization"));
+            batteryOptButton.setOnClickListener(v -> requestIgnoreBatteryOptimizations());
         }
         enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
         
@@ -1565,6 +1583,31 @@ public class SettingsActivity extends Activity {
         return Math.min(BUSY_QUEUE_WAIT_MAX_SECONDS, Math.max(BUSY_QUEUE_WAIT_MIN_SECONDS, progress));
     }
 
+    /**
+     * Ask the OS to exempt the app from battery optimization so the server keeps serving during Doze.
+     * Needed for the keep-awake toggle to actually survive idle sleep. Shows the standard system dialog.
+     */
+    private void requestIgnoreBatteryOptimizations() {
+        String pkg = getPackageName();
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm != null && pm.isIgnoringBatteryOptimizations(pkg)) {
+            showToast(localizedText("既に電池最適化から除外されています", "Already exempt from battery optimization"));
+            return;
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            intent.setData(Uri.parse("package:" + pkg));
+            startActivity(intent);
+        } catch (Exception e) {
+            // Fallback: open the full battery-optimization list so the user can allowlist manually.
+            try {
+                startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+            } catch (Exception e2) {
+                showToast(localizedText("電池最適化設定を開けませんでした", "Could not open battery optimization settings"));
+            }
+        }
+    }
+
     private int resolveApiPortFromUi() {
         Integer apiPort = parseApiPortFromUi();
         return apiPort != null ? apiPort : OllamaApiServer.DEFAULT_PORT;
@@ -1630,8 +1673,19 @@ public class SettingsActivity extends Activity {
         prefs.edit()
                 .putInt(PREF_API_PORT, resolveApiPortFromUi())
                 .putInt(PREF_BUSY_QUEUE_WAIT_SECONDS, resolveBusyTimeoutFromUi())
+                .putBoolean(OllamaForegroundService.PREF_KEEP_AWAKE,
+                        keepAwakeSwitch != null && keepAwakeSwitch.isChecked())
                 .putBoolean(PREF_SHOW_PERF_METRICS, showPerfMetricsSwitch != null && showPerfMetricsSwitch.isChecked())
                 .apply();
+        // Apply the keep-awake change immediately if the API server is currently enabled.
+        if (OllamaForegroundService.isApiEnabled(this)) {
+            try {
+                Intent powerIntent = new Intent(this, OllamaForegroundService.class);
+                powerIntent.setAction(OllamaForegroundService.ACTION_APPLY_POWER);
+                startService(powerIntent);
+            } catch (Exception ignored) {
+            }
+        }
         McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
         McpSettingsHelper.saveSharedFunctionDefinitionsJson(this, rawFunctionDefinitionsJson);
         McpSettingsHelper.saveSharedMcpEnabledOutsideWebUi(
@@ -3300,6 +3354,7 @@ public class SettingsActivity extends Activity {
         if (lang != null) json.put("display_language", lang);
         json.put(PREF_API_PORT, prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT));
         json.put(PREF_BUSY_QUEUE_WAIT_SECONDS, prefs.getInt(PREF_BUSY_QUEUE_WAIT_SECONDS, DEFAULT_BUSY_QUEUE_WAIT_SECONDS));
+        json.put(OllamaForegroundService.PREF_KEEP_AWAKE, prefs.getBoolean(OllamaForegroundService.PREF_KEEP_AWAKE, false));
         if (prefs.contains(PREF_LOG_LEVEL)) json.put(PREF_LOG_LEVEL, prefs.getInt(PREF_LOG_LEVEL, 2));
         json.put(PREF_SHOW_PERF_METRICS, prefs.getBoolean(PREF_SHOW_PERF_METRICS, false));
         json.put(McpSettingsHelper.PREF_SHARED_MCP_SERVERS_JSON, McpSettingsHelper.getSharedMcpServersJson(this));
@@ -3314,6 +3369,7 @@ public class SettingsActivity extends Activity {
         if (json.has("display_language")) ed.putString("display_language", json.optString("display_language"));
         if (json.has(PREF_API_PORT)) ed.putInt(PREF_API_PORT, json.optInt(PREF_API_PORT));
         if (json.has(PREF_BUSY_QUEUE_WAIT_SECONDS)) ed.putInt(PREF_BUSY_QUEUE_WAIT_SECONDS, json.optInt(PREF_BUSY_QUEUE_WAIT_SECONDS));
+        if (json.has(OllamaForegroundService.PREF_KEEP_AWAKE)) ed.putBoolean(OllamaForegroundService.PREF_KEEP_AWAKE, json.optBoolean(OllamaForegroundService.PREF_KEEP_AWAKE));
         if (json.has(PREF_LOG_LEVEL)) ed.putInt(PREF_LOG_LEVEL, json.optInt(PREF_LOG_LEVEL));
         if (json.has(PREF_SHOW_PERF_METRICS)) ed.putBoolean(PREF_SHOW_PERF_METRICS, json.optBoolean(PREF_SHOW_PERF_METRICS));
         ed.apply();

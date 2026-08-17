@@ -1029,6 +1029,20 @@
                 android:gravity="center" />
         </LinearLayout>
 
+        <Switch
+            android:id="@+id/keepAwakeSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="Keep the device awake (instant response during sleep; uses more battery)" />
+
+        <Button
+            android:id="@+id/batteryOptButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Ignore battery optimization" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Restart the API/WebUI foreground service after a reboot when the user had it enabled. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Let the user exempt the app from battery optimization so the server keeps serving during Doze
+         (screen off / idle). The exemption is only ever requested via the system dialog, on user action. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name="com.micklab.llama.LlamaApplication"
