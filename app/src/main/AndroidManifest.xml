@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Restart the API/WebUI foreground service after a reboot when the user had it enabled. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name="com.micklab.llama.LlamaApplication"
@@ -49,6 +51,20 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="llm_inference" />
         </service>
+
+        <!-- Re-assert a persisted "API enabled" intent after a device reboot. On Android 14+ a
+             specialUse FGS may not be startable directly from boot; startIfEnabled() degrades
+             gracefully and the next app launch re-asserts. -->
+        <receiver
+            android:name="com.micklab.llama.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <!-- Adreno GPU: allow loading the Qualcomm OpenCL driver (vendor lib).
              Used by the libggml-opencl.so DL plugin; required=false so non-OpenCL

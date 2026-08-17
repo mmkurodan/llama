@@ -40,6 +40,13 @@ public class LlamaApplication extends Application {
             }
         }, "diag-logcat").start();
 
+        // Re-assert a persisted "API enabled" intent as early as possible so the server comes back
+        // after a process restart (e.g. START_STICKY did not fire, or the process was revived by a
+        // component other than the activity). Best-effort: background foreground-service start
+        // restrictions are handled inside startIfEnabled(); MainActivity re-asserts again as the
+        // reliable foreground path.
+        OllamaForegroundService.startIfEnabled(this);
+
         final Thread.UncaughtExceptionHandler defaultHandler =
                 Thread.getDefaultUncaughtExceptionHandler();
 

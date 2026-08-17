@@ -73,6 +73,12 @@ public class SettingsActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_PERF_METRICS = "show_perf_metrics";
+    // Busy-queue max wait (seconds) a queued API request waits for the model slot. Must match
+    // OllamaApiServer's key. 0 = unlimited (wait forever); otherwise clamped to [30, 600].
+    private static final String PREF_BUSY_QUEUE_WAIT_SECONDS = "busy_queue_wait_seconds";
+    private static final int DEFAULT_BUSY_QUEUE_WAIT_SECONDS = 600;
+    private static final int BUSY_QUEUE_WAIT_MIN_SECONDS = 30;
+    private static final int BUSY_QUEUE_WAIT_MAX_SECONDS = 600;
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int REQUEST_RESTORE_DIR = 1002;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
@@ -148,6 +154,8 @@ public class SettingsActivity extends Activity {
     private Switch showPerfMetricsSwitch;
     private SeekBar gpuLayersSeekBar;
     private TextView gpuLayersValue;
+    private SeekBar busyTimeoutSeekBar;
+    private TextView busyTimeoutValue;
     private Switch enableThinkingSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
@@ -391,6 +399,42 @@ public class SettingsActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+
+        // Busy-queue wait timeout (how long a queued API request waits for the model slot).
+        // SeekBar 0..600: 0 = unlimited (wait forever); 1..29 snap up to the 30s minimum.
+        TextView busyTimeoutLabel = findViewById(R.id.busyTimeoutLabel);
+        if (busyTimeoutLabel != null) {
+            busyTimeoutLabel.setText(localizedText(
+                    "待機中リクエストのタイムアウト:", "Busy wait timeout for queued requests:"));
+        }
+        busyTimeoutSeekBar = findViewById(R.id.busyTimeoutSeekBar);
+        busyTimeoutValue = findViewById(R.id.busyTimeoutValue);
+        if (busyTimeoutSeekBar != null) {
+            busyTimeoutSeekBar.setMax(BUSY_QUEUE_WAIT_MAX_SECONDS);
+            busyTimeoutSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if (busyTimeoutValue != null) {
+                        busyTimeoutValue.setText(formatBusyTimeoutLabel(progress));
+                    }
+                }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                    int p = seekBar.getProgress();
+                    if (p > 0 && p < BUSY_QUEUE_WAIT_MIN_SECONDS) {
+                        seekBar.setProgress(BUSY_QUEUE_WAIT_MIN_SECONDS);
+                    }
+                }
+            });
+            int storedBusySeconds = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .getInt(PREF_BUSY_QUEUE_WAIT_SECONDS, DEFAULT_BUSY_QUEUE_WAIT_SECONDS);
+            int initialProgress = storedBusySeconds <= 0
+                    ? 0
+                    : Math.min(BUSY_QUEUE_WAIT_MAX_SECONDS, Math.max(BUSY_QUEUE_WAIT_MIN_SECONDS, storedBusySeconds));
+            busyTimeoutSeekBar.setProgress(initialProgress);
+            if (busyTimeoutValue != null) {
+                busyTimeoutValue.setText(formatBusyTimeoutLabel(initialProgress));
+            }
+        }
         enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
         
         // New prompt settings
@@ -1502,6 +1546,25 @@ public class SettingsActivity extends Activity {
         return config;
     }
 
+    private String formatBusyTimeoutLabel(int seconds) {
+        if (seconds <= 0) {
+            return localizedText("無制限（待ち続ける）", "Unlimited (wait forever)");
+        }
+        int clamped = Math.min(BUSY_QUEUE_WAIT_MAX_SECONDS, Math.max(BUSY_QUEUE_WAIT_MIN_SECONDS, seconds));
+        return clamped + localizedText("秒", "s");
+    }
+
+    private int resolveBusyTimeoutFromUi() {
+        if (busyTimeoutSeekBar == null) {
+            return DEFAULT_BUSY_QUEUE_WAIT_SECONDS;
+        }
+        int progress = busyTimeoutSeekBar.getProgress();
+        if (progress <= 0) {
+            return 0; // unlimited
+        }
+        return Math.min(BUSY_QUEUE_WAIT_MAX_SECONDS, Math.max(BUSY_QUEUE_WAIT_MIN_SECONDS, progress));
+    }
+
     private int resolveApiPortFromUi() {
         Integer apiPort = parseApiPortFromUi();
         return apiPort != null ? apiPort : OllamaApiServer.DEFAULT_PORT;
@@ -1566,6 +1629,7 @@ public class SettingsActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit()
                 .putInt(PREF_API_PORT, resolveApiPortFromUi())
+                .putInt(PREF_BUSY_QUEUE_WAIT_SECONDS, resolveBusyTimeoutFromUi())
                 .putBoolean(PREF_SHOW_PERF_METRICS, showPerfMetricsSwitch != null && showPerfMetricsSwitch.isChecked())
                 .apply();
         McpSettingsHelper.saveSharedMcpServersJson(this, rawMcpConfigJson);
@@ -3235,6 +3299,7 @@ public class SettingsActivity extends Activity {
         String lang = prefs.getString("display_language", null);
         if (lang != null) json.put("display_language", lang);
         json.put(PREF_API_PORT, prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT));
+        json.put(PREF_BUSY_QUEUE_WAIT_SECONDS, prefs.getInt(PREF_BUSY_QUEUE_WAIT_SECONDS, DEFAULT_BUSY_QUEUE_WAIT_SECONDS));
         if (prefs.contains(PREF_LOG_LEVEL)) json.put(PREF_LOG_LEVEL, prefs.getInt(PREF_LOG_LEVEL, 2));
         json.put(PREF_SHOW_PERF_METRICS, prefs.getBoolean(PREF_SHOW_PERF_METRICS, false));
         json.put(McpSettingsHelper.PREF_SHARED_MCP_SERVERS_JSON, McpSettingsHelper.getSharedMcpServersJson(this));
@@ -3248,6 +3313,7 @@ public class SettingsActivity extends Activity {
         SharedPreferences.Editor ed = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
         if (json.has("display_language")) ed.putString("display_language", json.optString("display_language"));
         if (json.has(PREF_API_PORT)) ed.putInt(PREF_API_PORT, json.optInt(PREF_API_PORT));
+        if (json.has(PREF_BUSY_QUEUE_WAIT_SECONDS)) ed.putInt(PREF_BUSY_QUEUE_WAIT_SECONDS, json.optInt(PREF_BUSY_QUEUE_WAIT_SECONDS));
         if (json.has(PREF_LOG_LEVEL)) ed.putInt(PREF_LOG_LEVEL, json.optInt(PREF_LOG_LEVEL));
         if (json.has(PREF_SHOW_PERF_METRICS)) ed.putBoolean(PREF_SHOW_PERF_METRICS, json.optBoolean(PREF_SHOW_PERF_METRICS));
         ed.apply();

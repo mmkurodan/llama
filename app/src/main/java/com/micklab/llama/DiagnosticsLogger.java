@@ -212,6 +212,48 @@ public final class DiagnosticsLogger {
         }
     }
 
+    /** Snapshot of the most recent process exit: reason, signal/exit status, and RSS at death. */
+    public static final class ExitSummary {
+        public final int reason;     // ApplicationExitInfo.REASON_* or EXIT_REASON_UNAVAILABLE
+        public final int status;     // signal number when reason==SIGNALED; otherwise process exit status
+        public final long rssBytes;  // resident set size at death (bytes), 0 when unknown
+
+        public ExitSummary(int reason, int status, long rssBytes) {
+            this.reason = reason;
+            this.status = status;
+            this.rssBytes = rssBytes;
+        }
+    }
+
+    /**
+     * Richer variant of {@link #getLastExitReason} that also returns the signal/exit status and the
+     * RSS at death, so callers can distinguish e.g. an OOM/SIGKILL from an orderly exit and report an
+     * accurate cause. Returns an {@link ExitSummary} with {@link #EXIT_REASON_UNAVAILABLE} when the
+     * information cannot be read (API &lt; 30, no service, or no recorded history).
+     */
+    public static ExitSummary getLastExitSummary(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+        }
+        ActivityManager activityManager =
+                (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) {
+            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+        }
+        try {
+            List<ApplicationExitInfo> infos =
+                    activityManager.getHistoricalProcessExitReasons(null, 0, 1);
+            if (infos == null || infos.isEmpty()) {
+                return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+            }
+            ApplicationExitInfo info = infos.get(0);
+            return new ExitSummary(info.getReason(), info.getStatus(), info.getRss() * 1024L);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to read last exit summary", t);
+            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+        }
+    }
+
     /**
      * Classifies whether an {@link ApplicationExitInfo} reason represents a genuine
      * in-process failure (native/Java crash, kernel signal, OOM/LMK kill, excessive

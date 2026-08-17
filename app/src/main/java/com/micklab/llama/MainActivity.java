@@ -1,6 +1,7 @@
 package com.micklab.llama;
 
 import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.Manifest;
@@ -307,6 +308,14 @@ public class MainActivity extends Activity {
         // Check if service is already running
         isServiceRunning = isServiceRunning(OllamaForegroundService.class);
         updateApiServerUI();
+
+        // Re-assert the persisted "API enabled" intent: if the user previously enabled the server,
+        // keep it running across process death / task removal / reboot until they explicitly disable
+        // it. (apiPort was just loaded by initApiServer() above.)
+        if (!isServiceRunning && OllamaForegroundService.isApiEnabled(this)) {
+            appendMessage("Re-enabling API/WebUI server (persisted enabled state)");
+            startApiService();
+        }
 
         // Send button behavior
         sendButton.setOnClickListener(v -> {
@@ -1470,9 +1479,8 @@ public class MainActivity extends Activity {
 
         clearPendingModelLoadMarker();
 
-        String message = localizedText(
-                "前回のモデルロードは、アドレス空間の確保失敗またはユーザ操作により中断されました。\n\nプロファイル: ",
-                "The previous model load was interrupted because address-space reservation failed or because the process was interrupted by user action.\n\nProfile: ")
+        String message = describeInterruptedLoadCause(DiagnosticsLogger.getLastExitSummary(this))
+                + localizedText("\n\nプロファイル: ", "\n\nProfile: ")
                 + profileName
                 + localizedText("\nモデル: ", "\nModel: ")
                 + modelName
@@ -1507,6 +1515,55 @@ public class MainActivity extends Activity {
             Log.e(TAG, "Failed to delete pending model load marker", e);
             appendMessage("Failed to delete pending model load marker: " + e.getMessage());
         }
+    }
+
+    /**
+     * Composes a cause-specific sentence for the "Interrupted Model Load" dialog from the previous
+     * process exit reason. It no longer blames "address-space reservation failure" unconditionally:
+     * an OOM/kernel SIGKILL, an app crash, and a benign user/system stop each get their own wording,
+     * and an unknown cause avoids asserting mmap as the reason.
+     */
+    private String describeInterruptedLoadCause(DiagnosticsLogger.ExitSummary exit) {
+        int reason = exit.reason;
+        // SIGNALED with a fault/abort signal (SIGABRT=6, SIGSEGV=11, SIGILL=4, SIGBUS=7) is a crash,
+        // not an OOM kill. SIGKILL(9) and REASON_LOW_MEMORY/EXCESSIVE_RESOURCE_USAGE are memory kills.
+        boolean signaledCrash = reason == ApplicationExitInfo.REASON_SIGNALED
+                && (exit.status == 6 || exit.status == 11 || exit.status == 4 || exit.status == 7);
+        if (signaledCrash
+                || reason == ApplicationExitInfo.REASON_CRASH
+                || reason == ApplicationExitInfo.REASON_CRASH_NATIVE) {
+            return localizedText(
+                    "前回のモデルロードは、アプリの異常終了（クラッシュ）により中断されました。",
+                    "The previous model load was interrupted by an app crash.");
+        }
+        boolean memoryKill = reason == ApplicationExitInfo.REASON_LOW_MEMORY
+                || reason == ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE
+                || reason == ApplicationExitInfo.REASON_SIGNALED; // SIGKILL(9) etc: kernel/cgroup OOM
+        if (memoryKill) {
+            String base = localizedText(
+                    "前回のモデルロードは、メモリ不足でプロセスが強制終了されて中断された可能性が高いです。これは mmap／アドレス空間の問題ではありません。GPUオフロード層数やコンテキスト長 (n_ctx) を下げると安定します。",
+                    "The previous model load likely stopped because the process ran out of memory and was killed. This is not an mmap/address-space problem — lowering the GPU offload layers or the context length (n_ctx) usually helps.");
+            if (exit.rssBytes > 0) {
+                base = base + " (RSS≈" + formatMb(exit.rssBytes) + ")";
+            }
+            return base;
+        }
+        if (reason == ApplicationExitInfo.REASON_USER_REQUESTED
+                || reason == ApplicationExitInfo.REASON_USER_STOPPED
+                || reason == ApplicationExitInfo.REASON_EXIT_SELF
+                || reason == ApplicationExitInfo.REASON_OTHER) {
+            return localizedText(
+                    "前回のモデルロードは、ユーザ操作またはシステムによる終了で中断されました。",
+                    "The previous model load was stopped by a user action or by the system.");
+        }
+        // Unknown / unavailable (e.g. API < 30): do not assert mmap as the cause.
+        return localizedText(
+                "前回のモデルロードが完了前に中断されました（原因は特定できませんでした）。大きなモデルではメモリ不足が主因のことが多く、GPUオフロード層数や n_ctx を下げると安定します。",
+                "The previous model load did not finish (cause unknown). For large models this is most often due to running out of memory — lowering the GPU offload layers or n_ctx usually helps.");
+    }
+
+    private String formatMb(long bytes) {
+        return (bytes / (1024L * 1024L)) + "MB";
     }
 
     private void copyToClipboard(String label, String text) {
@@ -1683,6 +1740,8 @@ public class MainActivity extends Activity {
     }
     
     private void startApiService() {
+        // Persist the enable intent immediately so it survives even if the service start is delayed.
+        OllamaForegroundService.setApiEnabled(this, true);
         Intent serviceIntent = new Intent(this, OllamaForegroundService.class);
         serviceIntent.setAction(OllamaForegroundService.ACTION_START);
         serviceIntent.putExtra("port", apiPort);
@@ -1699,6 +1758,8 @@ public class MainActivity extends Activity {
     }
     
     private void stopApiService() {
+        // Explicit user disable: clear the persisted intent so it does not auto-restart.
+        OllamaForegroundService.setApiEnabled(this, false);
         Intent serviceIntent = new Intent(this, OllamaForegroundService.class);
         serviceIntent.setAction(OllamaForegroundService.ACTION_STOP);
         startService(serviceIntent);

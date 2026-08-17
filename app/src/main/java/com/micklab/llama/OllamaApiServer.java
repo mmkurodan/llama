@@ -61,7 +61,11 @@ public class OllamaApiServer {
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final int MAX_BUSY_QUEUE_SIZE = 10;
-    private static final long BUSY_QUEUE_WAIT_MS = 60_000L;
+    // Busy-queue max wait is user-configurable (Settings). Default 600s; a stored value of
+    // 0 (or negative) means "wait indefinitely" until the slot frees or a model reset is requested.
+    private static final String PREF_BUSY_QUEUE_WAIT_SECONDS = "busy_queue_wait_seconds";
+    private static final int DEFAULT_BUSY_QUEUE_WAIT_SECONDS = 600;
+    private static final long BUSY_QUEUE_WAIT_UNLIMITED = Long.MAX_VALUE;
     private static final long BUSY_QUEUE_POLL_INTERVAL_MS = 100L;
     private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String SERVER_ROLE_MODEL = "model";
@@ -3333,6 +3337,25 @@ public class OllamaApiServer {
         modelManager.setGrammarConstraint(gbnf, schema);
     }
 
+    /**
+     * Max time (ms) a queued request waits for the generation slot, read from Settings
+     * ({@link #PREF_BUSY_QUEUE_WAIT_SECONDS}, default {@value #DEFAULT_BUSY_QUEUE_WAIT_SECONDS}s).
+     * A stored value &le; 0 means "wait indefinitely" and returns {@link #BUSY_QUEUE_WAIT_UNLIMITED}.
+     * Read per-request so a Settings change applies without restarting the server.
+     */
+    private long getBusyQueueWaitMs() {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            int seconds = prefs.getInt(PREF_BUSY_QUEUE_WAIT_SECONDS, DEFAULT_BUSY_QUEUE_WAIT_SECONDS);
+            if (seconds <= 0) {
+                return BUSY_QUEUE_WAIT_UNLIMITED;
+            }
+            return seconds * 1000L;
+        } catch (Exception e) {
+            return DEFAULT_BUSY_QUEUE_WAIT_SECONDS * 1000L;
+        }
+    }
+
     private boolean acquireGenerationSlot(OutputStream outputStream, String endpoint) throws IOException {
         return acquireGenerationSlot(outputStream, endpoint, false);
     }
@@ -3356,10 +3379,12 @@ public class OllamaApiServer {
             return false;
         }
 
-        long deadline = System.currentTimeMillis() + BUSY_QUEUE_WAIT_MS;
+        final long waitMs = getBusyQueueWaitMs();
+        final boolean unlimited = waitMs >= BUSY_QUEUE_WAIT_UNLIMITED;
+        final long deadline = unlimited ? 0L : System.currentTimeMillis() + waitMs;
         boolean acquired = false;
         try {
-            while (System.currentTimeMillis() < deadline) {
+            while (unlimited || System.currentTimeMillis() < deadline) {
                 if (modelManager.isResetPendingOrInProgress()) {
                     break;
                 }
@@ -3385,8 +3410,14 @@ public class OllamaApiServer {
         }
 
         if (!acquired) {
-            Log.w(TAG, "Busy queue timeout for " + endpoint + " waitedMs=" + BUSY_QUEUE_WAIT_MS);
-            sendBusyResponse(outputStream, 503, "Model is busy; queue wait timed out after 60 seconds", openAiStyle);
+            // With an unlimited wait this is only reachable via thread interruption (the reset case
+            // is handled above), so report that instead of a nonsensical timeout duration.
+            String waitDesc = unlimited
+                    ? "the request was interrupted"
+                    : ("queue wait timed out after " + (waitMs / 1000L) + " seconds");
+            Log.w(TAG, "Busy queue not acquired for " + endpoint
+                    + " waitMs=" + (unlimited ? "unlimited" : String.valueOf(waitMs)));
+            sendBusyResponse(outputStream, 503, "Model is busy; " + waitDesc, openAiStyle);
             return false;
         }
 

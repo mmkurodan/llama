@@ -5,7 +5,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -24,6 +26,13 @@ public class OllamaForegroundService extends Service {
     public static final String ACTION_STOP = "com.micklab.llama.STOP_SERVICE";
     public static final String ACTION_EXIT = "com.micklab.llama.EXIT_APP";
     public static final String ACTION_DISCONNECT_ALL = "com.micklab.llama.DISCONNECT_ALL";
+
+    // Persisted API-enable intent: once the user enables the server it stays enabled across process
+    // death / task removal / reboot until an explicit Stop/Exit. Shared with MainActivity, the boot
+    // receiver and LlamaApplication (all use the "ollama_prefs" file).
+    public static final String PREFS_NAME = "ollama_prefs";
+    public static final String PREF_API_ENABLED = "api_enabled";
+    public static final String PREF_API_PORT = "api_port";
     
     // Broadcast actions for communicating with MainActivity
     public static final String ACTION_LOG = "com.micklab.llama.LOG";
@@ -52,11 +61,15 @@ public class OllamaForegroundService extends Service {
         if (intent != null) {
             String action = intent.getAction();
             if (ACTION_STOP.equals(action)) {
+                // Explicit user disable: clear the persisted intent so we do NOT auto-restart.
+                setApiEnabled(this, false);
                 stopSelf();
                 return START_NOT_STICKY;
             }
             if (ACTION_EXIT.equals(action)) {
                 Log.i(TAG, "Exit action received - terminating app");
+                // Explicit user exit: clear the persisted intent so we do NOT auto-restart.
+                setApiEnabled(this, false);
                 stopApiServer();
                 stopSelf();
                 // This is a deliberate user-requested termination. Clear any in-progress
@@ -75,18 +88,92 @@ public class OllamaForegroundService extends Service {
                 }
                 return START_STICKY;
             }
-            
-            port = intent.getIntExtra("port", OllamaApiServer.DEFAULT_PORT);
         }
-        
-        // Start foreground with notification
-        Notification notification = createNotification("Llama API + WebUI Server", "Starting...");
-        startForeground(NOTIFICATION_ID, notification);
-        
+
+        // Resolve the port. On a START_STICKY restart the intent is null (its extras are lost), so
+        // fall back to the persisted port instead of silently reverting to the default.
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        port = prefs.getInt(PREF_API_PORT, OllamaApiServer.DEFAULT_PORT);
+        if (intent != null && intent.hasExtra("port")) {
+            port = intent.getIntExtra("port", port);
+            prefs.edit().putInt(PREF_API_PORT, port).apply();
+        }
+
+        // Reaching here means we are (re)starting the server, so persist the enabled intent.
+        setApiEnabled(this, true);
+
+        // Start foreground with notification. On Android 14+ starting a specialUse FGS from certain
+        // background contexts (e.g. BOOT_COMPLETED) can be disallowed; degrade gracefully rather than
+        // crash so a later foreground launch can re-assert.
+        try {
+            Notification notification = createNotification("Llama API + WebUI Server", "Starting...");
+            startForeground(NOTIFICATION_ID, notification);
+        } catch (Exception e) {
+            Log.w(TAG, "startForeground not allowed in this context; will retry on next launch", e);
+            stopSelf();
+            return START_STICKY;
+        }
+
         // Start API/WebUI server
         startApiServer();
-        
+
         return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // Surviving a swipe-from-recents: keep serving unless the user explicitly disabled the API.
+        // START_STICKY covers process death, but some OEMs kill on task removal without a sticky
+        // restart, so re-request a start here as a best effort.
+        if (isApiEnabled(this)) {
+            try {
+                Intent restart = new Intent(getApplicationContext(), OllamaForegroundService.class);
+                restart.setAction(ACTION_START);
+                restart.putExtra("port", port);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(restart);
+                } else {
+                    startService(restart);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "onTaskRemoved restart failed", e);
+            }
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
+    /** Persist the user's API-enable intent so the server is re-asserted after any restart. */
+    public static void setApiEnabled(Context context, boolean enabled) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(PREF_API_ENABLED, enabled).apply();
+    }
+
+    /** Whether the user has enabled the API server (persisted; default false). */
+    public static boolean isApiEnabled(Context context) {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(PREF_API_ENABLED, false);
+    }
+
+    /**
+     * Start the foreground service iff the persisted intent says the API is enabled. Safe to call on
+     * process start (app launch, boot). Failures (e.g. background-start restrictions) are swallowed so
+     * a later foreground launch can re-assert.
+     */
+    public static void startIfEnabled(Context context) {
+        if (!isApiEnabled(context)) {
+            return;
+        }
+        try {
+            Intent i = new Intent(context, OllamaForegroundService.class);
+            i.setAction(ACTION_START);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(i);
+            } else {
+                context.startService(i);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "startIfEnabled failed to start service", e);
+        }
     }
     
     @Override

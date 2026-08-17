@@ -1001,6 +1001,35 @@
             android:text="11434" />
 
         <TextView
+            android:id="@+id/busyTimeoutLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Busy wait timeout for queued requests:"
+            android:paddingTop="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <SeekBar
+                android:id="@+id/busyTimeoutSeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="600"
+                android:progress="600" />
+
+            <TextView
+                android:id="@+id/busyTimeoutValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="600s"
+                android:textSize="12sp"
+                android:paddingTop="4dp"
+                android:gravity="center" />
+        </LinearLayout>
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Local URL (tap to open / long-press to copy):"
