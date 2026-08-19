@@ -448,8 +448,8 @@ public class SettingsActivity extends Activity {
         keepAwakeSwitch = findViewById(R.id.keepAwakeSwitch);
         if (keepAwakeSwitch != null) {
             keepAwakeSwitch.setText(localizedText(
-                    "端末を起こし続ける（スリープ中も即応／電池消費大）",
-                    "Keep the device awake (instant response during sleep; uses more battery)"));
+                    "スリープ時も稼働（電池消費大）",
+                    "Run during sleep (more battery)"));
             keepAwakeSwitch.setChecked(OllamaForegroundService.isKeepAwakeEnabled(this));
         }
         batteryOptButton = findViewById(R.id.batteryOptButton);
@@ -462,15 +462,15 @@ public class SettingsActivity extends Activity {
         recoveryWatchdogSwitch = findViewById(R.id.recoveryWatchdogSwitch);
         if (recoveryWatchdogSwitch != null) {
             recoveryWatchdogSwitch.setText(localizedText(
-                    "強制終了されたらサーバを自動再起動（ウォッチドッグ）",
-                    "Auto-restart the server if it is killed (watchdog)"));
+                    "強制終了時の自動再起動",
+                    "Auto-restart if killed"));
             recoveryWatchdogSwitch.setChecked(RecoveryScheduler.isWatchdogEnabled(this));
         }
         recoveryRecycleSwitch = findViewById(R.id.recoveryRecycleSwitch);
         if (recoveryRecycleSwitch != null) {
             recoveryRecycleSwitch.setText(localizedText(
-                    "OEMの強制停止を避けるためプロセスを定期再起動",
-                    "Periodically recycle the process to avoid OEM force-stop"));
+                    "OEM強制終了予防の定期再起動",
+                    "Periodic restart (avoid OEM force-stop)"));
             recoveryRecycleSwitch.setChecked(RecoveryScheduler.isRecycleEnabled(this));
         }
         TextView recoveryRecycleIntervalLabel = findViewById(R.id.recoveryRecycleIntervalLabel);
@@ -882,7 +882,6 @@ public class SettingsActivity extends Activity {
             case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
             case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
             case "Use memory-map (mmap):": return "メモリマップ (mmap) を使う:";
-            case "Turn OFF for very large models (e.g. GPT-OSS 20B) that only load rarely: reading weights into memory avoids the large contiguous address-space reservation mmap needs. Uses more RAM at load.": return "ごく稀にしかロードできない超大型モデル（例: GPT-OSS 20B）ではOFFにしてください。重みをメモリに読み込むことで、mmap が必要とする大きな連続アドレス空間の確保を回避します。ロード時のRAM使用は増えます。";
             case "Custom Chat Template:": return "カスタムチャットテンプレート:";
             case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
             case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";

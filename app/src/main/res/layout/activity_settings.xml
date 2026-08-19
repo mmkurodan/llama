@@ -347,6 +347,26 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Use memory-map (mmap):" />
+
+            <Switch
+                android:id="@+id/useMmapSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
         <!-- Compute Backend Selection: CPU is the base; toggle GPU.
              backendType is derived from this switch (off = CPU, on = GPU). -->
         <TextView
@@ -849,6 +869,26 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:text="Enable Think (chat-template-kwargs.enable_thinking):" />
+
+            <Switch
+                android:id="@+id/enableThinkingSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:text="Show Performance Metrics:" />
 
             <Switch
@@ -898,55 +938,6 @@
             android:inputType="textMultiLine"
             android:minLines="2"
             android:gravity="top|start" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingTop="12dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Enable Think (chat-template-kwargs.enable_thinking):" />
-
-            <Switch
-                android:id="@+id/enableThinkingSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingTop="12dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Use memory-map (mmap):" />
-
-            <Switch
-                android:id="@+id/useMmapSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/useMmapHelp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Turn OFF for very large models (e.g. GPT-OSS 20B) that only load rarely: reading weights into memory avoids the large contiguous address-space reservation mmap needs. Uses more RAM at load."
-            android:textSize="12sp"
-            android:textColor="#666666"
-            android:paddingTop="2dp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -1063,7 +1054,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="12dp"
-            android:text="Keep the device awake (instant response during sleep; uses more battery)" />
+            android:text="Run during sleep (more battery)" />
 
         <Button
             android:id="@+id/batteryOptButton"
@@ -1077,14 +1068,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="12dp"
-            android:text="Auto-restart the server if it is killed (watchdog)" />
+            android:text="Auto-restart if killed" />
 
         <Switch
             android:id="@+id/recoveryRecycleSwitch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="12dp"
-            android:text="Periodically recycle the process to avoid OEM force-stop" />
+            android:text="Periodic restart (avoid OEM force-stop)" />
 
         <LinearLayout
             android:layout_width="match_parent"
