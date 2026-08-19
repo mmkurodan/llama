@@ -69,6 +69,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Self-recovery alarm target: resurrects the API foreground service after a SIGKILL/OOM/
+             crash/task-removal (watchdog) and drives the optional proactive process recycle. Not
+             exported: only our own AlarmManager PendingIntent triggers it. -->
+        <receiver
+            android:name="com.micklab.llama.WatchdogReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+
         <!-- Adreno GPU: allow loading the Qualcomm OpenCL driver (vendor lib).
              Used by the libggml-opencl.so DL plugin; required=false so non-OpenCL
              devices still run (GPU just unavailable). -->

@@ -1043,6 +1043,42 @@
             android:layout_marginTop="4dp"
             android:text="Ignore battery optimization" />
 
+        <Switch
+            android:id="@+id/recoveryWatchdogSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="Auto-restart the server if it is killed (watchdog)" />
+
+        <Switch
+            android:id="@+id/recoveryRecycleSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="Periodically recycle the process to avoid OEM force-stop" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp">
+
+            <TextView
+                android:id="@+id/recoveryRecycleIntervalLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recycle interval (min):" />
+
+            <EditText
+                android:id="@+id/recoveryRecycleIntervalInput"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:inputType="number"
+                android:maxLength="3" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

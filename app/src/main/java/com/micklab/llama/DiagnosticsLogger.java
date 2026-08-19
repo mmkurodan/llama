@@ -303,6 +303,17 @@ public final class DiagnosticsLogger {
     }
 
     /**
+     * Records a self-recovery lifecycle event (watchdog restart / proactive recycle) to the shared
+     * ollama.log so the alarm-driven restart chain is auditable alongside the exit-reason records.
+     */
+    public static void logRecoveryEvent(Context context, String category, String detail) {
+        String line = buildHeader(category) + " " + safe(detail);
+        synchronized (LOCK) {
+            appendToOllamaLogLocked(context, line);
+        }
+    }
+
+    /**
      * If the previous process left a generation marker behind, records why and returns
      * whether crash diagnostics (logcat) are worth capturing. The marker alone only means
      * "the process died during a native generate call"; the most common cause is a routine

@@ -159,6 +159,9 @@ public class SettingsActivity extends Activity {
     private SeekBar busyTimeoutSeekBar;
     private TextView busyTimeoutValue;
     private Switch keepAwakeSwitch;
+    private Switch recoveryWatchdogSwitch;
+    private Switch recoveryRecycleSwitch;
+    private EditText recoveryRecycleIntervalInput;
     private Button batteryOptButton;
     private Switch enableThinkingSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
@@ -452,6 +455,30 @@ public class SettingsActivity extends Activity {
         if (batteryOptButton != null) {
             batteryOptButton.setText(localizedText("電池最適化を無効化", "Ignore battery optimization"));
             batteryOptButton.setOnClickListener(v -> requestIgnoreBatteryOptimizations());
+        }
+
+        // Self-recovery: watchdog (auto-restart after a kill) + optional proactive process recycle.
+        recoveryWatchdogSwitch = findViewById(R.id.recoveryWatchdogSwitch);
+        if (recoveryWatchdogSwitch != null) {
+            recoveryWatchdogSwitch.setText(localizedText(
+                    "強制終了されたらサーバを自動再起動（ウォッチドッグ）",
+                    "Auto-restart the server if it is killed (watchdog)"));
+            recoveryWatchdogSwitch.setChecked(RecoveryScheduler.isWatchdogEnabled(this));
+        }
+        recoveryRecycleSwitch = findViewById(R.id.recoveryRecycleSwitch);
+        if (recoveryRecycleSwitch != null) {
+            recoveryRecycleSwitch.setText(localizedText(
+                    "OEMの強制停止を避けるためプロセスを定期再起動",
+                    "Periodically recycle the process to avoid OEM force-stop"));
+            recoveryRecycleSwitch.setChecked(RecoveryScheduler.isRecycleEnabled(this));
+        }
+        TextView recoveryRecycleIntervalLabel = findViewById(R.id.recoveryRecycleIntervalLabel);
+        if (recoveryRecycleIntervalLabel != null) {
+            recoveryRecycleIntervalLabel.setText(localizedText("再起動の間隔（分）:", "Recycle interval (min):"));
+        }
+        recoveryRecycleIntervalInput = findViewById(R.id.recoveryRecycleIntervalInput);
+        if (recoveryRecycleIntervalInput != null) {
+            recoveryRecycleIntervalInput.setText(String.valueOf(RecoveryScheduler.getRecycleIntervalMinutes(this)));
         }
         enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
         
@@ -1583,6 +1610,23 @@ public class SettingsActivity extends Activity {
         return Math.min(BUSY_QUEUE_WAIT_MAX_SECONDS, Math.max(BUSY_QUEUE_WAIT_MIN_SECONDS, progress));
     }
 
+    /** Parse and clamp the proactive-recycle interval (minutes) from the UI, falling back to default. */
+    private int resolveRecycleIntervalFromUi() {
+        if (recoveryRecycleIntervalInput == null) {
+            return RecoveryScheduler.DEFAULT_RECYCLE_INTERVAL_MIN;
+        }
+        int minutes = RecoveryScheduler.DEFAULT_RECYCLE_INTERVAL_MIN;
+        try {
+            String raw = recoveryRecycleIntervalInput.getText().toString().trim();
+            if (!raw.isEmpty()) {
+                minutes = Integer.parseInt(raw);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return Math.max(RecoveryScheduler.MIN_RECYCLE_INTERVAL_MIN,
+                Math.min(RecoveryScheduler.MAX_RECYCLE_INTERVAL_MIN, minutes));
+    }
+
     /**
      * Ask the OS to exempt the app from battery optimization so the server keeps serving during Doze.
      * Needed for the keep-awake toggle to actually survive idle sleep. Shows the standard system dialog.
@@ -1676,7 +1720,14 @@ public class SettingsActivity extends Activity {
                 .putBoolean(OllamaForegroundService.PREF_KEEP_AWAKE,
                         keepAwakeSwitch != null && keepAwakeSwitch.isChecked())
                 .putBoolean(PREF_SHOW_PERF_METRICS, showPerfMetricsSwitch != null && showPerfMetricsSwitch.isChecked())
+                .putBoolean(RecoveryScheduler.PREF_WATCHDOG_ENABLED,
+                        recoveryWatchdogSwitch == null || recoveryWatchdogSwitch.isChecked())
+                .putBoolean(RecoveryScheduler.PREF_RECYCLE_ENABLED,
+                        recoveryRecycleSwitch != null && recoveryRecycleSwitch.isChecked())
+                .putInt(RecoveryScheduler.PREF_RECYCLE_INTERVAL_MIN, resolveRecycleIntervalFromUi())
                 .apply();
+        // Apply the recovery-toggle changes immediately: (re)arm or cancel the alarm chain.
+        RecoveryScheduler.ensureScheduled(this);
         // Apply the keep-awake change immediately if the API server is currently enabled.
         if (OllamaForegroundService.isApiEnabled(this)) {
             try {

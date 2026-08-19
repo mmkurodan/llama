@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.util.Log;
 
 /**
@@ -46,6 +47,12 @@ public class OllamaForegroundService extends Service {
     public static final String EXTRA_STATUS = "status";
     public static final String EXTRA_PORT = "port";
     
+    // Process-scoped liveness used by the recovery watchdog (WatchdogReceiver). Statics reset to their
+    // defaults in a freshly cold-started process, so a watchdog tick delivered to a resurrected process
+    // sees sServiceRunning=false and restarts the service.
+    private static volatile boolean sServiceRunning = false;
+    private static volatile long sServiceStartElapsed = 0L;
+
     private OllamaApiServer apiServer;
     private ModelManager modelManager;
     private int port = OllamaApiServer.DEFAULT_PORT;
@@ -85,8 +92,11 @@ public class OllamaForegroundService extends Service {
         if (intent != null) {
             String action = intent.getAction();
             if (ACTION_STOP.equals(action)) {
-                // Explicit user disable: clear the persisted intent so we do NOT auto-restart.
+                // Explicit user disable: clear the persisted intent so we do NOT auto-restart, and stop
+                // the recovery alarm chain so the watchdog does not resurrect us.
                 setApiEnabled(this, false);
+                sServiceRunning = false;
+                RecoveryScheduler.cancel(this);
                 stopSelf();
                 return START_NOT_STICKY;
             }
@@ -94,6 +104,8 @@ public class OllamaForegroundService extends Service {
                 Log.i(TAG, "Exit action received - terminating app");
                 // Explicit user exit: clear the persisted intent so we do NOT auto-restart.
                 setApiEnabled(this, false);
+                sServiceRunning = false;
+                RecoveryScheduler.cancel(this);
                 stopApiServer();
                 stopSelf();
                 // This is a deliberate user-requested termination. Clear any in-progress
@@ -149,7 +161,26 @@ public class OllamaForegroundService extends Service {
         // Apply the keep-awake (high-availability) preference now that the server is up.
         applyKeepAwake();
 
+        // Mark this process's service as live and (re)arm the self-recovery alarm chain. The start
+        // time is captured once per process so the proactive-recycle age reflects real process uptime.
+        sServiceRunning = true;
+        if (sServiceStartElapsed == 0L) {
+            sServiceStartElapsed = SystemClock.elapsedRealtime();
+        }
+        RecoveryScheduler.ensureScheduled(this);
+
         return START_STICKY;
+    }
+
+    /** Whether the foreground service is live in the current process (see {@link WatchdogReceiver}). */
+    public static boolean isServiceRunning() {
+        return sServiceRunning;
+    }
+
+    /** Uptime of the service in the current process, or 0 if not yet started. */
+    public static long serviceUptimeMs() {
+        long start = sServiceStartElapsed;
+        return start == 0L ? 0L : SystemClock.elapsedRealtime() - start;
     }
 
     @Override
@@ -216,6 +247,7 @@ public class OllamaForegroundService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "Service onDestroy");
+        sServiceRunning = false;
         stopApiServer();
         if (busyWakeListener != null && modelManager != null) {
             modelManager.removeBusyStateListener(busyWakeListener);
