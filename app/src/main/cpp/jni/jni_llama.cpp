@@ -155,6 +155,10 @@ static float g_temp       = 0.7f;
 static float g_top_p      = 0.9f;
 static int   g_top_k      = 40;
 static int   g_n_gpu_layers = 0;
+// Memory-map the model file at load (default true). When false, weights are read into
+// native memory, avoiding the single large contiguous virtual-address reservation mmap
+// needs — helps very large models load when address space is fragmented.
+static bool  g_use_mmap   = true;
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
@@ -574,8 +578,17 @@ static void log_requested_load_params(const char * log_prefix) {
 
 static std::string build_model_load_failure_message(const char * log_prefix) {
     std::ostringstream ss;
-    ss << log_prefix
-       << ": failed to load model (possible mmap/address-space exhaustion or low_4GB fragmentation)";
+    ss << log_prefix << ": failed to load model";
+    if (g_use_mmap) {
+        // mmap is on: a large contiguous virtual-address reservation is required, so
+        // address-space fragmentation is a plausible cause and disabling mmap may help.
+        ss << " (out of memory, or mmap address-space fragmentation — for very large models"
+              " try disabling memory-map / lowering n_gpu_layers / n_ctx)";
+    } else {
+        // mmap is off: weights are read into native memory, so this is not an mmap issue.
+        ss << " (out of memory, or the model file is missing/corrupt — this is not an mmap issue;"
+              " try lowering n_gpu_layers / n_ctx or use a smaller model)";
+    }
     return ss.str();
 }
 
@@ -733,12 +746,8 @@ static ggml_backend_dev_t find_gpu_device_locked() {
 static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = g_n_gpu_layers;
-#if defined(__ANDROID__)
     (void) has_explicit_mmproj;
-    mparams.use_mmap = true;
-#else
-    mparams.use_mmap = true;
-#endif
+    mparams.use_mmap = g_use_mmap;
     mparams.use_mlock = false;
 
     // ---- Backend device list ----
@@ -2823,6 +2832,22 @@ Java_com_micklab_llama_LlamaNative_setLoadParameters(
            << " n_gpu_layers=" << g_n_gpu_layers;
         log_to_file(ss.str());
     }
+}
+
+// ---------------- JNI: setUseMmap ----------------
+// Records whether the model file should be memory-mapped at load. Applied at the next
+// init/initWithMmproj (build_model_params_locked reads g_use_mmap). Disabling avoids the
+// large contiguous virtual-address reservation mmap needs.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setUseMmap(
+        JNIEnv *, jobject, jboolean useMmap
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_use_mmap = (useMmap == JNI_TRUE);
+    std::ostringstream ss;
+    ss << "setUseMmap: use_mmap=" << (g_use_mmap ? "true" : "false");
+    log_to_file(ss.str());
 }
 
 // ---------------- JNI: setSpeculative (MTP draft-mtp) ----------------

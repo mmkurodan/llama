@@ -164,6 +164,7 @@ public class SettingsActivity extends Activity {
     private EditText recoveryRecycleIntervalInput;
     private Button batteryOptButton;
     private Switch enableThinkingSwitch;
+    private Switch useMmapSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
 
@@ -481,7 +482,8 @@ public class SettingsActivity extends Activity {
             recoveryRecycleIntervalInput.setText(String.valueOf(RecoveryScheduler.getRecycleIntervalMinutes(this)));
         }
         enableThinkingSwitch = findViewById(R.id.enableThinkingSwitch);
-        
+        useMmapSwitch = findViewById(R.id.useMmapSwitch);
+
         // New prompt settings
         systemPromptInput = findViewById(R.id.systemPromptInput);
         customChatTemplateInput = findViewById(R.id.customChatTemplateInput);
@@ -879,6 +881,8 @@ public class SettingsActivity extends Activity {
             case "System Prompt:": return "システムプロンプト:";
             case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
             case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
+            case "Use memory-map (mmap):": return "メモリマップ (mmap) を使う:";
+            case "Turn OFF for very large models (e.g. GPT-OSS 20B) that only load rarely: reading weights into memory avoids the large contiguous address-space reservation mmap needs. Uses more RAM at load.": return "ごく稀にしかロードできない超大型モデル（例: GPT-OSS 20B）ではOFFにしてください。重みをメモリに読み込むことで、mmap が必要とする大きな連続アドレス空間の確保を回避します。ロード時のRAM使用は増えます。";
             case "Custom Chat Template:": return "カスタムチャットテンプレート:";
             case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
             case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
@@ -1330,6 +1334,9 @@ public class SettingsActivity extends Activity {
         gpuLayersSeekBar.setProgress(displayLayers);
         gpuLayersValue.setText(displayLayers > 39 ? "ALL" : String.valueOf(displayLayers));
         enableThinkingSwitch.setChecked(config.enableThinking);
+        if (useMmapSwitch != null) {
+            useMmapSwitch.setChecked(config.useMmap);
+        }
 
         // Compute backend: backendType を GPU トグルへ分解 (GPU=ON, それ以外=OFF=CPU)
         boolean gpuOn = (config.backendType == ConfigurationManager.Configuration.BACKEND_GPU);
@@ -1571,6 +1578,9 @@ public class SettingsActivity extends Activity {
         int progress = gpuLayersSeekBar.getProgress();
         config.gpuOffloadLayers = (progress > 39) ? -1 : progress;
         config.enableThinking = enableThinkingSwitch.isChecked();
+        if (useMmapSwitch != null) {
+            config.useMmap = useMmapSwitch.isChecked();
+        }
 
         // Compute backend: GPU トグルから backendType を導出 (OFF = CPU)
         boolean gpuOn = (gpuEnabledSwitch != null) && gpuEnabledSwitch.isChecked();

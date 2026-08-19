@@ -103,6 +103,11 @@ public class ConfigurationManager {
         // Runtime behavior switches
         public int gpuOffloadLayers;
         public boolean enableThinking;
+        // Memory-map the model file at load. Default true. Disabling reads weights into
+        // native memory instead, which avoids the single large contiguous virtual-address
+        // reservation that mmap needs — helpful for very large models (e.g. GPT-OSS 20B)
+        // that fail to load intermittently due to address-space fragmentation.
+        public boolean useMmap;
 
         // Compute backend
         // 0=CPU  1=GPU  (NPU/HTP removed — Qualcomm Hexagon SDK redistribution restriction)
@@ -157,6 +162,7 @@ public class ConfigurationManager {
             // Runtime behavior defaults
             gpuOffloadLayers = 0;
             enableThinking = true;
+            useMmap = true;
 
             // Backend defaults
             backendType = BACKEND_CPU;
@@ -228,6 +234,7 @@ public class ConfigurationManager {
             json.put("gpuOffloadLayers", gpuOffloadLayers);
             json.put("gpuOffloadEnabled", gpuOffloadLayers != 0);
             json.put("enableThinking", enableThinking);
+            json.put("useMmap", useMmap);
 
             // Compute backend
             json.put("backendType", backendType);
@@ -305,6 +312,7 @@ public class ConfigurationManager {
                 config.gpuOffloadLayers = enabled ? -1 : 0;
             }
             config.enableThinking = json.optBoolean("enableThinking", true);
+            config.useMmap = json.optBoolean("useMmap", true);
 
             // Compute backend (backward compat: default CPU)
             config.backendType = json.optInt("backendType", Configuration.BACKEND_CPU);

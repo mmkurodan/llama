@@ -867,6 +867,10 @@ public class ModelManager {
         // KV cache quantization types (applied at next model init)
         llama.setKvCacheType(config.kvCacheTypeK, config.kvCacheTypeV);
 
+        // Memory-map toggle (applied at next model init). Disabling helps very large models
+        // load reliably when mmap's contiguous address-space reservation intermittently fails.
+        llama.setUseMmap(config.useMmap);
+
         // Compute backend を JNI へ通知 (ADSP_LIBRARY_PATH 設定含む)
         String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;
         llama.setBackendConfig(config.backendType, config.npuEnabled, nativeLibDir);

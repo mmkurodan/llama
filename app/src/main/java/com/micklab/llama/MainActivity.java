@@ -1541,8 +1541,8 @@ public class MainActivity extends Activity {
                 || reason == ApplicationExitInfo.REASON_SIGNALED; // SIGKILL(9) etc: kernel/cgroup OOM
         if (memoryKill) {
             String base = localizedText(
-                    "前回のモデルロードは、メモリ不足でプロセスが強制終了されて中断された可能性が高いです。これは mmap／アドレス空間の問題ではありません。GPUオフロード層数やコンテキスト長 (n_ctx) を下げると安定します。",
-                    "The previous model load likely stopped because the process ran out of memory and was killed. This is not an mmap/address-space problem — lowering the GPU offload layers or the context length (n_ctx) usually helps.");
+                    "前回のモデルロードは、メモリ不足でプロセスが強制終了されたか、非常に大きなモデルで mmap が連続したアドレス空間を確保できずに中断された可能性があります。GPUオフロード層数やコンテキスト長 (n_ctx) を下げる、または設定で「メモリマップ (mmap) を使わない」を有効にすると安定することがあります。",
+                    "The previous model load may have stopped because the process ran out of memory, or because mmap could not reserve enough contiguous address space for a very large model. Lowering the GPU offload layers or the context length (n_ctx), or turning off memory-map (mmap) in Settings, can help.");
             if (exit.rssBytes > 0) {
                 base = base + " (RSS≈" + formatMb(exit.rssBytes) + ")";
             }

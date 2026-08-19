@@ -80,6 +80,11 @@ public class LlamaNative {
     // Set KV cache quantization types (GGML type IDs; 1=F16, 8=Q8_0, 7=Q5_1, 6=Q5_0, 3=Q4_1, 2=Q4_0, 20=IQ4_NL).
     public native void setKvCacheType(int typeK, int typeV);
 
+    // Enable/disable memory-mapping the model file at load (default true). When false, weights
+    // are read into native memory, avoiding the large contiguous virtual-address reservation
+    // that mmap needs. Applied at the next model init/initWithMmproj.
+    public native void setUseMmap(boolean useMmap);
+
     // Token listener registration (native will keep a global ref)
     public native void setTokenListener(TokenListener listener);
 
