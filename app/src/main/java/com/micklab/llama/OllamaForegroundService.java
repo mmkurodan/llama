@@ -112,6 +112,9 @@ public class OllamaForegroundService extends Service {
                 // generation marker first so the next launch does not misreport this orderly
                 // exit (which kills the process mid-native-call) as a previous crash.
                 DiagnosticsLogger.clearGenerationInProgress(this);
+                // Tag this deliberate self-kill so the next launch does not confuse it with an OOM
+                // SIGKILL (both appear as REASON_SIGNALED/status=9 in ApplicationExitInfo).
+                DiagnosticsLogger.markIntentionalSelfKill(this, android.os.Process.myPid(), "user-exit");
                 // Terminate the entire application
                 android.os.Process.killProcess(android.os.Process.myPid());
                 return START_NOT_STICKY;

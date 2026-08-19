@@ -36,6 +36,15 @@ public final class DiagnosticsLogger {
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final int LOG_LEVEL_MAX_DEBUG = 0;
     private static final long MAX_PROCESS_LOG_BYTES = 512L * 1024L;
+    /**
+     * Bounded set of pids this app intentionally self-killed (proactive recycle / user exit), stored
+     * as CSV of {@code "pid:kind"} tokens. Needed because a deliberate {@code killProcess(myPid())}
+     * is reported by {@link ApplicationExitInfo} identically to an OOM kill
+     * ({@link ApplicationExitInfo#REASON_SIGNALED} / status=9); the next launch consults this to tell
+     * the benign self-restart apart from a real memory kill.
+     */
+    private static final String PREF_INTENTIONAL_SELF_KILLS = "intentional_self_kills";
+    private static final int MAX_TRACKED_SELF_KILLS = 16;
     /** Sentinel returned by {@link #getLastExitReason} when the reason cannot be determined. */
     public static final int EXIT_REASON_UNAVAILABLE = -1;
     private static final Object LOCK = new Object();
@@ -142,6 +151,11 @@ public final class DiagnosticsLogger {
             }
             SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US);
             for (ApplicationExitInfo info : infos) {
+                // A SIGNALED exit whose pid we recorded as a deliberate self-kill is a benign
+                // recycle/exit, not an OOM SIGKILL — flag it so log analysis does not conflate them.
+                String selfKillKind = info.getReason() == ApplicationExitInfo.REASON_SIGNALED
+                        ? intentionalSelfKillKind(context, info.getPid())
+                        : null;
                 String line = buildHeader("previous-exit")
                         + " pid=" + info.getPid()
                         + " reason=" + exitReasonName(info.getReason()) + "(" + info.getReason() + ")"
@@ -150,6 +164,7 @@ public final class DiagnosticsLogger {
                         + " pss=" + formatBytes(info.getPss() * 1024L)
                         + " rss=" + formatBytes(info.getRss() * 1024L)
                         + " time=" + fmt.format(new Date(info.getTimestamp()))
+                        + (selfKillKind != null ? " intentional=" + selfKillKind : "")
                         + " desc=" + toSingleLine(info.getDescription());
                 synchronized (LOCK) {
                     appendLine(context, PROCESS_LOG_FILENAME, line);
@@ -217,11 +232,15 @@ public final class DiagnosticsLogger {
         public final int reason;     // ApplicationExitInfo.REASON_* or EXIT_REASON_UNAVAILABLE
         public final int status;     // signal number when reason==SIGNALED; otherwise process exit status
         public final long rssBytes;  // resident set size at death (bytes), 0 when unknown
+        /** Non-null (e.g. "proactive-recycle", "user-exit") when the exit was a deliberate self-kill
+         *  by this app rather than an external/OOM kill; null otherwise. */
+        public final String intentionalSelfKill;
 
-        public ExitSummary(int reason, int status, long rssBytes) {
+        public ExitSummary(int reason, int status, long rssBytes, String intentionalSelfKill) {
             this.reason = reason;
             this.status = status;
             this.rssBytes = rssBytes;
+            this.intentionalSelfKill = intentionalSelfKill;
         }
     }
 
@@ -233,24 +252,27 @@ public final class DiagnosticsLogger {
      */
     public static ExitSummary getLastExitSummary(Context context) {
         if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L, null);
         }
         ActivityManager activityManager =
                 (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         if (activityManager == null) {
-            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L, null);
         }
         try {
             List<ApplicationExitInfo> infos =
                     activityManager.getHistoricalProcessExitReasons(null, 0, 1);
             if (infos == null || infos.isEmpty()) {
-                return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+                return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L, null);
             }
             ApplicationExitInfo info = infos.get(0);
-            return new ExitSummary(info.getReason(), info.getStatus(), info.getRss() * 1024L);
+            String selfKillKind = info.getReason() == ApplicationExitInfo.REASON_SIGNALED
+                    ? intentionalSelfKillKind(context, info.getPid())
+                    : null;
+            return new ExitSummary(info.getReason(), info.getStatus(), info.getRss() * 1024L, selfKillKind);
         } catch (Throwable t) {
             Log.w(TAG, "Failed to read last exit summary", t);
-            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L);
+            return new ExitSummary(EXIT_REASON_UNAVAILABLE, 0, 0L, null);
         }
     }
 
@@ -300,6 +322,63 @@ public final class DiagnosticsLogger {
         synchronized (LOCK) {
             deleteFile(context, INCOMPLETE_GENERATION_FILENAME);
         }
+    }
+
+    /**
+     * Records that {@code pid} (this process) is about to be intentionally terminated via
+     * {@code Process.killProcess(myPid())} — a proactive recycle or a user-requested exit — so the
+     * next launch can distinguish this benign self-kill from an OOM kill, which
+     * {@link ApplicationExitInfo} reports identically as {@link ApplicationExitInfo#REASON_SIGNALED}
+     * / status=9. MUST be called immediately before the self-kill; uses a synchronous
+     * {@code commit()} so the marker is persisted before the process dies.
+     *
+     * @param kind short label for the exit, e.g. {@code "proactive-recycle"} or {@code "user-exit"}
+     */
+    public static void markIntentionalSelfKill(Context context, int pid, String kind) {
+        if (context == null) {
+            return;
+        }
+        String cleanKind = safe(kind).replace(',', ' ').replace(':', ' ').trim();
+        synchronized (LOCK) {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String prefix = pid + ":";
+            java.util.ArrayList<String> tokens = new java.util.ArrayList<>();
+            for (String token : prefs.getString(PREF_INTENTIONAL_SELF_KILLS, "").split(",")) {
+                // Drop blanks and any stale entry for this same (possibly reused) pid.
+                if (!token.isEmpty() && !token.startsWith(prefix)) {
+                    tokens.add(token);
+                }
+            }
+            tokens.add(prefix + cleanKind);
+            while (tokens.size() > MAX_TRACKED_SELF_KILLS) {
+                tokens.remove(0);
+            }
+            prefs.edit()
+                    .putString(PREF_INTENTIONAL_SELF_KILLS, android.text.TextUtils.join(",", tokens))
+                    .commit();
+        }
+    }
+
+    /**
+     * Returns the recorded self-kill kind (e.g. {@code "proactive-recycle"}) for {@code pid}, or
+     * {@code null} if that pid was not an intentional self-termination by this app.
+     */
+    private static String intentionalSelfKillKind(Context context, int pid) {
+        if (context == null) {
+            return null;
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String csv = prefs.getString(PREF_INTENTIONAL_SELF_KILLS, "");
+        if (csv.isEmpty()) {
+            return null;
+        }
+        String prefix = pid + ":";
+        for (String token : csv.split(",")) {
+            if (token.startsWith(prefix)) {
+                return token.substring(prefix.length());
+            }
+        }
+        return null;
     }
 
     /**

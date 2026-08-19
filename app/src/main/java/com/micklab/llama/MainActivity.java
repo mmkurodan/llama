@@ -1525,6 +1525,13 @@ public class MainActivity extends Activity {
      */
     private String describeInterruptedLoadCause(DiagnosticsLogger.ExitSummary exit) {
         int reason = exit.reason;
+        // A deliberate self-restart (periodic recycle / user exit) reports as REASON_SIGNALED just
+        // like an OOM SIGKILL; do not blame memory/mmap when we know it was intentional.
+        if (exit.intentionalSelfKill != null) {
+            return localizedText(
+                    "前回のプロセスは、OEMの強制終了を避けるための定期リサイクル等（アプリ自身による計画的な再起動）で終了しました。異常ではありません。",
+                    "The previous process ended due to a planned self-restart (e.g. the periodic recycle that avoids an OEM force-stop), not a failure.");
+        }
         // SIGNALED with a fault/abort signal (SIGABRT=6, SIGSEGV=11, SIGILL=4, SIGBUS=7) is a crash,
         // not an OOM kill. SIGKILL(9) and REASON_LOW_MEMORY/EXCESSIVE_RESOURCE_USAGE are memory kills.
         boolean signaledCrash = reason == ApplicationExitInfo.REASON_SIGNALED

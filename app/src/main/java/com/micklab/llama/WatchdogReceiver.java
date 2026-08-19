@@ -48,6 +48,9 @@ public class WatchdogReceiver extends BroadcastReceiver {
                 RecoveryScheduler.schedule(app, RecoveryScheduler.recycleComebackMs());
                 // Clear any stale in-progress marker so the recycle is not later misreported as a crash.
                 DiagnosticsLogger.clearGenerationInProgress(app);
+                // Tag this self-kill so the next launch tells it apart from an OOM SIGKILL (both show
+                // up as REASON_SIGNALED/status=9 in ApplicationExitInfo).
+                DiagnosticsLogger.markIntentionalSelfKill(app, android.os.Process.myPid(), "proactive-recycle");
                 android.os.Process.killProcess(android.os.Process.myPid());
                 return;
             }
