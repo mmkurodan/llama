@@ -154,6 +154,124 @@ public class DocumentsActivity extends Activity {
         }
     }
 
+    /**
+     * Appends the detailed on-device HTTP API reference. Kept in one place and shared by the Japanese
+     * ({@code japanese=true}) and English manuals so the endpoint list stays in sync with the server.
+     */
+    private void appendApiReference(StringBuilder sb, boolean japanese) {
+        if (japanese) {
+            sb.append("8-A. 詳細API仕様（オンデバイスHTTPサーバー）\n\n");
+            sb.append("■ 基本\n");
+            sb.append("- ベースURL: http://<端末IP>:<ポート>/（既定ポートは設定画面に表示）。同一端末からは http://127.0.0.1:<ポート>/。\n");
+            sb.append("- 認証は不要です。互換のため Authorization / x-api-key ヘッダを送っても無視され、任意の値で通ります。\n");
+            sb.append("- CORSは全オリジン許可（Access-Control-Allow-Origin: *）。プリフライトのOPTIONSにも応答します。\n");
+            sb.append("- Content-Typeは application/json。ストリーミングは OpenAI/Anthropic系が Server-Sent Events（text/event-stream）、Ollama系が application/x-ndjson（改行区切りJSON）です。\n");
+            sb.append("- 同時生成は1件のみ。ビジー時は最大10件までキューイングし、既定で最大600秒（設定の「ビジー時タイムアウト」で変更可、0で無制限）待機します。超過・キュー満杯時は 503 を返します。\n");
+            sb.append("- model フィールドには保存済みプロファイル名を指定します。未指定/不明な場合は現在のプロファイル（default）を使用します。Anthropic/OpenAIの実在モデル名（例: claude-3-5-sonnet, gpt-4o）を送っても、ローカルの現行モデルにマッピングされます。\n\n");
+            sb.append("■ エンドポイント一覧\n");
+            sb.append("OpenAI互換:\n");
+            sb.append("  POST /v1/chat/completions  … チャット補完（stream可・画像/音声・tools対応）\n");
+            sb.append("  POST /v1/completions       … レガシーなテキスト補完（プロンプトをそのまま入力。object=text_completion）\n");
+            sb.append("  POST /v1/embeddings        … 埋め込み（input: 文字列/配列）\n");
+            sb.append("  GET  /v1/models            … モデル一覧\n");
+            sb.append("  POST /v1/tokenize, /v1/responses/input_tokens … トークン数の取得\n");
+            sb.append("Anthropic（Claude）互換:\n");
+            sb.append("  POST /v1/messages              … Messages API（stream可・system・マルチターン・thinking・画像/音声・tool_use対応）\n");
+            sb.append("  POST /v1/messages/count_tokens … 入力トークン数の見積り（生成なし）\n");
+            sb.append("Ollama互換:\n");
+            sb.append("  POST /api/chat, /api/generate, /api/embed, /api/embeddings, /api/tokenize、GET /api/tags\n");
+            sb.append("llama.cpp互換・管理:\n");
+            sb.append("  GET /props, GET /slots, GET /health（/v1/health）, POST /models/load, POST /models/unload\n\n");
+            sb.append("■ 共通の生成パラメータ（リクエストbodyの直下、またはOllamaは options 内）\n");
+            sb.append("- 上限: max_tokens / num_predict / n_predict（Anthropicは max_tokens 必須）。0は「無制限＝プロファイル設定に従う」。\n");
+            sb.append("- サンプリング: temperature, top_p, top_k, min_p, typ_p, dynatemp_range, dynatemp_exponent, xtc_probability, xtc_threshold。\n");
+            sb.append("- 反復抑制: repeat_penalty, repeat_last_n, presence_penalty, frequency_penalty, dry_multiplier, dry_base, dry_allowed_length, dry_penalty_last_n。\n");
+            sb.append("- Mirostat: mirostat, mirostat_tau, mirostat_eta。サンプラ順: samplers（配列）。\n");
+            sb.append("- コンテキスト長: options.num_ctx / num_ctx を指定すると必要に応じてモデルを再ロードします。\n");
+            sb.append("- 未指定の項目は選択中プロファイルの値が使われます。\n\n");
+            sb.append("■ 推論（thinking / reasoning）\n");
+            sb.append("- OpenAI/Ollama: think（true/false）、reasoning_format（none で無効）、chat_template_kwargs.enable_thinking などで制御。\n");
+            sb.append("- Anthropic: thinking:{\"type\":\"enabled|disabled\"}。有効時、思考は Anthropic では thinking ブロック、OpenAIでは delta.reasoning_content として出力されます。\n\n");
+            sb.append("■ マルチモーダル（mmproj による画像・音声認識）\n");
+            sb.append("- mmproj/projector を伴うモデルをロードしている場合に有効。対応画像は PNG / JPEG / BMP / GIF（HEIC/WebP/AVIFは非対応。事前にPNG/JPEGへ変換してください）。音声は wav / mp3。\n");
+            sb.append("- OpenAI /v1/chat/completions・Ollama /api/chat: content 配列に {\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,...\"}} や {\"type\":\"input_audio\",\"input_audio\":{\"data\":\"<base64>\",\"format\":\"wav\"}} を入れます。image_url は http(s) URLも可。\n");
+            sb.append("- Anthropic /v1/messages: content 配列に {\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/jpeg\",\"data\":\"...\"}}（source.type=\"url\" も可）。音声はローカル拡張として {\"type\":\"audio\",\"source\":{\"data\":\"<base64>\",\"format\":\"wav\"}} を受け付けます。\n");
+            sb.append("- 非対応モダリティを送ると 400（image/audio input is not supported by the current model）を返します。\n\n");
+            sb.append("■ ツール（function calling）\n");
+            sb.append("- OpenAI: tools（type=function）, tool_choice, parallel_tool_calls。結果は message.tool_calls / delta.tool_calls。\n");
+            sb.append("- Anthropic: tools（name/description/input_schema）, tool_choice（auto/any/tool）。アシスタントの tool_use ブロック、ユーザーの tool_result ブロックの往復に対応。\n");
+            sb.append("- 設定画面で Function Calling / MCP の「WebUI外でも使う」を有効にすると、共有定義が上記エンドポイントにも自動適用されます。\n\n");
+            sb.append("■ 構造化出力\n");
+            sb.append("- OpenAI: response_format={\"type\":\"json_object\"} または {\"type\":\"json_schema\",\"json_schema\":{...}}。\n");
+            sb.append("- Ollama: format（\"json\" または JSON Schema）。共通: grammar（GBNF文字列）も指定可能。\n\n");
+            sb.append("■ エラー形式\n");
+            sb.append("- OpenAI系: {\"error\":{\"message\":...,\"type\":...,\"code\":...}}。Anthropic系: {\"type\":\"error\",\"error\":{\"type\":...,\"message\":...}}。Ollama系: {\"error\":\"...\"}。\n");
+            sb.append("- ストリーム中断時は、SSEにエラーフレームを流してから終了します（WebUIはこれを検知して停止・エラー表示します）。\n\n");
+            sb.append("■ 例（curl）\n");
+            sb.append("- レガシー補完:\n");
+            sb.append("  curl http://127.0.0.1:<ポート>/v1/completions -H 'Content-Type: application/json' -d '{\"model\":\"default\",\"prompt\":\"東京の紹介を3行で\",\"max_tokens\":128,\"stream\":false}'\n");
+            sb.append("- Anthropic Messages（画像入力・stream）:\n");
+            sb.append("  curl -N http://127.0.0.1:<ポート>/v1/messages -H 'Content-Type: application/json' -d '{\"model\":\"default\",\"max_tokens\":256,\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"この画像を説明して\"},{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/jpeg\",\"data\":\"<base64>\"}}]}]}'\n");
+            sb.append("- トークン数見積り:\n");
+            sb.append("  curl http://127.0.0.1:<ポート>/v1/messages/count_tokens -H 'Content-Type: application/json' -d '{\"model\":\"default\",\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}'\n\n");
+        } else {
+            sb.append("8-A. Detailed API reference (on-device HTTP server)\n\n");
+            sb.append("■ Basics\n");
+            sb.append("- Base URL: http://<device-IP>:<port>/ (the default port is shown on the Settings screen). From the same device use http://127.0.0.1:<port>/.\n");
+            sb.append("- No authentication is required. For compatibility an Authorization / x-api-key header is accepted but ignored (any value passes).\n");
+            sb.append("- CORS allows all origins (Access-Control-Allow-Origin: *); preflight OPTIONS requests are answered.\n");
+            sb.append("- Content-Type is application/json. Streaming uses Server-Sent Events (text/event-stream) for the OpenAI/Anthropic families and newline-delimited JSON (application/x-ndjson) for the Ollama family.\n");
+            sb.append("- Only one generation runs at a time. While busy up to 10 requests are queued and wait up to 600s by default (configurable via Settings 'busy timeout'; 0 = unlimited). Exceeding the wait or a full queue returns 503.\n");
+            sb.append("- 'model' selects a saved profile. If omitted/unknown the current profile (default) is used. Sending a real OpenAI/Anthropic model name (e.g. gpt-4o, claude-3-5-sonnet) still maps to the locally loaded model.\n\n");
+            sb.append("■ Endpoints\n");
+            sb.append("OpenAI-compatible:\n");
+            sb.append("  POST /v1/chat/completions  … chat completion (streaming, image/audio, tools)\n");
+            sb.append("  POST /v1/completions       … legacy text completion (prompt fed verbatim; object=text_completion)\n");
+            sb.append("  POST /v1/embeddings        … embeddings (input: string/array)\n");
+            sb.append("  GET  /v1/models            … model list\n");
+            sb.append("  POST /v1/tokenize, /v1/responses/input_tokens … token counting\n");
+            sb.append("Anthropic (Claude)-compatible:\n");
+            sb.append("  POST /v1/messages              … Messages API (streaming, system, multi-turn, thinking, image/audio, tool_use)\n");
+            sb.append("  POST /v1/messages/count_tokens … estimate input tokens (no generation)\n");
+            sb.append("Ollama-compatible:\n");
+            sb.append("  POST /api/chat, /api/generate, /api/embed, /api/embeddings, /api/tokenize; GET /api/tags\n");
+            sb.append("llama.cpp-compatible / management:\n");
+            sb.append("  GET /props, GET /slots, GET /health (/v1/health), POST /models/load, POST /models/unload\n\n");
+            sb.append("■ Common generation parameters (top level of the body, or inside 'options' for Ollama)\n");
+            sb.append("- Limit: max_tokens / num_predict / n_predict (Anthropic requires max_tokens). 0 means 'unlimited = follow the profile'.\n");
+            sb.append("- Sampling: temperature, top_p, top_k, min_p, typ_p, dynatemp_range, dynatemp_exponent, xtc_probability, xtc_threshold.\n");
+            sb.append("- Repetition: repeat_penalty, repeat_last_n, presence_penalty, frequency_penalty, dry_multiplier, dry_base, dry_allowed_length, dry_penalty_last_n.\n");
+            sb.append("- Mirostat: mirostat, mirostat_tau, mirostat_eta. Sampler order: samplers (array).\n");
+            sb.append("- Context length: options.num_ctx / num_ctx triggers a model reload when needed.\n");
+            sb.append("- Anything omitted falls back to the selected profile's value.\n\n");
+            sb.append("■ Reasoning (thinking)\n");
+            sb.append("- OpenAI/Ollama: control via think (true/false), reasoning_format (none disables), chat_template_kwargs.enable_thinking, etc.\n");
+            sb.append("- Anthropic: thinking:{\"type\":\"enabled|disabled\"}. When enabled, reasoning is emitted as a thinking block (Anthropic) or delta.reasoning_content (OpenAI).\n\n");
+            sb.append("■ Multimodal (image/audio recognition via mmproj)\n");
+            sb.append("- Available when a model with an mmproj/projector is loaded. Supported images: PNG / JPEG / BMP / GIF (HEIC/WebP/AVIF are not supported; convert to PNG/JPEG first). Audio: wav / mp3.\n");
+            sb.append("- OpenAI /v1/chat/completions & Ollama /api/chat: put {\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,...\"}} or {\"type\":\"input_audio\",\"input_audio\":{\"data\":\"<base64>\",\"format\":\"wav\"}} in the content array. image_url may also be an http(s) URL.\n");
+            sb.append("- Anthropic /v1/messages: put {\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/jpeg\",\"data\":\"...\"}} (source.type=\"url\" also works). Audio is accepted as a local extension: {\"type\":\"audio\",\"source\":{\"data\":\"<base64>\",\"format\":\"wav\"}}.\n");
+            sb.append("- Sending an unsupported modality returns 400 (image/audio input is not supported by the current model).\n\n");
+            sb.append("■ Tools (function calling)\n");
+            sb.append("- OpenAI: tools (type=function), tool_choice, parallel_tool_calls. Results in message.tool_calls / delta.tool_calls.\n");
+            sb.append("- Anthropic: tools (name/description/input_schema), tool_choice (auto/any/tool). Supports the assistant tool_use / user tool_result round-trip.\n");
+            sb.append("- Enabling 'use outside WebUI' for Function Calling / MCP in Settings applies the shared definitions to these endpoints automatically.\n\n");
+            sb.append("■ Structured output\n");
+            sb.append("- OpenAI: response_format={\"type\":\"json_object\"} or {\"type\":\"json_schema\",\"json_schema\":{...}}.\n");
+            sb.append("- Ollama: format (\"json\" or a JSON Schema). Both families also accept grammar (a GBNF string).\n\n");
+            sb.append("■ Error shapes\n");
+            sb.append("- OpenAI: {\"error\":{\"message\":...,\"type\":...,\"code\":...}}. Anthropic: {\"type\":\"error\",\"error\":{\"type\":...,\"message\":...}}. Ollama: {\"error\":\"...\"}.\n");
+            sb.append("- If a stream is interrupted, an error frame is emitted on the SSE stream before it ends (the WebUI detects this and stops with an error).\n\n");
+            sb.append("■ Examples (curl)\n");
+            sb.append("- Legacy completion:\n");
+            sb.append("  curl http://127.0.0.1:<port>/v1/completions -H 'Content-Type: application/json' -d '{\"model\":\"default\",\"prompt\":\"Introduce Tokyo in 3 lines\",\"max_tokens\":128,\"stream\":false}'\n");
+            sb.append("- Anthropic Messages (image input, streaming):\n");
+            sb.append("  curl -N http://127.0.0.1:<port>/v1/messages -H 'Content-Type: application/json' -d '{\"model\":\"default\",\"max_tokens\":256,\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Describe this image\"},{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/jpeg\",\"data\":\"<base64>\"}}]}]}'\n");
+            sb.append("- Count tokens:\n");
+            sb.append("  curl http://127.0.0.1:<port>/v1/messages/count_tokens -H 'Content-Type: application/json' -d '{\"model\":\"default\",\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}'\n\n");
+        }
+    }
+
     private String buildJapaneseManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("操作マニュアル\n\n");
@@ -253,15 +371,16 @@ public class DocumentsActivity extends Activity {
         sb.append("生成時に一般的なチャットテンプレートの区切り文字を検出すると自動的に生成を停止します。\n\n");
         sb.append("8. API/WebUIサーバー（任意）\n");
         sb.append("- アプリ起動時にローカルAPI/WebUIサーバーを有効化するかどうか確認するポップアップが表示されます。\n");
-        sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots と WebUI の静的ファイルを提供します。\n");
+        sb.append("- 起動すると端末内で /api/chat, /api/generate, /api/tags, /api/tokenize, /api/embed, /v1/chat/completions, /v1/completions, /v1/messages, /v1/messages/count_tokens, /v1/embeddings, /v1/models, /v1/tokenize, /props, /slots と WebUI の静的ファイルを提供します。詳細は「8-A. 詳細API仕様」を参照してください。\n");
         sb.append("- トークナイズAPI: /api/tokenize（Ollama互換, body: {\"model\":\"...\",\"content\":\"テキスト\"}）および /v1/tokenize（OpenAI互換, body: {\"model\":\"...\",\"input\":\"テキスト\"}）で入力テキストのトークン列・トークン数・トークンIDを取得できます。\n");
         sb.append("- WebUIは同じポートの http://<端末IP>:<ポート>/ で利用できます。\n");
         sb.append("- WebUIはPWA対応で、ブラウザのメニューからホーム画面に追加してアプリのように利用できます（自動のインストール案内は表示しません）。端末上でインストールする場合は http://127.0.0.1:<ポート>/ で開いてください（ホーム追加やオフライン表示にはセキュアコンテキストが必要で、LAN IP では利用できません）。\n");
         sb.append("- アプリ設定で保存したMCPコンフィグJSONは共通設定として /props 経由でWebUIにも渡され、WebUIのローカルMCP設定と合わせて利用されます。\n");
         sb.append("- MCP の外部利用スイッチをオンにすると、共有MCP設定は WebUI に加えて、メイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions の内部ツール実行にも利用されます。オフでは WebUI のみで利用されます。\n");
         sb.append("- Function Calling の外部利用スイッチをオンにすると、Function Definitions JSON は共通の function calling 定義としてメイン画面のプロンプト入力、/api/chat、/api/generate、/v1/chat/completions に自動で追加されます。オフでは WebUI のみで利用されます。\n");
-        sb.append("- 同時生成は1件のみです。ビジー時は最大10件までキューに入り、最大60秒待機します。60秒超過またはキュー満杯時は503を返します。\n");
+        sb.append("- 同時生成は1件のみです。ビジー時は最大10件までキューに入り、既定で最大600秒待機します（設定で変更可）。超過またはキュー満杯時は503を返します。\n");
         sb.append("- Android 13以上では通知権限が必要な場合があります。\n\n");
+        appendApiReference(sb, true);
         sb.append("9. 🔍 アプリ内でGGUFを検索してダウンロードする（推奨）\n\n");
         sb.append("最も簡単な方法です。ブラウザを使わず、アプリ内だけでモデルを検索して取得できます。\n");
         sb.append("1) 設定画面を開き、「モデル管理」セクション直下の「Hugging FaceでGGUFを検索」ボタンを押します。\n");
@@ -398,15 +517,16 @@ public class DocumentsActivity extends Activity {
         sb.append("Generation automatically stops when common chat template delimiters are detected in the output.\n\n");
         sb.append("8. API/WebUI Server (Optional)\n");
         sb.append("- On app launch, a popup asks whether to enable the local API/WebUI server, and you can check \"Don't show next time\" to skip it on future launches.\n");
-        sb.append("- Provides /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots, and the bundled WebUI on device.\n");
+        sb.append("- Provides /api/chat, /api/generate, /api/tags, /api/tokenize, /api/embed, /v1/chat/completions, /v1/completions, /v1/messages, /v1/messages/count_tokens, /v1/embeddings, /v1/models, /v1/tokenize, /props, /slots, and the bundled WebUI on device. See '8-A. Detailed API reference' below.\n");
         sb.append("- Tokenize API: POST /api/tokenize (Ollama-compatible, body: {\"model\":\"...\",\"content\":\"text\"}) and POST /v1/tokenize (OpenAI-compatible, body: {\"model\":\"...\",\"input\":\"text\"}) return token strings, count, and IDs for the given input.\n");
         sb.append("- The WebUI is available at http://<device-ip>:<port>/ on the same port.\n");
         sb.append("- The WebUI is a PWA: you can add it to your home screen from the browser menu and use it like an app (no automatic install prompt is shown). To install it on-device, open http://127.0.0.1:<port>/ (home-screen install and offline use require a secure context and are not available over the LAN IP).\n");
         sb.append("- MCP config JSON saved in the app settings is exposed to the WebUI through /props as a shared setting and is used together with the WebUI's local MCP settings.\n");
         sb.append("- When MCP outside WebUI is enabled, shared MCP settings are also used by the main prompt input, /api/chat, /api/generate, and /v1/chat/completions for internal tool execution. When disabled, they remain WebUI-only.\n");
         sb.append("- When Function Calling outside WebUI is enabled, Function Definitions JSON is automatically added as shared function-calling definitions for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions. When disabled, it remains WebUI-only.\n");
-        sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 60 seconds; queue overflow or timeout returns 503.\n");
+        sb.append("- Only one generation runs at a time. When busy, requests are queued (up to 10) and wait up to 600 seconds by default (configurable in Settings); queue overflow or timeout returns 503.\n");
         sb.append("- Android 13+ may require notification permission.\n\n");
+        appendApiReference(sb, false);
         sb.append("9. 🔍 Search and Download GGUF in the App (Recommended)\n\n");
         sb.append("The easiest way — find and fetch models entirely inside the app, without a browser.\n");
         sb.append("1) Open the Settings screen and tap the \"Search GGUF on Hugging Face\" button directly below the Model Maintenance section.\n");

@@ -70,6 +70,14 @@
 
             </LinearLayout>
 
+            <Button
+                android:id="@+id/exitButton"
+                style="@style/SecondaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Exit" />
+
         </LinearLayout>
 
         <!-- ② WEB AI CHAT CARD: title + open-in-browser button -->

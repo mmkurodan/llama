@@ -1227,6 +1227,12 @@ public class OllamaApiServer {
                     handleTags(outputStream);
                 } else if ("/v1/chat/completions".equals(path)) {
                     handleOpenAiChat(outputStream, body);
+                } else if ("/v1/completions".equals(path)) {
+                    handleOpenAiCompletions(outputStream, body);
+                } else if ("/v1/messages".equals(path)) {
+                    handleAnthropicMessages(outputStream, body);
+                } else if ("/v1/messages/count_tokens".equals(path)) {
+                    handleAnthropicCountTokens(outputStream, body);
                 } else if ("/api/embed".equals(path)) {
                     handleEmbed(outputStream, body);
                 } else if ("/api/embeddings".equals(path)) {
@@ -3020,6 +3026,1067 @@ public class OllamaApiServer {
                     500,
                     e.getMessage() != null ? e.getMessage() : "OpenAI chat request failed",
                     "server_error");
+        }
+    }
+
+    // ==================== Shared streaming driver ====================
+
+    /**
+     * Formats streaming generation events for a specific wire protocol. The driver
+     * ({@link #runStreamingGeneration}) owns the token queue, filter threads and generation lifecycle;
+     * the emitter only serializes each event onto {@code outputStream} (already synchronized by the
+     * driver, so implementations must not spawn their own writers).
+     */
+    private interface StreamEmitter {
+        /** Write the HTTP status line, headers and any protocol prologue (e.g. an opening SSE frame). */
+        void onStart(OutputStream out) throws IOException;
+        /** A visible (non-reasoning) content token. */
+        void onText(OutputStream out, String token) throws IOException;
+        /** A reasoning/thinking token (only delivered when thinking is enabled). */
+        void onReasoning(OutputStream out, String token) throws IOException;
+        /** Generation finished successfully: write the terminal frames. */
+        void onComplete(OutputStream out) throws IOException;
+        /** Generation failed mid-stream: write an error frame so the client is not left hanging. */
+        void onError(OutputStream out, String message) throws IOException;
+    }
+
+    /**
+     * Runs a streaming generation and pushes each token to {@code emitter}. Mirrors the queue +
+     * writer-thread + think-block-filter pattern used by {@link #handleOpenAiChat} so the native
+     * generation thread is never blocked on network I/O, and factors it out for reuse by the
+     * {@code /v1/completions} and {@code /v1/messages} endpoints.
+     */
+    private void runStreamingGeneration(
+            OutputStream outputStream,
+            String prompt,
+            byte[][] media,
+            boolean enableThinking,
+            StreamEmitter emitter) throws IOException {
+        final Object writeLock = new Object();
+        final boolean[] errorSent = { false };
+        final AtomicBoolean clientDisconnected = new AtomicBoolean(false);
+        final Runnable onClientDisconnected = () -> {
+            if (clientDisconnected.compareAndSet(false, true)) {
+                Log.w(TAG, "Client disconnected during streaming response");
+                modelManager.getLlama().cancelGeneration();
+            }
+        };
+        final java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue =
+                new java.util.concurrent.LinkedBlockingQueue<>();
+        final StreamTokenFilter streamTokenFilter = new StreamTokenFilter(
+                tokenQueue, () -> modelManager.getLlama().cancelGeneration());
+        final ThinkBlockStreamFilter thinkBlockFilter = enableThinking
+                ? new ThinkBlockStreamFilter(streamTokenFilter,
+                        tok -> tokenQueue.offer(new ReasoningToken(tok)))
+                : new ThinkBlockStreamFilter(streamTokenFilter);
+
+        emitter.onStart(outputStream);
+
+        final Thread writerThread = new Thread(() -> {
+            try {
+                while (true) {
+                    Object ev = tokenQueue.take();
+                    if (ev == TOKEN_COMPLETE) {
+                        synchronized (writeLock) { emitter.onComplete(outputStream); }
+                        break;
+                    } else if (ev instanceof TokenError) {
+                        errorSent[0] = true;
+                        synchronized (writeLock) { emitter.onError(outputStream, ((TokenError) ev).error); }
+                        break;
+                    } else if (ev instanceof ReasoningToken) {
+                        synchronized (writeLock) { emitter.onReasoning(outputStream, ((ReasoningToken) ev).content); }
+                    } else {
+                        String token = stripResponseMarkers((String) ev);
+                        if (token.isEmpty()) {
+                            continue;
+                        }
+                        synchronized (writeLock) { emitter.onText(outputStream, token); }
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error writing streaming response", e);
+                onClientDisconnected.run();
+            } finally {
+                try { outputStream.flush(); } catch (Exception ignored) {}
+            }
+        }, "StreamWriter-" + Thread.currentThread().getId());
+        writerThread.start();
+
+        modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
+            @Override public void onToken(String token) { thinkBlockFilter.onToken(token); }
+            @Override public void onComplete() { thinkBlockFilter.onComplete(); }
+            @Override public void onError(String error) { thinkBlockFilter.onError(error); }
+        });
+
+        try {
+            modelManager.generate(prompt, media);
+        } finally {
+            modelManager.getLlama().setTokenListener(null);
+            if (!errorSent[0] && !clientDisconnected.get()) {
+                tokenQueue.offer(TOKEN_COMPLETE);
+            }
+        }
+
+        try {
+            writerThread.join(5000);
+            if (writerThread.isAlive()) {
+                Log.w(TAG, "Stream writer thread did not finish before timeout");
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            Log.w(TAG, "Stream writer thread join interrupted", ie);
+        }
+    }
+
+    // ==================== OpenAI legacy text completion (/v1/completions) ====================
+
+    /**
+     * OpenAI legacy completions. Unlike {@code /v1/chat/completions} this feeds the prompt to the
+     * model verbatim (no chat template) and returns {@code object: "text_completion"} with the text on
+     * {@code choices[].text}. Multimodal input is not part of this protocol; use chat/messages for that.
+     */
+    private void handleOpenAiCompletions(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            String prompt = extractCompletionPrompt(request.opt("prompt"));
+            boolean stream = request.optBoolean("stream", false);
+            final String cmplId = "cmpl-" + UUID.randomUUID().toString().replace("-", "");
+            final long createdAt = System.currentTimeMillis() / 1000L;
+
+            if (prompt == null) {
+                sendOpenAiErrorResponse(outputStream, 400, "'prompt' is required (string or array of strings)", "invalid_request_error");
+                return;
+            }
+            if (!acquireGenerationSlot(outputStream, "/v1/completions", true)) {
+                return;
+            }
+            applyNumCtxOverride(request);
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
+                    return;
+                }
+                if (modelManager.isResetPendingOrInProgress()) {
+                    sendOpenAiErrorResponse(outputStream, 503, "Model reset requested", "unavailable_error");
+                    return;
+                }
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                    applyRequestOverrides(config, request);
+                    modelManager.applyConfiguration(config);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not apply /v1/completions overrides", e);
+                }
+                applySamplerOrderOverride(request);
+                applyNPredictOverride(request, config);
+                applyStructuredOutputConstraint(request);
+
+                final String promptToUse = prompt;
+                logMaxDebugPayload("openai.completions.prompt", promptToUse);
+
+                if (stream) {
+                    final String modelF = model;
+                    runStreamingGeneration(outputStream, promptToUse, new byte[0][], false, new StreamEmitter() {
+                        @Override public void onStart(OutputStream out) throws IOException {
+                            out.write(sseHeader().getBytes(StandardCharsets.UTF_8));
+                            out.flush();
+                        }
+                        @Override public void onText(OutputStream out, String token) throws IOException {
+                            try {
+                                JSONObject chunk = buildTextCompletionChunk(modelF, token, null);
+                                putCompletionMeta(chunk, cmplId, createdAt);
+                                sendSseEvent(out, chunk.toString());
+                            } catch (JSONException ignored) {}
+                        }
+                        @Override public void onReasoning(OutputStream out, String token) { /* not exposed by legacy completions */ }
+                        @Override public void onComplete(OutputStream out) throws IOException {
+                            try {
+                                String metrics = buildPerfMetricsSuffix();
+                                if (!metrics.isEmpty()) {
+                                    JSONObject mc = buildTextCompletionChunk(modelF, metrics, null);
+                                    putCompletionMeta(mc, cmplId, createdAt);
+                                    sendSseEvent(out, mc.toString());
+                                }
+                                JSONObject stop = buildTextCompletionChunk(modelF, "", "stop");
+                                putCompletionMeta(stop, cmplId, createdAt);
+                                sendSseEvent(out, stop.toString());
+                                sendSseEvent(out, "[DONE]");
+                            } catch (JSONException ignored) {}
+                        }
+                        @Override public void onError(OutputStream out, String message) throws IOException {
+                            try {
+                                sendSseEvent(out, buildOpenAiErrorObject(500, message, "server_error").toString());
+                                sendSseEvent(out, "[DONE]");
+                            } catch (JSONException ignored) {}
+                        }
+                    });
+                } else {
+                    String rawResponse = modelManager.generate(promptToUse, new byte[0][]);
+                    String content = appendPerfMetrics(stripResponseMarkers(
+                            PromptTemplateManager.stripThinkingBlocks(rawResponse)));
+                    JSONObject resp = buildTextCompletionResponse(model, content, "stop");
+                    putCompletionMeta(resp, cmplId, createdAt);
+                    sendJsonResponse(outputStream, 200, resp.toString());
+                }
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Invalid JSON in /v1/completions request", e);
+            sendOpenAiErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage(), "invalid_request_error");
+        } catch (Exception e) {
+            Log.e(TAG, "/v1/completions request failed", e);
+            sendOpenAiErrorResponse(outputStream, 500,
+                    e.getMessage() != null ? e.getMessage() : "completions failed", "server_error");
+        }
+    }
+
+    /** Accepts OpenAI {@code prompt} as a string or an array of strings (joined). Null if absent/empty. */
+    private static String extractCompletionPrompt(Object promptObj) {
+        if (promptObj instanceof String) {
+            String s = (String) promptObj;
+            return s.isEmpty() ? "" : s;
+        }
+        if (promptObj instanceof JSONArray) {
+            JSONArray arr = (JSONArray) promptObj;
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.length(); i++) {
+                if (i > 0) sb.append("\n");
+                sb.append(arr.optString(i, ""));
+            }
+            return sb.toString();
+        }
+        return null;
+    }
+
+    private static String sseHeader() {
+        return "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: text/event-stream\r\n" +
+                "Cache-Control: no-cache\r\n" +
+                "Connection: keep-alive\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "\r\n";
+    }
+
+    private static void putCompletionMeta(JSONObject obj, String id, long created) throws JSONException {
+        obj.put("id", id);
+        obj.put("created", created);
+    }
+
+    private JSONObject buildTextCompletionResponse(String model, String text, String finishReason) throws JSONException {
+        JSONObject response = new JSONObject();
+        response.put("object", "text_completion");
+        response.put("model", model);
+        JSONObject choice = new JSONObject();
+        choice.put("index", 0);
+        choice.put("text", text != null ? text : "");
+        choice.put("finish_reason", finishReason != null ? finishReason : "stop");
+        choice.put("logprobs", JSONObject.NULL);
+        JSONArray choices = new JSONArray();
+        choices.put(choice);
+        response.put("choices", choices);
+        putOpenAiUsage(response);
+        return response;
+    }
+
+    private JSONObject buildTextCompletionChunk(String model, String text, String finishReason) throws JSONException {
+        JSONObject response = new JSONObject();
+        response.put("object", "text_completion");
+        response.put("model", model);
+        JSONObject choice = new JSONObject();
+        choice.put("index", 0);
+        choice.put("text", text != null ? text : "");
+        choice.put("finish_reason", finishReason != null ? finishReason : JSONObject.NULL);
+        choice.put("logprobs", JSONObject.NULL);
+        JSONArray choices = new JSONArray();
+        choices.put(choice);
+        response.put("choices", choices);
+        return response;
+    }
+
+    // ==================== Anthropic Messages API (/v1/messages) ====================
+
+    /**
+     * Anthropic-compatible Messages endpoint. Anthropic requests are translated into the same internal
+     * OpenAI-style message/tool representation used by {@link #handleOpenAiChat} (so mmproj vision/audio
+     * and shared tool execution are reused), then results are re-serialized into Anthropic's response
+     * and SSE event shapes. Supports system prompts, multi-turn, thinking blocks, image/audio input and
+     * basic tool_use/tool_result round-trips.
+     */
+    private void handleAnthropicMessages(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            JSONArray anthropicMessages = request.optJSONArray("messages");
+            if (anthropicMessages == null || anthropicMessages.length() == 0) {
+                sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", "'messages' is required");
+                return;
+            }
+            if (!request.has("max_tokens")) {
+                sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", "'max_tokens' is required");
+                return;
+            }
+            boolean stream = request.optBoolean("stream", false);
+            final String msgId = "msg_" + UUID.randomUUID().toString().replace("-", "");
+
+            // Translate Anthropic → internal OpenAI-style messages + tools.
+            JSONArray messages = anthropicToInternalMessages(request.opt("system"), anthropicMessages);
+            JSONArray tools = anthropicToolsToOpenAi(request.optJSONArray("tools"));
+
+            // Build a synthetic OpenAI-style request so the existing override/thinking plumbing applies.
+            JSONObject oai = new JSONObject();
+            if (request.has("max_tokens")) oai.put("max_tokens", request.opt("max_tokens"));
+            if (request.has("temperature")) oai.put("temperature", request.opt("temperature"));
+            if (request.has("top_p")) oai.put("top_p", request.opt("top_p"));
+            if (request.has("top_k")) oai.put("top_k", request.opt("top_k"));
+            JSONObject thinking = request.optJSONObject("thinking");
+            if (thinking != null) {
+                oai.put("think", "enabled".equalsIgnoreCase(thinking.optString("type", "")));
+            }
+
+            if (!acquireGenerationSlot(outputStream, "/v1/messages", false)) {
+                return;
+            }
+            applyNumCtxOverride(oai);
+            try {
+                RequestedModalities mods = detectRequestedModalities(messages);
+                if (!modelManager.loadConfiguration(model, mods.vision, mods.audio)) {
+                    sendAnthropicErrorResponse(outputStream, 500, "api_error", "Failed to load configuration: " + model);
+                    return;
+                }
+                if (modelManager.isResetPendingOrInProgress()) {
+                    sendAnthropicErrorResponse(outputStream, 503, "overloaded_error", "Model reset requested");
+                    return;
+                }
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                    applyRequestOverrides(config, oai);
+                    modelManager.applyConfiguration(config);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not apply /v1/messages overrides", e);
+                }
+                applyNPredictOverride(oai, config);
+                applyStructuredOutputConstraint(new JSONObject());
+
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String customTemplate = config != null ? config.customChatTemplate : null;
+                String settingsSystemPrompt = config != null ? config.systemPrompt : null;
+                boolean enableThinking = resolveEnableThinking(oai, config);
+
+                PreparedMessages prepared = normalizeMessagesForMedia(
+                        messages, modelManager.supportsVision(), modelManager.supportsAudio());
+
+                // Tool-enabled turn: SharedToolManager returns a complete result (not token-streamed).
+                boolean hasSharedToolConfig = hasSharedToolConfig();
+                if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
+                    SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                            context,
+                            modelManager.getLlama(),
+                            prepared.messages,
+                            tools,
+                            customTemplate,
+                            settingsSystemPrompt,
+                            serializeToolChoice(anthropicToOpenAiToolChoice(request.optJSONObject("tool_choice"))),
+                            false,
+                            enableThinking,
+                            prepared.toMediaArray(),
+                            true,
+                            true);
+                    if (toolResult != null) {
+                        if (stream) {
+                            sendAnthropicToolStream(outputStream, msgId, model, toolResult);
+                        } else {
+                            JSONObject resp = buildAnthropicResponse(msgId, model,
+                                    toolResult.content, toolResult.reasoningContent,
+                                    toolResult.toolCalls, mapAnthropicStopReason(toolResult.finishReason));
+                            sendJsonResponse(outputStream, 200, resp.toString());
+                        }
+                        return;
+                    }
+                }
+
+                String modelPath = modelManager.getCurrentModelPath();
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptFromMessagesWithSelection(
+                                prepared.messages, customTemplate, ggufChatTemplate,
+                                settingsSystemPrompt, modelPath, enableThinking);
+                logTemplateSelection("anthropic.messages", promptResult.selection);
+                String promptToUse = promptResult.prompt;
+                logMaxDebugPayload("anthropic.messages.prompt", promptToUse);
+
+                if (stream) {
+                    final String modelF = model;
+                    runStreamingGeneration(outputStream, promptToUse, prepared.toMediaArray(), enableThinking,
+                            new AnthropicStreamEmitter(msgId, modelF));
+                } else {
+                    String rawResponse = modelManager.generate(promptToUse, prepared.toMediaArray());
+                    final String reasoning;
+                    final String contentText;
+                    if (enableThinking) {
+                        String[] parts = PromptTemplateManager.extractThinkingContent(rawResponse);
+                        reasoning = parts[0];
+                        contentText = parts[1];
+                    } else {
+                        reasoning = null;
+                        contentText = PromptTemplateManager.stripThinkingBlocks(rawResponse);
+                    }
+                    String finalText = appendPerfMetrics(stripResponseMarkers(contentText));
+                    JSONObject resp = buildAnthropicResponse(msgId, model, finalText,
+                            (reasoning != null && !reasoning.isEmpty()) ? reasoning : null,
+                            null, "end_turn");
+                    sendJsonResponse(outputStream, 200, resp.toString());
+                }
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Invalid JSON in /v1/messages request", e);
+            sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", "Invalid JSON: " + e.getMessage());
+        } catch (InvalidMediaException e) {
+            Log.e(TAG, "Invalid media in /v1/messages request", e);
+            sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "/v1/messages request failed", e);
+            sendAnthropicErrorResponse(outputStream, 500, "api_error",
+                    e.getMessage() != null ? e.getMessage() : "messages request failed");
+        }
+    }
+
+    /** Anthropic {@code /v1/messages/count_tokens}: returns the prompt token count without generating. */
+    private void handleAnthropicCountTokens(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(request.optString("model", null));
+            JSONArray anthropicMessages = request.optJSONArray("messages");
+            if (anthropicMessages == null || anthropicMessages.length() == 0) {
+                sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", "'messages' is required");
+                return;
+            }
+            JSONArray messages = anthropicToInternalMessages(request.opt("system"), anthropicMessages);
+            if (!acquireGenerationSlot(outputStream, "/v1/messages/count_tokens", false)) {
+                return;
+            }
+            try {
+                RequestedModalities mods = detectRequestedModalities(messages);
+                if (!modelManager.loadConfiguration(model, mods.vision, mods.audio)) {
+                    sendAnthropicErrorResponse(outputStream, 500, "api_error", "Failed to load configuration: " + model);
+                    return;
+                }
+                ConfigurationManager.Configuration config = null;
+                String customTemplate = null, settingsSystemPrompt = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                    customTemplate = config.customChatTemplate;
+                    settingsSystemPrompt = config.systemPrompt;
+                } catch (Exception ignored) {}
+                PreparedMessages prepared = normalizeMessagesForMedia(
+                        messages, modelManager.supportsVision(), modelManager.supportsAudio());
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String modelPath = modelManager.getCurrentModelPath();
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptFromMessagesWithSelection(
+                                prepared.messages, customTemplate, ggufChatTemplate,
+                                settingsSystemPrompt, modelPath, false);
+                int tokenCount = 0;
+                try {
+                    JSONObject parsed = new JSONObject(modelManager.getLlama().tokenize(promptResult.prompt));
+                    if (parsed.has("ids")) {
+                        tokenCount = parsed.getJSONArray("ids").length();
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "count_tokens tokenize failed", e);
+                }
+                JSONObject result = new JSONObject();
+                result.put("input_tokens", Math.max(0, tokenCount));
+                sendJsonResponse(outputStream, 200, result.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", "Invalid JSON: " + e.getMessage());
+        } catch (InvalidMediaException e) {
+            sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error", e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "/v1/messages/count_tokens failed", e);
+            sendAnthropicErrorResponse(outputStream, 500, "api_error",
+                    e.getMessage() != null ? e.getMessage() : "count_tokens failed");
+        }
+    }
+
+    // ---- Anthropic <-> internal conversion ----
+
+    /**
+     * Converts an Anthropic {@code system} field (string or array of text blocks) plus {@code messages}
+     * into the internal OpenAI-style message array consumed by {@link #normalizeMessagesForMedia} and
+     * {@link PromptTemplateManager}. Image/audio blocks become {@code image_url}/{@code input_audio}
+     * parts; {@code tool_use} becomes assistant {@code tool_calls}; {@code tool_result} becomes a
+     * {@code tool} role message.
+     */
+    private static JSONArray anthropicToInternalMessages(Object system, JSONArray anthropicMessages) throws JSONException {
+        JSONArray out = new JSONArray();
+        String systemText = anthropicTextFromBlocks(system);
+        if (systemText != null && !systemText.isEmpty()) {
+            JSONObject sys = new JSONObject();
+            sys.put("role", "system");
+            sys.put("content", systemText);
+            out.put(sys);
+        }
+        for (int i = 0; i < anthropicMessages.length(); i++) {
+            JSONObject msg = anthropicMessages.getJSONObject(i);
+            String role = msg.optString("role", "user");
+            Object content = msg.opt("content");
+            if (content instanceof String) {
+                JSONObject m = new JSONObject();
+                m.put("role", role);
+                m.put("content", content);
+                out.put(m);
+                continue;
+            }
+            if (!(content instanceof JSONArray)) {
+                continue;
+            }
+            JSONArray blocks = (JSONArray) content;
+            JSONArray parts = new JSONArray();          // text/image/audio parts for this message
+            JSONArray toolCalls = new JSONArray();       // assistant tool_use blocks
+            for (int b = 0; b < blocks.length(); b++) {
+                JSONObject block = blocks.getJSONObject(b);
+                String type = block.optString("type", "");
+                switch (type) {
+                    case "text": {
+                        JSONObject p = new JSONObject();
+                        p.put("type", "text");
+                        p.put("text", block.optString("text", ""));
+                        parts.put(p);
+                        break;
+                    }
+                    case "image": {
+                        parts.put(anthropicImageToOpenAiPart(block.optJSONObject("source")));
+                        break;
+                    }
+                    case "audio": { // local extension (not in Anthropic's public schema) for mmproj audio
+                        parts.put(anthropicAudioToOpenAiPart(block.optJSONObject("source")));
+                        break;
+                    }
+                    case "tool_use": {
+                        JSONObject call = new JSONObject();
+                        call.put("id", block.optString("id", "call_" + b));
+                        call.put("type", "function");
+                        JSONObject fn = new JSONObject();
+                        fn.put("name", block.optString("name", ""));
+                        fn.put("arguments", block.opt("input") != null ? block.get("input").toString() : "{}");
+                        call.put("function", fn);
+                        toolCalls.put(call);
+                        break;
+                    }
+                    case "tool_result": {
+                        // Emitted as its own tool-role message (OpenAI convention).
+                        JSONObject toolMsg = new JSONObject();
+                        toolMsg.put("role", "tool");
+                        toolMsg.put("tool_call_id", block.optString("tool_use_id", ""));
+                        toolMsg.put("content", anthropicTextFromBlocks(block.opt("content")));
+                        out.put(toolMsg);
+                        break;
+                    }
+                    default:
+                        // Unknown block: fall back to any text field so nothing is silently dropped.
+                        if (block.has("text")) {
+                            JSONObject p = new JSONObject();
+                            p.put("type", "text");
+                            p.put("text", block.optString("text", ""));
+                            parts.put(p);
+                        }
+                        break;
+                }
+            }
+            // tool_result blocks already appended their own messages; only emit a role message if this
+            // turn carried text/media/tool_use.
+            if (parts.length() > 0 || toolCalls.length() > 0) {
+                JSONObject m = new JSONObject();
+                m.put("role", role);
+                // Collapse a single text-only part to a plain string (cheaper prompt path).
+                if (parts.length() == 1 && "text".equals(parts.getJSONObject(0).optString("type"))
+                        && toolCalls.length() == 0) {
+                    m.put("content", parts.getJSONObject(0).optString("text", ""));
+                } else if (parts.length() > 0) {
+                    m.put("content", parts);
+                } else {
+                    m.put("content", "");
+                }
+                if (toolCalls.length() > 0) {
+                    m.put("tool_calls", toolCalls);
+                }
+                out.put(m);
+            }
+        }
+        return out;
+    }
+
+    /** Joins the text of an Anthropic content value (string, or array of blocks) into a plain string. */
+    private static String anthropicTextFromBlocks(Object value) {
+        if (value == null || value == JSONObject.NULL) {
+            return "";
+        }
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof JSONArray) {
+            JSONArray arr = (JSONArray) value;
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject block = arr.optJSONObject(i);
+                if (block != null && "text".equals(block.optString("type", "text"))) {
+                    sb.append(block.optString("text", ""));
+                }
+            }
+            return sb.toString();
+        }
+        return String.valueOf(value);
+    }
+
+    private static JSONObject anthropicImageToOpenAiPart(JSONObject source) throws JSONException {
+        JSONObject part = new JSONObject();
+        part.put("type", "image_url");
+        JSONObject imageUrl = new JSONObject();
+        if (source != null && "url".equals(source.optString("type", ""))) {
+            imageUrl.put("url", source.optString("url", ""));
+        } else if (source != null) {
+            String mediaType = source.optString("media_type", "image/jpeg");
+            String data = source.optString("data", "");
+            imageUrl.put("url", "data:" + mediaType + ";base64," + data);
+        }
+        part.put("image_url", imageUrl);
+        return part;
+    }
+
+    private static JSONObject anthropicAudioToOpenAiPart(JSONObject source) throws JSONException {
+        JSONObject part = new JSONObject();
+        part.put("type", "input_audio");
+        JSONObject audio = new JSONObject();
+        if (source != null) {
+            audio.put("data", source.optString("data", ""));
+            String mediaType = source.optString("media_type", "");
+            String format = source.optString("format", "");
+            if (format.isEmpty() && mediaType.contains("mp3")) format = "mp3";
+            if (format.isEmpty()) format = "wav";
+            audio.put("format", format);
+        }
+        part.put("input_audio", audio);
+        return part;
+    }
+
+    /** Anthropic tools ({name, description, input_schema}) → OpenAI function tools. Null-safe. */
+    private static JSONArray anthropicToolsToOpenAi(JSONArray anthropicTools) throws JSONException {
+        if (anthropicTools == null || anthropicTools.length() == 0) {
+            return null;
+        }
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < anthropicTools.length(); i++) {
+            JSONObject t = anthropicTools.optJSONObject(i);
+            if (t == null) continue;
+            JSONObject fn = new JSONObject();
+            fn.put("name", t.optString("name", ""));
+            if (t.has("description")) fn.put("description", t.optString("description", ""));
+            JSONObject schema = t.optJSONObject("input_schema");
+            fn.put("parameters", schema != null ? schema : new JSONObject());
+            JSONObject wrapper = new JSONObject();
+            wrapper.put("type", "function");
+            wrapper.put("function", fn);
+            out.put(wrapper);
+        }
+        return out;
+    }
+
+    /** Anthropic tool_choice ({type:auto|any|tool, name?}) → OpenAI tool_choice. */
+    private static Object anthropicToOpenAiToolChoice(JSONObject toolChoice) throws JSONException {
+        if (toolChoice == null) {
+            return null;
+        }
+        String type = toolChoice.optString("type", "auto");
+        if ("any".equals(type)) {
+            return "required";
+        }
+        if ("tool".equals(type) && toolChoice.has("name")) {
+            JSONObject choice = new JSONObject();
+            choice.put("type", "function");
+            JSONObject fn = new JSONObject();
+            fn.put("name", toolChoice.optString("name", ""));
+            choice.put("function", fn);
+            return choice;
+        }
+        return "auto";
+    }
+
+    private static String mapAnthropicStopReason(String openAiFinishReason) {
+        if ("tool_calls".equals(openAiFinishReason)) return "tool_use";
+        if ("length".equals(openAiFinishReason)) return "max_tokens";
+        return "end_turn";
+    }
+
+    // ---- Anthropic response serialization ----
+
+    /**
+     * Builds a non-streaming Anthropic {@code message} response. Thinking (if any) becomes a
+     * {@code thinking} content block, text a {@code text} block, and OpenAI tool_calls become
+     * {@code tool_use} blocks.
+     */
+    private JSONObject buildAnthropicResponse(String msgId, String model, String content,
+            String reasoning, JSONArray toolCalls, String stopReason) throws JSONException {
+        JSONObject response = new JSONObject();
+        response.put("id", msgId);
+        response.put("type", "message");
+        response.put("role", "assistant");
+        response.put("model", model);
+
+        JSONArray contentBlocks = new JSONArray();
+        if (reasoning != null && !reasoning.isEmpty()) {
+            JSONObject thinkingBlock = new JSONObject();
+            thinkingBlock.put("type", "thinking");
+            thinkingBlock.put("thinking", reasoning);
+            contentBlocks.put(thinkingBlock);
+        }
+        if (content != null && !content.isEmpty()) {
+            JSONObject textBlock = new JSONObject();
+            textBlock.put("type", "text");
+            textBlock.put("text", content);
+            contentBlocks.put(textBlock);
+        }
+        if (toolCalls != null) {
+            for (int i = 0; i < toolCalls.length(); i++) {
+                JSONObject call = toolCalls.optJSONObject(i);
+                if (call == null) continue;
+                JSONObject fn = call.optJSONObject("function");
+                JSONObject toolUse = new JSONObject();
+                toolUse.put("type", "tool_use");
+                toolUse.put("id", call.optString("id", "toolu_" + i));
+                toolUse.put("name", fn != null ? fn.optString("name", "") : "");
+                toolUse.put("input", parseJsonObjectOrEmpty(fn != null ? fn.optString("arguments", "{}") : "{}"));
+                contentBlocks.put(toolUse);
+            }
+        }
+        if (contentBlocks.length() == 0) {
+            JSONObject textBlock = new JSONObject();
+            textBlock.put("type", "text");
+            textBlock.put("text", "");
+            contentBlocks.put(textBlock);
+        }
+        response.put("content", contentBlocks);
+        response.put("stop_reason", stopReason);
+        response.put("stop_sequence", JSONObject.NULL);
+        response.put("usage", anthropicUsage());
+        return response;
+    }
+
+    private JSONObject anthropicUsage() throws JSONException {
+        JSONObject usage = new JSONObject();
+        int inTokens = 0, outTokens = 0;
+        try {
+            LlamaNative llama = modelManager.getLlama();
+            if (llama != null) {
+                inTokens = llama.getLastNPromptTokens();
+                outTokens = llama.getLastNEvalTokens();
+            }
+        } catch (Exception ignored) {}
+        usage.put("input_tokens", inTokens);
+        usage.put("output_tokens", outTokens);
+        return usage;
+    }
+
+    private static JSONObject parseJsonObjectOrEmpty(String json) {
+        try {
+            return new JSONObject(json);
+        } catch (JSONException e) {
+            return new JSONObject();
+        }
+    }
+
+    /** Anthropic SSE frame: {@code event: <type>\n data: <json>\n\n}. */
+    private void sendAnthropicSse(OutputStream out, String eventType, String data) throws IOException {
+        out.write(("event: " + eventType + "\ndata: " + data + "\n\n").getBytes(StandardCharsets.UTF_8));
+        out.flush();
+    }
+
+    /**
+     * Streams a completed tool-enabled turn as Anthropic SSE events. The underlying tool call is
+     * produced in one shot by {@link SharedToolManager}, so each block is emitted whole.
+     */
+    private void sendAnthropicToolStream(OutputStream out, String msgId, String model,
+            SharedToolManager.ChatResult result) throws IOException, JSONException {
+        out.write(sseHeader().getBytes(StandardCharsets.UTF_8));
+        out.flush();
+        sendAnthropicSse(out, "message_start", anthropicMessageStart(msgId, model).toString());
+        int index = 0;
+        if (result.reasoningContent != null && !result.reasoningContent.isEmpty()) {
+            emitWholeThinkingBlock(out, index++, result.reasoningContent);
+        }
+        if (result.content != null && !result.content.isEmpty()) {
+            emitWholeTextBlock(out, index++, result.content);
+        }
+        if (result.toolCalls != null) {
+            for (int i = 0; i < result.toolCalls.length(); i++) {
+                JSONObject call = result.toolCalls.optJSONObject(i);
+                if (call == null) continue;
+                JSONObject fn = call.optJSONObject("function");
+                JSONObject start = new JSONObject();
+                start.put("type", "content_block_start");
+                start.put("index", index);
+                JSONObject cb = new JSONObject();
+                cb.put("type", "tool_use");
+                cb.put("id", call.optString("id", "toolu_" + i));
+                cb.put("name", fn != null ? fn.optString("name", "") : "");
+                cb.put("input", new JSONObject());
+                start.put("content_block", cb);
+                sendAnthropicSse(out, "content_block_start", start.toString());
+
+                JSONObject delta = new JSONObject();
+                delta.put("type", "content_block_delta");
+                delta.put("index", index);
+                JSONObject d = new JSONObject();
+                d.put("type", "input_json_delta");
+                d.put("partial_json", fn != null ? fn.optString("arguments", "{}") : "{}");
+                delta.put("delta", d);
+                sendAnthropicSse(out, "content_block_delta", delta.toString());
+                emitContentBlockStop(out, index);
+                index++;
+            }
+        }
+        sendAnthropicMessageDelta(out, mapAnthropicStopReason(result.finishReason));
+        sendAnthropicSse(out, "message_stop", "{\"type\":\"message_stop\"}");
+    }
+
+    private JSONObject anthropicMessageStart(String msgId, String model) throws JSONException {
+        JSONObject message = new JSONObject();
+        message.put("id", msgId);
+        message.put("type", "message");
+        message.put("role", "assistant");
+        message.put("model", model);
+        message.put("content", new JSONArray());
+        message.put("stop_reason", JSONObject.NULL);
+        message.put("stop_sequence", JSONObject.NULL);
+        JSONObject usage = new JSONObject();
+        int inTokens = 0;
+        try {
+            LlamaNative llama = modelManager.getLlama();
+            if (llama != null) inTokens = llama.getLastNPromptTokens();
+        } catch (Exception ignored) {}
+        usage.put("input_tokens", inTokens);
+        usage.put("output_tokens", 0);
+        message.put("usage", usage);
+        JSONObject event = new JSONObject();
+        event.put("type", "message_start");
+        event.put("message", message);
+        return event;
+    }
+
+    private void emitWholeTextBlock(OutputStream out, int index, String text) throws IOException, JSONException {
+        JSONObject start = new JSONObject();
+        start.put("type", "content_block_start");
+        start.put("index", index);
+        JSONObject cb = new JSONObject();
+        cb.put("type", "text");
+        cb.put("text", "");
+        start.put("content_block", cb);
+        sendAnthropicSse(out, "content_block_start", start.toString());
+        JSONObject delta = new JSONObject();
+        delta.put("type", "content_block_delta");
+        delta.put("index", index);
+        JSONObject d = new JSONObject();
+        d.put("type", "text_delta");
+        d.put("text", text);
+        delta.put("delta", d);
+        sendAnthropicSse(out, "content_block_delta", delta.toString());
+        emitContentBlockStop(out, index);
+    }
+
+    private void emitWholeThinkingBlock(OutputStream out, int index, String text) throws IOException, JSONException {
+        JSONObject start = new JSONObject();
+        start.put("type", "content_block_start");
+        start.put("index", index);
+        JSONObject cb = new JSONObject();
+        cb.put("type", "thinking");
+        cb.put("thinking", "");
+        start.put("content_block", cb);
+        sendAnthropicSse(out, "content_block_start", start.toString());
+        JSONObject delta = new JSONObject();
+        delta.put("type", "content_block_delta");
+        delta.put("index", index);
+        JSONObject d = new JSONObject();
+        d.put("type", "thinking_delta");
+        d.put("thinking", text);
+        delta.put("delta", d);
+        sendAnthropicSse(out, "content_block_delta", delta.toString());
+        emitContentBlockStop(out, index);
+    }
+
+    private void emitContentBlockStop(OutputStream out, int index) throws IOException, JSONException {
+        JSONObject stop = new JSONObject();
+        stop.put("type", "content_block_stop");
+        stop.put("index", index);
+        sendAnthropicSse(out, "content_block_stop", stop.toString());
+    }
+
+    private void sendAnthropicMessageDelta(OutputStream out, String stopReason) throws IOException, JSONException {
+        JSONObject event = new JSONObject();
+        event.put("type", "message_delta");
+        JSONObject delta = new JSONObject();
+        delta.put("stop_reason", stopReason);
+        delta.put("stop_sequence", JSONObject.NULL);
+        event.put("delta", delta);
+        JSONObject usage = new JSONObject();
+        int outTokens = 0;
+        try {
+            LlamaNative llama = modelManager.getLlama();
+            if (llama != null) outTokens = llama.getLastNEvalTokens();
+        } catch (Exception ignored) {}
+        usage.put("output_tokens", outTokens);
+        event.put("usage", usage);
+        sendAnthropicSse(out, "message_delta", event.toString());
+    }
+
+    private void sendAnthropicErrorResponse(OutputStream out, int statusCode, String type, String message)
+            throws IOException {
+        try {
+            JSONObject error = new JSONObject();
+            error.put("type", type);
+            error.put("message", message);
+            JSONObject wrapper = new JSONObject();
+            wrapper.put("type", "error");
+            wrapper.put("error", error);
+            sendJsonResponse(out, statusCode, wrapper.toString());
+        } catch (JSONException e) {
+            sendErrorResponse(out, statusCode, message);
+        }
+    }
+
+    /**
+     * Token-by-token Anthropic SSE emitter with a small state machine that keeps a thinking block and a
+     * text block correctly ordered and balanced (start/delta/stop). Thinking tokens (when enabled)
+     * arrive before text tokens, matching Anthropic's block ordering.
+     */
+    private final class AnthropicStreamEmitter implements StreamEmitter {
+        private final String msgId;
+        private final String model;
+        private static final int NONE = 0, THINKING = 1, TEXT = 2;
+        private int state = NONE;
+        private int nextIndex = 0;
+        private int currentIndex = -1;
+
+        AnthropicStreamEmitter(String msgId, String model) {
+            this.msgId = msgId;
+            this.model = model;
+        }
+
+        @Override public void onStart(OutputStream out) throws IOException {
+            out.write(sseHeader().getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            try {
+                sendAnthropicSse(out, "message_start", anthropicMessageStart(msgId, model).toString());
+            } catch (JSONException ignored) {}
+        }
+
+        private void closeCurrent(OutputStream out) throws IOException {
+            if (state != NONE && currentIndex >= 0) {
+                try { emitContentBlockStop(out, currentIndex); } catch (JSONException ignored) {}
+            }
+        }
+
+        private void openText(OutputStream out) throws IOException {
+            closeCurrent(out);
+            currentIndex = nextIndex++;
+            state = TEXT;
+            try {
+                JSONObject start = new JSONObject();
+                start.put("type", "content_block_start");
+                start.put("index", currentIndex);
+                JSONObject cb = new JSONObject();
+                cb.put("type", "text");
+                cb.put("text", "");
+                start.put("content_block", cb);
+                sendAnthropicSse(out, "content_block_start", start.toString());
+            } catch (JSONException ignored) {}
+        }
+
+        private void openThinking(OutputStream out) throws IOException {
+            closeCurrent(out);
+            currentIndex = nextIndex++;
+            state = THINKING;
+            try {
+                JSONObject start = new JSONObject();
+                start.put("type", "content_block_start");
+                start.put("index", currentIndex);
+                JSONObject cb = new JSONObject();
+                cb.put("type", "thinking");
+                cb.put("thinking", "");
+                start.put("content_block", cb);
+                sendAnthropicSse(out, "content_block_start", start.toString());
+            } catch (JSONException ignored) {}
+        }
+
+        @Override public void onText(OutputStream out, String token) throws IOException {
+            if (state != TEXT) {
+                openText(out);
+            }
+            try {
+                JSONObject delta = new JSONObject();
+                delta.put("type", "content_block_delta");
+                delta.put("index", currentIndex);
+                JSONObject d = new JSONObject();
+                d.put("type", "text_delta");
+                d.put("text", token);
+                delta.put("delta", d);
+                sendAnthropicSse(out, "content_block_delta", delta.toString());
+            } catch (JSONException ignored) {}
+        }
+
+        @Override public void onReasoning(OutputStream out, String token) throws IOException {
+            if (state != THINKING) {
+                openThinking(out);
+            }
+            try {
+                JSONObject delta = new JSONObject();
+                delta.put("type", "content_block_delta");
+                delta.put("index", currentIndex);
+                JSONObject d = new JSONObject();
+                d.put("type", "thinking_delta");
+                d.put("thinking", token);
+                delta.put("delta", d);
+                sendAnthropicSse(out, "content_block_delta", delta.toString());
+            } catch (JSONException ignored) {}
+        }
+
+        @Override public void onComplete(OutputStream out) throws IOException {
+            String metrics = buildPerfMetricsSuffix();
+            if (metrics != null && !metrics.isEmpty()) {
+                if (state != TEXT) {
+                    openText(out);
+                }
+                onText(out, metrics);
+            }
+            if (state == NONE) {
+                // Nothing was emitted: send an empty text block so the stream is well-formed.
+                openText(out);
+            }
+            closeCurrent(out);
+            try {
+                sendAnthropicMessageDelta(out, "end_turn");
+            } catch (JSONException ignored) {}
+            sendAnthropicSse(out, "message_stop", "{\"type\":\"message_stop\"}");
+        }
+
+        @Override public void onError(OutputStream out, String message) throws IOException {
+            closeCurrent(out);
+            try {
+                JSONObject error = new JSONObject();
+                error.put("type", "error");
+                JSONObject e = new JSONObject();
+                e.put("type", "api_error");
+                e.put("message", message);
+                error.put("error", e);
+                sendAnthropicSse(out, "error", error.toString());
+            } catch (JSONException ignored) {}
+            sendAnthropicSse(out, "message_stop", "{\"type\":\"message_stop\"}");
         }
     }
 

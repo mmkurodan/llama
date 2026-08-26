@@ -108,6 +108,7 @@ public class MainActivity extends Activity {
     private EditText promptInput;
     private Button sendButton;
     private Button settingsButton;
+    private Button exitButton;
     private Button initModelButton;
     private Button viewLogButton;
     private Button clearLogButton;
@@ -214,6 +215,10 @@ public class MainActivity extends Activity {
                 isServiceRunning = "running".equals(status);
                 apiPort = port;
                 updateApiServerUI();
+            } else if (OllamaForegroundService.ACTION_APP_EXITING.equals(action)) {
+                // The notification's Exit action is terminating the app: drop our task too so no dead
+                // entry lingers in recents before the service kills the process.
+                finishAndRemoveTask();
             }
         }
     };
@@ -270,6 +275,7 @@ public class MainActivity extends Activity {
         promptInput = findViewById(R.id.promptInput);
         sendButton = findViewById(R.id.sendButton);
         settingsButton = findViewById(R.id.settingsButton);
+        exitButton = findViewById(R.id.exitButton);
         initModelButton = findViewById(R.id.initModelButton);
         viewLogButton = findViewById(R.id.viewLogButton);
         clearLogButton = findViewById(R.id.clearLogButton);
@@ -293,6 +299,9 @@ public class MainActivity extends Activity {
 
         // Set up button listeners
         settingsButton.setOnClickListener(v -> openSettings());
+        if (exitButton != null) {
+            exitButton.setOnClickListener(v -> confirmExitApp());
+        }
         initModelButton.setOnClickListener(v -> reinitializeModel());
         viewLogButton.setOnClickListener(v -> toggleViewLog());
         clearLogButton.setOnClickListener(v -> clearLogFile());
@@ -1282,6 +1291,9 @@ public class MainActivity extends Activity {
         if (settingsButton != null) {
             settingsButton.setText(localizedText("設定", "Settings"));
         }
+        if (exitButton != null) {
+            exitButton.setText(localizedText("終了", "Exit"));
+        }
         if (initModelButton != null) {
             initModelButton.setText(localizedText("リセット", "Reset"));
         }
@@ -1781,6 +1793,33 @@ public class MainActivity extends Activity {
         serviceIntent.setAction(OllamaForegroundService.ACTION_DISCONNECT_ALL);
         startService(serviceIntent);
     }
+
+    /** Confirm, then fully terminate the API server and the app (mirrors the notification's Exit action). */
+    private void confirmExitApp() {
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("アプリを終了", "Exit app"))
+                .setMessage(localizedText(
+                        "APIサーバーを停止し、アプリを完全に終了します。よろしいですか？",
+                        "This stops the API/WebUI server and fully quits the app. Continue?"))
+                .setPositiveButton(localizedText("終了", "Exit"), (d, w) -> exitApp())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    private void exitApp() {
+        // Clear the persisted enable-intent so nothing auto-restarts, then hand the teardown to the
+        // service (it stops the server, cancels the recovery watchdog and kills the process).
+        OllamaForegroundService.setApiEnabled(this, false);
+        Intent serviceIntent = new Intent(this, OllamaForegroundService.class);
+        serviceIntent.setAction(OllamaForegroundService.ACTION_EXIT);
+        try {
+            startService(serviceIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to deliver EXIT to service", e);
+        }
+        // Finish the UI immediately and drop the task from recents; the service kills the process next.
+        finishAndRemoveTask();
+    }
     
     private boolean isServiceRunning(Class<?> serviceClass) {
         ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -1808,6 +1847,7 @@ public class MainActivity extends Activity {
         IntentFilter filter = new IntentFilter();
         filter.addAction(OllamaForegroundService.ACTION_LOG);
         filter.addAction(OllamaForegroundService.ACTION_STATUS_CHANGED);
+        filter.addAction(OllamaForegroundService.ACTION_APP_EXITING);
         registerReceiver(serviceReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         
         // Update service status when returning to the activity

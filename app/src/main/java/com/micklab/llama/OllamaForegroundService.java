@@ -29,6 +29,9 @@ public class OllamaForegroundService extends Service {
     public static final String ACTION_DISCONNECT_ALL = "com.micklab.llama.DISCONNECT_ALL";
     // Re-read power-related prefs (keep-awake) and apply them without restarting the server.
     public static final String ACTION_APPLY_POWER = "com.micklab.llama.APPLY_POWER";
+    // Broadcast to any live Activity telling it to finish & remove its task during an app exit, so the
+    // process kill below does not leave a dead entry lingering in the recents list.
+    public static final String ACTION_APP_EXITING = "com.micklab.llama.APP_EXITING";
 
     // Persisted API-enable intent: once the user enables the server it stays enabled across process
     // death / task removal / reboot until an explicit Stop/Exit. Shared with MainActivity, the boot
@@ -102,12 +105,11 @@ public class OllamaForegroundService extends Service {
             }
             if (ACTION_EXIT.equals(action)) {
                 Log.i(TAG, "Exit action received - terminating app");
-                // Explicit user exit: clear the persisted intent so we do NOT auto-restart.
+                // Explicit user exit: clear the persisted intent so we do NOT auto-restart, and stop the
+                // recovery alarm chain so the watchdog does not resurrect us.
                 setApiEnabled(this, false);
                 sServiceRunning = false;
                 RecoveryScheduler.cancel(this);
-                stopApiServer();
-                stopSelf();
                 // This is a deliberate user-requested termination. Clear any in-progress
                 // generation marker first so the next launch does not misreport this orderly
                 // exit (which kills the process mid-native-call) as a previous crash.
@@ -115,8 +117,28 @@ public class OllamaForegroundService extends Service {
                 // Tag this deliberate self-kill so the next launch does not confuse it with an OOM
                 // SIGKILL (both appear as REASON_SIGNALED/status=9 in ApplicationExitInfo).
                 DiagnosticsLogger.markIntentionalSelfKill(this, android.os.Process.myPid(), "user-exit");
-                // Terminate the entire application
-                android.os.Process.killProcess(android.os.Process.myPid());
+                // Ask any live Activity to finish & remove its task so no dead task lingers in recents.
+                try {
+                    Intent exiting = new Intent(ACTION_APP_EXITING).setPackage(getPackageName());
+                    sendBroadcast(exiting);
+                } catch (Exception ignored) {}
+                stopApiServer();
+                // Detach the foreground notification and clear the started state BEFORE killing the
+                // process. Previously we called killProcess() synchronously here, which meant this
+                // onStartCommand never returned — so AMS kept the earlier START_STICKY return value and
+                // resurrected the service in a fresh process (the null-intent restart path re-enabled and
+                // relaunched the server), making "Exit" appear to do nothing. Returning START_NOT_STICKY
+                // and deferring the kill lets stopSelf() clear the started state so no restart happens.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(Service.STOP_FOREGROUND_REMOVE);
+                } else {
+                    stopForeground(true);
+                }
+                stopSelf();
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                    System.exit(0);
+                }, 350L);
                 return START_NOT_STICKY;
             }
             if (ACTION_DISCONNECT_ALL.equals(action)) {
