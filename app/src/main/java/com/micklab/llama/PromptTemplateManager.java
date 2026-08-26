@@ -223,6 +223,15 @@ public class PromptTemplateManager {
             "\\[(THINK|FINAL)\\]([\\s\\S]*?)\\[\\/\\1\\]",
             Pattern.CASE_INSENSITIVE);
 
+    // Unclosed (truncated) reasoning opener: a generation cut off mid-thought (e.g. a small
+    // max_tokens) leaves an opening thinking tag with no matching close. After paired blocks are
+    // removed, any such opener that remains is unclosed, and everything from it to the end is partial
+    // reasoning. Restricted to genuine thinking containers (not final/answer/tool_* or role-marker
+    // pipe tokens) so a truncated final answer is never hidden.
+    private static final Pattern UNCLOSED_REASONING_OPENER = Pattern.compile(
+            "<(?:think|analysis|commentary|deliberate)(?:\\s[^>]*)?>|\\[THINK\\]",
+            Pattern.CASE_INSENSITIVE);
+
     // Orphaned (unmatched) tags left after paired-block removal
     private static final Pattern ORPHANED_REASONING_TAG = Pattern.compile(
             "<\\/?>(" + REASONING_TAG_NAMES + ")(?:\\s[^>]*)?>|" +  // named open/close
@@ -584,6 +593,12 @@ public class PromptTemplateManager {
         String result = NAMED_REASONING_BLOCK.matcher(text).replaceAll("");
         result = PIPE_TOKEN_REASONING_BLOCK.matcher(result).replaceAll("");
         result = BRACKET_REASONING_BLOCK.matcher(result).replaceAll("");
+        // Drop an unclosed (truncated) reasoning opener and everything after it, so a thought cut off
+        // mid-stream by a small max_tokens does not leak when Thinking is OFF.
+        Matcher unclosed = UNCLOSED_REASONING_OPENER.matcher(result);
+        if (unclosed.find()) {
+            result = result.substring(0, unclosed.start());
+        }
         result = ORPHANED_REASONING_TAG.matcher(result).replaceAll("");
         // Collapse runs of 3+ blank lines left behind by removed blocks
         result = result.replaceAll("(\r?\n){3,}", "\n\n").trim();
@@ -677,6 +692,18 @@ public class PromptTemplateManager {
         }
         m.appendTail(sb);
         cleaned = sb.toString();
+
+        // Truncated/unclosed reasoning: move an unclosed opening thinking tag and everything after it
+        // into reasoning, so the raw tag + partial thought never leaks into the visible content.
+        Matcher unclosed = UNCLOSED_REASONING_OPENER.matcher(cleaned);
+        if (unclosed.find()) {
+            String tail = cleaned.substring(unclosed.end()).trim();
+            if (!tail.isEmpty()) {
+                if (reasoning.length() > 0) reasoning.append('\n');
+                reasoning.append(tail);
+            }
+            cleaned = cleaned.substring(0, unclosed.start());
+        }
 
         // Remove orphaned tags left by the extractions above
         cleaned = ORPHANED_REASONING_TAG.matcher(cleaned).replaceAll("");
