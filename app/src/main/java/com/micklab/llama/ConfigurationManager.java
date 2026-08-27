@@ -341,15 +341,69 @@ public class ConfigurationManager {
         }
     }
     
+    // Bundled starter configurations shipped in assets/defaults/*.json (e.g. "default",
+    // "default Chat", "default Vision"). Seeded on every construction (so a version upgrade
+    // that adds a new bundled config picks it up) but ONLY when that config does not already
+    // exist — an existing config (fresh install or a user's edited copy) is never overwritten.
+    private static final String BUNDLED_DEFAULTS_ASSET_DIR = "defaults";
+
     public ConfigurationManager(Context context) {
         this.context = context;
         this.configDir = new File(context.getExternalFilesDir(null), CONFIG_DIR);
         if (!configDir.exists()) {
             configDir.mkdirs();
         }
+        ensureBundledDefaults();
         ensureDefaultConfig();
     }
-    
+
+    // Add each assets/defaults/*.json whose config is missing; skip the ones already present.
+    private void ensureBundledDefaults() {
+        String[] files;
+        try {
+            files = context.getAssets().list(BUNDLED_DEFAULTS_ASSET_DIR);
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to list bundled default configs", e);
+            return;
+        }
+        if (files == null) {
+            return;
+        }
+        for (String fileName : files) {
+            if (!fileName.endsWith(".json")) {
+                continue;
+            }
+            String configName = fileName.substring(0, fileName.length() - 5);
+            File target = new File(configDir, configName + ".json");
+            if (target.exists()) {
+                continue; // Already present — skip (never clobber user edits on version-up).
+            }
+            try {
+                String content = readAsset(BUNDLED_DEFAULTS_ASSET_DIR + "/" + fileName);
+                Configuration config = Configuration.fromJSON(new JSONObject(content));
+                if (config.name == null || config.name.trim().isEmpty()) {
+                    config.name = configName;
+                }
+                saveConfiguration(config);
+                Log.d(TAG, "Seeded bundled default configuration: " + configName);
+            } catch (IOException | JSONException e) {
+                Log.e(TAG, "Failed to seed bundled default '" + configName + "'", e);
+            }
+        }
+    }
+
+    private String readAsset(String path) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(context.getAssets().open(path), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
     private void ensureDefaultConfig() {
         File defaultFile = new File(configDir, DEFAULT_CONFIG_NAME + ".json");
         if (!defaultFile.exists()) {
