@@ -3281,7 +3281,7 @@ static bool prefill_text_prompt_locked(
             static_cast<int>(prompt.size()),
             tokens.data(),
             static_cast<int>(tokens.size()),
-            false,
+            true,   // add_special: モデルの add_bos_token/add_eos_token 設定に従い BOS/EOS を付与する
             true
     );
 
@@ -3360,7 +3360,7 @@ static bool prefill_text_prompt_cached_locked(
     std::vector<llama_token> tokens(g_n_ctx);
     int32_t n_tokens = llama_tokenize(
             vocab, prompt.c_str(), static_cast<int>(prompt.size()),
-            tokens.data(), static_cast<int>(tokens.size()), false, true);
+            tokens.data(), static_cast<int>(tokens.size()), true, true);  // add_special=true: BOS/EOS を付与
     if (n_tokens < 0) {
         error_message = "prompt too long for context: needs " + std::to_string(-n_tokens)
                       + " tokens but n_ctx=" + std::to_string(g_n_ctx)
