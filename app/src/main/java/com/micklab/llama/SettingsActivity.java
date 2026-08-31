@@ -35,10 +35,12 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.AutoCompleteTextView;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.CompoundButton;
@@ -208,6 +210,9 @@ public class SettingsActivity extends Activity {
     private boolean modelLoadedSuccessfully = false;
     private volatile boolean importInProgress = false;
     private volatile boolean huggingFaceSearchInProgress = false;
+    // Quantization chosen in the search dialog. It is a per-file property, so rather than filtering
+    // repositories it narrows the GGUF file list shown for the selected repository. Empty = no filter.
+    private String huggingFaceQuantFilter = "";
     private final List<CollapsibleSectionController> collapsibleSections = new ArrayList<>();
     private final ModelManager.BusyStateListener busyStateListener =
             busy -> runOnUiThread(this::updateActionButtonStateForBusy);
@@ -2254,37 +2259,125 @@ public class SettingsActivity extends Activity {
         updateAutoTemplatePreview(currentConfig);
     }
 
+    // Model-family pulldown. Labels double as the server search keyword (index 0 = "any" = no keyword).
+    private static final String[] HF_FAMILY_KEYWORDS = {
+            "", "Qwen", "Gemma", "Llama", "Mistral", "Phi", "DeepSeek", "GLM", "Yi", "Granite", "SmolLM"};
+    // Parameter-size pulldown, parallel min/max bounds in billions (0 = unbounded).
+    private static final double[] HF_SIZE_MIN_B = {0, 0, 1, 4, 8, 14, 34};
+    private static final double[] HF_SIZE_MAX_B = {0, 1, 4, 8, 14, 34, 0};
+    // Quantization pulldown (index 0 = "any"). Matched as a substring against GGUF file names.
+    private static final String[] HF_QUANT_VALUES = {
+            "", "Q2_K", "Q3_K_M", "Q4_K_M", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "F16", "BF16"};
+
     private void showHuggingFaceSearchDialog() {
+        int pad = Math.round(getResources().getDisplayMetrics().density * 20f);
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(pad, pad, pad, pad);
+
         EditText queryInput = new EditText(this);
         queryInput.setSingleLine(true);
-        queryInput.setHint(localizedText("モデル名またはキーワード（部分一致）", "Model name or keyword (partial match)"));
+        queryInput.setHint(localizedText("モデル名またはキーワード（自由入力・任意）",
+                "Model name or keyword (free text, optional)"));
+        form.addView(queryInput);
+
+        Spinner familySpinner = addLabeledSpinner(form,
+                localizedText("モデル名", "Model name"),
+                buildFamilyLabels());
+        Spinner sizeSpinner = addLabeledSpinner(form,
+                localizedText("パラメータ数", "Parameter size"),
+                buildSizeLabels());
+        Spinner quantSpinner = addLabeledSpinner(form,
+                localizedText("量子化", "Quantization"),
+                buildQuantLabels());
+
+        CheckBox multimodalCheck = new CheckBox(this);
+        multimodalCheck.setText(localizedText("マルチモーダル対応のみ", "Multimodal only"));
+        form.addView(multimodalCheck);
+
+        CheckBox mtpCheck = new CheckBox(this);
+        mtpCheck.setText(localizedText("MTP対応のみ（推定）", "MTP only (best-effort)"));
+        form.addView(mtpCheck);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(form);
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("Hugging Face で GGUF を検索", "Search GGUF on Hugging Face"))
-                .setView(queryInput)
+                .setView(scroll)
                 .setPositiveButton(localizedText("検索", "Search"),
                         (dialog, which) -> {
-                            String query = queryInput.getText().toString().trim();
-                            if (query.isEmpty()) {
-                                showToast(localizedText("キーワードを入力してください", "Enter a keyword"));
-                                return;
-                            }
-                            searchHuggingFaceRepositories(query);
+                            int familyIdx = familySpinner.getSelectedItemPosition();
+                            int sizeIdx = sizeSpinner.getSelectedItemPosition();
+                            int quantIdx = quantSpinner.getSelectedItemPosition();
+                            HuggingFaceApiClient.SearchFilters filters =
+                                    new HuggingFaceApiClient.SearchFilters(
+                                            queryInput.getText().toString().trim(),
+                                            HF_FAMILY_KEYWORDS[familyIdx],
+                                            HF_SIZE_MIN_B[sizeIdx],
+                                            HF_SIZE_MAX_B[sizeIdx],
+                                            multimodalCheck.isChecked(),
+                                            mtpCheck.isChecked());
+                            huggingFaceQuantFilter = HF_QUANT_VALUES[quantIdx];
+                            searchHuggingFaceRepositories(filters);
                         })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
                 .show();
     }
 
-    private void searchHuggingFaceRepositories(String rawQuery) {
-        final String query = rawQuery != null ? rawQuery.trim() : "";
+    /** Adds a caption + full-width {@link Spinner} to {@code parent} and returns the spinner. */
+    private Spinner addLabeledSpinner(LinearLayout parent, String caption, String[] labels) {
+        int topMargin = Math.round(getResources().getDisplayMetrics().density * 12f);
+        TextView label = new TextView(this);
+        label.setText(caption);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        labelParams.topMargin = topMargin;
+        parent.addView(label, labelParams);
+
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        parent.addView(spinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return spinner;
+    }
+
+    private String[] buildFamilyLabels() {
+        String[] labels = HF_FAMILY_KEYWORDS.clone();
+        labels[0] = localizedText("指定なし", "Any");
+        return labels;
+    }
+
+    private String[] buildSizeLabels() {
+        return new String[]{
+                localizedText("指定なし", "Any"),
+                localizedText("〜1B", "Up to 1B"),
+                "1–4B",
+                "4–8B",
+                "8–14B",
+                "14–34B",
+                localizedText("34B以上", "34B+")};
+    }
+
+    private String[] buildQuantLabels() {
+        String[] labels = HF_QUANT_VALUES.clone();
+        labels[0] = localizedText("指定なし", "Any");
+        return labels;
+    }
+
+    private void searchHuggingFaceRepositories(HuggingFaceApiClient.SearchFilters filters) {
         setHuggingFaceSearchBusy(true, localizedText(
                 "Hugging Face を検索中... ",
-                "Searching Hugging Face... ") + query);
+                "Searching Hugging Face... "));
 
         new Thread(() -> {
             try {
                 List<HuggingFaceApiClient.ModelSearchResult> results =
-                        HuggingFaceApiClient.searchGgufModels(query);
+                        HuggingFaceApiClient.searchGgufModels(filters);
                 runOnUiThread(() -> {
                     setHuggingFaceSearchBusy(false, null);
                     if (results.isEmpty()) {
@@ -2358,15 +2451,41 @@ public class SettingsActivity extends Activity {
     }
 
     private void showHuggingFaceFileDialog(HuggingFaceApiClient.RepositoryFiles repositoryFiles) {
-        List<HuggingFaceApiClient.GgufFileInfo> files = repositoryFiles.getFiles();
-        String[] labels = new String[files.size()];
-        for (int i = 0; i < files.size(); i++) {
-            labels[i] = files.get(i).getFilename();
+        List<HuggingFaceApiClient.GgufFileInfo> allFiles = repositoryFiles.getFiles();
+
+        // Quantization is a per-file property, so the quant chosen in the search dialog is applied
+        // here. If nothing matches, fall back to the full list rather than showing an empty dialog.
+        List<HuggingFaceApiClient.GgufFileInfo> files = allFiles;
+        boolean quantFallback = false;
+        if (huggingFaceQuantFilter != null && !huggingFaceQuantFilter.isEmpty()) {
+            String needle = huggingFaceQuantFilter.toLowerCase(Locale.US);
+            List<HuggingFaceApiClient.GgufFileInfo> filtered = new ArrayList<>();
+            for (HuggingFaceApiClient.GgufFileInfo file : allFiles) {
+                if (file.getFilename().toLowerCase(Locale.US).contains(needle)) {
+                    filtered.add(file);
+                }
+            }
+            if (filtered.isEmpty()) {
+                quantFallback = true;
+            } else {
+                files = filtered;
+            }
+        }
+        if (quantFallback) {
+            showToast(localizedText(
+                    "指定した量子化のファイルが無いため全件を表示します",
+                    "No files for the selected quantization; showing all"));
+        }
+
+        final List<HuggingFaceApiClient.GgufFileInfo> shownFiles = files;
+        String[] labels = new String[shownFiles.size()];
+        for (int i = 0; i < shownFiles.size(); i++) {
+            labels[i] = shownFiles.get(i).getFilename();
         }
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("ダウンロード対象を選択", "Select a GGUF file"))
-                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(repositoryFiles, files.get(which)))
+                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(repositoryFiles, shownFiles.get(which)))
                 .setNegativeButton(localizedText("閉じる", "Close"), null)
                 .show();
     }
@@ -2424,6 +2543,12 @@ public class SettingsActivity extends Activity {
 
     private String buildHuggingFaceRepositoryMeta(HuggingFaceApiClient.ModelSearchResult result) {
         List<String> items = new ArrayList<>();
+        if (result.getParamSizeB() > 0d) {
+            items.add(formatParamSize(result.getParamSizeB()));
+        }
+        if (result.isMultimodal()) {
+            items.add(localizedText("マルチモーダル", "Multimodal"));
+        }
         if (result.getDownloads() > 0) {
             items.add("DL " + formatCompactCount(result.getDownloads()));
         }
@@ -2441,6 +2566,13 @@ public class SettingsActivity extends Activity {
             builder.append(items.get(i));
         }
         return builder.toString();
+    }
+
+    private String formatParamSize(double paramSizeB) {
+        if (paramSizeB == Math.floor(paramSizeB)) {
+            return String.format(Locale.US, "%.0fB", paramSizeB);
+        }
+        return String.format(Locale.US, "%.1fB", paramSizeB);
     }
 
     private String formatCompactCount(long value) {

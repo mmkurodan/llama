@@ -798,6 +798,8 @@ public class ModelManager {
                     "model-load-complete",
                     "config=" + configName
                             + " model=" + new File(modelPath).getName()
+                            + " mmap=" + config.useMmap
+                            + " gpuLayers=" + config.gpuOffloadLayers
                             + " mmproj=" + (currentMmprojPath != null ? new File(currentMmprojPath).getName() : "(none)"));
             return true;
         } catch (IOException | JSONException e) {

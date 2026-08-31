@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class HuggingFaceApiClient {
     private static final String API_BASE_URL = "https://huggingface.co/api";
@@ -24,13 +26,35 @@ public final class HuggingFaceApiClient {
     private static final int CONNECT_TIMEOUT_MS = 10000;
     private static final int READ_TIMEOUT_MS = 20000;
     private static final int SEARCH_RESULT_LIMIT = 30;
+    // When structured filters are active we cannot express them all server-side, so fetch a larger
+    // page and narrow it client-side while still capping how many rows we ultimately surface.
+    private static final int FILTERED_FETCH_LIMIT = 100;
+    /** Matches a parameter-count token such as {@code 7B}, {@code 1.5b}, {@code 0.5B} in a repo id. */
+    private static final Pattern PARAM_SIZE_PATTERN =
+            Pattern.compile("(?<![a-zA-Z0-9.])(\\d+(?:\\.\\d+)?)\\s*[bB](?![a-zA-Z])");
 
     private HuggingFaceApiClient() {
     }
 
+    /** Backwards-compatible free-text search (no structured filters). */
     public static List<ModelSearchResult> searchGgufModels(String query) throws IOException, JSONException {
-        String trimmedQuery = query != null ? query.trim() : "";
-        JSONArray items = readModelSearchPage(trimmedQuery);
+        return searchGgufModels(new SearchFilters(query, "", 0d, 0d, false, false));
+    }
+
+    /**
+     * Searches GGUF repositories on Hugging Face. The free-text term and the selected model family
+     * are combined into the server-side {@code search} query (both match against the repo id);
+     * the parameter-size range, multimodal and MTP conditions are applied client-side because the
+     * API exposes no reliable server filter for them. Quantization is intentionally not applied
+     * here — it is a per-file property handled when listing a repository's GGUF files.
+     */
+    public static List<ModelSearchResult> searchGgufModels(SearchFilters filters)
+            throws IOException, JSONException {
+        SearchFilters safe = filters != null ? filters : new SearchFilters("", "", 0d, 0d, false, false);
+        boolean clientFiltering = safe.hasClientSideFilters();
+        int fetchLimit = clientFiltering ? FILTERED_FETCH_LIMIT : SEARCH_RESULT_LIMIT;
+        JSONArray items = readModelSearchPage(safe.buildServerQuery(), fetchLimit);
+
         List<ModelSearchResult> results = new ArrayList<>();
         for (int i = 0; i < items.length(); i++) {
             JSONObject item = items.optJSONObject(i);
@@ -39,7 +63,23 @@ public final class HuggingFaceApiClient {
             }
 
             String repoId = item.optString("id", "").trim();
-            if (repoId.isEmpty() || !hasGgufTag(item.optJSONArray("tags"))) {
+            JSONArray tagsArray = item.optJSONArray("tags");
+            if (repoId.isEmpty() || !hasGgufTag(tagsArray)) {
+                continue;
+            }
+
+            List<String> tags = toLowerStringList(tagsArray);
+            String pipelineTag = item.optString("pipeline_tag", "");
+            double paramSizeB = parseParameterSizeB(repoId);
+            boolean multimodal = isMultimodal(pipelineTag, tags);
+
+            if (!safe.matchesParamSize(paramSizeB)) {
+                continue;
+            }
+            if (safe.multimodalOnly && !multimodal) {
+                continue;
+            }
+            if (safe.mtpOnly && !supportsMtp(repoId, tags)) {
                 continue;
             }
 
@@ -47,9 +87,86 @@ public final class HuggingFaceApiClient {
                     repoId,
                     item.optLong("downloads", 0L),
                     item.optLong("likes", 0L),
-                    item.optString("pipeline_tag", "")));
+                    pipelineTag,
+                    paramSizeB,
+                    multimodal));
+            if (results.size() >= SEARCH_RESULT_LIMIT) {
+                break;
+            }
         }
         return results;
+    }
+
+    private static List<String> toLowerStringList(JSONArray array) {
+        List<String> out = new ArrayList<>();
+        if (array == null) {
+            return out;
+        }
+        for (int i = 0; i < array.length(); i++) {
+            String value = array.optString(i, "").trim().toLowerCase(java.util.Locale.US);
+            if (!value.isEmpty()) {
+                out.add(value);
+            }
+        }
+        return out;
+    }
+
+    /** Extracts the parameter count in billions from a repo id (e.g. {@code 7} from {@code .../Qwen2-7B}), or -1. */
+    static double parseParameterSizeB(String repoId) {
+        if (repoId == null || repoId.isEmpty()) {
+            return -1d;
+        }
+        int slash = repoId.lastIndexOf('/');
+        String name = slash >= 0 ? repoId.substring(slash + 1) : repoId;
+        Matcher matcher = PARAM_SIZE_PATTERN.matcher(name);
+        double best = -1d;
+        while (matcher.find()) {
+            try {
+                double value = Double.parseDouble(matcher.group(1));
+                // Prefer the largest plausible token; guards against matching "Q4" style noise.
+                if (value > best && value <= 2000d) {
+                    best = value;
+                }
+            } catch (NumberFormatException ignored) {
+                // skip
+            }
+        }
+        return best;
+    }
+
+    private static boolean isMultimodal(String pipelineTag, List<String> tags) {
+        String pt = pipelineTag != null ? pipelineTag.toLowerCase(java.util.Locale.US) : "";
+        if (pt.contains("image-text-to-text")
+                || pt.contains("image-to-text")
+                || pt.contains("visual")
+                || pt.contains("audio-text-to-text")
+                || pt.contains("any-to-any")) {
+            return true;
+        }
+        for (String tag : tags) {
+            if (tag.contains("multimodal")
+                    || tag.contains("vision")
+                    || tag.contains("image-text-to-text")
+                    || tag.contains("audio-text-to-text")
+                    || tag.contains("any-to-any")
+                    || tag.equals("mmproj")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean supportsMtp(String repoId, List<String> tags) {
+        String id = repoId != null ? repoId.toLowerCase(java.util.Locale.US) : "";
+        if (id.contains("mtp") || id.contains("multi-token") || id.contains("eagle")) {
+            return true;
+        }
+        for (String tag : tags) {
+            if (tag.contains("mtp") || tag.contains("multi-token") || tag.equals("eagle")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static RepositoryFiles getRepositoryGgufFiles(String repoId) throws IOException, JSONException {
@@ -128,10 +245,10 @@ public final class HuggingFaceApiClient {
         }
     }
 
-    private static JSONArray readModelSearchPage(String query) throws IOException, JSONException {
+    private static JSONArray readModelSearchPage(String query, int limit) throws IOException, JSONException {
         Uri.Builder builder = Uri.parse(API_BASE_URL + "/models").buildUpon()
                 .appendQueryParameter("filter", "gguf")
-                .appendQueryParameter("limit", String.valueOf(SEARCH_RESULT_LIMIT));
+                .appendQueryParameter("limit", String.valueOf(limit));
         if (!query.isEmpty()) {
             builder.appendQueryParameter("search", query);
         }
@@ -193,17 +310,90 @@ public final class HuggingFaceApiClient {
         }
     }
 
+    /**
+     * Structured search conditions. {@code freeText} and {@code modelFamily} are merged into the
+     * server-side search term; {@code paramSizeMinB}/{@code paramSizeMaxB} (billions, {@code 0}
+     * meaning "no bound") plus the {@code multimodalOnly}/{@code mtpOnly} flags are applied
+     * client-side. Quantization is deliberately absent — it is filtered when listing repo files.
+     */
+    public static final class SearchFilters {
+        private final String freeText;
+        private final String modelFamily;
+        private final double paramSizeMinB;
+        private final double paramSizeMaxB;
+        public final boolean multimodalOnly;
+        public final boolean mtpOnly;
+
+        public SearchFilters(
+                String freeText,
+                String modelFamily,
+                double paramSizeMinB,
+                double paramSizeMaxB,
+                boolean multimodalOnly,
+                boolean mtpOnly) {
+            this.freeText = freeText != null ? freeText.trim() : "";
+            this.modelFamily = modelFamily != null ? modelFamily.trim() : "";
+            this.paramSizeMinB = paramSizeMinB;
+            this.paramSizeMaxB = paramSizeMaxB;
+            this.multimodalOnly = multimodalOnly;
+            this.mtpOnly = mtpOnly;
+        }
+
+        String buildServerQuery() {
+            StringBuilder sb = new StringBuilder();
+            if (!modelFamily.isEmpty()) {
+                sb.append(modelFamily);
+            }
+            if (!freeText.isEmpty()) {
+                if (sb.length() > 0) {
+                    sb.append(' ');
+                }
+                sb.append(freeText);
+            }
+            return sb.toString().trim();
+        }
+
+        boolean hasClientSideFilters() {
+            return paramSizeMinB > 0d || paramSizeMaxB > 0d || multimodalOnly || mtpOnly;
+        }
+
+        boolean matchesParamSize(double paramSizeB) {
+            if (paramSizeMinB <= 0d && paramSizeMaxB <= 0d) {
+                return true;
+            }
+            if (paramSizeB < 0d) {
+                // Size could not be inferred from the repo id; exclude it only when a bound is set.
+                return false;
+            }
+            if (paramSizeMinB > 0d && paramSizeB < paramSizeMinB) {
+                return false;
+            }
+            // Max is treated as inclusive of the labelled upper bound (e.g. "4–8B" keeps an 8B repo).
+            return !(paramSizeMaxB > 0d && paramSizeB > paramSizeMaxB);
+        }
+    }
+
     public static final class ModelSearchResult {
         private final String repoId;
         private final long downloads;
         private final long likes;
         private final String pipelineTag;
+        private final double paramSizeB;
+        private final boolean multimodal;
 
-        private ModelSearchResult(String repoId, long downloads, long likes, String pipelineTag) {
+        private ModelSearchResult(
+                String repoId,
+                long downloads,
+                long likes,
+                String pipelineTag,
+                double paramSizeB,
+                boolean multimodal) {
             this.repoId = repoId;
             this.downloads = downloads;
             this.likes = likes;
             this.pipelineTag = pipelineTag != null ? pipelineTag : "";
+            this.paramSizeB = paramSizeB;
+            this.multimodal = multimodal;
         }
 
         public String getRepoId() {
@@ -220,6 +410,15 @@ public final class HuggingFaceApiClient {
 
         public String getPipelineTag() {
             return pipelineTag;
+        }
+
+        /** Parameter count in billions parsed from the repo id, or a negative value if unknown. */
+        public double getParamSizeB() {
+            return paramSizeB;
+        }
+
+        public boolean isMultimodal() {
+            return multimodal;
         }
     }
 

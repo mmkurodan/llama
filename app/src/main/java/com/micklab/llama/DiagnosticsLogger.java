@@ -535,9 +535,87 @@ public final class DiagnosticsLogger {
         appendProcStatusValue(sb, procStatus, "VmHWM");
         appendProcStatusValue(sb, procStatus, "VmSize");
         appendProcStatusValue(sb, procStatus, "VmSwap");
+        // RssAnon / RssFile split the resident set into the anonymous vs file-backed buckets
+        // that the Google Play "Anonymous RSS + Swap" memory requirement is measured against.
+        appendProcStatusValue(sb, procStatus, "RssAnon");
+        appendProcStatusValue(sb, procStatus, "RssFile");
+        appendProcStatusValue(sb, procStatus, "RssShmem");
         appendProcStatusValue(sb, procStatus, "Threads");
         appendProcStatusValue(sb, procStatus, "FDSize");
+        appendSmapsRollup(sb);
         return sb.toString();
+    }
+
+    /**
+     * Appends a one-line summary of {@code /proc/self/smaps_rollup}, the aggregate memory
+     * accounting whose Anonymous/Swap fields mirror what Google Play measures for the
+     * "reduced memory usage" requirement (90th-percentile Anonymous RSS + Swap). The headline
+     * {@code anonPlusSwap} is the direct proxy for that metric; {@code filePss} is the
+     * file-backed portion that mmap'd model weights should fall into (and therefore be excluded
+     * from the metric). Silently no-ops when the file is unavailable (older kernels / restricted
+     * mounts) so it can never break snapshot logging.
+     */
+    private static void appendSmapsRollup(StringBuilder sb) {
+        Map<String, Long> rollup = readSmapsRollup();
+        if (rollup.isEmpty()) {
+            return;
+        }
+        long anon = rollup.getOrDefault("Anonymous", -1L);
+        long swap = rollup.getOrDefault("Swap", -1L);
+        long anonPlusSwap = anon >= 0 && swap >= 0 ? anon + swap : -1L;
+        sb.append("\n  smapsRollup");
+        appendKb(sb, "rss", rollup.get("Rss"));
+        appendKb(sb, "pss", rollup.get("Pss"));
+        appendKb(sb, "anon", rollup.get("Anonymous"));
+        appendKb(sb, "anonPss", rollup.get("Pss_Anon"));
+        appendKb(sb, "filePss", rollup.get("Pss_File"));
+        appendKb(sb, "privDirty", rollup.get("Private_Dirty"));
+        appendKb(sb, "swap", rollup.get("Swap"));
+        appendKb(sb, "swapPss", rollup.get("SwapPss"));
+        if (anonPlusSwap >= 0) {
+            sb.append(" anonPlusSwap=").append(formatBytes(anonPlusSwap * 1024L));
+        }
+    }
+
+    private static void appendKb(StringBuilder sb, String label, Long valueKb) {
+        if (valueKb == null || valueKb < 0) {
+            return;
+        }
+        sb.append(' ').append(label).append('=').append(formatBytes(valueKb * 1024L));
+    }
+
+    /**
+     * Reads {@code /proc/self/smaps_rollup} into a map of field name to kB value. Each data line
+     * has the form {@code "Anonymous:  123456 kB"}; the leading address/range header line is
+     * ignored. Returns an empty map on any error or when the file is absent.
+     */
+    private static Map<String, Long> readSmapsRollup() {
+        Map<String, Long> values = new LinkedHashMap<>();
+        File rollupFile = new File("/proc/self/smaps_rollup");
+        if (!rollupFile.exists()) {
+            return values;
+        }
+        try (BufferedReader reader = new BufferedReader(new FileReader(rollupFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                int colon = line.indexOf(':');
+                if (colon <= 0) {
+                    continue;
+                }
+                String key = line.substring(0, colon).trim();
+                String rest = line.substring(colon + 1).trim();
+                int space = rest.indexOf(' ');
+                String number = space > 0 ? rest.substring(0, space) : rest;
+                try {
+                    values.put(key, Long.parseLong(number.trim()));
+                } catch (NumberFormatException ignored) {
+                    // Header/non-numeric line (e.g. the address-range row); skip it.
+                }
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "Failed to read /proc/self/smaps_rollup", e);
+        }
+        return values;
     }
 
     private static void appendProcStatusValue(StringBuilder sb, Map<String, String> status, String key) {
@@ -565,6 +643,9 @@ public final class DiagnosticsLogger {
                         && !"VmHWM".equals(key)
                         && !"VmSize".equals(key)
                         && !"VmSwap".equals(key)
+                        && !"RssAnon".equals(key)
+                        && !"RssFile".equals(key)
+                        && !"RssShmem".equals(key)
                         && !"Threads".equals(key)
                         && !"FDSize".equals(key)) {
                     continue;
