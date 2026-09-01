@@ -300,6 +300,10 @@ target_compile_definitions(
     # This target vendors ggml sources directly, so mirror upstream backend-selection defines.
     GGML_USE_CPU
     GGML_USE_K_QUANTS
+    # CPU-affinity code in ggml-cpu.c (cpu_set_t / CPU_SET / sched_setaffinity, reached via the
+    # __linux__ path on Android) needs the GNU libc extensions. Upstream's ggml/src/CMakeLists.txt
+    # adds _GNU_SOURCE for Linux AND Android; mirror that here since we build ggml in our own target.
+    _GNU_SOURCE
     GGML_VERSION="${GGML_VERSION}"
     GGML_COMMIT="${GGML_BUILD_COMMIT}"
     # b10621/v0.3.0: src/llama.cpp (llama_version()) now needs LLAMA_VERSION at compile
