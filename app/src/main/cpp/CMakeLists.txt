@@ -330,6 +330,8 @@ target_include_directories(
     ${LLAMA_ROOT_DIR}/common
     ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/vendor
+    # sha256.c includes "rotate-bits/rotate-bits.h" relative to vendor/hash.
+    ${LLAMA_ROOT_DIR}/vendor/hash
     ${LLAMA_ROOT_DIR}/tools/mtmd
 
     ${GGML_ROOT_DIR}/include
