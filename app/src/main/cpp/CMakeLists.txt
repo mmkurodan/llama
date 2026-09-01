@@ -78,6 +78,8 @@ file(GLOB LLAMA_COMMON_JINJA_FILES CONFIGURE_DEPENDS
 
 set(LLAMA_VENDOR_FILES
     ${LLAMA_ROOT_DIR}/vendor/cpp-httplib/httplib.cpp
+    # b10621/v0.3.0: mtmd-helper hashes bitmap IDs with hash_sha256_hex (FNV -> SHA-256).
+    ${LLAMA_ROOT_DIR}/vendor/hash/hash.cpp
 )
 
 file(GLOB LLAMA_SRC_FILES CONFIGURE_DEPENDS
