@@ -78,8 +78,11 @@ file(GLOB LLAMA_COMMON_JINJA_FILES CONFIGURE_DEPENDS
 
 set(LLAMA_VENDOR_FILES
     ${LLAMA_ROOT_DIR}/vendor/cpp-httplib/httplib.cpp
-    # b10621/v0.3.0: mtmd-helper hashes bitmap IDs with hash_sha256_hex (FNV -> SHA-256).
+    # b10621/v0.3.0: mtmd-helper hashes bitmap IDs with hash_sha256_hex (FNV -> SHA-256);
+    # hash.cpp delegates to the C sha256 implementation. (sha1/xxhash are only for the
+    # gguf-hash example, which we don't build.)
     ${LLAMA_ROOT_DIR}/vendor/hash/hash.cpp
+    ${LLAMA_ROOT_DIR}/vendor/hash/sha256/sha256.c
 )
 
 file(GLOB LLAMA_SRC_FILES CONFIGURE_DEPENDS
