@@ -25,14 +25,14 @@ set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 #   @BUILD_COMPILER@
 #   @BUILD_TARGET@
 # ---------------------------------------------------------
-set(LLAMA_BUILD_NUMBER 10091 CACHE STRING "")
-set(LLAMA_BUILD_COMMIT "b4d6c7d8ff69c2e05e4e8ee7e6e710a08abd7b45" CACHE STRING "")
+set(LLAMA_BUILD_NUMBER 10621 CACHE STRING "")
+set(LLAMA_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
 # ggml.c expects these string macros to be defined at compile time.
-set(GGML_VERSION      "0.17.0" CACHE STRING "")
-set(GGML_BUILD_COMMIT "b4d6c7d8ff69c2e05e4e8ee7e6e710a08abd7b45" CACHE STRING "")
+set(GGML_VERSION      "0.22.0" CACHE STRING "")
+set(GGML_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
 
 # ---------------------------------------------------------
 # embedded license text for --license in common/arg.cpp

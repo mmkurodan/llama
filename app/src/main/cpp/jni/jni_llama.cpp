@@ -66,6 +66,24 @@ static llama_context *g_ctx   = nullptr;
 static common_grammar g_grammar;
 static mtmd_context  *g_mtmd  = nullptr;
 
+// common_context_seq_rm shim.
+// Up to b10091 llama.cpp exported common_context_seq_rm() from common.h. The
+// b10621/v0.3.0 KV-memory refactor made it a file-static helper inside common.cpp
+// (now reached via common_memory::seq_rm), so it is no longer linkable from this
+// translation unit. Reintroduce a local equivalent over the public llama_memory_seq_rm()
+// API to keep the MTP draft/target KV trimming working. Unlike upstream's
+// GGML_ABORT-on-failure variant we only log, so a recoverable partial-removal failure
+// never turns into a process abort on this memory-sensitive app.
+static void common_context_seq_rm(llama_context * ctx, llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
+    if (ctx == nullptr) {
+        return;
+    }
+    llama_memory_t mem = llama_get_memory(ctx);
+    if (mem != nullptr && !llama_memory_seq_rm(mem, seq_id, p0, p1)) {
+        LOGE("common_context_seq_rm: partial removal failed (seq=%d p0=%d p1=%d)", seq_id, p0, p1);
+    }
+}
+
 // ---- MTP / speculative decoding (draft-mtp) ----
 // g_spec_init owns the draft (MTP-head) model + its context; g_ctx_dft is borrowed
 // from it. g_spec_cp must outlive g_spec because common_speculative_init() takes its
