@@ -454,6 +454,8 @@ if(OPENCL_LIB AND EXISTS "${_OPENCL_CL_INC}/CL/cl.h")
 
     add_library(ggml-opencl SHARED
         "${_OPENCL_SRC_DIR}/ggml-opencl.cpp"
+        # b10621/v0.3.0 split the OpenCL program cache (cl_program_cache_*) into its own file.
+        "${_OPENCL_SRC_DIR}/cl-program-cache.cpp"
         ${_OPENCL_KERNEL_HEADERS})
     target_compile_features(ggml-opencl PRIVATE cxx_std_17)
     target_compile_definitions(ggml-opencl PRIVATE
