@@ -27,6 +27,8 @@ set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 # ---------------------------------------------------------
 set(LLAMA_BUILD_NUMBER 10621 CACHE STRING "")
 set(LLAMA_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
+# llama.cpp switched to semantic versioning at v0.3.0; llama_version() needs this string.
+set(LLAMA_VERSION      "0.3.0"  CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
@@ -300,6 +302,10 @@ target_compile_definitions(
     GGML_USE_K_QUANTS
     GGML_VERSION="${GGML_VERSION}"
     GGML_COMMIT="${GGML_BUILD_COMMIT}"
+    # b10621/v0.3.0: src/llama.cpp (llama_version()) now needs LLAMA_VERSION at compile
+    # time. Upstream's src/CMakeLists.txt passes it as a target compile definition; mirror
+    # that here since this target vendors the llama sources directly.
+    LLAMA_VERSION="${LLAMA_VERSION}"
 )
 if(GGML_HEXAGON)
     target_compile_definitions(llama_jni PRIVATE GGML_USE_HEXAGON)
