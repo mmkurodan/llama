@@ -461,6 +461,21 @@ public final class DiagnosticsLogger {
         return baseDir != null ? new File(baseDir, OLLAMA_LOG_FILENAME) : null;
     }
 
+    /**
+     * The rolling process diagnostics log ({@code diagnostics/process_diagnostics.log}) that holds
+     * the memory snapshots (smapsRollup / anonPlusSwap), model-load, generation and previous-exit
+     * records. Exposed so the API server can serve it for on-device memory analysis. May be
+     * {@code null} if the base dir is unavailable; the file itself may not yet exist.
+     */
+    public static File getProcessDiagnosticsLogFile(Context context) {
+        return getDiagnosticsFile(context, PROCESS_LOG_FILENAME);
+    }
+
+    /** The last-state snapshot file ({@code diagnostics/last_state.txt}) — the newest memory snapshot only. */
+    public static File getLastStateFile(Context context) {
+        return getDiagnosticsFile(context, LAST_STATE_FILENAME);
+    }
+
     public static void appendToOllamaLog(Context context, String contents) {
         synchronized (LOCK) {
             appendToOllamaLogLocked(context, contents);

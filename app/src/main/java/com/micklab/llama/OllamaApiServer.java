@@ -1265,6 +1265,8 @@ public class OllamaApiServer {
                     handleProps(outputStream, queryParams);
                 } else if ("/slots".equals(path)) {
                     handleSlots(outputStream, queryParams);
+                } else if ("/api/diagnostics".equals(path)) {
+                    handleDiagnostics(outputStream, queryParams);
                 } else if (isWebUiPath(path)) {
                     handleWebUi(outputStream, path);
                 } else {
@@ -1365,6 +1367,66 @@ public class OllamaApiServer {
         } catch (JSONException e) {
             Log.e(TAG, "Failed to build health response", e);
             sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    /**
+     * Serves the on-device diagnostics logs as {@code text/plain} for memory analysis (read-only):
+     * <ul>
+     *   <li>{@code file=process} (default) — {@code diagnostics/process_diagnostics.log}: the memory
+     *       snapshots (smapsRollup / anonPlusSwap / RssAnon), model-load, generation and
+     *       previous-exit records. Bounded (~512KB) so it is returned whole.</li>
+     *   <li>{@code file=ollama} — the unified {@code ollama.log}; can be large, so only the last
+     *       {@code tail} bytes (default 512KB) are returned.</li>
+     *   <li>{@code file=state} — {@code diagnostics/last_state.txt}: the newest snapshot only.</li>
+     * </ul>
+     * {@code tail=<bytes>} overrides how many trailing bytes to return (hard-capped at 4MB).
+     */
+    private void handleDiagnostics(OutputStream outputStream, Map<String, String> queryParams) throws IOException {
+        String which = queryParams.containsKey("file") ? queryParams.get("file") : "process";
+        File file;
+        long defaultTail;
+        if ("ollama".equals(which)) {
+            file = DiagnosticsLogger.getOllamaLogFile(context);
+            defaultTail = 512L * 1024L;
+        } else if ("state".equals(which)) {
+            file = DiagnosticsLogger.getLastStateFile(context);
+            defaultTail = 0L;
+        } else {
+            which = "process";
+            file = DiagnosticsLogger.getProcessDiagnosticsLogFile(context);
+            defaultTail = 0L;
+        }
+        if (file == null || !file.exists()) {
+            sendErrorResponse(outputStream, 404, "diagnostics file not available: " + which);
+            return;
+        }
+        long tail = defaultTail;
+        String tailParam = queryParams.get("tail");
+        if (tailParam != null) {
+            try {
+                tail = Math.max(0L, Long.parseLong(tailParam.trim()));
+            } catch (NumberFormatException ignored) {
+                // fall back to the default tail
+            }
+        }
+        byte[] body = readFileTail(file, tail, 4L * 1024L * 1024L);
+        sendBinaryResponse(outputStream, 200, "text/plain; charset=utf-8", body);
+    }
+
+    /** Reads the trailing {@code tailBytes} of {@code file} ({@code 0} = whole file), hard-capped at {@code maxBytes}. */
+    private byte[] readFileTail(File file, long tailBytes, long maxBytes) throws IOException {
+        long length = file.length();
+        long want = tailBytes > 0 ? Math.min(tailBytes, length) : length;
+        if (want > maxBytes) {
+            want = maxBytes;
+        }
+        long start = length - want;
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r")) {
+            raf.seek(start);
+            byte[] buf = new byte[(int) want];
+            raf.readFully(buf);
+            return buf;
         }
     }
 
