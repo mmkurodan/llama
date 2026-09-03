@@ -25,14 +25,16 @@ set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 #   @BUILD_COMPILER@
 #   @BUILD_TARGET@
 # ---------------------------------------------------------
-set(LLAMA_BUILD_NUMBER 10091 CACHE STRING "")
-set(LLAMA_BUILD_COMMIT "b4d6c7d8ff69c2e05e4e8ee7e6e710a08abd7b45" CACHE STRING "")
+set(LLAMA_BUILD_NUMBER 10621 CACHE STRING "")
+set(LLAMA_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
+# llama.cpp switched to semantic versioning at v0.3.0; llama_version() needs this string.
+set(LLAMA_VERSION      "0.3.0"  CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
 # ggml.c expects these string macros to be defined at compile time.
-set(GGML_VERSION      "0.17.0" CACHE STRING "")
-set(GGML_BUILD_COMMIT "b4d6c7d8ff69c2e05e4e8ee7e6e710a08abd7b45" CACHE STRING "")
+set(GGML_VERSION      "0.22.0" CACHE STRING "")
+set(GGML_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
 
 # ---------------------------------------------------------
 # embedded license text for --license in common/arg.cpp
@@ -76,6 +78,11 @@ file(GLOB LLAMA_COMMON_JINJA_FILES CONFIGURE_DEPENDS
 
 set(LLAMA_VENDOR_FILES
     ${LLAMA_ROOT_DIR}/vendor/cpp-httplib/httplib.cpp
+    # b10621/v0.3.0: mtmd-helper hashes bitmap IDs with hash_sha256_hex (FNV -> SHA-256);
+    # hash.cpp delegates to the C sha256 implementation. (sha1/xxhash are only for the
+    # gguf-hash example, which we don't build.)
+    ${LLAMA_ROOT_DIR}/vendor/hash/hash.cpp
+    ${LLAMA_ROOT_DIR}/vendor/hash/sha256/sha256.c
 )
 
 file(GLOB LLAMA_SRC_FILES CONFIGURE_DEPENDS
@@ -298,8 +305,16 @@ target_compile_definitions(
     # This target vendors ggml sources directly, so mirror upstream backend-selection defines.
     GGML_USE_CPU
     GGML_USE_K_QUANTS
+    # CPU-affinity code in ggml-cpu.c (cpu_set_t / CPU_SET / sched_setaffinity, reached via the
+    # __linux__ path on Android) needs the GNU libc extensions. Upstream's ggml/src/CMakeLists.txt
+    # adds _GNU_SOURCE for Linux AND Android; mirror that here since we build ggml in our own target.
+    _GNU_SOURCE
     GGML_VERSION="${GGML_VERSION}"
     GGML_COMMIT="${GGML_BUILD_COMMIT}"
+    # b10621/v0.3.0: src/llama.cpp (llama_version()) now needs LLAMA_VERSION at compile
+    # time. Upstream's src/CMakeLists.txt passes it as a target compile definition; mirror
+    # that here since this target vendors the llama sources directly.
+    LLAMA_VERSION="${LLAMA_VERSION}"
 )
 if(GGML_HEXAGON)
     target_compile_definitions(llama_jni PRIVATE GGML_USE_HEXAGON)
@@ -315,6 +330,8 @@ target_include_directories(
     ${LLAMA_ROOT_DIR}/common
     ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/vendor
+    # sha256.c includes "rotate-bits/rotate-bits.h" relative to vendor/hash.
+    ${LLAMA_ROOT_DIR}/vendor/hash
     ${LLAMA_ROOT_DIR}/tools/mtmd
 
     ${GGML_ROOT_DIR}/include
@@ -437,6 +454,8 @@ if(OPENCL_LIB AND EXISTS "${_OPENCL_CL_INC}/CL/cl.h")
 
     add_library(ggml-opencl SHARED
         "${_OPENCL_SRC_DIR}/ggml-opencl.cpp"
+        # b10621/v0.3.0 split the OpenCL program cache (cl_program_cache_*) into its own file.
+        "${_OPENCL_SRC_DIR}/cl-program-cache.cpp"
         ${_OPENCL_KERNEL_HEADERS})
     target_compile_features(ggml-opencl PRIVATE cxx_std_17)
     target_compile_definitions(ggml-opencl PRIVATE

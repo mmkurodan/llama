@@ -66,6 +66,24 @@ static llama_context *g_ctx   = nullptr;
 static common_grammar g_grammar;
 static mtmd_context  *g_mtmd  = nullptr;
 
+// common_context_seq_rm shim.
+// Up to b10091 llama.cpp exported common_context_seq_rm() from common.h. The
+// b10621/v0.3.0 KV-memory refactor made it a file-static helper inside common.cpp
+// (now reached via common_memory::seq_rm), so it is no longer linkable from this
+// translation unit. Reintroduce a local equivalent over the public llama_memory_seq_rm()
+// API to keep the MTP draft/target KV trimming working. Unlike upstream's
+// GGML_ABORT-on-failure variant we only log, so a recoverable partial-removal failure
+// never turns into a process abort on this memory-sensitive app.
+static void common_context_seq_rm(llama_context * ctx, llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
+    if (ctx == nullptr) {
+        return;
+    }
+    llama_memory_t mem = llama_get_memory(ctx);
+    if (mem != nullptr && !llama_memory_seq_rm(mem, seq_id, p0, p1)) {
+        LOGE("common_context_seq_rm: partial removal failed (seq=%d p0=%d p1=%d)", seq_id, p0, p1);
+    }
+}
+
 // ---- MTP / speculative decoding (draft-mtp) ----
 // g_spec_init owns the draft (MTP-head) model + its context; g_ctx_dft is borrowed
 // from it. g_spec_cp must outlive g_spec because common_speculative_init() takes its
@@ -747,8 +765,9 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     llama_model_params mparams = llama_model_default_params();
     mparams.n_gpu_layers = g_n_gpu_layers;
     (void) has_explicit_mmproj;
-    mparams.use_mmap = g_use_mmap;
-    mparams.use_mlock = false;
+    // b10621/v0.3.0 replaced the use_mmap/use_mlock booleans with a load_mode enum.
+    // We never used mlock, so map the app's mmap toggle onto MMAP vs NONE.
+    mparams.load_mode = g_use_mmap ? LLAMA_LOAD_MODE_MMAP : LLAMA_LOAD_MODE_NONE;
 
     // ---- Backend device list ----
     // backendType: 0=CPU  1=GPU  2=NPU/HTP  3=GPU+NPU
@@ -845,8 +864,9 @@ static void log_model_params(const char * log_prefix, const llama_model_params &
     std::ostringstream ss;
     ss << log_prefix
        << ": model params n_gpu_layers=" << mparams.n_gpu_layers
-       << " use_mmap=" << (mparams.use_mmap ? "true" : "false")
-       << " use_mlock=" << (mparams.use_mlock ? "true" : "false")
+       << " use_mmap=" << ((mparams.load_mode == LLAMA_LOAD_MODE_MMAP
+                            || mparams.load_mode == LLAMA_LOAD_MODE_MMAP_MLOCK) ? "true" : "false")
+       << " load_mode=" << (int) mparams.load_mode
        << " backend=" << type_name
        << " npuEnabled=" << (g_npu_enabled ? "true" : "false")
        << " devices=" << (!mparams.devices ? "default(NULL)"
@@ -3023,7 +3043,7 @@ Java_com_micklab_llama_LlamaNative_setGrammar(
         // common_sampler_init passes grammar.grammar directly to llama_sampler_init_grammar,
         // which expects GBNF — storing the raw JSON schema there causes "failed to parse grammar".
         try {
-            const std::string gbnf_from_schema = json_schema_to_grammar(json::parse(schema));
+            const std::string gbnf_from_schema = json_schema_to_grammar(common_json::parse(schema));
             g_grammar = { COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, gbnf_from_schema };
         } catch (const std::exception & e) {
             log_to_file(std::string("setGrammar: json_schema_to_grammar failed: ") + e.what(),
@@ -3675,7 +3695,9 @@ static jstring generate_locked(
     smpl = llama_sampler_chain_init(sparams);
 
     if (g_penalty_last_n > 0 && (g_penalty_repeat != 1.0f || g_penalty_freq != 0.0f || g_penalty_present != 0.0f)) {
+        // b10621/v0.3.0 re-added n_vocab as the leading argument.
         llama_sampler_chain_add(smpl, llama_sampler_init_penalties(
+                llama_vocab_n_tokens(vocab),
                 g_penalty_last_n, g_penalty_repeat, g_penalty_freq, g_penalty_present));
     }
 
@@ -3698,8 +3720,9 @@ static jstring generate_locked(
             breaker_ptrs.push_back(s.c_str());
         }
         if (!breaker_ptrs.empty()) {
+            // b10621/v0.3.0 dropped the n_ctx_train argument from the dry sampler.
             llama_sampler_chain_add(smpl, llama_sampler_init_dry(
-                    vocab, g_n_ctx, g_dry_multiplier, g_dry_base,
+                    vocab, g_dry_multiplier, g_dry_base,
                     g_dry_allowed_length, g_dry_penalty_last_n,
                     breaker_ptrs.data(), breaker_ptrs.size()));
         }
@@ -3987,8 +4010,12 @@ static jstring generate_openai_chat_completion_locked(
     g_cancel_generation.store(false);
 
     try {
-        json messages_json = json::parse(messages_json_text.empty() ? "[]" : messages_json_text);
-        json tools_json = tools_json_text.empty() ? json::array() : json::parse(tools_json_text);
+        // b10621/v0.3.0 replaced nlohmann::json with the common_json abstraction in the
+        // common_chat_* / json_schema_to_grammar APIs; parse straight into common_json.
+        // tool_choice still needs nlohmann here for its object-shape inspection below (the
+        // common API itself takes a plain std::string).
+        common_json messages_json = common_json::parse(messages_json_text.empty() ? "[]" : messages_json_text);
+        common_json tools_json = common_json::parse(tools_json_text.empty() ? "[]" : tools_json_text);
         json tool_choice_json = tool_choice_json_text.empty() ? json() : json::parse(tool_choice_json_text);
 
         auto messages = common_chat_msgs_parse_oaicompat(messages_json);
