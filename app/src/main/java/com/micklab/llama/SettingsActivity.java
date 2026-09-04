@@ -2272,14 +2272,16 @@ public class SettingsActivity extends Activity {
     private static final String[] HF_FAMILY_KEYWORDS = {
             "", "Qwen", "Gemma", "Llama", "Mistral", "Phi", "DeepSeek", "GLM", "Yi", "Granite", "SmolLM"};
     // Parameter-size pulldown, parallel min/max bounds in billions (0 = unbounded).
-    private static final double[] HF_SIZE_MIN_B = {0, 0, 1, 4, 8, 14, 34};
-    private static final double[] HF_SIZE_MAX_B = {0, 1, 4, 8, 14, 34, 0};
+    // Parameter-size pulldown bands (parallel min/max in billions; 0 = unbounded), finer-grained.
+    private static final double[] HF_SIZE_MIN_B = {0, 0,    0.5, 1,   2, 4,   7, 9,  14, 20, 34, 70};
+    private static final double[] HF_SIZE_MAX_B = {0, 0.5,  1,   2,   4, 7,   9, 14, 20, 34, 70, 0};
     // Quantization pulldown (index 0 = "any"). Matched as a substring against GGUF file names.
+    // "Q1" matches IQ1_S/IQ1_M 1-bit files (lowercased "iq1_s" contains "q1").
     private static final String[] HF_QUANT_VALUES = {
-            "", "Q2_K", "Q3_K_M", "Q4_K_M", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "F16", "BF16"};
+            "", "Q1", "Q2_K", "Q3_K_M", "Q4_K_M", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "F16", "BF16"};
     // Representative parameter count (in billions) per size band, parallel to buildSizeLabels() /
     // HF_SIZE_MIN_B. 0 = "Any" (no device-suitability rating). Used to estimate the +…+++++ rating.
-    private static final double[] HF_SIZE_REP_B = {0, 1, 3, 7, 13, 24, 40};
+    private static final double[] HF_SIZE_REP_B = {0, 0.35, 0.75, 1.5, 3, 5.5, 8, 11, 17, 27, 50, 80};
 
     private void showHuggingFaceSearchDialog() {
         int pad = Math.round(getResources().getDisplayMetrics().density * 20f);
@@ -2294,11 +2296,21 @@ public class SettingsActivity extends Activity {
                 "Model name or keyword (free text, optional)"));
         form.addView(queryInput);
 
-        // ---- Model name: a scrollable single-select list (not a pulldown). Each row shows the
-        //      family name plus a one-line strength summary. selectedFamily[0] tracks the choice.
-        final int[] selectedFamily = {0};
-        addSectionCaption(form, localizedText("モデル名", "Model name"));
-        addFamilySelectionList(form, selectedFamily);
+        // ---- Model name: a pulldown (same form as size/quant) + a one-line strength note below.
+        Spinner familySpinner = addLabeledSpinner(form,
+                localizedText("モデル名", "Model name"),
+                buildFamilyLabels());
+        TextView familyNote = addNoteView(form);
+        final String[] familyStrengths = buildFamilyStrengths();
+        familySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                familyNote.setText(position >= 0 && position < familyStrengths.length
+                        ? familyStrengths[position] : "");
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
 
         // ---- Parameter size: pulldown + a device-specific suitability rating (+ … +++++) below.
         Spinner sizeSpinner = addLabeledSpinner(form,
@@ -2346,7 +2358,7 @@ public class SettingsActivity extends Activity {
                 .setView(scroll)
                 .setPositiveButton(localizedText("検索", "Search"),
                         (dialog, which) -> {
-                            int familyIdx = selectedFamily[0];
+                            int familyIdx = familySpinner.getSelectedItemPosition();
                             int sizeIdx = sizeSpinner.getSelectedItemPosition();
                             int quantIdx = quantSpinner.getSelectedItemPosition();
                             HuggingFaceApiClient.SearchFilters filters =
@@ -2364,19 +2376,7 @@ public class SettingsActivity extends Activity {
                 .show();
     }
 
-    /** Adds a bold section caption to {@code parent}. */
-    private void addSectionCaption(LinearLayout parent, String text) {
-        int topMargin = Math.round(getResources().getDisplayMetrics().density * 12f);
-        TextView label = new TextView(this);
-        label.setText(text);
-        label.setTypeface(label.getTypeface(), android.graphics.Typeface.BOLD);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = topMargin;
-        parent.addView(label, lp);
-    }
-
-    /** Adds a small secondary-text note line (used under the size / quant pulldowns). */
+    /** Adds a small secondary-text note line (used under the model / size / quant pulldowns). */
     private TextView addNoteView(LinearLayout parent) {
         TextView note = new TextView(this);
         note.setTextSize(12f);
@@ -2386,49 +2386,6 @@ public class SettingsActivity extends Activity {
         parent.addView(note, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return note;
-    }
-
-    /**
-     * Builds the scrollable model-family selection list into {@code parent}. Each row shows the
-     * family name and a one-line strength; tapping a row selects it (updating {@code selected[0]}
-     * and the row highlights). Row 0 = "Any".
-     */
-    private void addFamilySelectionList(LinearLayout parent, int[] selected) {
-        final String[] labels = buildFamilyLabels();
-        final String[] strengths = buildFamilyStrengths();
-        final int rowPad = Math.round(getResources().getDisplayMetrics().density * 8f);
-        final int selectedBg = 0x332196F3;   // translucent blue highlight
-        final List<View> rows = new ArrayList<>();
-        for (int i = 0; i < labels.length; i++) {
-            final int index = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(rowPad, rowPad, rowPad, rowPad);
-            row.setClickable(true);
-            row.setBackgroundColor(i == selected[0] ? selectedBg : 0x00000000);
-
-            TextView name = new TextView(this);
-            name.setText(labels[i]);
-            name.setTextSize(15f);
-            name.setTypeface(name.getTypeface(), android.graphics.Typeface.BOLD);
-            row.addView(name);
-
-            TextView strength = new TextView(this);
-            strength.setText(strengths[i]);
-            strength.setTextSize(12f);
-            strength.setTextColor(0xFF888888);
-            row.addView(strength);
-
-            row.setOnClickListener(v -> {
-                selected[0] = index;
-                for (int r = 0; r < rows.size(); r++) {
-                    rows.get(r).setBackgroundColor(r == index ? selectedBg : 0x00000000);
-                }
-            });
-            rows.add(row);
-            parent.addView(row, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        }
     }
 
     /** One-line strengths parallel to HF_FAMILY_KEYWORDS / buildFamilyLabels(). */
@@ -2451,6 +2408,7 @@ public class SettingsActivity extends Activity {
     private String[] buildQuantTendencies() {
         return new String[]{
                 localizedText("量子化を指定しません", "No quantization filter"),
+                localizedText("1bit級。極小・最速だが品質は実験的", "1-bit class; tiny/fastest but experimental quality"),
                 localizedText("最小・最速だが品質低下が大きい（動作確認向け）", "Smallest/fastest but large quality loss (smoke test)"),
                 localizedText("小型・高速だが品質はやや低下", "Small/fast, slightly reduced quality"),
                 localizedText("サイズと品質のバランスが最良（推奨既定）", "Best size/quality balance (recommended default)"),
@@ -2543,12 +2501,17 @@ public class SettingsActivity extends Activity {
     private String[] buildSizeLabels() {
         return new String[]{
                 localizedText("指定なし", "Any"),
-                localizedText("〜1B", "Up to 1B"),
-                "1–4B",
-                "4–8B",
-                "8–14B",
-                "14–34B",
-                localizedText("34B以上", "34B+")};
+                localizedText("〜0.5B", "Up to 0.5B"),
+                "0.5–1B",
+                "1–2B",
+                "2–4B",
+                "4–7B",
+                "7–9B",
+                "9–14B",
+                "14–20B",
+                "20–34B",
+                "34–70B",
+                localizedText("70B以上", "70B+")};
     }
 
     private String[] buildQuantLabels() {
@@ -2665,17 +2628,82 @@ public class SettingsActivity extends Activity {
                     "No files for the selected quantization; showing all"));
         }
 
-        final List<HuggingFaceApiClient.GgufFileInfo> shownFiles = files;
+        // Combine model files (quant-filtered above) with the repository's mmproj/projector files.
+        // Projector files are always shown regardless of the quant filter (they are named like
+        // "mmproj-…-F16.gguf" and would otherwise be filtered out), tagged with "[mmproj]", and are
+        // downloaded directly WITHOUT loading (request: search/download mmproj directly, no load).
+        final List<HuggingFaceApiClient.GgufFileInfo> shownFiles = new ArrayList<>(files);
+        for (HuggingFaceApiClient.GgufFileInfo projector : repositoryFiles.getProjectorFiles()) {
+            if (!shownFiles.contains(projector)) {
+                shownFiles.add(projector);
+            }
+        }
         String[] labels = new String[shownFiles.size()];
         for (int i = 0; i < shownFiles.size(); i++) {
-            labels[i] = shownFiles.get(i).getFilename();
+            HuggingFaceApiClient.GgufFileInfo file = shownFiles.get(i);
+            labels[i] = file.isProjector()
+                    ? "[mmproj] " + file.getFilename()
+                    : file.getFilename();
         }
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("ダウンロード対象を選択", "Select a GGUF file"))
-                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(repositoryFiles, shownFiles.get(which)))
+                .setItems(labels, (dialog, which) -> {
+                    HuggingFaceApiClient.GgufFileInfo chosen = shownFiles.get(which);
+                    if (chosen.isProjector()) {
+                        downloadProjectorFileOnly(chosen);
+                    } else {
+                        applyHuggingFaceFileSelection(repositoryFiles, chosen);
+                    }
+                })
                 .setNegativeButton(localizedText("閉じる", "Close"), null)
                 .show();
+    }
+
+    /**
+     * Download a standalone mmproj/projector file directly, WITHOUT loading it (request #4). The
+     * file is saved into the model storage directory; if the name collides with an existing file a
+     * " (N)" suffix is added so nothing is overwritten. No model/projector config is changed.
+     */
+    private void downloadProjectorFileOnly(HuggingFaceApiClient.GgufFileInfo projector) {
+        if (modelManager.isBusy()) {
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
+            return;
+        }
+        final String url = projector.getDownloadUrl();
+        modelFileInfo.setText(localizedText("mmproj をダウンロード中: ", "Downloading mmproj: ")
+                + projector.getFilename());
+        modelProgressBar.setIndeterminate(true);
+        new Thread(() -> {
+            if (!modelManager.tryAcquire()) {
+                runOnUiThread(() -> showToast(localizedText("モデルは処理中です", "Model is busy")));
+                return;
+            }
+            String savedName = null;
+            try {
+                savedName = modelManager.downloadStandaloneFile(url);
+            } catch (Throwable t) {
+                Log.e(TAG, "mmproj download error", t);
+            } finally {
+                modelManager.release();
+            }
+            final String saved = savedName;
+            runOnUiThread(() -> {
+                modelProgressBar.setIndeterminate(false);
+                if (saved != null) {
+                    modelFileInfo.setText(localizedText("mmproj ダウンロード完了: ", "mmproj downloaded: ") + saved);
+                    modelProgressBar.setProgress(100);
+                    lastDownloadProgress = 100;
+                    showToast(localizedText("mmproj をダウンロードしました（ロードはしません）",
+                            "Downloaded mmproj (not loaded)"));
+                } else {
+                    modelFileInfo.setText(localizedText("mmproj のダウンロードに失敗しました", "mmproj download failed"));
+                    modelProgressBar.setProgress(0);
+                    lastDownloadProgress = 0;
+                    showToast(localizedText("mmproj のダウンロードに失敗しました", "mmproj download failed"));
+                }
+            });
+        }, "hf-mmproj-download").start();
     }
 
     private void applyHuggingFaceFileSelection(

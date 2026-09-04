@@ -1420,6 +1420,44 @@ public class ModelManager {
         return ModelFileHelper.getModelStorageDir(context);
     }
 
+    /**
+     * Download a single remote file (e.g. a standalone mmproj) into the model storage directory
+     * WITHOUT loading it. If a file with the derived name already exists, a " (N)" suffix is added
+     * (before the extension) so nothing is overwritten. Returns the saved filename on success, or
+     * {@code null} on failure. The caller is responsible for the busy lock (as with other downloads).
+     */
+    public String downloadStandaloneFile(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return null;
+        }
+        String base = extractFilenameFromUrl(url);
+        if (base == null || base.isEmpty()) {
+            base = "download.gguf";
+        }
+        File dest = uniqueDestinationFile(getModelStorageDir(), base);
+        String result = downloadWithWakeLock(url.trim(), dest.getAbsolutePath());
+        boolean ok = "ok".equals(result) || (dest.isFile() && dest.length() > 0);
+        return ok ? dest.getName() : null;
+    }
+
+    /** Returns {@code dir/filename}, or {@code dir/name (N).ext} if that already exists (N ≥ 2). */
+    private File uniqueDestinationFile(File dir, String filename) {
+        File f = new File(dir, filename);
+        if (!f.exists()) {
+            return f;
+        }
+        int dot = filename.lastIndexOf('.');
+        String stem = dot > 0 ? filename.substring(0, dot) : filename;
+        String ext = dot > 0 ? filename.substring(dot) : "";
+        for (int n = 2; n <= 9999; n++) {
+            File candidate = new File(dir, stem + " (" + n + ")" + ext);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return new File(dir, stem + " (" + System.currentTimeMillis() + ")" + ext);
+    }
+
     private String ensureModelFilesAvailable(ConfigurationManager.Configuration config, File destFile) {
         boolean needsDownload = !destFile.exists() || destFile.length() == 0;
         String missingShardPath = findMissingSplitShardPath(destFile);
