@@ -167,6 +167,7 @@ public class SettingsActivity extends Activity {
     private Button batteryOptButton;
     private Switch enableThinkingSwitch;
     private Switch useMmapSwitch;
+    private Switch nCtxAutoExpandSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
 
@@ -318,6 +319,7 @@ public class SettingsActivity extends Activity {
         mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
         searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
+        nCtxAutoExpandSwitch = findViewById(R.id.nCtxAutoExpandSwitch);
         nThreadsInput = findViewById(R.id.nThreadsInput);
         nBatchInput = findViewById(R.id.nBatchInput);
         tempInput = findViewById(R.id.tempInput);
@@ -887,6 +889,7 @@ public class SettingsActivity extends Activity {
             case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
             case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
             case "Use memory-map (mmap):": return "メモリマップ (mmap) を使う:";
+            case "Auto-expand context (n_ctx):": return "コンテキスト自動拡張 (n_ctx):";
             case "Custom Chat Template:": return "カスタムチャットテンプレート:";
             case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
             case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
@@ -1279,6 +1282,9 @@ public class SettingsActivity extends Activity {
         updateMtpControlsEnabled();
         modelUrlInput.setText(config.modelUrl);
         nCtxInput.setText(String.valueOf(config.nCtx));
+        if (nCtxAutoExpandSwitch != null) {
+            nCtxAutoExpandSwitch.setChecked(config.nCtxAutoExpand);
+        }
         nThreadsInput.setText(String.valueOf(config.nThreads));
         nBatchInput.setText(String.valueOf(config.nBatch));
         tempInput.setText(String.valueOf(config.temp));
@@ -1398,7 +1404,10 @@ public class SettingsActivity extends Activity {
         } catch (NumberFormatException e) {
             config.nCtx = 2048;
         }
-        
+        if (nCtxAutoExpandSwitch != null) {
+            config.nCtxAutoExpand = nCtxAutoExpandSwitch.isChecked();
+        }
+
         try {
             config.nThreads = Integer.parseInt(nThreadsInput.getText().toString());
         } catch (NumberFormatException e) {

@@ -3307,10 +3307,12 @@ static bool prefill_text_prompt_locked(
     );
 
     if (n_tokens < 0) {
-        // llama_tokenize returns the negated required count when the buffer (n_ctx) is too small
-        error_message = "prompt too long for context: needs " + std::to_string(-n_tokens)
-                      + " tokens but n_ctx=" + std::to_string(g_n_ctx)
-                      + " (increase Context Size in Settings, or shorten the input / reduce MCP tools+history)";
+        // llama_tokenize returns the negated required count when the buffer (n_ctx) is too small.
+        // Emit the unified CTX_TOO_SMALL form so the Java layer can auto-promote n_ctx / suppress
+        // the intermediate error from the stream (same handling as the multimodal path).
+        error_message = "CTX_TOO_SMALL need=" + std::to_string(-n_tokens)
+                      + " have=" + std::to_string(g_n_ctx)
+                      + " (prompt too long for context; increase Context Size or shorten the input / reduce MCP tools+history)";
         return false;
     }
     if (n_tokens == 0) {
@@ -3318,8 +3320,9 @@ static bool prefill_text_prompt_locked(
         return false;
     }
     if (n_tokens >= g_n_ctx) {
-        error_message = "prompt (" + std::to_string(n_tokens) + " tokens) leaves no room in context n_ctx="
-                      + std::to_string(g_n_ctx) + " — increase Context Size in Settings";
+        error_message = "CTX_TOO_SMALL need=" + std::to_string(n_tokens + 16)
+                      + " have=" + std::to_string(g_n_ctx)
+                      + " (prompt leaves no room in context; increase Context Size)";
         return false;
     }
 
@@ -3383,15 +3386,16 @@ static bool prefill_text_prompt_cached_locked(
             vocab, prompt.c_str(), static_cast<int>(prompt.size()),
             tokens.data(), static_cast<int>(tokens.size()), true, true);  // add_special=true: BOS/EOS を付与
     if (n_tokens < 0) {
-        error_message = "prompt too long for context: needs " + std::to_string(-n_tokens)
-                      + " tokens but n_ctx=" + std::to_string(g_n_ctx)
-                      + " (increase Context Size in Settings, or shorten the input / reduce MCP tools+history)";
+        error_message = "CTX_TOO_SMALL need=" + std::to_string(-n_tokens)
+                      + " have=" + std::to_string(g_n_ctx)
+                      + " (prompt too long for context; increase Context Size or shorten the input / reduce MCP tools+history)";
         return false;
     }
     if (n_tokens == 0)        { error_message = "tokenize produced no tokens (empty prompt)"; return false; }
     if (n_tokens >= g_n_ctx)  {
-        error_message = "prompt (" + std::to_string(n_tokens) + " tokens) leaves no room in context n_ctx="
-                      + std::to_string(g_n_ctx) + " — increase Context Size in Settings";
+        error_message = "CTX_TOO_SMALL need=" + std::to_string(n_tokens + 16)
+                      + " have=" + std::to_string(g_n_ctx)
+                      + " (prompt leaves no room in context; increase Context Size)";
         return false;
     }
     tokens.resize(n_tokens);
@@ -3669,7 +3673,15 @@ static jstring generate_locked(
 
     if (!prefill_ok) {
         log_to_file(std::string("generate: prompt prefill failed: ") + prefill_error, GGML_LOG_LEVEL_ERROR);
-        notify_token_error(prefill_error.c_str());
+        // A CTX_TOO_SMALL shortfall is a retryable/handleable pre-generation condition: the Java
+        // layer may auto-promote n_ctx and retry, or surface a clean final message via the return
+        // value. Do NOT push it to the token stream — a mid-stream error frame followed by a silent
+        // retry corrupts the WebUI SSE state machine (browser freeze). The error is still returned
+        // as the function result so the caller can act on it. Other prefill errors are terminal and
+        // still notify the stream so a streaming client sees them.
+        if (prefill_error.rfind("CTX_TOO_SMALL", 0) != 0) {
+            notify_token_error(prefill_error.c_str());
+        }
         return new_java_string_utf8(env, prefill_error);
     }
 

@@ -1037,21 +1037,34 @@ public class ModelManager {
         if (perCell <= 0) {
             // Unknown model dims — fall back to the absolute cap only.
             cap = CTX_PROMOTE_MAX_NCTX;
-        } else if (isCurrentBackendGpu()) {
-            long maxCells = CTX_PROMOTE_GPU_KV_BUDGET_BYTES / perCell;
-            cap = (int) Math.min(CTX_PROMOTE_MAX_NCTX, Math.max(0, maxCells));
         } else {
-            // CPU: KV is anon. Budget the *projected* anon against ~3 GB using a live reading of the
-            // current anon footprint minus the KV already resident, so the estimate self-calibrates.
-            long liveAnon = DiagnosticsLogger.getCurrentAnonPlusSwapBytes();
-            long baselineNonKv;
-            if (liveAnon > 0) {
-                long currentKv = perCell * Math.max(0, currentNCtx);
-                baselineNonKv = Math.max(0, liveAnon - currentKv);
+            // Byte budget for the KV cache we may add. The 3 GB policy is the target ceiling, but a
+            // device with less memory than that is the tighter upper bound — so bound by the memory
+            // actually available now (minus safety headroom) as well.
+            long kvBudget;
+            if (isCurrentBackendGpu()) {
+                // GPU: KV lives in an OpenCL buffer (off-anon); bounded by VRAM, which is unified
+                // with system RAM on these SoCs, so the live-available reading still applies.
+                kvBudget = CTX_PROMOTE_GPU_KV_BUDGET_BYTES;
             } else {
-                baselineNonKv = CTX_PROMOTE_CPU_BASELINE_FALLBACK_BYTES;
+                // CPU: KV is anon. Budget the *projected* anon against ~3 GB using a live reading of
+                // the current anon footprint minus the KV already resident (self-calibrating).
+                long liveAnon = DiagnosticsLogger.getCurrentAnonPlusSwapBytes();
+                long baselineNonKv;
+                if (liveAnon > 0) {
+                    long currentKv = perCell * Math.max(0, currentNCtx);
+                    baselineNonKv = Math.max(0, liveAnon - currentKv);
+                } else {
+                    baselineNonKv = CTX_PROMOTE_CPU_BASELINE_FALLBACK_BYTES;
+                }
+                kvBudget = CTX_PROMOTE_ANON_BUDGET_BYTES - CTX_PROMOTE_ANON_SAFETY_BYTES - baselineNonKv;
             }
-            long kvBudget = CTX_PROMOTE_ANON_BUDGET_BYTES - CTX_PROMOTE_ANON_SAFETY_BYTES - baselineNonKv;
+            // Upper-bound by the device's currently-available memory (min of 3 GB target and the
+            // real device headroom): never try to grab more KV than the device can actually give.
+            long deviceAvail = getAvailableSystemMemoryBytes();
+            if (deviceAvail > 0) {
+                kvBudget = Math.min(kvBudget, deviceAvail - CTX_PROMOTE_ANON_SAFETY_BYTES);
+            }
             long maxCells = kvBudget > 0 ? kvBudget / perCell : 0;
             cap = (int) Math.min(CTX_PROMOTE_MAX_NCTX, Math.max(0, maxCells));
         }
@@ -1064,13 +1077,37 @@ public class ModelManager {
         return promoted;
     }
 
+    /** Currently-available system memory in bytes (ActivityManager.MemoryInfo.availMem), or -1. */
+    private long getAvailableSystemMemoryBytes() {
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                am.getMemoryInfo(mi);
+                return mi.availMem;
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1L;
+    }
+
     /** User-facing, actionable message when a prompt can't fit even after bounded n_ctx promotion. */
     private String ctxTooSmallUserMessage(int needTokens, int haveNCtx) {
-        return "Input too large for the current memory budget: it needs about " + needTokens
-                + " context tokens but only " + haveNCtx + " fit within the ~3 GB limit. "
-                + "Use a smaller image or shorter input. "
-                + "／ 入力がメモリ上限に対して大きすぎます（約" + needTokens + "トークン必要ですが、"
-                + "3GB制限内では" + haveNCtx + "しか確保できません）。画像を小さくするか入力を短くしてください。";
+        return "Input too large for the available memory budget: it needs about " + needTokens
+                + " context tokens but only " + haveNCtx + " fit within the memory limit (~3 GB or the "
+                + "device's available memory, whichever is smaller). Use a smaller image or shorter input. "
+                + "／ 入力が利用可能メモリに対して大きすぎます（約" + needTokens + "トークン必要ですが、"
+                + "メモリ上限（3GBまたは実機の空きメモリの小さい方）内では" + haveNCtx
+                + "しか確保できません）。画像を小さくするか入力を短くしてください。";
+    }
+
+    /** Message when the prompt exceeds n_ctx and auto-expand is turned off. */
+    private String ctxTooSmallDisabledMessage(int needTokens, int haveNCtx) {
+        return "Input needs about " + needTokens + " context tokens but n_ctx=" + haveNCtx
+                + ". Increase Context Size, or enable \"Auto-expand context\" in Settings, or shorten the input. "
+                + "／ 入力に約" + needTokens + "トークン必要ですが n_ctx=" + haveNCtx
+                + " です。コンテキストサイズを増やすか、設定の「コンテキスト自動拡張」を有効にするか、入力を短くしてください。";
     }
     
     /**
@@ -1154,7 +1191,8 @@ public class ModelManager {
                 int need = parseCtxTooSmallNeed(result);
                 if (need > 0) {
                     ctxPromoteTried = true;
-                    int newNCtx = computePromotedNCtx(need);
+                    boolean autoExpand = lastLoadedConfig != null && lastLoadedConfig.nCtxAutoExpand;
+                    int newNCtx = autoExpand ? computePromotedNCtx(need) : 0;
                     if (newNCtx > 0 && currentConfigName != null) {
                         DiagnosticsLogger.logEvent(context, "ctx-autopromote",
                                 "need=" + need + " from=" + currentNCtx + " to=" + newNCtx
@@ -1165,10 +1203,14 @@ public class ModelManager {
                         }
                         Log.e(TAG, "ctx auto-promote reload failed; returning original error");
                     } else {
-                        // Can't grow enough within the memory budget — surface an actionable error.
+                        // Either auto-expand is disabled, or we can't grow enough within the memory
+                        // budget — surface an actionable error instead of the raw native string.
                         DiagnosticsLogger.logEvent(context, "ctx-autopromote",
-                                "need=" + need + " have=" + currentNCtx + " result=capped(no-promote)");
-                        result = ctxTooSmallUserMessage(need, currentNCtx);
+                                "need=" + need + " have=" + currentNCtx
+                                        + " result=" + (autoExpand ? "capped(no-promote)" : "disabled"));
+                        result = autoExpand
+                                ? ctxTooSmallUserMessage(need, currentNCtx)
+                                : ctxTooSmallDisabledMessage(need, currentNCtx);
                     }
                 }
             }

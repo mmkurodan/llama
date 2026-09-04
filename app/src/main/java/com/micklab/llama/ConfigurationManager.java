@@ -108,6 +108,11 @@ public class ConfigurationManager {
         // reservation that mmap needs — helpful for very large models (e.g. GPT-OSS 20B)
         // that fail to load intermittently due to address-space fragmentation.
         public boolean useMmap;
+        // Auto-expand n_ctx: when a prompt (text or multimodal) doesn't fit the configured context,
+        // grow n_ctx (bounded by the ~3 GB memory budget, or the device's available memory when that
+        // is smaller) and reload+retry once instead of failing. Default true. User-toggleable next to
+        // Context Size in Settings.
+        public boolean nCtxAutoExpand;
 
         // Compute backend
         // 0=CPU  1=GPU  (NPU/HTP removed — Qualcomm Hexagon SDK redistribution restriction)
@@ -163,6 +168,7 @@ public class ConfigurationManager {
             gpuOffloadLayers = 0;
             enableThinking = true;
             useMmap = true;
+            nCtxAutoExpand = true;
 
             // Backend defaults
             backendType = BACKEND_CPU;
@@ -235,6 +241,7 @@ public class ConfigurationManager {
             json.put("gpuOffloadEnabled", gpuOffloadLayers != 0);
             json.put("enableThinking", enableThinking);
             json.put("useMmap", useMmap);
+            json.put("nCtxAutoExpand", nCtxAutoExpand);
 
             // Compute backend
             json.put("backendType", backendType);
@@ -313,6 +320,7 @@ public class ConfigurationManager {
             }
             config.enableThinking = json.optBoolean("enableThinking", true);
             config.useMmap = json.optBoolean("useMmap", true);
+        config.nCtxAutoExpand = json.optBoolean("nCtxAutoExpand", true);
 
             // Compute backend (backward compat: default CPU)
             config.backendType = json.optInt("backendType", Configuration.BACKEND_CPU);

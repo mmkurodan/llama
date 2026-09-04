@@ -2673,12 +2673,19 @@ public class OllamaApiServer {
                     }, "OllamaApiWriter-" + Thread.currentThread().getId());
                     writerThread.start();
 
+                    // Tracks whether native emitted any token. If a generation ends up producing
+                    // nothing on the stream (e.g. a context-fit shortfall that could not be
+                    // auto-promoted — the intermediate error is intentionally suppressed from the
+                    // stream), we deliver generate()'s returned message as content below so the
+                    // client isn't left with an empty/hung stream.
+                    final boolean[] streamedAny = { false };
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         private int tokenCount = 0;
 
                         @Override
                         public void onToken(String token) {
                             tokenCount++;
+                            streamedAny[0] = true;
                             if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
                                 Log.d(TAG, "chat stream tokens=" + tokenCount);
                             }
@@ -2703,11 +2710,19 @@ public class OllamaApiServer {
                         }
                     });
 
+                    String streamResult = null;
                     try {
-                        modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                        streamResult = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
+                            // Nothing reached the stream but generate() returned a message (a
+                            // suppressed, unrecoverable context-fit error, or an exception string).
+                            // Deliver it as assistant content so the client sees it and the stream
+                            // terminates cleanly instead of hanging on an empty response.
+                            if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
+                                tokenQueue.offer(stripResponseMarkers(streamResult));
+                            }
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
                     }

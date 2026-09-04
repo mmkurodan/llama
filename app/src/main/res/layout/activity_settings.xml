@@ -294,6 +294,28 @@
             android:inputType="number"
             android:text="2048" />
 
+        <!-- Auto-expand context: when a prompt (text or image) exceeds n_ctx, grow n_ctx within the
+             memory budget (~3 GB or the device's available memory, whichever is smaller) and retry. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Auto-expand context (n_ctx):" />
+
+            <Switch
+                android:id="@+id/nCtxAutoExpandSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
