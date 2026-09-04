@@ -136,6 +136,9 @@ public class ModelManager {
     private volatile int currentNCtx = 0;
     // Per-request n_ctx override from options.num_ctx; 0 = use config value.
     private volatile int nCtxOverrideForNextLoad = 0;
+    // When true, loadConfiguration keeps the currently-registered native token listener across the
+    // reload (used by n_ctx auto-promotion so the retried generation still streams to the caller).
+    private volatile boolean preserveTokenListenerOnReload = false;
 
     // ---- n_ctx auto-promotion (Q2) budget ----
     // The Android/Play per-app memory governor force-stops the process when anon RSS + swap
@@ -753,7 +756,14 @@ public class ModelManager {
                 }
 
                 if (currentModelPath != null || modelLoaded) {
-                    clearTransientLoadReferences();
+                    // During an n_ctx auto-promotion the streaming caller's token listener must
+                    // survive the reload — otherwise the retried generation streams to a null
+                    // listener and its output never reaches the client. clearTransientLoadReferences
+                    // only detaches the listener, so skip it here (the native listener global
+                    // survives free()/init()).
+                    if (!preserveTokenListenerOnReload) {
+                        clearTransientLoadReferences();
+                    }
                     unloadCurrentModelLocked();
                     if (stabilLevel >= 2 && backendChanged) {
                         int postFreeWaitMs = stabilLevel == 2 ? 300 : 500;
@@ -1193,7 +1203,15 @@ public class ModelManager {
                                 "need=" + need + " from=" + currentNCtx + " to=" + newNCtx
                                         + " backend=" + (isCurrentBackendGpu() ? "GPU" : "CPU"));
                         setNCtxOverrideForNextLoad(newNCtx);
-                        if (loadConfiguration(currentConfigName)) {
+                        // Keep the caller's token listener across this reload so the retry streams.
+                        preserveTokenListenerOnReload = true;
+                        boolean reloaded;
+                        try {
+                            reloaded = loadConfiguration(currentConfigName);
+                        } finally {
+                            preserveTokenListenerOnReload = false;
+                        }
+                        if (reloaded) {
                             continue;   // retry generation at the larger context
                         }
                         Log.e(TAG, "ctx auto-promote reload failed; returning original error");
