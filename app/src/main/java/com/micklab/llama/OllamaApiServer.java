@@ -2323,12 +2323,14 @@ public class OllamaApiServer {
                     }, "OllamaApiWriter-" + Thread.currentThread().getId());
                     writerThread.start();
 
+                    final boolean[] streamedAny = { false };
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         private int tokenCount = 0;
 
                         @Override
                         public void onToken(String token) {
                             tokenCount++;
+                            streamedAny[0] = true;
                             if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
                                 Log.d(TAG, "generate stream tokens=" + tokenCount);
                             }
@@ -2353,12 +2355,18 @@ public class OllamaApiServer {
                         }
                     });
 
+                    String streamResult = null;
                     try {
                         // This will trigger token callbacks
-                        modelManager.generate(promptToUse);
+                        streamResult = modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
+                            // If an n_ctx auto-promotion reload cleared the listener (retry tokens
+                            // lost) or a CTX_TOO_SMALL was suppressed, deliver the returned text.
+                            if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
+                                tokenQueue.offer(stripResponseMarkers(streamResult));
+                            }
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
                     }
@@ -3033,9 +3041,17 @@ public class OllamaApiServer {
                     }, "OpenAiApiWriter-" + Thread.currentThread().getId());
                     writerThread.start();
 
+                    // Tracks whether any token reached the stream. An n_ctx auto-promotion reloads
+                    // the model mid-generate(), which clears this native token listener, so the
+                    // retried generation's tokens never arrive here — and a suppressed CTX_TOO_SMALL
+                    // (auto-expand off, or over-budget) streams nothing either. In both cases we fall
+                    // back to delivering generate()'s returned text as a single content chunk so the
+                    // client isn't left with an empty response.
+                    final boolean[] streamedAny = { false };
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         @Override
                         public void onToken(String token) {
+                            streamedAny[0] = true;
                             thinkBlockFilter.onToken(token);
                         }
 
@@ -3050,11 +3066,15 @@ public class OllamaApiServer {
                         }
                     });
 
+                    String streamResult = null;
                     try {
-                        modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                        streamResult = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
+                            if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
+                                tokenQueue.offer(stripResponseMarkers(streamResult));
+                            }
                             tokenQueue.offer(TOKEN_COMPLETE);
                         }
                     }
@@ -3189,17 +3209,24 @@ public class OllamaApiServer {
         }, "StreamWriter-" + Thread.currentThread().getId());
         writerThread.start();
 
+        final boolean[] streamedAny = { false };
         modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
-            @Override public void onToken(String token) { thinkBlockFilter.onToken(token); }
+            @Override public void onToken(String token) { streamedAny[0] = true; thinkBlockFilter.onToken(token); }
             @Override public void onComplete() { thinkBlockFilter.onComplete(); }
             @Override public void onError(String error) { thinkBlockFilter.onError(error); }
         });
 
+        String streamResult = null;
         try {
-            modelManager.generate(prompt, media);
+            streamResult = modelManager.generate(prompt, media);
         } finally {
             modelManager.getLlama().setTokenListener(null);
             if (!errorSent[0] && !clientDisconnected.get()) {
+                // Deliver the returned text if nothing streamed (auto-promote reload cleared the
+                // listener, or a suppressed CTX_TOO_SMALL) so the client never gets an empty stream.
+                if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
+                    tokenQueue.offer(stripResponseMarkers(streamResult));
+                }
                 tokenQueue.offer(TOKEN_COMPLETE);
             }
         }
