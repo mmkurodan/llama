@@ -32,6 +32,7 @@
   "gpuOffloadEnabled": false,
   "enableThinking": false,
   "useMmap": true,
+  "nCtxAutoExpand": true,
   "backendType": 0,
   "npuEnabled": false,
   "systemPrompt": "",

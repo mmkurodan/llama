@@ -1096,18 +1096,13 @@ public class ModelManager {
     private String ctxTooSmallUserMessage(int needTokens, int haveNCtx) {
         return "Input too large for the available memory budget: it needs about " + needTokens
                 + " context tokens but only " + haveNCtx + " fit within the memory limit (~3 GB or the "
-                + "device's available memory, whichever is smaller). Use a smaller image or shorter input. "
-                + "／ 入力が利用可能メモリに対して大きすぎます（約" + needTokens + "トークン必要ですが、"
-                + "メモリ上限（3GBまたは実機の空きメモリの小さい方）内では" + haveNCtx
-                + "しか確保できません）。画像を小さくするか入力を短くしてください。";
+                + "device's available memory, whichever is smaller). Use a smaller image or shorter input.";
     }
 
     /** Message when the prompt exceeds n_ctx and auto-expand is turned off. */
     private String ctxTooSmallDisabledMessage(int needTokens, int haveNCtx) {
         return "Input needs about " + needTokens + " context tokens but n_ctx=" + haveNCtx
-                + ". Increase Context Size, or enable \"Auto-expand context\" in Settings, or shorten the input. "
-                + "／ 入力に約" + needTokens + "トークン必要ですが n_ctx=" + haveNCtx
-                + " です。コンテキストサイズを増やすか、設定の「コンテキスト自動拡張」を有効にするか、入力を短くしてください。";
+                + ". Increase Context Size, or enable \"Auto-expand context\" in Settings, or shorten the input.";
     }
     
     /**
@@ -1433,6 +1428,13 @@ public class ModelManager {
         String base = extractFilenameFromUrl(url);
         if (base == null || base.isEmpty()) {
             base = "download.gguf";
+        }
+        // Configure the native HTTPS trust store first — the normal model/mmproj download paths do
+        // this before every transfer; without it the TLS handshake to huggingface.co fails.
+        String trustStoreError = configureNativeDownloadTrustStore();
+        if (trustStoreError != null) {
+            Log.e(TAG, "downloadStandaloneFile: " + trustStoreError);
+            return null;
         }
         File dest = uniqueDestinationFile(getModelStorageDir(), base);
         String result = downloadWithWakeLock(url.trim(), dest.getAbsolutePath());
