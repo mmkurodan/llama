@@ -2277,6 +2277,9 @@ public class SettingsActivity extends Activity {
     // Quantization pulldown (index 0 = "any"). Matched as a substring against GGUF file names.
     private static final String[] HF_QUANT_VALUES = {
             "", "Q2_K", "Q3_K_M", "Q4_K_M", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "F16", "BF16"};
+    // Representative parameter count (in billions) per size band, parallel to buildSizeLabels() /
+    // HF_SIZE_MIN_B. 0 = "Any" (no device-suitability rating). Used to estimate the +…+++++ rating.
+    private static final double[] HF_SIZE_REP_B = {0, 1, 3, 7, 13, 24, 40};
 
     private void showHuggingFaceSearchDialog() {
         int pad = Math.round(getResources().getDisplayMetrics().density * 20f);
@@ -2291,15 +2294,41 @@ public class SettingsActivity extends Activity {
                 "Model name or keyword (free text, optional)"));
         form.addView(queryInput);
 
-        Spinner familySpinner = addLabeledSpinner(form,
-                localizedText("モデル名", "Model name"),
-                buildFamilyLabels());
+        // ---- Model name: a scrollable single-select list (not a pulldown). Each row shows the
+        //      family name plus a one-line strength summary. selectedFamily[0] tracks the choice.
+        final int[] selectedFamily = {0};
+        addSectionCaption(form, localizedText("モデル名", "Model name"));
+        addFamilySelectionList(form, selectedFamily);
+
+        // ---- Parameter size: pulldown + a device-specific suitability rating (+ … +++++) below.
         Spinner sizeSpinner = addLabeledSpinner(form,
                 localizedText("パラメータ数", "Parameter size"),
                 buildSizeLabels());
+        TextView sizeRating = addNoteView(form);
+        sizeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                sizeRating.setText(paramRatingText(position));
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
+
+        // ---- Quantization: pulldown + a one-line tendency note below.
         Spinner quantSpinner = addLabeledSpinner(form,
                 localizedText("量子化", "Quantization"),
                 buildQuantLabels());
+        TextView quantNote = addNoteView(form);
+        final String[] quantTendencies = buildQuantTendencies();
+        quantSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                quantNote.setText(position >= 0 && position < quantTendencies.length
+                        ? quantTendencies[position] : "");
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
 
         CheckBox multimodalCheck = new CheckBox(this);
         multimodalCheck.setText(localizedText("マルチモーダル対応のみ", "Multimodal only"));
@@ -2317,7 +2346,7 @@ public class SettingsActivity extends Activity {
                 .setView(scroll)
                 .setPositiveButton(localizedText("検索", "Search"),
                         (dialog, which) -> {
-                            int familyIdx = familySpinner.getSelectedItemPosition();
+                            int familyIdx = selectedFamily[0];
                             int sizeIdx = sizeSpinner.getSelectedItemPosition();
                             int quantIdx = quantSpinner.getSelectedItemPosition();
                             HuggingFaceApiClient.SearchFilters filters =
@@ -2333,6 +2362,156 @@ public class SettingsActivity extends Activity {
                         })
                 .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
                 .show();
+    }
+
+    /** Adds a bold section caption to {@code parent}. */
+    private void addSectionCaption(LinearLayout parent, String text) {
+        int topMargin = Math.round(getResources().getDisplayMetrics().density * 12f);
+        TextView label = new TextView(this);
+        label.setText(text);
+        label.setTypeface(label.getTypeface(), android.graphics.Typeface.BOLD);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = topMargin;
+        parent.addView(label, lp);
+    }
+
+    /** Adds a small secondary-text note line (used under the size / quant pulldowns). */
+    private TextView addNoteView(LinearLayout parent) {
+        TextView note = new TextView(this);
+        note.setTextSize(12f);
+        note.setTextColor(0xFF888888);
+        int topPad = Math.round(getResources().getDisplayMetrics().density * 2f);
+        note.setPadding(0, topPad, 0, 0);
+        parent.addView(note, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return note;
+    }
+
+    /**
+     * Builds the scrollable model-family selection list into {@code parent}. Each row shows the
+     * family name and a one-line strength; tapping a row selects it (updating {@code selected[0]}
+     * and the row highlights). Row 0 = "Any".
+     */
+    private void addFamilySelectionList(LinearLayout parent, int[] selected) {
+        final String[] labels = buildFamilyLabels();
+        final String[] strengths = buildFamilyStrengths();
+        final int rowPad = Math.round(getResources().getDisplayMetrics().density * 8f);
+        final int selectedBg = 0x332196F3;   // translucent blue highlight
+        final List<View> rows = new ArrayList<>();
+        for (int i = 0; i < labels.length; i++) {
+            final int index = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(rowPad, rowPad, rowPad, rowPad);
+            row.setClickable(true);
+            row.setBackgroundColor(i == selected[0] ? selectedBg : 0x00000000);
+
+            TextView name = new TextView(this);
+            name.setText(labels[i]);
+            name.setTextSize(15f);
+            name.setTypeface(name.getTypeface(), android.graphics.Typeface.BOLD);
+            row.addView(name);
+
+            TextView strength = new TextView(this);
+            strength.setText(strengths[i]);
+            strength.setTextSize(12f);
+            strength.setTextColor(0xFF888888);
+            row.addView(strength);
+
+            row.setOnClickListener(v -> {
+                selected[0] = index;
+                for (int r = 0; r < rows.size(); r++) {
+                    rows.get(r).setBackgroundColor(r == index ? selectedBg : 0x00000000);
+                }
+            });
+            rows.add(row);
+            parent.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+    }
+
+    /** One-line strengths parallel to HF_FAMILY_KEYWORDS / buildFamilyLabels(). */
+    private String[] buildFamilyStrengths() {
+        return new String[]{
+                localizedText("すべてのモデルを対象", "Search across all models"),
+                localizedText("多言語・コーディング・長文に強い万能型", "Versatile: multilingual, coding, long context"),
+                localizedText("軽量で多言語・要約が得意", "Lightweight; strong multilingual & summarization"),
+                localizedText("汎用的で派生・エコシステムが豊富", "General-purpose with a rich ecosystem"),
+                localizedText("少パラメータで高効率・指示追従が堅実", "Efficient at small sizes; solid instruction following"),
+                localizedText("小型ながら推論・数学に強い", "Small but strong at reasoning & math"),
+                localizedText("推論・コード生成・数学に特化", "Specialized in reasoning, code & math"),
+                localizedText("中英バイリンガルとツール利用に強い", "Strong CN/EN bilingual & tool use"),
+                localizedText("長文コンテキストとバイリンガル性能", "Long context & bilingual performance"),
+                localizedText("企業向け・コード/RAG志向で安定", "Enterprise-oriented; stable for code/RAG"),
+                localizedText("超小型・端末常駐向けの最軽量", "Ultra-small; ideal for always-on/on-device")};
+    }
+
+    /** One-line quantization tendencies parallel to HF_QUANT_VALUES / buildQuantLabels(). */
+    private String[] buildQuantTendencies() {
+        return new String[]{
+                localizedText("量子化を指定しません", "No quantization filter"),
+                localizedText("最小・最速だが品質低下が大きい（動作確認向け）", "Smallest/fastest but large quality loss (smoke test)"),
+                localizedText("小型・高速だが品質はやや低下", "Small/fast, slightly reduced quality"),
+                localizedText("サイズと品質のバランスが最良（推奨既定）", "Best size/quality balance (recommended default)"),
+                localizedText("旧式4bit。軽量だがQ4_K_Mに品質で劣る", "Legacy 4-bit; light but lower quality than Q4_K_M"),
+                localizedText("高品質寄りで中容量。バランス良好", "Higher quality, medium size, well balanced"),
+                localizedText("ほぼ無損失に近い高品質。容量大", "Near-lossless quality; large size"),
+                localizedText("高品質・大容量。速度/メモリ負担大", "High quality, large; heavier on speed/memory"),
+                localizedText("非量子化(16bit)。最高品質だが最大容量・低速", "Unquantized (16-bit); top quality, largest & slow"),
+                localizedText("非量子化(bfloat16)。F16同等で最大容量", "Unquantized (bfloat16); like F16, largest size")};
+    }
+
+    /**
+     * Device-specific suitability rating (+ … +++++) for a parameter-size band, based on total RAM.
+     * + = hard to run, +++ = practically usable, +++++ = fast. Rough estimate using a Q4_K_M
+     * footprint of ~0.7 GB per 1B params against ~half of total device memory.
+     */
+    private String paramRatingText(int sizeIdx) {
+        double repB = (sizeIdx >= 0 && sizeIdx < HF_SIZE_REP_B.length) ? HF_SIZE_REP_B[sizeIdx] : 0;
+        if (repB <= 0) {
+            return localizedText("この端末での推奨度: 指定なし", "Suitability on this device: not specified");
+        }
+        long totalBytes = getDeviceTotalMemoryBytes();
+        double deviceGB = totalBytes > 0 ? totalBytes / 1.0e9 : 0;
+        double requiredGB = repB * 0.7;                 // Q4_K_M weights + modest overhead
+        double budgetGB = deviceGB > 0 ? deviceGB * 0.5 : 0;  // usable for model weights
+        int stars;
+        if (budgetGB <= 0) {
+            stars = 3;                                  // unknown device → neutral
+        } else {
+            double ratio = requiredGB / budgetGB;
+            if (ratio <= 0.25) stars = 5;
+            else if (ratio <= 0.5) stars = 4;
+            else if (ratio <= 0.8) stars = 3;
+            else if (ratio <= 1.1) stars = 2;
+            else stars = 1;
+        }
+        String plus = "+++++".substring(0, stars);
+        String note;
+        switch (stars) {
+            case 5:  note = localizedText("高速実行", "fast"); break;
+            case 4:  note = localizedText("快適", "comfortable"); break;
+            case 3:  note = localizedText("実用可能", "usable"); break;
+            case 2:  note = localizedText("動作は重い", "sluggish"); break;
+            default: note = localizedText("実行困難", "hard to run"); break;
+        }
+        return localizedText("この端末での推奨度: ", "Suitability on this device: ") + plus + " (" + note + ")";
+    }
+
+    /** Total physical device memory in bytes (ActivityManager.MemoryInfo.totalMem), or -1. */
+    private long getDeviceTotalMemoryBytes() {
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            if (am != null) {
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                am.getMemoryInfo(mi);
+                return mi.totalMem;
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1L;
     }
 
     /** Adds a caption + full-width {@link Spinner} to {@code parent} and returns the spinner. */
