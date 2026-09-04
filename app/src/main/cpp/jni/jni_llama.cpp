@@ -38,6 +38,7 @@
 #include <cstdio>
 
 #include "llama.h"
+#include "ggml.h"          // ggml_type_size / ggml_blck_size (KV bytes/cell computation)
 #include "gguf.h"
 #include "ggml-backend.h"
 #include "ggml-backend-impl.h"   // ★ これが必要
@@ -3516,6 +3517,29 @@ static bool prefill_multimodal_prompt_locked(
     }
 
     n_prompt_tokens = mtmd_helper_get_n_tokens(chunks);
+
+    // Context-fit pre-check (Q1). Qwen3-VL and other native-dynamic-resolution VLMs emit far more
+    // image tokens than older models (e.g. ~3200 for one image), so the full multimodal prompt can
+    // exceed n_ctx. Without this guard mtmd_helper_eval_chunks() below fails deep in the decode loop
+    // ("failed to find a memory slot for batch of size N") with a cryptic, unactionable error. Catch
+    // it here — before eval — and emit a structured, machine-parseable message so the Java layer can
+    // either auto-promote n_ctx (bounded by the memory budget) or show the user a clear error. This
+    // check is version-independent: it compares only our own n_prompt_tokens against our own g_n_ctx,
+    // so it survives llama.cpp/mtmd internal changes. MIN_GEN_HEADROOM leaves room for a few output
+    // tokens (the prompt merely fitting is not enough — there must be slots left to generate into).
+    {
+        const size_t MIN_GEN_HEADROOM = 16;
+        if (n_prompt_tokens + MIN_GEN_HEADROOM > static_cast<size_t>(g_n_ctx)) {
+            std::ostringstream es;
+            es << "CTX_TOO_SMALL need=" << (n_prompt_tokens + MIN_GEN_HEADROOM)
+               << " have=" << g_n_ctx
+               << " (multimodal prompt exceeds context; increase Context Size (n_ctx) or use a smaller image)";
+            error_message = es.str();
+            log_to_file(std::string("prefill_multimodal: ") + error_message, GGML_LOG_LEVEL_ERROR);
+            cleanup();
+            return false;
+        }
+    }
     {
         // [mm-diag] Confirm the media marker(s) matched the decoded media and that the
         // multimodal chunks actually carry non-text (image/audio) tokens. If markers != media
@@ -4385,6 +4409,42 @@ Java_com_micklab_llama_LlamaNative_getLastNEvalTokens(
         JNIEnv *, jobject /*thiz*/
 ) {
     return (jint) g_last_n_eval.load(std::memory_order_relaxed);
+}
+
+// KV キャッシュ 1 セル (= 1 トークン) あたりのバイト数を返す (0 = モデル未ロード)。
+// Q2 の自動昇格 cap 計算に使う: あるモデル・KV量子化型で n_ct=N にした際の KV サイズは
+// getKvBytesPerCell() * N。実測 (Qwen3VL-2B, f16) で 112KiB/cell に一致する。
+// KV(token) = n_layer * n_embd_gqa * (sizeof(type_k) + sizeof(type_v)) ,
+//   n_embd_gqa = (n_embd / n_head) * n_head_kv   (n_embd_head_k ≈ n_embd_head_v ≈ n_embd/n_head)
+extern "C"
+JNIEXPORT jlong JNICALL
+Java_com_micklab_llama_LlamaNative_getKvBytesPerCell(
+        JNIEnv *, jobject /*thiz*/
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_model) {
+        return 0;
+    }
+    const int n_layer   = llama_model_n_layer(g_model);
+    const int n_head    = llama_model_n_head(g_model);
+    const int n_head_kv = llama_model_n_head_kv(g_model);
+    const int n_embd    = llama_model_n_embd(g_model);
+    if (n_layer <= 0 || n_head <= 0 || n_head_kv <= 0 || n_embd <= 0) {
+        return 0;
+    }
+    const long n_embd_head = (long) n_embd / n_head;
+    const long n_embd_gqa  = n_embd_head * n_head_kv;
+    // Bytes per element for the configured KV cache quant types (F16=2, Q8_0≈1.06, …).
+    auto bytes_per_elem = [](int type_id) -> double {
+        const ggml_type t = (ggml_type) type_id;
+        const int blk = ggml_blck_size(t);
+        if (blk <= 0) return 2.0;  // fallback to F16 size
+        return (double) ggml_type_size(t) / (double) blk;
+    };
+    const double k_be = bytes_per_elem(g_kv_type_k);
+    const double v_be = bytes_per_elem(g_kv_type_v);
+    const double per_cell = (double) n_layer * (double) n_embd_gqa * (k_be + v_be);
+    return (jlong) (per_cell + 0.5);
 }
 
 // 直近の生成の合計時間 (ms) を返す。プロンプト処理 + デコード。

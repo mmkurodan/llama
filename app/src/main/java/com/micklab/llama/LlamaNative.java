@@ -131,6 +131,13 @@ public class LlamaNative {
     /** Output (eval) token count of the most recent generation. */
     public native int getLastNEvalTokens();
 
+    /**
+     * KV-cache bytes per cell (= per token) for the currently loaded model and KV quant types,
+     * or 0 if no model is loaded. The KV size at context length N is roughly
+     * {@code getKvBytesPerCell() * N}. Used to bound n_ctx auto-promotion against a memory budget.
+     */
+    public native long getKvBytesPerCell();
+
     /** Total generation time (prompt + decode) in milliseconds of the most recent generation. */
     public native double getLastTotalTimeMs();
 
