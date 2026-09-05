@@ -22,7 +22,10 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -116,6 +119,19 @@ public class ModelManager {
     private volatile String currentModelPath = null;
     private volatile ConfigurationManager.Configuration lastLoadedConfig = null;
     private volatile String currentConfiguredMmprojPath = null;
+    // (model, mmproj) pairs whose projector failed to activate at native init in this session
+    // (init returned "ok" but the model came up text-only — i.e. the mmproj is incompatible).
+    // Without this, an auto-discovered wrong mmproj (e.g. a co-located Qwen3-VL projector picked
+    // up by a text-only chat model) would be retried every generation, and because a "requested
+    // but inactive" projector bypasses the reuse fast-path, it forces a full model reload each
+    // turn. We remember the failed pair and load text-only instead. Keyed by absolute paths, so a
+    // DIFFERENT mmproj (e.g. the user consciously re-assigns the correct one) is a new pair and is
+    // still attempted normally; the set is in-memory, so an app restart clears it for a fresh try.
+    private final Set<String> incompatibleMmprojPairs = ConcurrentHashMap.newKeySet();
+    // Cache of each mmproj's audio-encoder capability (1=has audio, 0=vision-only, -1=unknown),
+    // read once from GGUF metadata via LlamaNative.mmprojSupportsAudio(). Avoids re-reading the
+    // file on every load; keyed by absolute mmproj path (file content is stable).
+    private final Map<String, Integer> mmprojAudioCapCache = new ConcurrentHashMap<>();
     // Backend config the currently-loaded model was built with. A change here must
     // force a model reload (tensors are placed on the accelerator at load time).
     private volatile int currentBackendType = -1;
@@ -670,7 +686,30 @@ public class ModelManager {
                 }
             }
 
-            boolean enableAudioForLoad = mmprojPath != null;
+            // Loop guard: if this exact (model, mmproj) pair already failed to activate as a
+            // projector earlier in this session, don't keep retrying it — that would force a full
+            // model reload before every generation. Load text-only instead. A different mmproj (the
+            // user consciously re-assigning a matching one) is a new pair and is still attempted.
+            if (mmprojPath != null && incompatibleMmprojPairs.contains(mmprojFailKey(modelPath, mmprojPath))) {
+                Log.i(TAG, "Skipping known-incompatible mmproj for this model (loading text-only): " + mmprojPath);
+                DiagnosticsLogger.logEvent(context, "mmproj-loop-guard",
+                        "config=" + configName + " mmproj=" + new File(mmprojPath).getName() + " action=skip-load-text-only");
+                mmprojPath = null;
+            }
+
+            // Only request the audio encoder when the mmproj actually advertises one. A vision-only
+            // mmproj (e.g. Qwen3-VL, clip.has_audio_encoder=false) previously always got
+            // enable_audio=true, so the reuse fast-path's audio clause (!enableAudioForLoad ||
+            // currentSupportsAudio) was never satisfied → a full model reload before EVERY
+            // generation. mmprojSupportsAudio()==0 means "definitely no audio" (skip audio); 1 or -1
+            // (has audio / unknown) keep requesting it so audio-capable mmproj are unaffected.
+            boolean enableAudioForLoad = false;
+            if (mmprojPath != null) {
+                final String mmprojForCap = mmprojPath;
+                int audioCap = mmprojAudioCapCache.computeIfAbsent(
+                        mmprojForCap, p -> llama.mmprojSupportsAudio(p));
+                enableAudioForLoad = audioCap != 0;   // request audio unless definitely vision-only
+            }
             boolean projectorRequestedButInactive =
                     mmprojPath != null && !currentSupportsVision && !currentSupportsAudio;
 
@@ -825,6 +864,14 @@ public class ModelManager {
                 boolean multimodalActive = currentSupportsVision || currentSupportsAudio;
                 if (!multimodalActive && mmprojPath != null) {
                     Log.i(TAG, "Projector request was not activated by native init; treating model as text-only");
+                    // Init returned "ok" yet the projector didn't come up → the mmproj is
+                    // incompatible with this model. Remember it so subsequent generations don't keep
+                    // reloading to retry it (see incompatibleMmprojPairs). A different mmproj (a
+                    // conscious re-assignment) is a new pair and will still be attempted.
+                    incompatibleMmprojPairs.add(mmprojFailKey(modelPath, mmprojPath));
+                    DiagnosticsLogger.logEvent(context, "mmproj-loop-guard",
+                            "config=" + configName + " mmproj=" + new File(mmprojPath).getName()
+                                    + " action=cache-incompatible");
                 } else if (mmprojPath != null && !enableAudioForLoad && currentSupportsVision && !currentSupportsAudio) {
                     Log.i(TAG, "Projector initialized in vision-only mode; audio encoder will be loaded on demand");
                 }
@@ -1543,6 +1590,11 @@ public class ModelManager {
         }
 
         return null;
+    }
+
+    /** Key for {@link #incompatibleMmprojPairs}: a specific (model file, mmproj file) combination. */
+    private static String mmprojFailKey(String modelPath, String mmprojPath) {
+        return modelPath + " " + mmprojPath;
     }
 
     private MultimodalProjectorResolution resolveMultimodalProjectorPath(
