@@ -3289,6 +3289,25 @@ static void log_generation_perf(const char * log_prefix) {
     log_to_file(ss.str());
 }
 
+// Decide the add_special flag for llama_tokenize. Normally true so the model's
+// add_bos_token/add_eos_token policy is honored (see the missing-BOS fix). But some GGUFs are
+// mis-tagged with a *normal* token as BOS (e.g. Qwen3.5-2B reports BOS = 11 ','); letting llama
+// prepend that corrupts the prompt (an out-of-distribution leading comma). In that specific case
+// — the model wants a BOS yet its BOS is not a control token — suppress add_special.
+static bool tokenize_add_special_flag(const llama_vocab * vocab) {
+    if (llama_vocab_get_add_bos(vocab)) {
+        const llama_token bos = llama_vocab_bos(vocab);
+        if (bos != LLAMA_TOKEN_NULL &&
+            (llama_vocab_get_attr(vocab, bos) & LLAMA_TOKEN_ATTR_CONTROL) == 0) {
+            log_to_file("tokenize: model BOS token is not a control token (mis-tagged GGUF);"
+                        " suppressing add_special to avoid a spurious leading BOS",
+                        GGML_LOG_LEVEL_INFO);
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool prefill_text_prompt_locked(
         const llama_vocab * vocab,
         const std::string & prompt,
@@ -3302,7 +3321,7 @@ static bool prefill_text_prompt_locked(
             static_cast<int>(prompt.size()),
             tokens.data(),
             static_cast<int>(tokens.size()),
-            true,   // add_special: モデルの add_bos_token/add_eos_token 設定に従い BOS/EOS を付与する
+            tokenize_add_special_flag(vocab),   // add_special: honor add_bos/eos, but guard mis-tagged BOS
             true
     );
 
@@ -3384,7 +3403,8 @@ static bool prefill_text_prompt_cached_locked(
     std::vector<llama_token> tokens(g_n_ctx);
     int32_t n_tokens = llama_tokenize(
             vocab, prompt.c_str(), static_cast<int>(prompt.size()),
-            tokens.data(), static_cast<int>(tokens.size()), true, true);  // add_special=true: BOS/EOS を付与
+            tokens.data(), static_cast<int>(tokens.size()),
+            tokenize_add_special_flag(vocab), true);  // add_special: honor add_bos/eos, but guard mis-tagged BOS
     if (n_tokens < 0) {
         error_message = "CTX_TOO_SMALL need=" + std::to_string(-n_tokens)
                       + " have=" + std::to_string(g_n_ctx)

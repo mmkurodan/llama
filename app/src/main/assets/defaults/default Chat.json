@@ -39,7 +39,7 @@
   "customChatTemplate": "",
   "multimodalProjectorUrl": "",
   "multimodalProjectorManualSelection": false,
-  "multimodalProjectorDisabled": false,
+  "multimodalProjectorDisabled": true,
   "mtpEnabled": false,
   "mtpModelReference": "",
   "mtpNDraft": 2,
