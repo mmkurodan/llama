@@ -324,6 +324,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. モデルパラメータの詳細説明\n\n");
         sb.append("【基本パラメータ】\n");
         sb.append("- コンテキストサイズ (n_ctx): モデルが一度に処理できるトークン数です。大きいほど長い文脈を扱えますが、メモリ消費が増加します。\n");
+        sb.append("- コンテキスト自動拡張 (nCtxAutoExpand): コンテキストサイズの隣のトグルです。有効にすると、画像や長いプロンプトが n_ctx を超える場合に、端末のメモリ範囲内で n_ctx を自動的に拡張して読み込み直します。拡張しても収まらない場合やトグルが無効の場合は、その旨を通知し、API クライアントにはサーバーエラーとして返します。\n");
         sb.append("- スレッド数 (n_threads): 推論に使用するCPUスレッド数です。端末のコア数に合わせて調整してください。\n");
         sb.append("- バッチサイズ (n_batch): 一度に処理するトークン数です。大きくすると高速ですがメモリを多く使用します。\n");
         sb.append("- 最大出力トークン数 (n_predict): 1回の生成で出力するトークン数の上限です。-1は無制限（コンテキストの残り全体）を意味します。WebUIから送信するmax_tokens/num_predictも優先して反映されます。\n");
@@ -390,6 +391,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) マルチモーダル対応モデルで別途 mmproj のダウンロードが必要な場合は、続行前に確認します。スキップした場合はテキスト専用で読み込みます。\n");
         sb.append("- Gemma-4 などで同じリポジトリに対応 mmproj / projector が含まれている場合は、自動的に対応する projector のみを設定し、Projector 欄は Available と表示されます（テキスト専用モデルに無関係な projector は自動適用しません）。\n");
         sb.append("- ダウンロード中は端末がスリープしても中断されにくいよう配慮していますが、安定した Wi-Fi 環境での実行を強く推奨します。\n\n");
+        sb.append("- 検索ダイアログでは、モデル名・パラメータ数・量子化をプルダウンで絞り込め、それぞれに特徴の一言説明が表示されます。パラメータ数には端末に対する適合度（+〜+++++）が表示されます。mmproj / Projector ファイルも一覧から選んで直接ダウンロードできます。\n\n");
         sb.append("10. 🧭 GGUFモデルの探し方・選び方\n\n");
         sb.append("【10-1. GGUF対応モデルを探す】\n");
         sb.append("- Hugging Face のモデル検索で GGUF タグを使う\n");
@@ -470,6 +472,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. Model Parameter Details\n\n");
         sb.append("[Basic Parameters]\n");
         sb.append("- Context Size (n_ctx): Number of tokens the model can process at once. Larger values handle longer contexts but use more memory.\n");
+        sb.append("- Auto-expand context (nCtxAutoExpand): a toggle next to Context Size. When enabled, if an image or long prompt exceeds n_ctx the app automatically raises n_ctx (within the device's memory budget) and reloads. If it still does not fit, or the toggle is off, a clear notice is shown and API clients receive a proper server error.\n");
         sb.append("- Threads (n_threads): Number of CPU threads for inference. Adjust based on your device's core count.\n");
         sb.append("- Batch Size (n_batch): Number of tokens processed at once. Larger is faster but uses more memory.\n");
         sb.append("- Max Output Tokens (n_predict): Maximum tokens to generate per response. -1 means unlimited (fills remaining context). The max_tokens / num_predict from WebUI requests take precedence.\n");
@@ -536,6 +539,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) If a multimodal model also needs a separate mmproj download, the app asks before continuing; if you skip it, the model loads text-only.\n");
         sb.append("- When a repository also contains a matching mmproj / projector for models such as Gemma-4, the app auto-configures only a compatible projector and shows Projector as Available (unrelated projector files are not auto-applied to text-only models).\n");
         sb.append("- Downloads are kept awake even if the device screen turns off, but a stable Wi-Fi connection is strongly recommended.\n\n");
+        sb.append("- The search dialog lets you narrow by model name, parameter size and quantization via pull-downs, each with a one-line note; parameter size also shows a suitability rating for your device (+ to +++++). mmproj / projector files can be selected from the list and downloaded directly.\n\n");
         sb.append("10. 🧭 Finding and Choosing GGUF Models\n\n");
         sb.append("[10-1. Locating GGUF-compatible models]\n");
         sb.append("- Use the GGUF tag on Hugging Face model search\n");
@@ -616,6 +620,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. Détails des paramètres du modèle\n\n");
         sb.append("[Paramètres de base]\n");
         sb.append("- Context Size (n_ctx) : nombre de jetons que le modèle peut traiter à la fois. Des valeurs plus élevées gèrent des contextes plus longs mais utilisent plus de mémoire.\n");
+        sb.append("- Extension automatique du contexte (nCtxAutoExpand) : un interrupteur à côté de Context Size. Activé, si une image ou une longue invite dépasse n_ctx, l'application augmente automatiquement n_ctx (dans la limite de la mémoire de l'appareil) et recharge. Si cela ne suffit pas, ou si l'option est désactivée, un message clair s'affiche et les clients API reçoivent une véritable erreur serveur.\n");
         sb.append("- Threads (n_threads) : nombre de threads CPU pour l'inférence. Ajustez selon le nombre de cœurs de votre appareil.\n");
         sb.append("- Batch Size (n_batch) : nombre de jetons traités à la fois. Plus grand est plus rapide mais utilise plus de mémoire.\n");
         sb.append("- Jetons max (n_predict) : limite de jetons de sortie par génération. -1 = illimité (remplit le contexte restant). max_tokens/num_predict envoyés par la WebUI ont la priorité.\n");
@@ -681,6 +686,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) Si un modèle multimodal nécessite aussi un téléchargement mmproj séparé, l'application demande avant de continuer ; si vous l'ignorez, le modèle se charge en texte seul.\n");
         sb.append("- Lorsqu'un dépôt contient aussi un mmproj / projecteur correspondant pour des modèles tels que Gemma-4, l'application ne configure automatiquement qu'un projecteur compatible et affiche Projector comme Available (les fichiers projecteur sans rapport ne sont pas appliqués automatiquement aux modèles en texte seul).\n");
         sb.append("- Les téléchargements restent actifs même si l'écran de l'appareil s'éteint, mais une connexion Wi-Fi stable est fortement recommandée.\n\n");
+        sb.append("- La boîte de recherche permet de filtrer par nom de modèle, taille de paramètres et quantification via des menus déroulants, chacun avec une note d'une ligne ; la taille affiche aussi un indice d'adéquation à votre appareil (+ à +++++). Les fichiers mmproj / projecteur peuvent être sélectionnés dans la liste et téléchargés directement.\n\n");
         sb.append("10. 🧭 Trouver et choisir des modèles GGUF\n\n");
         sb.append("[10-1. Localiser des modèles compatibles GGUF]\n");
         sb.append("- Utilisez le tag GGUF dans la recherche de modèles Hugging Face\n");
@@ -761,6 +767,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. Detalles de los parámetros del modelo\n\n");
         sb.append("[Parámetros básicos]\n");
         sb.append("- Context Size (n_ctx): número de tokens que el modelo puede procesar a la vez. Valores mayores manejan contextos más largos pero usan más memoria.\n");
+        sb.append("- Expansión automática del contexto (nCtxAutoExpand): un interruptor junto a Context Size. Al activarlo, si una imagen o un prompt largo supera n_ctx, la app aumenta automáticamente n_ctx (dentro de la memoria del dispositivo) y recarga. Si aun así no cabe, o si está desactivado, se muestra un aviso claro y los clientes de la API reciben un error de servidor real.\n");
         sb.append("- Threads (n_threads): número de hilos de CPU para la inferencia. Ajústelo según el número de núcleos de su dispositivo.\n");
         sb.append("- Batch Size (n_batch): número de tokens procesados a la vez. Mayor es más rápido pero usa más memoria.\n");
         sb.append("- Tokens máx (n_predict): límite de tokens de salida por generación. -1 = ilimitado. max_tokens/num_predict de la WebUI tienen prioridad.\n");
@@ -826,6 +833,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) Si un modelo multimodal también necesita una descarga de mmproj por separado, la aplicación pregunta antes de continuar; si lo omite, el modelo se carga solo texto.\n");
         sb.append("- Cuando un repositorio también contiene un mmproj / proyector coincidente para modelos como Gemma-4, la aplicación configura automáticamente solo un proyector compatible y muestra Projector como Available (los archivos de proyector no relacionados no se aplican automáticamente a los modelos solo texto).\n");
         sb.append("- Las descargas se mantienen activas incluso si la pantalla del dispositivo se apaga, pero se recomienda encarecidamente una conexión Wi-Fi estable.\n\n");
+        sb.append("- El cuadro de búsqueda permite filtrar por nombre de modelo, tamaño de parámetros y cuantización mediante menús desplegables, cada uno con una nota breve; el tamaño también muestra una valoración de idoneidad para tu dispositivo (+ a +++++). Los archivos mmproj / proyector pueden seleccionarse de la lista y descargarse directamente.\n\n");
         sb.append("10. 🧭 Encontrar y elegir modelos GGUF\n\n");
         sb.append("[10-1. Localizar modelos compatibles con GGUF]\n");
         sb.append("- Use la etiqueta GGUF en la búsqueda de modelos de Hugging Face\n");
@@ -906,6 +914,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. Detalhes dos parâmetros do modelo\n\n");
         sb.append("[Parâmetros básicos]\n");
         sb.append("- Context Size (n_ctx): número de tokens que o modelo pode processar de uma vez. Valores maiores lidam com contextos mais longos, mas usam mais memória.\n");
+        sb.append("- Expansão automática do contexto (nCtxAutoExpand): um botão ao lado de Context Size. Quando ativado, se uma imagem ou prompt longo exceder n_ctx, o app aumenta automaticamente n_ctx (dentro da memória do dispositivo) e recarrega. Se ainda não couber, ou se estiver desativado, um aviso claro é exibido e os clientes da API recebem um erro de servidor real.\n");
         sb.append("- Threads (n_threads): número de threads de CPU para a inferência. Ajuste conforme o número de núcleos do seu dispositivo.\n");
         sb.append("- Batch Size (n_batch): número de tokens processados de uma vez. Maior é mais rápido, mas usa mais memória.\n");
         sb.append("- Tokens máx (n_predict): limite de tokens de saída por geração. -1 = ilimitado. max_tokens/num_predict da WebUI têm prioridade.\n");
@@ -971,6 +980,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) Se um modelo multimodal também precisar de um download de mmproj separado, o aplicativo pergunta antes de continuar; se você pular, o modelo carrega somente texto.\n");
         sb.append("- Quando um repositório também contém um mmproj / projetor correspondente para modelos como Gemma-4, o aplicativo configura automaticamente apenas um projetor compatível e mostra Projector como Available (arquivos de projetor não relacionados não são aplicados automaticamente a modelos somente texto).\n");
         sb.append("- Os downloads permanecem ativos mesmo se a tela do dispositivo se apagar, mas uma conexão Wi-Fi estável é altamente recomendada.\n\n");
+        sb.append("- A caixa de busca permite filtrar por nome do modelo, tamanho de parâmetros e quantização via menus suspensos, cada um com uma nota curta; o tamanho também mostra uma avaliação de adequação ao seu dispositivo (+ a +++++). Arquivos mmproj / projetor podem ser selecionados na lista e baixados diretamente.\n\n");
         sb.append("10. 🧭 Encontrar e escolher modelos GGUF\n\n");
         sb.append("[10-1. Localizar modelos compatíveis com GGUF]\n");
         sb.append("- Use a tag GGUF na busca de modelos do Hugging Face\n");
@@ -1051,6 +1061,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. Details zu den Modellparametern\n\n");
         sb.append("[Grundparameter]\n");
         sb.append("- Context Size (n_ctx): Anzahl der Tokens, die das Modell gleichzeitig verarbeiten kann. Größere Werte bewältigen längere Kontexte, benötigen aber mehr Speicher.\n");
+        sb.append("- Automatische Kontexterweiterung (nCtxAutoExpand): ein Schalter neben Context Size. Wenn aktiviert und ein Bild oder langer Prompt n_ctx überschreitet, erhöht die App n_ctx automatisch (im Rahmen des Gerätespeichers) und lädt neu. Passt es dann immer noch nicht, oder ist der Schalter aus, wird ein klarer Hinweis angezeigt und API-Clients erhalten einen echten Serverfehler.\n");
         sb.append("- Threads (n_threads): Anzahl der CPU-Threads für die Inferenz. Passen Sie sie an die Kernanzahl Ihres Geräts an.\n");
         sb.append("- Batch Size (n_batch): Anzahl der gleichzeitig verarbeiteten Tokens. Größer ist schneller, benötigt aber mehr Speicher.\n");
         sb.append("- Max. Ausgabetokens (n_predict): Limit der Ausgabetokens pro Generation. -1 = unbegrenzt. max_tokens/num_predict der WebUI haben Vorrang.\n");
@@ -1116,6 +1127,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) Wenn ein multimodales Modell zusätzlich einen separaten mmproj-Download benötigt, fragt die App vor dem Fortfahren; wenn Sie es überspringen, wird das Modell nur als Text geladen.\n");
         sb.append("- Wenn ein Repository für Modelle wie Gemma-4 auch ein passendes mmproj / einen Projektor enthält, konfiguriert die App automatisch nur einen kompatiblen Projektor und zeigt Projector als Available an (nicht zugehörige Projektor-Dateien werden bei Nur-Text-Modellen nicht automatisch angewendet).\n");
         sb.append("- Downloads bleiben aktiv, auch wenn sich der Bildschirm des Geräts ausschaltet, aber eine stabile WLAN-Verbindung wird dringend empfohlen.\n\n");
+        sb.append("- Der Suchdialog erlaubt das Filtern nach Modellname, Parametergröße und Quantisierung über Dropdowns, jeweils mit einer kurzen Notiz; die Größe zeigt zudem eine Eignungsbewertung für Ihr Gerät (+ bis +++++). mmproj-/Projektor-Dateien lassen sich aus der Liste auswählen und direkt herunterladen.\n\n");
         sb.append("10. 🧭 GGUF-Modelle finden und auswählen\n\n");
         sb.append("[10-1. GGUF-kompatible Modelle finden]\n");
         sb.append("- Verwenden Sie das GGUF-Tag in der Hugging-Face-Modellsuche\n");
@@ -1196,6 +1208,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. Dettagli dei parametri del modello\n\n");
         sb.append("[Parametri di base]\n");
         sb.append("- Context Size (n_ctx): numero di token che il modello può elaborare in una volta. Valori più grandi gestiscono contesti più lunghi ma usano più memoria.\n");
+        sb.append("- Espansione automatica del contesto (nCtxAutoExpand): un interruttore accanto a Context Size. Se attivo e un'immagine o un prompt lungo supera n_ctx, l'app aumenta automaticamente n_ctx (entro la memoria del dispositivo) e ricarica. Se ancora non basta, o se è disattivato, viene mostrato un avviso chiaro e i client API ricevono un vero errore del server.\n");
         sb.append("- Threads (n_threads): numero di thread CPU per l'inferenza. Regolalo in base al numero di core del tuo dispositivo.\n");
         sb.append("- Batch Size (n_batch): numero di token elaborati in una volta. Più grande è più veloce ma usa più memoria.\n");
         sb.append("- Token max (n_predict): limite di token di uscita per generazione. -1 = illimitato. max_tokens/num_predict della WebUI hanno la priorità.\n");
@@ -1261,6 +1274,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) Se un modello multimodale richiede anche un download mmproj separato, l'app chiede prima di continuare; se lo salti, il modello viene caricato solo testo.\n");
         sb.append("- Quando un repository contiene anche un mmproj / proiettore corrispondente per modelli come Gemma-4, l'app configura automaticamente solo un proiettore compatibile e mostra Projector come Available (i file proiettore non correlati non vengono applicati automaticamente ai modelli solo testo).\n");
         sb.append("- I download restano attivi anche se lo schermo del dispositivo si spegne, ma è vivamente consigliata una connessione Wi-Fi stabile.\n\n");
+        sb.append("- La finestra di ricerca consente di filtrare per nome del modello, dimensione dei parametri e quantizzazione tramite menu a discesa, ciascuno con una breve nota; la dimensione mostra anche una valutazione di idoneità per il tuo dispositivo (+ a +++++). I file mmproj / proiettore possono essere selezionati dall'elenco e scaricati direttamente.\n\n");
         sb.append("10. 🧭 Trovare e scegliere i modelli GGUF\n\n");
         sb.append("[10-1. Individuare modelli compatibili con GGUF]\n");
         sb.append("- Usa il tag GGUF nella ricerca modelli di Hugging Face\n");
@@ -1341,6 +1355,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. 模型参数详解\n\n");
         sb.append("[基本参数]\n");
         sb.append("- Context Size (n_ctx)：模型一次可处理的 token 数。数值越大可处理越长的上下文，但占用更多内存。\n");
+        sb.append("- 上下文自动扩展 (nCtxAutoExpand)：位于 Context Size 旁边的开关。启用后，当图片或长提示超过 n_ctx 时，应用会在设备内存范围内自动提高 n_ctx 并重新加载。若仍放不下或开关关闭，则显示明确提示，并向 API 客户端返回真正的服务器错误。\n");
         sb.append("- Threads (n_threads)：推理使用的 CPU 线程数。请根据设备的核心数调整。\n");
         sb.append("- Batch Size (n_batch)：一次处理的 token 数。越大越快，但占用更多内存。\n");
         sb.append("- 最大输出 token 数 (n_predict)：每次生成的输出 token 上限。-1 表示无限制。WebUI 的 max_tokens/num_predict 优先生效。\n");
@@ -1406,6 +1421,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) 若多模态模型还需要单独下载 mmproj，应用会在继续前询问；若跳过，模型将仅加载文本。\n");
         sb.append("- 当仓库中还包含适用于 Gemma-4 等模型的匹配 mmproj / 投影器时，应用只会自动配置兼容的投影器，并将 Projector 显示为 Available（无关的投影器文件不会自动应用于纯文本模型）。\n");
         sb.append("- 即使设备屏幕熄灭，下载也会保持唤醒，但强烈建议保持稳定的 Wi-Fi 连接。\n\n");
+        sb.append("- 搜索对话框可通过下拉菜单按模型名称、参数量和量化进行筛选，每项都有一行说明；参数量还会显示针对你设备的适配度评级（+ 到 +++++）。mmproj / 投影器文件也可从列表中选择并直接下载。\n\n");
         sb.append("10. 🧭 查找并选择 GGUF 模型\n\n");
         sb.append("[10-1. 定位兼容 GGUF 的模型]\n");
         sb.append("- 在 Hugging Face 模型搜索中使用 GGUF 标签\n");
@@ -1486,6 +1502,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5. 모델 매개변수 상세\n\n");
         sb.append("[기본 매개변수]\n");
         sb.append("- Context Size (n_ctx): 모델이 한 번에 처리할 수 있는 토큰 수입니다. 값이 클수록 더 긴 컨텍스트를 처리하지만 메모리를 더 많이 사용합니다.\n");
+        sb.append("- 컨텍스트 자동 확장 (nCtxAutoExpand): Context Size 옆의 토글입니다. 켜면 이미지나 긴 프롬프트가 n_ctx를 초과할 때 앱이 기기 메모리 범위 내에서 n_ctx를 자동으로 늘려 다시 로드합니다. 그래도 맞지 않거나 토글이 꺼져 있으면 명확한 안내를 표시하고 API 클라이언트에는 실제 서버 오류로 반환합니다.\n");
         sb.append("- Threads (n_threads): 추론에 사용할 CPU 스레드 수입니다. 기기의 코어 수에 맞게 조정하세요.\n");
         sb.append("- Batch Size (n_batch): 한 번에 처리하는 토큰 수입니다. 클수록 빠르지만 메모리를 더 많이 사용합니다.\n");
         sb.append("- 최대 출력 토큰 수 (n_predict): 생성당 출력 토큰 상한입니다. -1=무제한. WebUI의 max_tokens/num_predict가 우선 적용됩니다.\n");
@@ -1551,6 +1568,7 @@ public class DocumentsActivity extends Activity {
         sb.append("5) 멀티모달 모델에 별도의 mmproj 다운로드도 필요하면 계속하기 전에 앱이 묻습니다. 건너뛰면 모델이 텍스트 전용으로 로드됩니다.\n");
         sb.append("- 저장소에 Gemma-4 같은 모델을 위한 일치하는 mmproj / 프로젝터도 포함되어 있으면 앱은 호환되는 프로젝터만 자동으로 구성하고 Projector를 Available로 표시합니다(관련 없는 프로젝터 파일은 텍스트 전용 모델에 자동으로 적용되지 않습니다).\n");
         sb.append("- 기기 화면이 꺼져도 다운로드는 계속 유지되지만, 안정적인 Wi-Fi 연결을 강력히 권장합니다.\n\n");
+        sb.append("- 검색 대화상자에서는 모델 이름·파라미터 수·양자화를 풀다운으로 좁힐 수 있으며 각 항목에 한 줄 설명이 표시됩니다. 파라미터 수에는 기기 적합도 평가(+ ~ +++++)가 표시됩니다. mmproj / 프로젝터 파일도 목록에서 선택해 바로 다운로드할 수 있습니다.\n\n");
         sb.append("10. 🧭 GGUF 모델 찾기 및 선택\n\n");
         sb.append("[10-1. GGUF 호환 모델 찾기]\n");
         sb.append("- Hugging Face 모델 검색에서 GGUF 태그를 사용하세요\n");
