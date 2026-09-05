@@ -2799,6 +2799,40 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
     }
 }
 
+// Cheap metadata-only check for whether an mmproj advertises an audio encoder.
+// Returns 1 = has audio, 0 = no audio (vision-only), -1 = unknown (couldn't read).
+static int mmproj_audio_capability(const std::string & mmproj_path) {
+    struct gguf_init_params p = { /*.no_alloc =*/ true, /*.ctx =*/ nullptr };
+    gguf_context * g = gguf_init_from_file(mmproj_path.c_str(), p);
+    if (!g) {
+        return -1;
+    }
+    const bool has_audio = gguf_kv_is_true(g, "clip.has_audio_encoder");
+    gguf_free(g);
+    return has_audio ? 1 : 0;
+}
+
+// ---------------- JNI: mmprojSupportsAudio ----------------
+// Lets the Java layer request the audio encoder only for mmproj that actually have one, so a
+// vision-only mmproj is not loaded with enable_audio=true (which would keep the reuse fast-path's
+// audio clause unsatisfied and force a full model reload before every generation).
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_micklab_llama_LlamaNative_mmprojSupportsAudio(
+        JNIEnv * env,
+        jobject,
+        jstring jMmprojPath) {
+    try {
+        const std::string mmproj_path = jMmprojPath ? jstring_to_std(env, jMmprojPath) : "";
+        if (mmproj_path.empty()) {
+            return -1;
+        }
+        return (jint) mmproj_audio_capability(mmproj_path);
+    } catch (...) {
+        return -1;
+    }
+}
+
 // ---------------- JNI: validateMmproj ----------------
 extern "C"
 JNIEXPORT jstring JNICALL

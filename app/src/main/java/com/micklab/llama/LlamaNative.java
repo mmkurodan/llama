@@ -40,6 +40,8 @@ public class LlamaNative {
      * Never throws across the JNI boundary.
      */
     public native String validateMmproj(String modelPath, String mmprojPath);
+    /** 1 = mmproj has an audio encoder, 0 = vision-only, -1 = unknown (couldn't read). */
+    public native int mmprojSupportsAudio(String mmprojPath);
     public native void setLoadParameters(int nCtx, int nThreads, int nBatch, float temp, float topP, int topK, int nGpuLayers);
     /**
      * Configure MTP (multi-token prediction) speculative decoding. Applied at the next

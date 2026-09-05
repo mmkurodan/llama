@@ -22,6 +22,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -127,6 +128,10 @@ public class ModelManager {
     // DIFFERENT mmproj (e.g. the user consciously re-assigns the correct one) is a new pair and is
     // still attempted normally; the set is in-memory, so an app restart clears it for a fresh try.
     private final Set<String> incompatibleMmprojPairs = ConcurrentHashMap.newKeySet();
+    // Cache of each mmproj's audio-encoder capability (1=has audio, 0=vision-only, -1=unknown),
+    // read once from GGUF metadata via LlamaNative.mmprojSupportsAudio(). Avoids re-reading the
+    // file on every load; keyed by absolute mmproj path (file content is stable).
+    private final Map<String, Integer> mmprojAudioCapCache = new ConcurrentHashMap<>();
     // Backend config the currently-loaded model was built with. A change here must
     // force a model reload (tensors are placed on the accelerator at load time).
     private volatile int currentBackendType = -1;
@@ -692,7 +697,19 @@ public class ModelManager {
                 mmprojPath = null;
             }
 
-            boolean enableAudioForLoad = mmprojPath != null;
+            // Only request the audio encoder when the mmproj actually advertises one. A vision-only
+            // mmproj (e.g. Qwen3-VL, clip.has_audio_encoder=false) previously always got
+            // enable_audio=true, so the reuse fast-path's audio clause (!enableAudioForLoad ||
+            // currentSupportsAudio) was never satisfied → a full model reload before EVERY
+            // generation. mmprojSupportsAudio()==0 means "definitely no audio" (skip audio); 1 or -1
+            // (has audio / unknown) keep requesting it so audio-capable mmproj are unaffected.
+            boolean enableAudioForLoad = false;
+            if (mmprojPath != null) {
+                final String mmprojForCap = mmprojPath;
+                int audioCap = mmprojAudioCapCache.computeIfAbsent(
+                        mmprojForCap, p -> llama.mmprojSupportsAudio(p));
+                enableAudioForLoad = audioCap != 0;   // request audio unless definitely vision-only
+            }
             boolean projectorRequestedButInactive =
                     mmprojPath != null && !currentSupportsVision && !currentSupportsAudio;
 
