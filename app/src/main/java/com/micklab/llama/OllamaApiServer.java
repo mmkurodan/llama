@@ -2323,12 +2323,14 @@ public class OllamaApiServer {
                     }, "OllamaApiWriter-" + Thread.currentThread().getId());
                     writerThread.start();
 
+                    final boolean[] streamedAny = { false };
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         private int tokenCount = 0;
 
                         @Override
                         public void onToken(String token) {
                             tokenCount++;
+                            streamedAny[0] = true;
                             if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
                                 Log.d(TAG, "generate stream tokens=" + tokenCount);
                             }
@@ -2353,13 +2355,14 @@ public class OllamaApiServer {
                         }
                     });
 
+                    String streamResult = null;
                     try {
                         // This will trigger token callbacks
-                        modelManager.generate(promptToUse);
+                        streamResult = modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
-                            tokenQueue.offer(TOKEN_COMPLETE);
+                            enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
                         }
                     }
                     try {
@@ -2374,6 +2377,10 @@ public class OllamaApiServer {
                 } else {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse);
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendErrorResponse(outputStream, 400, ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
                     logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
                     final String genReasoning;
                     final String genContent;
@@ -2673,12 +2680,19 @@ public class OllamaApiServer {
                     }, "OllamaApiWriter-" + Thread.currentThread().getId());
                     writerThread.start();
 
+                    // Tracks whether native emitted any token. If a generation ends up producing
+                    // nothing on the stream (e.g. a context-fit shortfall that could not be
+                    // auto-promoted — the intermediate error is intentionally suppressed from the
+                    // stream), we deliver generate()'s returned message as content below so the
+                    // client isn't left with an empty/hung stream.
+                    final boolean[] streamedAny = { false };
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         private int tokenCount = 0;
 
                         @Override
                         public void onToken(String token) {
                             tokenCount++;
+                            streamedAny[0] = true;
                             if (BuildConfig.DEBUG && (tokenCount % 50 == 0)) {
                                 Log.d(TAG, "chat stream tokens=" + tokenCount);
                             }
@@ -2703,12 +2717,13 @@ public class OllamaApiServer {
                         }
                     });
 
+                    String streamResult = null;
                     try {
-                        modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                        streamResult = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
-                            tokenQueue.offer(TOKEN_COMPLETE);
+                            enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
                         }
                     }
                     try {
@@ -2723,6 +2738,10 @@ public class OllamaApiServer {
                 } else {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendErrorResponse(outputStream, 400, ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
                     final String chatReasoning;
                     final String chatContent;
@@ -3018,9 +3037,17 @@ public class OllamaApiServer {
                     }, "OpenAiApiWriter-" + Thread.currentThread().getId());
                     writerThread.start();
 
+                    // Tracks whether any token reached the stream. An n_ctx auto-promotion reloads
+                    // the model mid-generate(), which clears this native token listener, so the
+                    // retried generation's tokens never arrive here — and a suppressed CTX_TOO_SMALL
+                    // (auto-expand off, or over-budget) streams nothing either. In both cases we fall
+                    // back to delivering generate()'s returned text as a single content chunk so the
+                    // client isn't left with an empty response.
+                    final boolean[] streamedAny = { false };
                     modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
                         @Override
                         public void onToken(String token) {
+                            streamedAny[0] = true;
                             thinkBlockFilter.onToken(token);
                         }
 
@@ -3035,12 +3062,13 @@ public class OllamaApiServer {
                         }
                     });
 
+                    String streamResult = null;
                     try {
-                        modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                        streamResult = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
-                            tokenQueue.offer(TOKEN_COMPLETE);
+                            enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
                         }
                     }
 
@@ -3055,6 +3083,11 @@ public class OllamaApiServer {
                     }
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendOpenAiErrorResponse(outputStream, 400,
+                                ModelManager.ctxLimitMessage(rawResponse), "invalid_request_error");
+                        return;
+                    }
                     final String oaiReasoning;
                     final String oaiContent;
                     if (enableThinking) {
@@ -3089,6 +3122,28 @@ public class OllamaApiServer {
                     e.getMessage() != null ? e.getMessage() : "OpenAI chat request failed",
                     "server_error");
         }
+    }
+
+    /**
+     * Route generate()'s returned string onto a stream's token queue when nothing was streamed.
+     * A terminal context-limit condition ({@link ModelManager#isCtxLimitError}) is surfaced as a
+     * protocol error frame (via {@link TokenError}, which each emitter renders per wire format) —
+     * never as fake assistant content — so GBNF / JSON-schema clients see a real server error. Any
+     * other non-empty return (e.g. an auto-promote reload that cleared the listener) is delivered as
+     * content so the client never receives an empty stream.
+     */
+    private void enqueueTerminalStreamResult(
+            java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue,
+            boolean streamedAny,
+            String streamResult) {
+        if (ModelManager.isCtxLimitError(streamResult)) {
+            tokenQueue.offer(new TokenError(ModelManager.ctxLimitMessage(streamResult)));
+            return;
+        }
+        if (!streamedAny && streamResult != null && !streamResult.isEmpty()) {
+            tokenQueue.offer(stripResponseMarkers(streamResult));
+        }
+        tokenQueue.offer(TOKEN_COMPLETE);
     }
 
     // ==================== Shared streaming driver ====================
@@ -3174,18 +3229,20 @@ public class OllamaApiServer {
         }, "StreamWriter-" + Thread.currentThread().getId());
         writerThread.start();
 
+        final boolean[] streamedAny = { false };
         modelManager.getLlama().setTokenListener(new LlamaNative.TokenListener() {
-            @Override public void onToken(String token) { thinkBlockFilter.onToken(token); }
+            @Override public void onToken(String token) { streamedAny[0] = true; thinkBlockFilter.onToken(token); }
             @Override public void onComplete() { thinkBlockFilter.onComplete(); }
             @Override public void onError(String error) { thinkBlockFilter.onError(error); }
         });
 
+        String streamResult = null;
         try {
-            modelManager.generate(prompt, media);
+            streamResult = modelManager.generate(prompt, media);
         } finally {
             modelManager.getLlama().setTokenListener(null);
             if (!errorSent[0] && !clientDisconnected.get()) {
-                tokenQueue.offer(TOKEN_COMPLETE);
+                enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
             }
         }
 
@@ -3286,6 +3343,11 @@ public class OllamaApiServer {
                     });
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, new byte[0][]);
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendOpenAiErrorResponse(outputStream, 400,
+                                ModelManager.ctxLimitMessage(rawResponse), "invalid_request_error");
+                        return;
+                    }
                     String content = appendPerfMetrics(stripResponseMarkers(
                             PromptTemplateManager.stripThinkingBlocks(rawResponse)));
                     JSONObject resp = buildTextCompletionResponse(model, content, "stop");
@@ -3485,6 +3547,11 @@ public class OllamaApiServer {
                             new AnthropicStreamEmitter(msgId, modelF));
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, prepared.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error",
+                                ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
                     final String reasoning;
                     final String contentText;
                     if (enableThinking) {

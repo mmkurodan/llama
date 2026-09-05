@@ -167,6 +167,7 @@ public class SettingsActivity extends Activity {
     private Button batteryOptButton;
     private Switch enableThinkingSwitch;
     private Switch useMmapSwitch;
+    private Switch nCtxAutoExpandSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
 
@@ -318,6 +319,7 @@ public class SettingsActivity extends Activity {
         mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
         searchGgufButton = findViewById(R.id.searchGgufButton);
         nCtxInput = findViewById(R.id.nCtxInput);
+        nCtxAutoExpandSwitch = findViewById(R.id.nCtxAutoExpandSwitch);
         nThreadsInput = findViewById(R.id.nThreadsInput);
         nBatchInput = findViewById(R.id.nBatchInput);
         tempInput = findViewById(R.id.tempInput);
@@ -887,6 +889,7 @@ public class SettingsActivity extends Activity {
             case "Used when API doesn't provide a system message.": return "API が system メッセージを渡さない場合に使用します。";
             case "Enable Think (chat-template-kwargs.enable_thinking):": return "Thinkを有効化 (chat-template-kwargs.enable_thinking):";
             case "Use memory-map (mmap):": return "メモリマップ (mmap) を使う:";
+            case "Auto-expand context (n_ctx):": return "コンテキスト自動拡張 (n_ctx):";
             case "Custom Chat Template:": return "カスタムチャットテンプレート:";
             case "Overrides auto-detection. Use {SYSTEM} and {USER} placeholders.": return "自動判定を上書きします。{SYSTEM} と {USER} プレースホルダーを使用します。";
             case "Auto-selected Prompt Template:": return "自動選択されたプロンプトテンプレート:";
@@ -1279,6 +1282,9 @@ public class SettingsActivity extends Activity {
         updateMtpControlsEnabled();
         modelUrlInput.setText(config.modelUrl);
         nCtxInput.setText(String.valueOf(config.nCtx));
+        if (nCtxAutoExpandSwitch != null) {
+            nCtxAutoExpandSwitch.setChecked(config.nCtxAutoExpand);
+        }
         nThreadsInput.setText(String.valueOf(config.nThreads));
         nBatchInput.setText(String.valueOf(config.nBatch));
         tempInput.setText(String.valueOf(config.temp));
@@ -1398,7 +1404,10 @@ public class SettingsActivity extends Activity {
         } catch (NumberFormatException e) {
             config.nCtx = 2048;
         }
-        
+        if (nCtxAutoExpandSwitch != null) {
+            config.nCtxAutoExpand = nCtxAutoExpandSwitch.isChecked();
+        }
+
         try {
             config.nThreads = Integer.parseInt(nThreadsInput.getText().toString());
         } catch (NumberFormatException e) {
@@ -2263,11 +2272,16 @@ public class SettingsActivity extends Activity {
     private static final String[] HF_FAMILY_KEYWORDS = {
             "", "Qwen", "Gemma", "Llama", "Mistral", "Phi", "DeepSeek", "GLM", "Yi", "Granite", "SmolLM"};
     // Parameter-size pulldown, parallel min/max bounds in billions (0 = unbounded).
-    private static final double[] HF_SIZE_MIN_B = {0, 0, 1, 4, 8, 14, 34};
-    private static final double[] HF_SIZE_MAX_B = {0, 1, 4, 8, 14, 34, 0};
+    // Parameter-size pulldown bands (parallel min/max in billions; 0 = unbounded), finer-grained.
+    private static final double[] HF_SIZE_MIN_B = {0, 0,    0.5, 1,   2, 4,   7, 9,  14, 20, 34, 70};
+    private static final double[] HF_SIZE_MAX_B = {0, 0.5,  1,   2,   4, 7,   9, 14, 20, 34, 70, 0};
     // Quantization pulldown (index 0 = "any"). Matched as a substring against GGUF file names.
+    // "Q1" matches IQ1_S/IQ1_M 1-bit files (lowercased "iq1_s" contains "q1").
     private static final String[] HF_QUANT_VALUES = {
-            "", "Q2_K", "Q3_K_M", "Q4_K_M", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "F16", "BF16"};
+            "", "Q1", "Q2_K", "Q3_K_M", "Q4_K_M", "Q4_0", "Q5_K_M", "Q6_K", "Q8_0", "F16", "BF16"};
+    // Representative parameter count (in billions) per size band, parallel to buildSizeLabels() /
+    // HF_SIZE_MIN_B. 0 = "Any" (no device-suitability rating). Used to estimate the +…+++++ rating.
+    private static final double[] HF_SIZE_REP_B = {0, 0.35, 0.75, 1.5, 3, 5.5, 8, 11, 17, 27, 50, 80};
 
     private void showHuggingFaceSearchDialog() {
         int pad = Math.round(getResources().getDisplayMetrics().density * 20f);
@@ -2282,15 +2296,51 @@ public class SettingsActivity extends Activity {
                 "Model name or keyword (free text, optional)"));
         form.addView(queryInput);
 
+        // ---- Model name: a pulldown (same form as size/quant) + a one-line strength note below.
         Spinner familySpinner = addLabeledSpinner(form,
                 localizedText("モデル名", "Model name"),
                 buildFamilyLabels());
+        TextView familyNote = addNoteView(form);
+        final String[] familyStrengths = buildFamilyStrengths();
+        familySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                familyNote.setText(position >= 0 && position < familyStrengths.length
+                        ? familyStrengths[position] : "");
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
+
+        // ---- Parameter size: pulldown + a device-specific suitability rating (+ … +++++) below.
         Spinner sizeSpinner = addLabeledSpinner(form,
                 localizedText("パラメータ数", "Parameter size"),
                 buildSizeLabels());
+        TextView sizeRating = addNoteView(form);
+        sizeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                sizeRating.setText(paramRatingText(position));
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
+
+        // ---- Quantization: pulldown + a one-line tendency note below.
         Spinner quantSpinner = addLabeledSpinner(form,
                 localizedText("量子化", "Quantization"),
                 buildQuantLabels());
+        TextView quantNote = addNoteView(form);
+        final String[] quantTendencies = buildQuantTendencies();
+        quantSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                quantNote.setText(position >= 0 && position < quantTendencies.length
+                        ? quantTendencies[position] : "");
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
 
         CheckBox multimodalCheck = new CheckBox(this);
         multimodalCheck.setText(localizedText("マルチモーダル対応のみ", "Multimodal only"));
@@ -2326,6 +2376,102 @@ public class SettingsActivity extends Activity {
                 .show();
     }
 
+    /** Adds a small secondary-text note line (used under the model / size / quant pulldowns). */
+    private TextView addNoteView(LinearLayout parent) {
+        TextView note = new TextView(this);
+        note.setTextSize(12f);
+        note.setTextColor(0xFF888888);
+        int topPad = Math.round(getResources().getDisplayMetrics().density * 2f);
+        note.setPadding(0, topPad, 0, 0);
+        parent.addView(note, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return note;
+    }
+
+    /** One-line strengths parallel to HF_FAMILY_KEYWORDS / buildFamilyLabels(). */
+    private String[] buildFamilyStrengths() {
+        return new String[]{
+                localizedText("すべてのモデルを対象", "Search across all models"),
+                localizedText("多言語・コーディング・長文に強い万能型", "Versatile: multilingual, coding, long context"),
+                localizedText("軽量で多言語・要約が得意", "Lightweight; strong multilingual & summarization"),
+                localizedText("汎用的で派生・エコシステムが豊富", "General-purpose with a rich ecosystem"),
+                localizedText("少パラメータで高効率・指示追従が堅実", "Efficient at small sizes; solid instruction following"),
+                localizedText("小型ながら推論・数学に強い", "Small but strong at reasoning & math"),
+                localizedText("推論・コード生成・数学に特化", "Specialized in reasoning, code & math"),
+                localizedText("中英バイリンガルとツール利用に強い", "Strong CN/EN bilingual & tool use"),
+                localizedText("長文コンテキストとバイリンガル性能", "Long context & bilingual performance"),
+                localizedText("企業向け・コード/RAG志向で安定", "Enterprise-oriented; stable for code/RAG"),
+                localizedText("超小型・端末常駐向けの最軽量", "Ultra-small; ideal for always-on/on-device")};
+    }
+
+    /** One-line quantization tendencies parallel to HF_QUANT_VALUES / buildQuantLabels(). */
+    private String[] buildQuantTendencies() {
+        return new String[]{
+                localizedText("量子化を指定しません", "No quantization filter"),
+                localizedText("1bit級。極小・最速だが品質は実験的", "1-bit class; tiny/fastest but experimental quality"),
+                localizedText("最小・最速だが品質低下が大きい（動作確認向け）", "Smallest/fastest but large quality loss (smoke test)"),
+                localizedText("小型・高速だが品質はやや低下", "Small/fast, slightly reduced quality"),
+                localizedText("サイズと品質のバランスが最良（推奨既定）", "Best size/quality balance (recommended default)"),
+                localizedText("旧式4bit。軽量だがQ4_K_Mに品質で劣る", "Legacy 4-bit; light but lower quality than Q4_K_M"),
+                localizedText("高品質寄りで中容量。バランス良好", "Higher quality, medium size, well balanced"),
+                localizedText("ほぼ無損失に近い高品質。容量大", "Near-lossless quality; large size"),
+                localizedText("高品質・大容量。速度/メモリ負担大", "High quality, large; heavier on speed/memory"),
+                localizedText("非量子化(16bit)。最高品質だが最大容量・低速", "Unquantized (16-bit); top quality, largest & slow"),
+                localizedText("非量子化(bfloat16)。F16同等で最大容量", "Unquantized (bfloat16); like F16, largest size")};
+    }
+
+    /**
+     * Device-specific suitability rating (+ … +++++) for a parameter-size band, based on total RAM.
+     * + = hard to run, +++ = practically usable, +++++ = fast. Rough estimate using a Q4_K_M
+     * footprint of ~0.7 GB per 1B params against ~half of total device memory.
+     */
+    private String paramRatingText(int sizeIdx) {
+        double repB = (sizeIdx >= 0 && sizeIdx < HF_SIZE_REP_B.length) ? HF_SIZE_REP_B[sizeIdx] : 0;
+        if (repB <= 0) {
+            return localizedText("この端末での推奨度: 指定なし", "Suitability on this device: not specified");
+        }
+        long totalBytes = getDeviceTotalMemoryBytes();
+        double deviceGB = totalBytes > 0 ? totalBytes / 1.0e9 : 0;
+        double requiredGB = repB * 0.7;                 // Q4_K_M weights + modest overhead
+        double budgetGB = deviceGB > 0 ? deviceGB * 0.5 : 0;  // usable for model weights
+        int stars;
+        if (budgetGB <= 0) {
+            stars = 3;                                  // unknown device → neutral
+        } else {
+            double ratio = requiredGB / budgetGB;
+            if (ratio <= 0.25) stars = 5;
+            else if (ratio <= 0.5) stars = 4;
+            else if (ratio <= 0.8) stars = 3;
+            else if (ratio <= 1.1) stars = 2;
+            else stars = 1;
+        }
+        String plus = "+++++".substring(0, stars);
+        String note;
+        switch (stars) {
+            case 5:  note = localizedText("高速実行", "fast"); break;
+            case 4:  note = localizedText("快適", "comfortable"); break;
+            case 3:  note = localizedText("実用可能", "usable"); break;
+            case 2:  note = localizedText("動作は重い", "sluggish"); break;
+            default: note = localizedText("実行困難", "hard to run"); break;
+        }
+        return localizedText("この端末での推奨度: ", "Suitability on this device: ") + plus + " (" + note + ")";
+    }
+
+    /** Total physical device memory in bytes (ActivityManager.MemoryInfo.totalMem), or -1. */
+    private long getDeviceTotalMemoryBytes() {
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            if (am != null) {
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                am.getMemoryInfo(mi);
+                return mi.totalMem;
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1L;
+    }
+
     /** Adds a caption + full-width {@link Spinner} to {@code parent} and returns the spinner. */
     private Spinner addLabeledSpinner(LinearLayout parent, String caption, String[] labels) {
         int topMargin = Math.round(getResources().getDisplayMetrics().density * 12f);
@@ -2355,12 +2501,17 @@ public class SettingsActivity extends Activity {
     private String[] buildSizeLabels() {
         return new String[]{
                 localizedText("指定なし", "Any"),
-                localizedText("〜1B", "Up to 1B"),
-                "1–4B",
-                "4–8B",
-                "8–14B",
-                "14–34B",
-                localizedText("34B以上", "34B+")};
+                localizedText("〜0.5B", "Up to 0.5B"),
+                "0.5–1B",
+                "1–2B",
+                "2–4B",
+                "4–7B",
+                "7–9B",
+                "9–14B",
+                "14–20B",
+                "20–34B",
+                "34–70B",
+                localizedText("70B以上", "70B+")};
     }
 
     private String[] buildQuantLabels() {
@@ -2477,17 +2628,82 @@ public class SettingsActivity extends Activity {
                     "No files for the selected quantization; showing all"));
         }
 
-        final List<HuggingFaceApiClient.GgufFileInfo> shownFiles = files;
+        // Combine model files (quant-filtered above) with the repository's mmproj/projector files.
+        // Projector files are always shown regardless of the quant filter (they are named like
+        // "mmproj-…-F16.gguf" and would otherwise be filtered out), tagged with "[mmproj]", and are
+        // downloaded directly WITHOUT loading (request: search/download mmproj directly, no load).
+        final List<HuggingFaceApiClient.GgufFileInfo> shownFiles = new ArrayList<>(files);
+        for (HuggingFaceApiClient.GgufFileInfo projector : repositoryFiles.getProjectorFiles()) {
+            if (!shownFiles.contains(projector)) {
+                shownFiles.add(projector);
+            }
+        }
         String[] labels = new String[shownFiles.size()];
         for (int i = 0; i < shownFiles.size(); i++) {
-            labels[i] = shownFiles.get(i).getFilename();
+            HuggingFaceApiClient.GgufFileInfo file = shownFiles.get(i);
+            labels[i] = file.isProjector()
+                    ? "[mmproj] " + file.getFilename()
+                    : file.getFilename();
         }
 
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("ダウンロード対象を選択", "Select a GGUF file"))
-                .setItems(labels, (dialog, which) -> applyHuggingFaceFileSelection(repositoryFiles, shownFiles.get(which)))
+                .setItems(labels, (dialog, which) -> {
+                    HuggingFaceApiClient.GgufFileInfo chosen = shownFiles.get(which);
+                    if (chosen.isProjector()) {
+                        downloadProjectorFileOnly(chosen);
+                    } else {
+                        applyHuggingFaceFileSelection(repositoryFiles, chosen);
+                    }
+                })
                 .setNegativeButton(localizedText("閉じる", "Close"), null)
                 .show();
+    }
+
+    /**
+     * Download a standalone mmproj/projector file directly, WITHOUT loading it (request #4). The
+     * file is saved into the model storage directory; if the name collides with an existing file a
+     * " (N)" suffix is added so nothing is overwritten. No model/projector config is changed.
+     */
+    private void downloadProjectorFileOnly(HuggingFaceApiClient.GgufFileInfo projector) {
+        if (modelManager.isBusy()) {
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
+            return;
+        }
+        final String url = projector.getDownloadUrl();
+        modelFileInfo.setText(localizedText("mmproj をダウンロード中: ", "Downloading mmproj: ")
+                + projector.getFilename());
+        modelProgressBar.setIndeterminate(true);
+        new Thread(() -> {
+            if (!modelManager.tryAcquire()) {
+                runOnUiThread(() -> showToast(localizedText("モデルは処理中です", "Model is busy")));
+                return;
+            }
+            String savedName = null;
+            try {
+                savedName = modelManager.downloadStandaloneFile(url);
+            } catch (Throwable t) {
+                Log.e(TAG, "mmproj download error", t);
+            } finally {
+                modelManager.release();
+            }
+            final String saved = savedName;
+            runOnUiThread(() -> {
+                modelProgressBar.setIndeterminate(false);
+                if (saved != null) {
+                    modelFileInfo.setText(localizedText("mmproj ダウンロード完了: ", "mmproj downloaded: ") + saved);
+                    modelProgressBar.setProgress(100);
+                    lastDownloadProgress = 100;
+                    showToast(localizedText("mmproj をダウンロードしました（ロードはしません）",
+                            "Downloaded mmproj (not loaded)"));
+                } else {
+                    modelFileInfo.setText(localizedText("mmproj のダウンロードに失敗しました", "mmproj download failed"));
+                    modelProgressBar.setProgress(0);
+                    lastDownloadProgress = 0;
+                    showToast(localizedText("mmproj のダウンロードに失敗しました", "mmproj download failed"));
+                }
+            });
+        }, "hf-mmproj-download").start();
     }
 
     private void applyHuggingFaceFileSelection(

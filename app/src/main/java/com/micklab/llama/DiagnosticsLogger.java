@@ -633,6 +633,23 @@ public final class DiagnosticsLogger {
         return values;
     }
 
+    /**
+     * Current process anonymous + swap memory in bytes (from {@code /proc/self/smaps_rollup}),
+     * or -1 if unavailable. This is the metric the Android/Play per-app memory governor kills on
+     * (~3 GB); n_ctx auto-promotion uses it to stay within budget on CPU, where the KV cache is
+     * anonymous memory (on GPU the KV lives in an OpenCL buffer and is not counted here).
+     */
+    public static long getCurrentAnonPlusSwapBytes() {
+        Map<String, Long> rollup = readSmapsRollup();
+        Long anon = rollup.get("Anonymous");
+        if (anon == null || anon < 0) {
+            return -1L;
+        }
+        Long swap = rollup.get("Swap");
+        long totalKb = anon + (swap != null && swap > 0 ? swap : 0L);
+        return totalKb * 1024L;
+    }
+
     private static void appendProcStatusValue(StringBuilder sb, Map<String, String> status, String key) {
         String value = status.get(key);
         if (value != null && !value.isEmpty()) {

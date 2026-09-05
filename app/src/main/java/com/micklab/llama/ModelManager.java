@@ -136,6 +136,32 @@ public class ModelManager {
     private volatile int currentNCtx = 0;
     // Per-request n_ctx override from options.num_ctx; 0 = use config value.
     private volatile int nCtxOverrideForNextLoad = 0;
+    // When true, loadConfiguration keeps the currently-registered native token listener across the
+    // reload (used by n_ctx auto-promotion so the retried generation still streams to the caller).
+    private volatile boolean preserveTokenListenerOnReload = false;
+
+    // ---- n_ctx auto-promotion (Q2) budget ----
+    // The Android/Play per-app memory governor force-stops the process when anon RSS + swap
+    // exceeds ~3 GB. On CPU the KV cache is anonymous memory, so n_ctx auto-promotion must stay
+    // under that budget; on GPU the KV lives in an OpenCL buffer (not anon) and is bounded by
+    // VRAM instead. Verified on-device: CPU Qwen3VL-2B @ n_ctx=8192 peaks anonPlusSwap≈2.5 GB.
+    private static final long CTX_PROMOTE_ANON_BUDGET_BYTES = 3L * 1024 * 1024 * 1024; // 3 GB policy
+    private static final long CTX_PROMOTE_ANON_SAFETY_BYTES = 512L * 1024 * 1024;      // headroom
+    // Fallback CPU non-KV baseline when a live anon reading is unavailable (measured ~1.7 GB for a
+    // 2B Q4 model + clip); conservative so promotion never over-commits.
+    private static final long CTX_PROMOTE_CPU_BASELINE_FALLBACK_BYTES = 1800L * 1024 * 1024;
+    // GPU KV ceiling: OpenCL single-buffer max alloc is ~2 GB and VRAM here is ~10 GB, so a 3 GB
+    // KV budget is comfortable while still finite.
+    private static final long CTX_PROMOTE_GPU_KV_BUDGET_BYTES = 3L * 1024 * 1024 * 1024;
+    private static final int CTX_PROMOTE_MAX_NCTX = 32768;
+    // Machine-parseable native error prefix emitted by the multimodal context-fit pre-check (Q1).
+    private static final Pattern CTX_TOO_SMALL_PATTERN =
+            Pattern.compile("CTX_TOO_SMALL need=(\\d+) have=(\\d+)");
+    // Text-path context overflow errors already carry the needed token count in prose.
+    private static final Pattern CTX_TEXT_NEEDS_PATTERN =
+            Pattern.compile("needs (\\d+) tokens but n_ctx=(\\d+)");
+    private static final Pattern CTX_TEXT_NOROOM_PATTERN =
+            Pattern.compile("prompt \\((\\d+) tokens\\) leaves no room in context n_ctx=(\\d+)");
     private volatile String currentMmprojPath = null;
     private volatile boolean currentSupportsVision = false;
     private volatile boolean currentSupportsAudio = false;
@@ -730,7 +756,14 @@ public class ModelManager {
                 }
 
                 if (currentModelPath != null || modelLoaded) {
-                    clearTransientLoadReferences();
+                    // During an n_ctx auto-promotion the streaming caller's token listener must
+                    // survive the reload — otherwise the retried generation streams to a null
+                    // listener and its output never reaches the client. clearTransientLoadReferences
+                    // only detaches the listener, so skip it here (the native listener global
+                    // survives free()/init()).
+                    if (!preserveTokenListenerOnReload) {
+                        clearTransientLoadReferences();
+                    }
                     unloadCurrentModelLocked();
                     if (stabilLevel >= 2 && backendChanged) {
                         int postFreeWaitMs = stabilLevel == 2 ? 300 : 500;
@@ -748,11 +781,41 @@ public class ModelManager {
                         mmprojPath != null ? mmprojPath : "",
                         enableAudioForLoad);
                 if (!"ok".equals(initResult)) {
-                    Log.e(TAG, "Model init failed: " + initResult);
-                    if (listener != null) {
-                        listener.onError("Model init failed: " + initResult);
+                    // GPU→CPU auto-fallback (general, not vision-specific): a GPU model init can fail
+                    // for any model due to OpenCL buffer allocation / kernel compilation / VRAM. Note
+                    // the "GPU device not found" case already falls back inside native build_model_params
+                    // and returns "ok"; this handles a *present* GPU that fails to initialize. Retry
+                    // once on pure CPU so the model still loads instead of leaving the user stuck.
+                    boolean gpuWasRequested =
+                            config.backendType != ConfigurationManager.Configuration.BACKEND_CPU
+                                    || config.gpuOffloadLayers != 0;
+                    if (gpuWasRequested) {
+                        Log.w(TAG, "GPU model init failed (" + initResult + "); retrying on CPU");
+                        DiagnosticsLogger.logEvent(context, "model-load",
+                                "GPU init failed → CPU auto-fallback: " + initResult);
+                        config.backendType = ConfigurationManager.Configuration.BACKEND_CPU;
+                        config.gpuOffloadLayers = 0;
+                        prepareForLargeModelLoad(modelPath);
+                        applyLoadParameters(config, config.nCtx);
+                        initResult = llama.initWithMmproj(
+                                modelPath,
+                                mmprojPath != null ? mmprojPath : "",
+                                enableAudioForLoad);
+                        if ("ok".equals(initResult)) {
+                            DiagnosticsLogger.logEvent(context, "model-load", "CPU auto-fallback init ok");
+                            if (listener != null) {
+                                listener.onError("GPU unavailable for this model — loaded on CPU instead."
+                                        + "／GPUで初期化できなかったためCPUで読み込みました。");
+                            }
+                        }
                     }
-                    return false;
+                    if (!"ok".equals(initResult)) {
+                        Log.e(TAG, "Model init failed: " + initResult);
+                        if (listener != null) {
+                            listener.onError("Model init failed: " + initResult);
+                        }
+                        return false;
+                    }
                 }
 
                 currentModelPath = modelPath;
@@ -922,6 +985,158 @@ public class ModelManager {
     private float safeFinite(float value, float fallback) {
         return Float.isFinite(value) ? value : fallback;
     }
+
+    // ---- n_ctx auto-promotion (Q2) helpers ----
+
+    /**
+     * If {@code result} is a context-too-small error (multimodal CTX_TOO_SMALL, or a text-path
+     * overflow), return the number of prompt tokens that need to fit (including a small generation
+     * headroom); otherwise 0. Used to decide whether to auto-promote n_ctx and retry.
+     */
+    private int parseCtxTooSmallNeed(String result) {
+        if (result == null) {
+            return 0;
+        }
+        Matcher m = CTX_TOO_SMALL_PATTERN.matcher(result);
+        if (m.find()) {
+            try { return Integer.parseInt(m.group(1)); } catch (NumberFormatException ignored) { return 0; }
+        }
+        m = CTX_TEXT_NEEDS_PATTERN.matcher(result);
+        if (m.find()) {
+            try { return Integer.parseInt(m.group(1)) + 16; } catch (NumberFormatException ignored) { return 0; }
+        }
+        m = CTX_TEXT_NOROOM_PATTERN.matcher(result);
+        if (m.find()) {
+            try { return Integer.parseInt(m.group(1)) + 16; } catch (NumberFormatException ignored) { return 0; }
+        }
+        return 0;
+    }
+
+    private boolean isCurrentBackendGpu() {
+        return currentBackendType != ConfigurationManager.Configuration.BACKEND_CPU
+                || currentGpuOffloadLayers != 0;
+    }
+
+    private static int nextPow2AtLeast(int v) {
+        if (v <= 1) {
+            return 1;
+        }
+        int p = Integer.highestOneBit(v - 1) << 1;
+        return p > 0 ? p : Integer.MAX_VALUE;
+    }
+
+    /**
+     * Compute the n_ctx to promote to so a prompt of {@code needTokens} fits, bounded by the memory
+     * budget (approach A): on CPU by the ~3 GB anon governor (KV is anon), on GPU by a VRAM-friendly
+     * KV ceiling (KV is an OpenCL buffer, off-anon). Returns 0 if promotion can't help / isn't
+     * possible (unknown per-cell size, or the cap can't even hold the prompt).
+     */
+    private int computePromotedNCtx(int needTokens) {
+        if (needTokens <= 0) {
+            return 0;
+        }
+        long perCell;
+        try {
+            perCell = llama.getKvBytesPerCell();
+        } catch (Throwable t) {
+            perCell = 0;
+        }
+        int target = Math.min(CTX_PROMOTE_MAX_NCTX, nextPow2AtLeast(needTokens));
+
+        int cap;
+        if (perCell <= 0) {
+            // Unknown model dims — fall back to the absolute cap only.
+            cap = CTX_PROMOTE_MAX_NCTX;
+        } else {
+            // Byte budget for the KV cache we may add. The 3 GB policy is the target ceiling, but a
+            // device with less memory than that is the tighter upper bound — so bound by the memory
+            // actually available now (minus safety headroom) as well.
+            long kvBudget;
+            if (isCurrentBackendGpu()) {
+                // GPU: KV lives in an OpenCL buffer (off-anon); bounded by VRAM, which is unified
+                // with system RAM on these SoCs, so the live-available reading still applies.
+                kvBudget = CTX_PROMOTE_GPU_KV_BUDGET_BYTES;
+            } else {
+                // CPU: KV is anon. Budget the *projected* anon against ~3 GB using a live reading of
+                // the current anon footprint minus the KV already resident (self-calibrating).
+                long liveAnon = DiagnosticsLogger.getCurrentAnonPlusSwapBytes();
+                long baselineNonKv;
+                if (liveAnon > 0) {
+                    long currentKv = perCell * Math.max(0, currentNCtx);
+                    baselineNonKv = Math.max(0, liveAnon - currentKv);
+                } else {
+                    baselineNonKv = CTX_PROMOTE_CPU_BASELINE_FALLBACK_BYTES;
+                }
+                kvBudget = CTX_PROMOTE_ANON_BUDGET_BYTES - CTX_PROMOTE_ANON_SAFETY_BYTES - baselineNonKv;
+            }
+            // Upper-bound by the device's currently-available memory (min of 3 GB target and the
+            // real device headroom): never try to grab more KV than the device can actually give.
+            long deviceAvail = getAvailableSystemMemoryBytes();
+            if (deviceAvail > 0) {
+                kvBudget = Math.min(kvBudget, deviceAvail - CTX_PROMOTE_ANON_SAFETY_BYTES);
+            }
+            long maxCells = kvBudget > 0 ? kvBudget / perCell : 0;
+            cap = (int) Math.min(CTX_PROMOTE_MAX_NCTX, Math.max(0, maxCells));
+        }
+
+        int promoted = Math.min(target, cap);
+        // Only worthwhile if it grows the window AND can actually hold the prompt.
+        if (promoted <= currentNCtx || promoted < needTokens) {
+            return 0;
+        }
+        return promoted;
+    }
+
+    /** Currently-available system memory in bytes (ActivityManager.MemoryInfo.availMem), or -1. */
+    private long getAvailableSystemMemoryBytes() {
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                am.getMemoryInfo(mi);
+                return mi.availMem;
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1L;
+    }
+
+    /** User-facing, actionable message when a prompt can't fit even after bounded n_ctx promotion. */
+    private String ctxTooSmallUserMessage(int needTokens, int haveNCtx) {
+        return "Input too large for the available memory budget: it needs about " + needTokens
+                + " context tokens but only " + haveNCtx + " fit within the memory limit (~3 GB or the "
+                + "device's available memory, whichever is smaller). Use a smaller image or shorter input.";
+    }
+
+    /** Message when the prompt exceeds n_ctx and auto-expand is turned off. */
+    private String ctxTooSmallDisabledMessage(int needTokens, int haveNCtx) {
+        return "Input needs about " + needTokens + " context tokens but n_ctx=" + haveNCtx
+                + ". Increase Context Size, or enable \"Auto-expand context\" in Settings, or shorten the input.";
+    }
+
+    /**
+     * Internal marker prefixed onto a terminal context-limit result returned by {@link #generate}.
+     * A prompt that can't fit even after bounded n_ctx promotion is NOT a valid model completion —
+     * delivering the human-readable notice as assistant content would corrupt structured output
+     * (GBNF / JSON-schema clients) and mislead any caller expecting a specific response shape. The
+     * API layer detects this marker via {@link #isCtxLimitError} and surfaces it as a real server
+     * error (HTTP error / SSE error frame) instead of fake content. The marker is stripped by
+     * {@link #ctxLimitMessage} before the human text is used.
+     */
+    public static final String CTX_LIMIT_ERROR_PREFIX = "\u0001CTX_LIMIT\u0001";
+
+    /** True if {@code result} is the terminal context-limit signal from {@link #generate}. */
+    public static boolean isCtxLimitError(String result) {
+        return result != null && result.startsWith(CTX_LIMIT_ERROR_PREFIX);
+    }
+
+    /** The human-readable notice carried by a context-limit result (marker stripped); pass-through otherwise. */
+    public static String ctxLimitMessage(String result) {
+        return isCtxLimitError(result)
+                ? result.substring(CTX_LIMIT_ERROR_PREFIX.length())
+                : result;
+    }
     
     /**
      * Generate response from prompt.
@@ -943,56 +1158,104 @@ public class ModelManager {
             listener.onGenerating(currentConfigName);
         }
         
-        String result;
-        int generationId = generationCounter.incrementAndGet();
-        String loadedModelName = currentModelPath != null ? new File(currentModelPath).getName() : "(none)";
-        int promptLength = prompt != null ? prompt.length() : 0;
-        int mediaCount = mediaFiles != null ? mediaFiles.length : 0;
-        DiagnosticsLogger.logMemorySnapshot(
-                context,
-                "generation-start",
-                "id=" + generationId
-                        + " config=" + currentConfigName
-                        + " model=" + loadedModelName
-                        + " promptLen=" + promptLength
-                        + " mediaCount=" + mediaCount);
-        DiagnosticsLogger.markGenerationInProgress(
-                context,
-                generationId,
-                currentConfigName,
-                loadedModelName,
-                promptLength,
-                mediaCount);
-        DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-start");
-        try {
-            result = (mediaFiles == null || mediaFiles.length == 0)
-                    ? llama.generate(prompt)
-                    : llama.generateWithMedia(prompt, mediaFiles);
-            DiagnosticsLogger.logEvent(
-                    context,
-                    "generation-stage",
-                    "id=" + generationId + " stage=native-call-end resultLen=" + (result != null ? result.length() : 0));
-        } catch (Throwable t) {
-            // Log full stack trace and notify listener so the server can respond gracefully
-            Log.e(TAG, "Exception during generate", t);
-            DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-throw error=" + t);
+        String result = null;
+        // Q2: allow one context-too-small auto-promotion + retry. Qwen3-VL and other native
+        // dynamic-resolution VLMs can emit more image tokens than the configured n_ctx; when the
+        // native pre-check reports CTX_TOO_SMALL we grow n_ctx (bounded by the ~3 GB memory budget),
+        // reload, and retry once instead of returning a cryptic decode failure.
+        boolean ctxPromoteTried = false;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            int generationId = generationCounter.incrementAndGet();
+            String loadedModelName = currentModelPath != null ? new File(currentModelPath).getName() : "(none)";
+            int promptLength = prompt != null ? prompt.length() : 0;
+            int mediaCount = mediaFiles != null ? mediaFiles.length : 0;
             DiagnosticsLogger.logMemorySnapshot(
                     context,
-                    "generation-error",
-                    "id=" + generationId + " error=" + t);
-            if (listener != null) {
-                listener.onError("Generation exception: " + t.toString());
+                    "generation-start",
+                    "id=" + generationId
+                            + " config=" + currentConfigName
+                            + " model=" + loadedModelName
+                            + " promptLen=" + promptLength
+                            + " mediaCount=" + mediaCount);
+            DiagnosticsLogger.markGenerationInProgress(
+                    context,
+                    generationId,
+                    currentConfigName,
+                    loadedModelName,
+                    promptLength,
+                    mediaCount);
+            DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-start");
+            try {
+                result = (mediaFiles == null || mediaFiles.length == 0)
+                        ? llama.generate(prompt)
+                        : llama.generateWithMedia(prompt, mediaFiles);
+                DiagnosticsLogger.logEvent(
+                        context,
+                        "generation-stage",
+                        "id=" + generationId + " stage=native-call-end resultLen=" + (result != null ? result.length() : 0));
+            } catch (Throwable t) {
+                // Log full stack trace and notify listener so the server can respond gracefully
+                Log.e(TAG, "Exception during generate", t);
+                DiagnosticsLogger.logEvent(context, "generation-stage", "id=" + generationId + " stage=native-call-throw error=" + t);
+                DiagnosticsLogger.logMemorySnapshot(
+                        context,
+                        "generation-error",
+                        "id=" + generationId + " error=" + t);
+                if (listener != null) {
+                    listener.onError("Generation exception: " + t.toString());
+                }
+                // Return a clear error string so API layer can send a proper error response
+                return "generate failed: " + t.toString();
+            } finally {
+                DiagnosticsLogger.clearGenerationInProgress(context);
             }
-            // Return a clear error string so API layer can send a proper error response
-            return "generate failed: " + t.toString();
-        } finally {
-            DiagnosticsLogger.clearGenerationInProgress(context);
+            DiagnosticsLogger.logMemorySnapshot(
+                    context,
+                    "generation-end",
+                    "id=" + generationId + " resultLen=" + (result != null ? result.length() : 0));
+
+            // Q2: context-too-small → promote n_ctx within the memory budget and retry once.
+            if (!ctxPromoteTried && attempt == 0) {
+                int need = parseCtxTooSmallNeed(result);
+                if (need > 0) {
+                    ctxPromoteTried = true;
+                    boolean autoExpand = lastLoadedConfig != null && lastLoadedConfig.nCtxAutoExpand;
+                    int newNCtx = autoExpand ? computePromotedNCtx(need) : 0;
+                    if (newNCtx > 0 && currentConfigName != null) {
+                        DiagnosticsLogger.logEvent(context, "ctx-autopromote",
+                                "need=" + need + " from=" + currentNCtx + " to=" + newNCtx
+                                        + " backend=" + (isCurrentBackendGpu() ? "GPU" : "CPU"));
+                        setNCtxOverrideForNextLoad(newNCtx);
+                        // Keep the caller's token listener across this reload so the retry streams.
+                        preserveTokenListenerOnReload = true;
+                        boolean reloaded;
+                        try {
+                            reloaded = loadConfiguration(currentConfigName);
+                        } finally {
+                            preserveTokenListenerOnReload = false;
+                        }
+                        if (reloaded) {
+                            continue;   // retry generation at the larger context
+                        }
+                        Log.e(TAG, "ctx auto-promote reload failed; returning original error");
+                    } else {
+                        // Either auto-expand is disabled, or we can't grow enough within the memory
+                        // budget — surface an actionable error instead of the raw native string.
+                        DiagnosticsLogger.logEvent(context, "ctx-autopromote",
+                                "need=" + need + " have=" + currentNCtx
+                                        + " result=" + (autoExpand ? "capped(no-promote)" : "disabled"));
+                        // Terminal context-limit: prompt can't fit even after bounded promotion (or
+                        // auto-expand is off). Mark it so the API layer returns a server error rather
+                        // than delivering the notice as assistant content (breaks GBNF/schema clients).
+                        result = CTX_LIMIT_ERROR_PREFIX + (autoExpand
+                                ? ctxTooSmallUserMessage(need, currentNCtx)
+                                : ctxTooSmallDisabledMessage(need, currentNCtx));
+                    }
+                }
+            }
+            break;
         }
-        DiagnosticsLogger.logMemorySnapshot(
-                context,
-                "generation-end",
-                "id=" + generationId + " resultLen=" + (result != null ? result.length() : 0));
-        
+
         if (listener != null) {
             listener.onGenerationComplete(currentConfigName, result);
         }
@@ -1194,6 +1457,51 @@ public class ModelManager {
 
     private File getModelStorageDir() {
         return ModelFileHelper.getModelStorageDir(context);
+    }
+
+    /**
+     * Download a single remote file (e.g. a standalone mmproj) into the model storage directory
+     * WITHOUT loading it. If a file with the derived name already exists, a " (N)" suffix is added
+     * (before the extension) so nothing is overwritten. Returns the saved filename on success, or
+     * {@code null} on failure. The caller is responsible for the busy lock (as with other downloads).
+     */
+    public String downloadStandaloneFile(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return null;
+        }
+        String base = extractFilenameFromUrl(url);
+        if (base == null || base.isEmpty()) {
+            base = "download.gguf";
+        }
+        // Configure the native HTTPS trust store first — the normal model/mmproj download paths do
+        // this before every transfer; without it the TLS handshake to huggingface.co fails.
+        String trustStoreError = configureNativeDownloadTrustStore();
+        if (trustStoreError != null) {
+            Log.e(TAG, "downloadStandaloneFile: " + trustStoreError);
+            return null;
+        }
+        File dest = uniqueDestinationFile(getModelStorageDir(), base);
+        String result = downloadWithWakeLock(url.trim(), dest.getAbsolutePath());
+        boolean ok = "ok".equals(result) || (dest.isFile() && dest.length() > 0);
+        return ok ? dest.getName() : null;
+    }
+
+    /** Returns {@code dir/filename}, or {@code dir/name (N).ext} if that already exists (N ≥ 2). */
+    private File uniqueDestinationFile(File dir, String filename) {
+        File f = new File(dir, filename);
+        if (!f.exists()) {
+            return f;
+        }
+        int dot = filename.lastIndexOf('.');
+        String stem = dot > 0 ? filename.substring(0, dot) : filename;
+        String ext = dot > 0 ? filename.substring(dot) : "";
+        for (int n = 2; n <= 9999; n++) {
+            File candidate = new File(dir, stem + " (" + n + ")" + ext);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return new File(dir, stem + " (" + System.currentTimeMillis() + ")" + ext);
     }
 
     private String ensureModelFilesAvailable(ConfigurationManager.Configuration config, File destFile) {
