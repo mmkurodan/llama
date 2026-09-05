@@ -2362,12 +2362,7 @@ public class OllamaApiServer {
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
-                            // If an n_ctx auto-promotion reload cleared the listener (retry tokens
-                            // lost) or a CTX_TOO_SMALL was suppressed, deliver the returned text.
-                            if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
-                                tokenQueue.offer(stripResponseMarkers(streamResult));
-                            }
-                            tokenQueue.offer(TOKEN_COMPLETE);
+                            enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
                         }
                     }
                     try {
@@ -2382,6 +2377,10 @@ public class OllamaApiServer {
                 } else {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse);
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendErrorResponse(outputStream, 400, ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
                     logMaxDebugPayload("api.generate.nonstream.model.raw", rawResponse);
                     final String genReasoning;
                     final String genContent;
@@ -2724,14 +2723,7 @@ public class OllamaApiServer {
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
-                            // Nothing reached the stream but generate() returned a message (a
-                            // suppressed, unrecoverable context-fit error, or an exception string).
-                            // Deliver it as assistant content so the client sees it and the stream
-                            // terminates cleanly instead of hanging on an empty response.
-                            if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
-                                tokenQueue.offer(stripResponseMarkers(streamResult));
-                            }
-                            tokenQueue.offer(TOKEN_COMPLETE);
+                            enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
                         }
                     }
                     try {
@@ -2746,6 +2738,10 @@ public class OllamaApiServer {
                 } else {
                     // Non-streaming response
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendErrorResponse(outputStream, 400, ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
                     logMaxDebugPayload("api.chat.nonstream.model.raw", rawResponse);
                     final String chatReasoning;
                     final String chatContent;
@@ -3072,10 +3068,7 @@ public class OllamaApiServer {
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
-                            if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
-                                tokenQueue.offer(stripResponseMarkers(streamResult));
-                            }
-                            tokenQueue.offer(TOKEN_COMPLETE);
+                            enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
                         }
                     }
 
@@ -3090,6 +3083,11 @@ public class OllamaApiServer {
                     }
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, preparedMessages.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendOpenAiErrorResponse(outputStream, 400,
+                                ModelManager.ctxLimitMessage(rawResponse), "invalid_request_error");
+                        return;
+                    }
                     final String oaiReasoning;
                     final String oaiContent;
                     if (enableThinking) {
@@ -3124,6 +3122,28 @@ public class OllamaApiServer {
                     e.getMessage() != null ? e.getMessage() : "OpenAI chat request failed",
                     "server_error");
         }
+    }
+
+    /**
+     * Route generate()'s returned string onto a stream's token queue when nothing was streamed.
+     * A terminal context-limit condition ({@link ModelManager#isCtxLimitError}) is surfaced as a
+     * protocol error frame (via {@link TokenError}, which each emitter renders per wire format) —
+     * never as fake assistant content — so GBNF / JSON-schema clients see a real server error. Any
+     * other non-empty return (e.g. an auto-promote reload that cleared the listener) is delivered as
+     * content so the client never receives an empty stream.
+     */
+    private void enqueueTerminalStreamResult(
+            java.util.concurrent.LinkedBlockingQueue<Object> tokenQueue,
+            boolean streamedAny,
+            String streamResult) {
+        if (ModelManager.isCtxLimitError(streamResult)) {
+            tokenQueue.offer(new TokenError(ModelManager.ctxLimitMessage(streamResult)));
+            return;
+        }
+        if (!streamedAny && streamResult != null && !streamResult.isEmpty()) {
+            tokenQueue.offer(stripResponseMarkers(streamResult));
+        }
+        tokenQueue.offer(TOKEN_COMPLETE);
     }
 
     // ==================== Shared streaming driver ====================
@@ -3222,12 +3242,7 @@ public class OllamaApiServer {
         } finally {
             modelManager.getLlama().setTokenListener(null);
             if (!errorSent[0] && !clientDisconnected.get()) {
-                // Deliver the returned text if nothing streamed (auto-promote reload cleared the
-                // listener, or a suppressed CTX_TOO_SMALL) so the client never gets an empty stream.
-                if (!streamedAny[0] && streamResult != null && !streamResult.isEmpty()) {
-                    tokenQueue.offer(stripResponseMarkers(streamResult));
-                }
-                tokenQueue.offer(TOKEN_COMPLETE);
+                enqueueTerminalStreamResult(tokenQueue, streamedAny[0], streamResult);
             }
         }
 
@@ -3328,6 +3343,11 @@ public class OllamaApiServer {
                     });
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, new byte[0][]);
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendOpenAiErrorResponse(outputStream, 400,
+                                ModelManager.ctxLimitMessage(rawResponse), "invalid_request_error");
+                        return;
+                    }
                     String content = appendPerfMetrics(stripResponseMarkers(
                             PromptTemplateManager.stripThinkingBlocks(rawResponse)));
                     JSONObject resp = buildTextCompletionResponse(model, content, "stop");
@@ -3527,6 +3547,11 @@ public class OllamaApiServer {
                             new AnthropicStreamEmitter(msgId, modelF));
                 } else {
                     String rawResponse = modelManager.generate(promptToUse, prepared.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendAnthropicErrorResponse(outputStream, 400, "invalid_request_error",
+                                ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
                     final String reasoning;
                     final String contentText;
                     if (enableThinking) {

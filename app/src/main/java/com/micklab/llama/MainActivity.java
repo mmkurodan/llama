@@ -555,6 +555,9 @@ public class MainActivity extends Activity {
                 return;
             }
             String gen = modelManager.generate(chatPrompt);
+            // In-app chat is not a structured (GBNF/schema) client, so show the plain context-limit
+            // notice inline; the API layer keeps returning it as a server error instead.
+            gen = ModelManager.ctxLimitMessage(gen);
             logMaxDebugPayload("direct.nonstream.model.raw", gen);
             final boolean thinkingEnabled = currentConfig != null && currentConfig.enableThinking;
             final String processedGen = thinkingEnabled

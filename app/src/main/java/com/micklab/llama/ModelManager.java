@@ -1114,6 +1114,29 @@ public class ModelManager {
         return "Input needs about " + needTokens + " context tokens but n_ctx=" + haveNCtx
                 + ". Increase Context Size, or enable \"Auto-expand context\" in Settings, or shorten the input.";
     }
+
+    /**
+     * Internal marker prefixed onto a terminal context-limit result returned by {@link #generate}.
+     * A prompt that can't fit even after bounded n_ctx promotion is NOT a valid model completion —
+     * delivering the human-readable notice as assistant content would corrupt structured output
+     * (GBNF / JSON-schema clients) and mislead any caller expecting a specific response shape. The
+     * API layer detects this marker via {@link #isCtxLimitError} and surfaces it as a real server
+     * error (HTTP error / SSE error frame) instead of fake content. The marker is stripped by
+     * {@link #ctxLimitMessage} before the human text is used.
+     */
+    public static final String CTX_LIMIT_ERROR_PREFIX = "\u0001CTX_LIMIT\u0001";
+
+    /** True if {@code result} is the terminal context-limit signal from {@link #generate}. */
+    public static boolean isCtxLimitError(String result) {
+        return result != null && result.startsWith(CTX_LIMIT_ERROR_PREFIX);
+    }
+
+    /** The human-readable notice carried by a context-limit result (marker stripped); pass-through otherwise. */
+    public static String ctxLimitMessage(String result) {
+        return isCtxLimitError(result)
+                ? result.substring(CTX_LIMIT_ERROR_PREFIX.length())
+                : result;
+    }
     
     /**
      * Generate response from prompt.
@@ -1221,9 +1244,12 @@ public class ModelManager {
                         DiagnosticsLogger.logEvent(context, "ctx-autopromote",
                                 "need=" + need + " have=" + currentNCtx
                                         + " result=" + (autoExpand ? "capped(no-promote)" : "disabled"));
-                        result = autoExpand
+                        // Terminal context-limit: prompt can't fit even after bounded promotion (or
+                        // auto-expand is off). Mark it so the API layer returns a server error rather
+                        // than delivering the notice as assistant content (breaks GBNF/schema clients).
+                        result = CTX_LIMIT_ERROR_PREFIX + (autoExpand
                                 ? ctxTooSmallUserMessage(need, currentNCtx)
-                                : ctxTooSmallDisabledMessage(need, currentNCtx);
+                                : ctxTooSmallDisabledMessage(need, currentNCtx));
                     }
                 }
             }
