@@ -1,7 +1,7 @@
 {
   "name": "default Vision",
   "modelUrl": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct-GGUF/resolve/52d6c8ffea26cc873ac5ad116f8631268d7eb503/Qwen3VL-2B-Instruct-Q4_K_M.gguf?download=true",
-  "nCtx": 8192,
+  "nCtx": 2048,
   "nThreads": 4,
   "nBatch": 128,
   "temp": 0.7,
