@@ -28,6 +28,7 @@
 #include "llama.h"
 #include "ggml.h"
 #include "ggml-opt.h"
+#include "gguf.h"
 #include "common.h"
 
 // ---- 進捗コールバック用のスレッドローカル状態 ----
@@ -119,6 +120,24 @@ std::string jstr(JNIEnv * env, jstring s) {
     return r;
 }
 
+// GGUF の general.file_type を読む。読めなければ -1。
+// llama.cpp の finetune は FP32 前提（README 明記）。量子化ベースは ggml-opt が
+// 最適化対象テンソルを扱えず GGML_ASSERT→abort する。事前に弾いて綺麗なエラーにする。
+int read_file_type(const std::string & path) {
+    struct gguf_init_params gp{ /*no_alloc=*/ true, /*ctx=*/ nullptr };
+    struct gguf_context * gc = gguf_init_from_file(path.c_str(), gp);
+    if (!gc) return -1;
+    int ftype = -1;
+    int64_t kid = gguf_find_key(gc, "general.file_type");
+    if (kid >= 0) {
+        enum gguf_type t = gguf_get_kv_type(gc, kid);
+        if (t == GGUF_TYPE_UINT32)      ftype = (int) gguf_get_val_u32(gc, kid);
+        else if (t == GGUF_TYPE_INT32)  ftype = (int) gguf_get_val_i32(gc, kid);
+    }
+    gguf_free(gc);
+    return ftype;
+}
+
 std::string read_file(const std::string & path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return std::string();
@@ -149,6 +168,15 @@ Java_com_micklab_llama_LlamaNative_trainRun(
 
     const std::string corpus = read_file(datasetPath);
     if (corpus.empty()) return fail("dataset file empty/unreadable: " + datasetPath);
+
+    // FP32/F16 以外（量子化）のベースは学習不可。abort する前に明確に弾く。
+    // file_type: 0=ALL_F32, 1=MOSTLY_F16。それ以外は量子化とみなす。
+    int ftype = read_file_type(modelPath);
+    if (ftype != 0 && ftype != 1) {
+        return fail("base model must be F32 (or F16). This GGUF file_type=" + std::to_string(ftype)
+                    + " is quantized; on-device finetune (ggml-opt) requires an FP32 base. "
+                    + "Register/convert an F32 GGUF of the model and retry.");
+    }
 
     // ---- common_params の組み立て（finetune.cpp 準拠） ----
     common_params params;
