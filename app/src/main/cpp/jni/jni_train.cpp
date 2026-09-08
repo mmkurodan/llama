@@ -19,6 +19,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cstdio>
 #include <exception>
 
 #include <android/log.h>
@@ -60,6 +61,15 @@ void emit(int epoch, int epochs, int ibatch, int ibatchMax, double loss, const c
         // Java 側で例外が出ても学習ループは壊さない。ログして握りつぶす。
         env->ExceptionClear();
     }
+}
+
+// クラッシュ耐性のある段階トレース。ollama.log へ即 flush して書く（SIGSEGV でも直前段階が残る）。
+// /api/diagnostics?file=ollama で読める。emit(HTTP)はクラッシュで失われるため、これが唯一の頼り。
+void trace(const char * stage) {
+    static const char * kPath = "/storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log";
+    FILE * f = std::fopen(kPath, "a");
+    if (f) { std::fprintf(f, "[TRAIN-TRACE] %s\n", stage); std::fflush(f); std::fclose(f); }
+    TLOGI("TRACE %s", stage);
 }
 
 // 学習対象テンソルだけ true を返す param_filter。userdata は std::vector<std::string>*。
@@ -191,6 +201,10 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     params.load_mode    = LLAMA_LOAD_MODE_NONE;
     params.cache_type_k = GGML_TYPE_F32;
     params.cache_type_v = GGML_TYPE_F32;
+    // ★学習は CPU 強制。この APK は Adreno(OpenCL) バックエンド込みビルドで、ggml-opt の
+    //   逆伝播/OUT_PROD は GPU バックエンド未対応 → SIGSEGV になる（finetune README:
+    //   "For CPU training, compile without additional backends"）。GPUオフロードを止める。
+    params.n_gpu_layers = 0;
 
     // 学習率/エポック/オプティマイザ
     params.lr.lr0    = (float) lr > 0 ? (float) lr : 1e-4f;
@@ -210,15 +224,20 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     }
     g_tc = &tc;
 
+    trace("enter trainRun");
+    { char b[64]; std::snprintf(b, sizeof b, "base_ftype=%d n_ctx=%d", base_ftype, params.n_ctx); trace(b); }
     emit(0, epochs, base_ftype, 0, 0.0, "base_ftype");  // batch フィールドに file_type を載せる
     emit(0, epochs, 0, 0, 0.0, "loading_model");        // ← ここまで出れば model load 前まで到達
 
+    trace("before backend_init");
     llama_backend_init();
     llama_numa_init(params.numa);
 
+    trace("before common_init_from_params (model load, ngl=0)");
     auto llama_init = common_init_from_params(params);
     llama_model   * model = llama_init->model();
     llama_context * ctx   = llama_init->context();
+    trace("after common_init_from_params");
     if (model == nullptr || ctx == nullptr) {
         g_tc = nullptr;
         return fail("model load failed: " + modelPath);
@@ -227,6 +246,7 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     emit(0, epochs, 0, 0, 0.0, tc.targets.empty() ? "prep(full-ft)" : "prep");
 
     // ---- データセット ----
+    trace("before tokenize/dataset");
     std::vector<llama_token> tokens = common_tokenize(ctx, params.prompt, true);
     if ((int) tokens.size() < 4) { g_tc = nullptr; return fail("tokenized corpus too small (" + std::to_string(tokens.size()) + " tokens)"); }
     emit(0, epochs, (int) tokens.size(), 0, 0.0, "dataset");
@@ -237,6 +257,7 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     }
 
     emit(0, epochs, 0, 0, 0.0, "opt_init");
+    trace("before llama_opt_init");
     // ---- オプティマイザ初期化（param_filter で対象層を限定） ----
     struct llama_opt_params lopt_params {
         /*n_ctx_train     =*/ 0,
@@ -247,6 +268,7 @@ Java_com_micklab_llama_LlamaNative_trainRun(
         /*optimizer_type  =*/ params.optimizer,
     };
     llama_opt_init(ctx, model, lopt_params);
+    trace("after llama_opt_init (entering epoch loop)");
 
     const int64_t ndata       = ggml_opt_dataset_ndata(dataset);
     const int64_t idata_split = ndata * (1.0f - params.val_split);
