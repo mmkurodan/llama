@@ -206,6 +206,9 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     //   逆伝播/OUT_PROD は GPU バックエンド未対応 → SIGSEGV になる（finetune README:
     //   "For CPU training, compile without additional backends"）。GPUオフロードを止める。
     params.n_gpu_layers = 0;
+    // 学習に不要な warmup（前向きデコード）を無効化。学習用コンテキストでの warmup が
+    // クラッシュ源の候補のため切る。
+    params.warmup = false;
 
     // 学習率/エポック/オプティマイザ
     params.lr.lr0    = (float) lr > 0 ? (float) lr : 1e-4f;
@@ -245,14 +248,22 @@ Java_com_micklab_llama_LlamaNative_trainRun(
         if (cpu_dev) params.devices = { cpu_dev };
     }
 
-    trace("before common_init_from_params (CPU-only devices, ngl=0)");
-    auto llama_init = common_init_from_params(params);
-    llama_model   * model = llama_init->model();
-    llama_context * ctx   = llama_init->context();
-    trace("after common_init_from_params");
-    if (model == nullptr || ctx == nullptr) {
+    // ---- モデルロードとコンテキスト生成を分割し、どの段で落ちるか特定する ----
+    trace("before model load (model_only=true)");
+    auto llama_init = common_init_from_params(params, /*model_only=*/true);
+    llama_model * model = llama_init->model();
+    if (model == nullptr) {
         g_tc = nullptr;
         return fail("model load failed: " + modelPath);
+    }
+    trace("model load OK; before llama_init_from_model (context)");
+
+    llama_context_params cparams = common_context_params_to_llama(params);
+    llama_context * ctx = llama_init_from_model(model, cparams);
+    trace(ctx ? "context create OK" : "context create returned NULL");
+    if (ctx == nullptr) {
+        g_tc = nullptr;
+        return fail("context create failed: " + modelPath);
     }
 
     emit(0, epochs, 0, 0, 0.0, tc.targets.empty() ? "prep(full-ft)" : "prep");
@@ -311,7 +322,8 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     llama_model_save_to_file(model, params.out_file.c_str());
 
     g_tc = nullptr;
-    // 学習用に確保したモデル/コンテキストは llama_init のデストラクタで解放される。
+    // context は自前生成なので明示 free（model より先に）。model は llama_init が解放する。
+    llama_free(ctx);
     // backend は推論側が使い続けるので free しない。
 
     std::ostringstream ok;
