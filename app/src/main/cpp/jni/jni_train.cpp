@@ -75,6 +75,14 @@ void trace(const char * stage) {
     TLOGI("TRACE %s", stage);
 }
 
+// ggml_abort（GGML_ASSERT 含む）のメッセージを ollama.log へ記録。この後 ggml は abort() する。
+void train_abort_cb(const char * msg) {
+    static const char * kPath = "/storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log";
+    FILE * f = std::fopen(kPath, "a");
+    if (f) { std::fprintf(f, "[GGML-ABORT] %s\n", msg ? msg : "(null)"); std::fflush(f); std::fclose(f); }
+    TLOGE("GGML-ABORT %s", msg ? msg : "(null)");
+}
+
 // 学習対象テンソルだけ true を返す param_filter。userdata は std::vector<std::string>*。
 bool train_param_filter(const struct ggml_tensor * t, void * ud) {
     const auto * subs = reinterpret_cast<const std::vector<std::string> *>(ud);
@@ -175,15 +183,9 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     const std::string targetSpec  = jstr(env, jTargets);
     const int epochs   = jEpochs > 0 ? (int) jEpochs : 1;
 
-    // GGML_ASSERT/backtrace は stderr に出る。学習プロセスの stderr を ollama.log へ
-    // リダイレクトして文言を捕捉する（/api/diagnostics?file=ollama で読める）。
-    {
-        int fd = open("/storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log",
-                      O_WRONLY | O_APPEND | O_CREAT, 0644);
-        if (fd >= 0) { dup2(fd, 2); close(fd); }
-        std::fprintf(stderr, "\n[TRAIN-STDERR] redirected stderr for assert capture\n");
-        std::fflush(stderr);
-    }
+    // GGML_ASSERT/GGML_ABORT のメッセージ（file:line: 条件式）を捕捉する。ggml_abort は
+    // g_abort_callback があればそちらへ渡すので、自前コールバックで ollama.log に記録する。
+    ggml_set_abort_callback(train_abort_cb);
 
     auto fail = [&](const std::string & msg) -> jstring {
         TLOGE("trainRun failed: %s", msg.c_str());
