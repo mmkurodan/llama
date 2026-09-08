@@ -21,6 +21,8 @@
 #include <cstring>
 #include <cstdio>
 #include <exception>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <android/log.h>
 #define TLOG_TAG "LLAMA_TRAIN"
@@ -172,6 +174,16 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     const std::string outPath     = jstr(env, jOutPath);
     const std::string targetSpec  = jstr(env, jTargets);
     const int epochs   = jEpochs > 0 ? (int) jEpochs : 1;
+
+    // GGML_ASSERT/backtrace は stderr に出る。学習プロセスの stderr を ollama.log へ
+    // リダイレクトして文言を捕捉する（/api/diagnostics?file=ollama で読める）。
+    {
+        int fd = open("/storage/emulated/0/Android/data/com.micklab.llama/files/ollama.log",
+                      O_WRONLY | O_APPEND | O_CREAT, 0644);
+        if (fd >= 0) { dup2(fd, 2); close(fd); }
+        std::fprintf(stderr, "\n[TRAIN-STDERR] redirected stderr for assert capture\n");
+        std::fflush(stderr);
+    }
 
     auto fail = [&](const std::string & msg) -> jstring {
         TLOGE("trainRun failed: %s", msg.c_str());
