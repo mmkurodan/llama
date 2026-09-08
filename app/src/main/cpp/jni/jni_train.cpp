@@ -30,6 +30,7 @@
 #include "llama.h"
 #include "ggml.h"
 #include "ggml-opt.h"
+#include "ggml-backend.h"
 #include "gguf.h"
 #include "common.h"
 
@@ -233,7 +234,18 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     llama_backend_init();
     llama_numa_init(params.numa);
 
-    trace("before common_init_from_params (model load, ngl=0)");
+    // ★A: 学習は CPU デバイスのみを使う（Adreno/OpenCL を完全に回避）。ngl=0 だけでは
+    //   バックエンドが登録済みで巻き込まれるため、model/context のデバイスを CPU に固定する。
+    {
+        ggml_backend_dev_t cpu_dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+        char b[128];
+        std::snprintf(b, sizeof b, "backend dev_count=%zu cpu_dev=%p (CPU-only for training)",
+                      ggml_backend_dev_count(), (void*) cpu_dev);
+        trace(b);
+        if (cpu_dev) params.devices = { cpu_dev };
+    }
+
+    trace("before common_init_from_params (CPU-only devices, ngl=0)");
     auto llama_init = common_init_from_params(params);
     llama_model   * model = llama_init->model();
     llama_context * ctx   = llama_init->context();
