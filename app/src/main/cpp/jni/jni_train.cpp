@@ -169,16 +169,9 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     const std::string corpus = read_file(datasetPath);
     if (corpus.empty()) return fail("dataset file empty/unreadable: " + datasetPath);
 
-    // ベースは FP32 必須。llama.cpp の finetune は FP32 前提（examples/training/README）で、
-    // 量子化はもちろん BF16 でも ggml-opt が最適化/OUT_PROD を通せず GGML_ASSERT→abort する
-    // （実機 LFM2.5JA を Q4_K_M / BF16 双方で確認済み）。abort する前に明確に弾く。
-    // file_type: 0=ALL_F32 のみ許可。
-    int ftype = read_file_type(modelPath);
-    if (ftype != 0) {
-        return fail("base model must be F32 (file_type=0). This GGUF file_type=" + std::to_string(ftype)
-                    + " (quantized or F16/BF16) is unsupported for on-device finetune (ggml-opt "
-                    + "requires an FP32 base). Convert an F32 GGUF (convert_hf_to_gguf.py --outtype f32) and retry.");
-    }
+    // ベース精度は「情報として出す」だけでブロックしない（Q4/BF16/F32 の可否を実測で見極める）。
+    // file_type: 0=ALL_F32, 1=F16, 32=BF16, その他=量子化。base_ftype として emit する。
+    const int base_ftype = read_file_type(modelPath);
 
     // ---- common_params の組み立て（finetune.cpp 準拠） ----
     common_params params;
@@ -187,6 +180,10 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     params.out_file     = outPath.empty() ? std::string("trained.gguf") : outPath;
     params.prompt       = corpus;
     params.n_ctx        = jNCtx > 0 ? (int) jNCtx : 512;
+    // finetune.cpp は -c -b -ub を同値にする。batch/ubatch を n_ctx に揃えないと
+    // コンテキスト生成時に n_ubatch>n_ctx 等で GGML_ASSERT→abort する。
+    params.n_batch      = params.n_ctx;
+    params.n_ubatch     = params.n_ctx;
     params.cpuparams.n_threads = jNThreads > 0 ? (int) jNThreads : 4;
 
     // finetune.cpp と同じ強制設定: 書込み可能な重み + OUT_PROD 用に KV=F32
@@ -200,17 +197,7 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     params.optimizer = (jOptimizer == 1) ? GGML_OPT_OPTIMIZER_TYPE_SGD
                                          : GGML_OPT_OPTIMIZER_TYPE_ADAMW;
 
-    llama_backend_init();
-    llama_numa_init(params.numa);
-
-    auto llama_init = common_init_from_params(params);
-    llama_model   * model = llama_init->model();
-    llama_context * ctx   = llama_init->context();
-    if (model == nullptr || ctx == nullptr) {
-        return fail("model load failed: " + modelPath);
-    }
-
-    // ---- 進捗コンテキスト ----
+    // ---- 進捗コンテキスト（モデルロード前に用意し、段階を可視化する） ----
     TrainCtx tc;
     tc.env      = env;
     tc.listener = jListener;
@@ -222,13 +209,33 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     }
     g_tc = &tc;
 
+    emit(0, epochs, base_ftype, 0, 0.0, "base_ftype");  // batch フィールドに file_type を載せる
+    emit(0, epochs, 0, 0, 0.0, "loading_model");        // ← ここまで出れば model load 前まで到達
+
+    llama_backend_init();
+    llama_numa_init(params.numa);
+
+    auto llama_init = common_init_from_params(params);
+    llama_model   * model = llama_init->model();
+    llama_context * ctx   = llama_init->context();
+    if (model == nullptr || ctx == nullptr) {
+        g_tc = nullptr;
+        return fail("model load failed: " + modelPath);
+    }
+
     emit(0, epochs, 0, 0, 0.0, tc.targets.empty() ? "prep(full-ft)" : "prep");
 
     // ---- データセット ----
     std::vector<llama_token> tokens = common_tokenize(ctx, params.prompt, true);
-    if (tokens.size() < 4) { g_tc = nullptr; return fail("tokenized corpus too small"); }
+    if ((int) tokens.size() < 4) { g_tc = nullptr; return fail("tokenized corpus too small (" + std::to_string(tokens.size()) + " tokens)"); }
+    emit(0, epochs, (int) tokens.size(), 0, 0.0, "dataset");
     ggml_opt_dataset_t dataset = common_opt_dataset_init(ctx, tokens, llama_n_ctx(ctx) / 2);
+    if (ggml_opt_dataset_ndata(dataset) < 1) {
+        ggml_opt_dataset_free(dataset); g_tc = nullptr;
+        return fail("dataset has 0 datapoints (corpus shorter than n_ctx/2=" + std::to_string(llama_n_ctx(ctx) / 2) + " tokens; use more data or smaller n_ctx)");
+    }
 
+    emit(0, epochs, 0, 0, 0.0, "opt_init");
     // ---- オプティマイザ初期化（param_filter で対象層を限定） ----
     struct llama_opt_params lopt_params {
         /*n_ctx_train     =*/ 0,
