@@ -19,6 +19,12 @@ public class LlamaNative {
         void onError(String error);
     }
 
+    // 端末内学習（LoRA/部分FT）の進捗リスナ。ネイティブ側 jni_train.cpp から同一スレッドで呼ばれる。
+    // phase: "prep" / "train"(バッチ中) / "epoch_done" / "saving"
+    public interface TrainListener {
+        void onProgress(int epoch, int totalEpochs, int batch, int batchTotal, double loss, String phase);
+    }
+
     static {
         System.loadLibrary("llama_jni");
     }
@@ -151,6 +157,26 @@ public class LlamaNative {
 
     /** Effective compute backend after the last model load (CPU/GPU/CPU (fallback)). */
     public native String getActiveBackend();
+
+    /**
+     * 端末内で LoRA/部分ファインチューンを実行する（同期・ブロッキング）。必ずワーカースレッドから呼ぶこと。
+     * 呼び出し前に推論モデルを {@link #free()} して二重ロードを避ける。
+     *
+     * @param modelPath   ベースGGUF（Q8_0/F16 推奨。Q4_K_M は勾配が粗い）
+     * @param datasetPath 学習テキスト（UTF-8、チャットテンプレ整形済みを連結したもの）のファイルパス
+     * @param outPath     出力GGUF（マージ済みモデル）のパス
+     * @param targets     学習対象テンソル。"q,v"（既定＝attn q/v のみ）や空文字（フルFT）
+     * @param lr          学習率
+     * @param epochs      エポック数
+     * @param nCtx        コンテキスト長
+     * @param nThreads    スレッド数
+     * @param optimizer   0=AdamW, 1=SGD
+     * @param listener    進捗コールバック（null 可）
+     * @return "OK loss=... out=..." もしくは "ERROR: ..."
+     */
+    public native String trainRun(String modelPath, String datasetPath, String outPath,
+                                  String targets, float lr, int epochs, int nCtx, int nThreads,
+                                  int optimizer, TrainListener listener);
 
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;

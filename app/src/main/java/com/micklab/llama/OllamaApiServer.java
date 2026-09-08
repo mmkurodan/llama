@@ -1247,6 +1247,8 @@ public class OllamaApiServer {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
                     handleUnloadModel(outputStream, body);
+                } else if ("/api/finetune".equals(path)) {
+                    handleFinetune(outputStream, body);
                 } else {
                     sendErrorResponse(outputStream, 404, "Not Found");
                 }
@@ -1862,6 +1864,209 @@ public class OllamaApiServer {
             Log.e(TAG, "Invalid unload-model request", e);
             sendErrorResponse(outputStream, 400, "Invalid JSON");
         }
+    }
+
+    /**
+     * 端末内 LoRA/部分ファインチューン。gguf アプリ等から localhost 経由で叩く薄い制御API。
+     * 大きなデータ（GGUF/データセット）は本文に載せず、共有領域のパスで受け取る。
+     * 進捗は application/x-ndjson でストリーミング（1行=1イベント、最後に done:true）。
+     *
+     * リクエスト JSON:
+     *   { "base":"/path/base.gguf", "dataset":"/path/corpus.txt", "out":"/path/out.gguf",
+     *     "targets":"q,v", "lr":1e-4, "epochs":3, "n_ctx":512, "threads":4, "optimizer":0 }
+     */
+    private void handleFinetune(OutputStream outputStream, String body) throws IOException {
+        JSONObject request;
+        try {
+            request = new JSONObject(body);
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 400, "Invalid JSON");
+            return;
+        }
+
+        // ベースは「llama が管理するプロファイル名」で内部指定する（クロスアプリのファイル共有が不要）。
+        // 明示パス base を渡せば上書き可（テスト用）。
+        final String modelName = resolveRequestedModel(request.optString("model", null));
+        final String baseOverride = request.optString("base", null);
+        final String corpus  = request.optString("corpus", null);   // 学習テキストをインラインで受ける（推奨）
+        final String datasetPathIn = request.optString("dataset", null); // 代替: パス指定
+        final String targets = request.optString("targets", "q,v");
+        final float  lr       = (float) request.optDouble("lr", 1e-4);
+        final int    epochs   = request.optInt("epochs", 3);
+        final int    nCtx     = request.optInt("n_ctx", 512);
+        final int    threads  = request.optInt("threads", Math.max(2, Runtime.getRuntime().availableProcessors() - 1));
+        final int    optimizer = request.optInt("optimizer", 0);
+        final boolean register = request.optBoolean("register_profile", true);
+        final String outName = sanitizeFileBase(request.optString("out_name",
+                (modelName == null ? "model" : modelName) + "-ft-"
+                        + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(new java.util.Date())));
+
+        // プロファイル名 → llama が保持する実ファイルへ内部解決
+        java.io.File baseFile = null;
+        try {
+            ConfigurationManager.Configuration cfg = configManager.loadConfiguration(modelName);
+            if (cfg != null) baseFile = ModelFileHelper.resolveStoredModelFile(context, cfg.modelUrl);
+        } catch (Exception e) {
+            Log.w(TAG, "finetune: profile resolve failed for " + modelName, e);
+        }
+        if (baseOverride != null && !baseOverride.trim().isEmpty() && new java.io.File(baseOverride).exists()) {
+            baseFile = new java.io.File(baseOverride);
+        }
+        if (baseFile == null || !baseFile.exists()) {
+            sendErrorResponse(outputStream, 400, "base model not found/downloaded for profile: " + modelName);
+            return;
+        }
+        if (corpus == null && datasetPathIn == null) {
+            sendErrorResponse(outputStream, 400, "corpus (inline text) or dataset (path) is required");
+            return;
+        }
+        if (modelManager.isBusy()) { sendErrorResponse(outputStream, 503, "Model is busy"); return; }
+
+        // 排他確保。学習中は推論を止める。学習はメモリを食うので推論モデルを解放して二重ロードを避ける。
+        if (!modelManager.tryAcquire()) { sendErrorResponse(outputStream, 503, "Could not acquire model lock"); return; }
+
+        // インラインコーパスは private キャッシュへ落として native にパスで渡す。
+        java.io.File tempCorpus = null;
+        String datasetPath = datasetPathIn;
+        if (corpus != null) {
+            try {
+                tempCorpus = new java.io.File(context.getCacheDir(), "ft_corpus_" + System.currentTimeMillis() + ".txt");
+                try (OutputStream os = new java.io.FileOutputStream(tempCorpus)) {
+                    os.write(corpus.getBytes(StandardCharsets.UTF_8));
+                }
+                datasetPath = tempCorpus.getAbsolutePath();
+            } catch (Exception e) {
+                modelManager.release();
+                sendErrorResponse(outputStream, 500, "failed to stage corpus: " + e.getMessage());
+                return;
+            }
+        }
+
+        // 出力先 = llama のモデル保管ディレクトリ。ここに置けばそのまま推論・プロファイル化できる。
+        final java.io.File outFile = new java.io.File(ModelFileHelper.getModelStorageDir(context), outName + ".gguf");
+        final String basePath = baseFile.getAbsolutePath();
+        final String outPath  = outFile.getAbsolutePath();
+        final java.io.File tempCorpusF = tempCorpus;
+
+        // チャンク応答開始
+        String header = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: application/x-ndjson\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "Transfer-Encoding: chunked\r\n" +
+                "\r\n";
+        outputStream.write(header.getBytes(StandardCharsets.UTF_8));
+        outputStream.flush();
+
+        final Object writeLock = new Object();
+        final java.util.concurrent.atomic.AtomicBoolean disconnected = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        // NDJSON 1行をチャンクで書く。学習スレッド＝この handler スレッドなので直接書いてよい。
+        final java.util.function.Consumer<String> sendLine = (line) -> {
+            if (disconnected.get()) return;
+            byte[] bytes = (line + "\n").getBytes(StandardCharsets.UTF_8);
+            try {
+                synchronized (writeLock) {
+                    outputStream.write((Integer.toHexString(bytes.length) + "\r\n").getBytes(StandardCharsets.UTF_8));
+                    outputStream.write(bytes);
+                    outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
+                }
+            } catch (Exception e) {
+                disconnected.set(true);
+            }
+        };
+
+        try {
+            if (modelManager.isModelLoaded()) {
+                modelManager.free();
+                sendLine.accept("{\"status\":\"unloaded inference model to free memory\"}");
+            }
+
+            LlamaNative.TrainListener listener = (epoch, totalEpochs, batch, batchTotal, loss, phase) -> {
+                JSONObject o = new JSONObject();
+                try {
+                    o.put("phase", phase);
+                    o.put("epoch", epoch);
+                    o.put("total_epochs", totalEpochs);
+                    o.put("batch", batch);
+                    o.put("batch_total", batchTotal);
+                    o.put("loss", loss);
+                    o.put("done", false);
+                } catch (JSONException ignored) {}
+                sendLine.accept(o.toString());
+            };
+
+            long t0 = System.currentTimeMillis();
+            String result = modelManager.getLlama().trainRun(
+                    basePath, datasetPath, outPath, targets, lr, epochs, nCtx, threads, optimizer, listener);
+            long ms = System.currentTimeMillis() - t0;
+
+            boolean ok = result != null && result.startsWith("OK") && outFile.exists();
+
+            // 成功時は出力GGUFをそのまま新プロファイルとして登録 → llama 側で即推論可能に。
+            boolean registered = false;
+            if (ok && register) {
+                try {
+                    registered = registerTrainedProfile(outName, outFile);
+                } catch (Exception e) {
+                    Log.w(TAG, "finetune: profile registration failed", e);
+                }
+            }
+
+            JSONObject done = new JSONObject();
+            try {
+                done.put("done", true);
+                done.put("success", ok);
+                done.put("result", result);
+                done.put("out_path", outPath);
+                done.put("out_name", outName);
+                done.put("profile", registered ? outName : JSONObject.NULL);
+                done.put("registered", registered);
+                done.put("size_bytes", outFile.exists() ? outFile.length() : 0);
+                done.put("elapsed_ms", ms);
+            } catch (JSONException ignored) {}
+            sendLine.accept(done.toString());
+        } catch (Throwable t) {
+            Log.e(TAG, "finetune failed", t);
+            JSONObject err = new JSONObject();
+            try { err.put("done", true); err.put("success", false); err.put("error", String.valueOf(t.getMessage())); } catch (JSONException ignored) {}
+            sendLine.accept(err.toString());
+        } finally {
+            if (tempCorpusF != null) { try { tempCorpusF.delete(); } catch (Exception ignored) {} }
+            modelManager.release();
+            // 終端チャンク
+            try {
+                synchronized (writeLock) {
+                    outputStream.write("0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
+                }
+            } catch (Exception ignored) {}
+        }
+    }
+
+    /** ファイル名に使える形へ正規化（英数・-・_ のみ、他は _）。 */
+    private static String sanitizeFileBase(String s) {
+        if (s == null || s.trim().isEmpty()) return "model";
+        String r = s.trim().replaceAll("[^A-Za-z0-9_.-]", "_");
+        return r.length() > 96 ? r.substring(0, 96) : r;
+    }
+
+    /**
+     * 学習済みGGUF（llama のモデル保管ディレクトリに保存済み）を新しいプロファイルとして登録する。
+     * modelUrl にはローカルファイル名参照を入れ、{@link ModelFileHelper#resolveStoredModelFile} で
+     * 解決できるようにする。既存の推論経路（/api/chat 等）からそのまま選べるようになる。
+     */
+    private boolean registerTrainedProfile(String name, java.io.File outFile) throws Exception {
+        ConfigurationManager.Configuration base;
+        try {
+            base = configManager.loadConfiguration(resolveRequestedModel(null));
+        } catch (Exception e) {
+            base = new ConfigurationManager.Configuration();
+        }
+        base.name = name;
+        base.modelUrl = outFile.getName(); // ローカル保管ファイル名参照
+        configManager.saveConfiguration(base);
+        return true;
     }
 
     private void applyNPredictOverride(JSONObject request, ConfigurationManager.Configuration config) {

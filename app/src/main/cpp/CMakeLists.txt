@@ -284,6 +284,7 @@ add_library(
     SHARED
 
     jni/jni_llama.cpp
+    jni/jni_train.cpp
 
     ${LLAMA_SOURCES}
     ${GGML_SOURCES}
