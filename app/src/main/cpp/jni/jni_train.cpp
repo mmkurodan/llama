@@ -169,13 +169,15 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     const std::string corpus = read_file(datasetPath);
     if (corpus.empty()) return fail("dataset file empty/unreadable: " + datasetPath);
 
-    // FP32/F16 以外（量子化）のベースは学習不可。abort する前に明確に弾く。
-    // file_type: 0=ALL_F32, 1=MOSTLY_F16。それ以外は量子化とみなす。
+    // ベースは FP32 必須。llama.cpp の finetune は FP32 前提（examples/training/README）で、
+    // 量子化はもちろん BF16 でも ggml-opt が最適化/OUT_PROD を通せず GGML_ASSERT→abort する
+    // （実機 LFM2.5JA を Q4_K_M / BF16 双方で確認済み）。abort する前に明確に弾く。
+    // file_type: 0=ALL_F32 のみ許可。
     int ftype = read_file_type(modelPath);
-    if (ftype != 0 && ftype != 1) {
-        return fail("base model must be F32 (or F16). This GGUF file_type=" + std::to_string(ftype)
-                    + " is quantized; on-device finetune (ggml-opt) requires an FP32 base. "
-                    + "Register/convert an F32 GGUF of the model and retry.");
+    if (ftype != 0) {
+        return fail("base model must be F32 (file_type=0). This GGUF file_type=" + std::to_string(ftype)
+                    + " (quantized or F16/BF16) is unsupported for on-device finetune (ggml-opt "
+                    + "requires an FP32 base). Convert an F32 GGUF (convert_hf_to_gguf.py --outtype f32) and retry.");
     }
 
     // ---- common_params の組み立て（finetune.cpp 準拠） ----
