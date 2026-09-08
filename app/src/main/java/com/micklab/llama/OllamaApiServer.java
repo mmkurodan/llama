@@ -1393,6 +1393,10 @@ public class OllamaApiServer {
         if ("ollama".equals(which)) {
             file = DiagnosticsLogger.getOllamaLogFile(context);
             defaultTail = 512L * 1024L;
+        } else if ("crash".equals(which)) {
+            // ネイティブ crash（SIGABRT/SIGSEGV）のバックトレース。学習の GGML_ASSERT 文言確認用。
+            file = new java.io.File(DiagnosticsLogger.getAppFilesBaseDir(context), "native_crash.txt");
+            defaultTail = 0L;
         } else if ("state".equals(which)) {
             file = DiagnosticsLogger.getLastStateFile(context);
             defaultTail = 0L;

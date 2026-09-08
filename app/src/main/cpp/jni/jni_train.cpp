@@ -302,7 +302,9 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     double last_loss = 0.0;
     for (params.lr.epoch = 0; params.lr.epoch < params.lr.epochs; ++params.lr.epoch) {
         tc.epoch = (int) params.lr.epoch;
+        { char b[64]; std::snprintf(b, sizeof b, "before llama_opt_epoch %u/%u", params.lr.epoch + 1, params.lr.epochs); trace(b); }
         llama_opt_epoch(ctx, dataset, result_train, result_eval, idata_split, cb_train, nullptr);
+        trace("after llama_opt_epoch");
 
         double loss = 0.0, unc = 0.0;
         ggml_opt_result_loss(result_train, &loss, &unc);
