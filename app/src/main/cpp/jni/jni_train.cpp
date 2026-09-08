@@ -19,6 +19,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <exception>
 
 #include <android/log.h>
 #define TLOG_TAG "LLAMA_TRAIN"
@@ -282,4 +283,34 @@ Java_com_micklab_llama_LlamaNative_trainRun(
     std::ostringstream ok;
     ok << "OK loss=" << last_loss << " out=" << params.out_file;
     return env->NewStringUTF(ok.str().c_str());
+}
+
+// ---- GGUF 精度変換（例: Q8_0 → F32 デクオンタイズ）----
+// 外部ツール無しで端末内 F32 GGUF を作るための最小ラッパ。llama_model_quantize は
+// ftype=ALL_F32(0) を指定でき、量子化テンソルは allow_requantize=true で F32 へ逆量子化される。
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_convertModel(
+        JNIEnv * env, jobject /*thiz*/, jstring jIn, jstring jOut, jint jFtype) {
+    const std::string in  = jstr(env, jIn);
+    const std::string out = jstr(env, jOut);
+    if (in.empty() || out.empty()) return env->NewStringUTF("ERROR: in/out path required");
+
+    llama_backend_init();
+    llama_model_quantize_params qp = llama_model_quantize_default_params();
+    qp.ftype                  = (enum llama_ftype) jFtype; // 0 = LLAMA_FTYPE_ALL_F32
+    qp.allow_requantize       = true;   // 量子化→F32 の逆量子化を許可
+    qp.quantize_output_tensor = true;
+    qp.only_copy              = false;
+    qp.nthread                = 0;      // 0 = 自動
+
+    uint32_t rc;
+    try {
+        rc = llama_model_quantize(in.c_str(), out.c_str(), &qp);
+    } catch (const std::exception & e) {
+        return env->NewStringUTF((std::string("ERROR: ") + e.what()).c_str());
+    } catch (...) {
+        return env->NewStringUTF("ERROR: unknown exception in llama_model_quantize");
+    }
+    if (rc != 0) return env->NewStringUTF(("ERROR: llama_model_quantize rc=" + std::to_string(rc)).c_str());
+    return env->NewStringUTF(("OK out=" + out).c_str());
 }

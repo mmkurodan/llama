@@ -178,6 +178,15 @@ public class LlamaNative {
                                   String targets, float lr, int epochs, int nCtx, int nThreads,
                                   int optimizer, TrainListener listener);
 
+    /**
+     * GGUF の精度変換（例: Q8_0 → F32 デクオンタイズ）。外部ツール無しで端末内 F32 GGUF を作る。
+     * @param inPath  入力GGUF（量子化でも可）
+     * @param outPath 出力GGUF
+     * @param ftype   目標 file_type（0 = ALL_F32）
+     * @return "OK out=..." もしくは "ERROR: ..."
+     */
+    public native String convertModel(String inPath, String outPath, int ftype);
+
     public void setDownloadProgressListener(DownloadProgressListener listener) {
         this.downloadProgressListener = listener;
     }

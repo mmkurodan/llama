@@ -1249,6 +1249,8 @@ public class OllamaApiServer {
                     handleUnloadModel(outputStream, body);
                 } else if ("/api/finetune".equals(path)) {
                     handleFinetune(outputStream, body);
+                } else if ("/api/convert".equals(path)) {
+                    handleConvert(outputStream, body);
                 } else {
                     sendErrorResponse(outputStream, 404, "Not Found");
                 }
@@ -2041,6 +2043,74 @@ public class OllamaApiServer {
                     outputStream.flush();
                 }
             } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * GGUF 精度変換（既定 Q8_0 等 → F32）。外部ツール無しで端末内 F32 ベースを用意するため。
+     * リクエスト: { "model":"<既存プロファイル名>", "out_name":"<名前>", "ftype":"f32", "register_profile":true }
+     * 応答: 完了までブロックし JSON を返す（変換は数秒〜。ストリームなし）。
+     */
+    private void handleConvert(OutputStream outputStream, String body) throws IOException {
+        JSONObject request;
+        try { request = new JSONObject(body); }
+        catch (JSONException e) { sendErrorResponse(outputStream, 400, "Invalid JSON"); return; }
+
+        final String modelName = resolveRequestedModel(request.optString("model", null));
+        final String baseOverride = request.optString("base", null);
+        final boolean register = request.optBoolean("register_profile", true);
+        // ftype: "f32"(0) のみ当面サポート（学習用途）。将来 f16 等に拡張可。
+        final int ftype = 0; // LLAMA_FTYPE_ALL_F32
+        final String outName = sanitizeFileBase(request.optString("out_name",
+                (modelName == null ? "model" : modelName) + "-f32"));
+
+        java.io.File baseFile = null;
+        try {
+            ConfigurationManager.Configuration cfg = configManager.loadConfiguration(modelName);
+            if (cfg != null) baseFile = ModelFileHelper.resolveStoredModelFile(context, cfg.modelUrl);
+        } catch (Exception e) {
+            Log.w(TAG, "convert: profile resolve failed for " + modelName, e);
+        }
+        if (baseOverride != null && !baseOverride.trim().isEmpty() && new java.io.File(baseOverride).exists()) {
+            baseFile = new java.io.File(baseOverride);
+        }
+        if (baseFile == null || !baseFile.exists()) {
+            sendErrorResponse(outputStream, 400, "source model not found for profile: " + modelName);
+            return;
+        }
+        if (modelManager.isBusy()) { sendErrorResponse(outputStream, 503, "Model is busy"); return; }
+        if (!modelManager.tryAcquire()) { sendErrorResponse(outputStream, 503, "Could not acquire model lock"); return; }
+
+        final java.io.File outFile = new java.io.File(ModelFileHelper.getModelStorageDir(context), outName + ".gguf");
+        try {
+            if (modelManager.isModelLoaded()) modelManager.free(); // メモリ確保のため推論モデルを解放
+            long t0 = System.currentTimeMillis();
+            String result = modelManager.getLlama().convertModel(
+                    baseFile.getAbsolutePath(), outFile.getAbsolutePath(), ftype);
+            long ms = System.currentTimeMillis() - t0;
+
+            boolean ok = result != null && result.startsWith("OK") && outFile.exists();
+            boolean registered = false;
+            if (ok && register) {
+                try { registered = registerTrainedProfile(outName, outFile); }
+                catch (Exception e) { Log.w(TAG, "convert: profile registration failed", e); }
+            }
+            JSONObject resp = new JSONObject();
+            try {
+                resp.put("success", ok);
+                resp.put("result", result);
+                resp.put("out_path", outFile.getAbsolutePath());
+                resp.put("out_name", outName);
+                resp.put("registered", registered);
+                resp.put("size_bytes", outFile.exists() ? outFile.length() : 0);
+                resp.put("elapsed_ms", ms);
+            } catch (JSONException ignored) {}
+            sendJsonResponse(outputStream, ok ? 200 : 500, resp.toString());
+        } catch (Throwable t) {
+            Log.e(TAG, "convert failed", t);
+            sendErrorResponse(outputStream, 500, "convert failed: " + t.getMessage());
+        } finally {
+            modelManager.release();
         }
     }
 
