@@ -69,38 +69,8 @@ static float               g_lora_scale = 1.0f;
 // release_model では消さず clearLoraAdapter でのみ消す。空=アダプタ無し。
 static std::string         g_lora_want_path;
 static float               g_lora_want_scale = 1.0f;
-
-// g_lora_want_path が指定されていれば、現在の g_model/g_ctx へアダプタを（再）適用する。
-// init/initWithMmproj でコンテキスト生成直後に呼ぶ。呼び出し側で g_mutex 保持済み前提。
-static void reapply_lora_locked(const char * log_prefix) {
-    if (g_lora_want_path.empty() || !g_model || !g_ctx) {
-        return;
-    }
-    if (g_lora) { // 念のため既存を外す
-        llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
-        llama_adapter_lora_free(g_lora);
-        g_lora = nullptr;
-    }
-    llama_adapter_lora * ad = llama_adapter_lora_init(g_model, g_lora_want_path.c_str());
-    if (!ad) {
-        log_to_file(std::string(log_prefix) + ": LoRA re-apply failed (adapter init) path=" + g_lora_want_path,
-                    GGML_LOG_LEVEL_ERROR);
-        return;
-    }
-    llama_adapter_lora * arr[1] = { ad };
-    float                scl[1] = { g_lora_want_scale };
-    if (llama_set_adapters_lora(g_ctx, arr, 1, scl) != 0) {
-        llama_adapter_lora_free(ad);
-        log_to_file(std::string(log_prefix) + ": LoRA re-apply failed (set_adapters)", GGML_LOG_LEVEL_ERROR);
-        return;
-    }
-    g_lora = ad;
-    g_lora_path = g_lora_want_path;
-    g_lora_scale = g_lora_want_scale;
-    std::ostringstream ss;
-    ss << log_prefix << ": LoRA re-applied path=" << g_lora_want_path << " scale=" << g_lora_want_scale;
-    log_to_file(ss.str());
-}
+// 定義は log_to_file 宣言の後（下方）。init/initWithMmproj から呼ぶ。
+static void reapply_lora_locked(const char * log_prefix);
 // Grammar constraint applied via common_sampler in generate(); empty (type NONE) = no constraint.
 // Set via setGrammar() before a generate() call (OllamaApiServer wires format/grammar here).
 // USER = raw GBNF; OUTPUT_FORMAT = JSON schema (converted by common_sampler).
@@ -195,6 +165,38 @@ static std::atomic<bool> g_fatal_signal_handlers_installed(false);
 static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
 static void trim_native_allocator(const char * reason);
+
+// g_lora_want_path が指定されていれば、現在の g_model/g_ctx へアダプタを（再）適用する。
+// init/initWithMmproj でコンテキスト生成直後に呼ぶ。呼び出し側で g_mutex 保持済み前提。
+static void reapply_lora_locked(const char * log_prefix) {
+    if (g_lora_want_path.empty() || !g_model || !g_ctx) {
+        return;
+    }
+    if (g_lora) { // 念のため既存を外す
+        llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+        llama_adapter_lora_free(g_lora);
+        g_lora = nullptr;
+    }
+    llama_adapter_lora * ad = llama_adapter_lora_init(g_model, g_lora_want_path.c_str());
+    if (!ad) {
+        log_to_file(std::string(log_prefix) + ": LoRA re-apply failed (adapter init) path=" + g_lora_want_path,
+                    GGML_LOG_LEVEL_ERROR);
+        return;
+    }
+    llama_adapter_lora * arr[1] = { ad };
+    float                scl[1] = { g_lora_want_scale };
+    if (llama_set_adapters_lora(g_ctx, arr, 1, scl) != 0) {
+        llama_adapter_lora_free(ad);
+        log_to_file(std::string(log_prefix) + ": LoRA re-apply failed (set_adapters)", GGML_LOG_LEVEL_ERROR);
+        return;
+    }
+    g_lora = ad;
+    g_lora_path = g_lora_want_path;
+    g_lora_scale = g_lora_want_scale;
+    std::ostringstream ss;
+    ss << log_prefix << ": LoRA re-applied path=" << g_lora_want_path << " scale=" << g_lora_want_scale;
+    log_to_file(ss.str());
+}
 static std::string initialize_optional_multimodal_support_locked(
         const std::string & model_path,
         const std::string & requested_mmproj_path,
