@@ -320,6 +320,18 @@ public final class ModelFileHelper {
                 || lowerName.contains("gemma4v"));
     }
 
+    /** LoRA アダプタ GGUF らしいファイル名か（名前に lora/adapter を含む .gguf）。
+     *  ロード可能モデル一覧からの除外や、アダプタ選択候補の抽出に使う（mmproj と同様の扱い）。 */
+    public static boolean isLikelyAdapterFilename(String filename) {
+        if (filename == null) {
+            return false;
+        }
+        String lowerName = filename.toLowerCase(Locale.US);
+        return isGgufFilename(lowerName)
+                && (lowerName.contains("lora")
+                || lowerName.contains("adapter"));
+    }
+
     private static int scoreProjectorCandidate(
             String candidateStem,
             String modelStem,

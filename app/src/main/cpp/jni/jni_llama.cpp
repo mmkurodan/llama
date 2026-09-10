@@ -61,6 +61,16 @@ using json = nlohmann::ordered_json;
 static std::mutex g_mutex;
 static llama_model   *g_model = nullptr;
 static llama_context *g_ctx   = nullptr;
+// 適用中の LoRA アダプタ（g_model に紐づく。model 解放時に自動 free されるため g_lora も無効化する）。
+static llama_adapter_lora *g_lora       = nullptr;
+static std::string         g_lora_path;
+static float               g_lora_scale = 1.0f;
+// 「付けておきたい」アダプタ（スティッキー）。モデル再ロードのたびに再適用するため、
+// release_model では消さず clearLoraAdapter でのみ消す。空=アダプタ無し。
+static std::string         g_lora_want_path;
+static float               g_lora_want_scale = 1.0f;
+// 定義は log_to_file 宣言の後（下方）。init/initWithMmproj から呼ぶ。
+static void reapply_lora_locked(const char * log_prefix);
 // Grammar constraint applied via common_sampler in generate(); empty (type NONE) = no constraint.
 // Set via setGrammar() before a generate() call (OllamaApiServer wires format/grammar here).
 // USER = raw GBNF; OUTPUT_FORMAT = JSON schema (converted by common_sampler).
@@ -155,6 +165,38 @@ static std::atomic<bool> g_fatal_signal_handlers_installed(false);
 static constexpr const char * NATIVE_CRASH_LOG_FILENAME = "native_crash.txt";
 static void log_to_file(const std::string& msg, ggml_log_level level = GGML_LOG_LEVEL_INFO);
 static void trim_native_allocator(const char * reason);
+
+// g_lora_want_path が指定されていれば、現在の g_model/g_ctx へアダプタを（再）適用する。
+// init/initWithMmproj でコンテキスト生成直後に呼ぶ。呼び出し側で g_mutex 保持済み前提。
+static void reapply_lora_locked(const char * log_prefix) {
+    if (g_lora_want_path.empty() || !g_model || !g_ctx) {
+        return;
+    }
+    if (g_lora) { // 念のため既存を外す
+        llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+        llama_adapter_lora_free(g_lora);
+        g_lora = nullptr;
+    }
+    llama_adapter_lora * ad = llama_adapter_lora_init(g_model, g_lora_want_path.c_str());
+    if (!ad) {
+        log_to_file(std::string(log_prefix) + ": LoRA re-apply failed (adapter init) path=" + g_lora_want_path,
+                    GGML_LOG_LEVEL_ERROR);
+        return;
+    }
+    llama_adapter_lora * arr[1] = { ad };
+    float                scl[1] = { g_lora_want_scale };
+    if (llama_set_adapters_lora(g_ctx, arr, 1, scl) != 0) {
+        llama_adapter_lora_free(ad);
+        log_to_file(std::string(log_prefix) + ": LoRA re-apply failed (set_adapters)", GGML_LOG_LEVEL_ERROR);
+        return;
+    }
+    g_lora = ad;
+    g_lora_path = g_lora_want_path;
+    g_lora_scale = g_lora_want_scale;
+    std::ostringstream ss;
+    ss << log_prefix << ": LoRA re-applied path=" << g_lora_want_path << " scale=" << g_lora_want_scale;
+    log_to_file(ss.str());
+}
 static std::string initialize_optional_multimodal_support_locked(
         const std::string & model_path,
         const std::string & requested_mmproj_path,
@@ -935,6 +977,9 @@ static void release_model_locked(const char * log_prefix) {
     llama_model_free(g_model);
     g_model = nullptr;
     g_current_model_path.clear();
+    // アダプタは model に紐づき、model_free で自動解放される。ハンドルを無効化するだけ。
+    g_lora = nullptr;
+    g_lora_path.clear();
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": model freed");
     }
@@ -2552,6 +2597,7 @@ Java_com_micklab_llama_LlamaNative_init(
                 log_to_file(ss.str());
             }
         }
+        reapply_lora_locked("init"); // モデル再ロード後もアダプタを維持する
         g_current_model_path = model_path;
         g_current_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
@@ -2773,6 +2819,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
                 log_to_file(ss.str());
             }
         }
+        reapply_lora_locked("initWithMmproj"); // モデル再ロード後もアダプタを維持する
         const std::string selected_mmproj_path = initialize_optional_multimodal_support_locked(
                 model_path,
                 mmproj_path,
@@ -2903,6 +2950,91 @@ Java_com_micklab_llama_LlamaNative_setUseMmap(
     std::ostringstream ss;
     ss << "setUseMmap: use_mmap=" << (g_use_mmap ? "true" : "false");
     log_to_file(ss.str());
+}
+
+// ---------------- JNI: applyLoraAdapter ----------------
+// 現在ロード中のモデル/コンテキストへ LoRA アダプタGGUF を適用する。
+// 既に別アダプタ適用中なら差し替える。成功="", 失敗=エラーメッセージ。
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_applyLoraAdapter(
+        JNIEnv *env, jobject, jstring jPath, jfloat scale
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_model || !g_ctx) {
+        return env->NewStringUTF("モデル未ロードです。先にモデルを読み込んでください。");
+    }
+    std::string path = jPath ? jstring_to_std(env, jPath) : "";
+    if (path.empty()) {
+        return env->NewStringUTF("アダプタのパスが空です。");
+    }
+    // 既存アダプタを外して解放（差し替え）
+    if (g_lora) {
+        llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+        llama_adapter_lora_free(g_lora);
+        g_lora = nullptr;
+        g_lora_path.clear();
+    }
+    llama_adapter_lora *ad = llama_adapter_lora_init(g_model, path.c_str());
+    if (!ad) {
+        return env->NewStringUTF("アダプタ読込失敗（GGUF形式/対象アーキ不一致の可能性）。");
+    }
+    llama_adapter_lora *arr[1]   = { ad };
+    float               scl[1]   = { (float) scale };
+    int32_t rc = llama_set_adapters_lora(g_ctx, arr, 1, scl);
+    if (rc != 0) {
+        llama_adapter_lora_free(ad);
+        return env->NewStringUTF("アダプタ適用失敗（llama_set_adapters_lora）。");
+    }
+    g_lora = ad;
+    g_lora_path = path;
+    g_lora_scale = (float) scale;
+    // 以後のモデル再ロード後も自動再適用されるよう「付けておきたいアダプタ」を記録
+    g_lora_want_path = path;
+    g_lora_want_scale = (float) scale;
+    std::ostringstream ss;
+    ss << "applyLoraAdapter: path=" << path << " scale=" << g_lora_scale;
+    log_to_file(ss.str());
+    return env->NewStringUTF("");
+}
+
+// ---------------- JNI: clearLoraAdapter ----------------
+// 適用中の LoRA アダプタを外して解放する。未適用なら何もしない。
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_clearLoraAdapter(
+        JNIEnv *, jobject
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    // スティッキー指定を解除（以後の再ロードで再適用しない）
+    g_lora_want_path.clear();
+    if (!g_lora) {
+        return;
+    }
+    if (g_ctx) {
+        llama_set_adapters_lora(g_ctx, nullptr, 0, nullptr);
+    }
+    llama_adapter_lora_free(g_lora);
+    g_lora = nullptr;
+    g_lora_path.clear();
+    log_to_file("clearLoraAdapter: adapter removed");
+}
+
+// ---------------- JNI: getLoraAdapterInfo ----------------
+// 適用中アダプタの "path\tscale" を返す。未適用は ""（UI表示用）。
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_getLoraAdapterInfo(
+        JNIEnv *env, jobject
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    // スティッキー指定（再ロード後も維持される想定の設定）を優先して返す
+    if (g_lora_want_path.empty()) {
+        return env->NewStringUTF("");
+    }
+    std::ostringstream ss;
+    ss << g_lora_want_path << "\t" << g_lora_want_scale;
+    return env->NewStringUTF(ss.str().c_str());
 }
 
 // ---------------- JNI: setSpeculative (MTP draft-mtp) ----------------
