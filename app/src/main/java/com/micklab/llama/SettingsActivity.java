@@ -4051,7 +4051,9 @@ public class SettingsActivity extends Activity {
     /** 選択されたアダプタGGUFをアプリ領域へコピーし、スケールを尋ねてから適用する。
      *  ネイティブは実ファイルパスで開くため、SAF Uri は一旦コピーが必要。 */
     private void importAndApplyLoraAdapter(Uri sourceUri) {
-        if (!modelLoadedSuccessfully) {
+        // ローカルの modelLoadedSuccessfully はこの設定画面での読込のみ true になるため、
+        // 他画面/自動ロード済みのケースを取りこぼす。ネイティブ状態(isModelLoaded)で判定する。
+        if (modelManager == null || !modelManager.isModelLoaded()) {
             showToast(localizedText("先にモデルを読み込んでください", "Load a model first"));
             return;
         }
