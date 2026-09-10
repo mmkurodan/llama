@@ -186,7 +186,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="アダプタ適用" />
+                android:text="アダプタ選択" />
 
             <Button
                 style="@style/SecondaryButton" android:id="@+id/clearLoraButton"
