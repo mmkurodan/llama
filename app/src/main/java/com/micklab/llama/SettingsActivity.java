@@ -76,6 +76,9 @@ public class SettingsActivity extends Activity {
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
+    // 適用中の LoRA アダプタ（永続化：表示・再起動後の再適用に使用）
+    private static final String PREF_LORA_ADAPTER_PATH = "lora_adapter_path";
+    private static final String PREF_LORA_ADAPTER_SCALE = "lora_adapter_scale";
     private static final String PREF_SHOW_PERF_METRICS = "show_perf_metrics";
     // Busy-queue max wait (seconds) a queued API request waits for the model slot. Must match
     // OllamaApiServer's key. 0 = unlimited (wait forever); otherwise clamped to [30, 600].
@@ -321,6 +324,8 @@ public class SettingsActivity extends Activity {
         applyLoraButton = findViewById(R.id.applyLoraButton);
         clearLoraButton = findViewById(R.id.clearLoraButton);
         loraAdapterInfo = findViewById(R.id.loraAdapterInfo);
+        updateLoraAdapterInfoDisplay(); // 永続化された選択を表示に復元
+        reapplyPersistedLoraAdapterIfNeeded(); // 再起動後などモデル既ロードなら復元
         mtpModelButton = findViewById(R.id.mtpModelButton);
         mtpEnableToggle = findViewById(R.id.mtpEnableToggle);
         mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
@@ -3700,6 +3705,7 @@ public class SettingsActivity extends Activity {
                     modelProgressBar.setProgress(100);
                     showToast(localizedText("モデルの初期化に成功しました", "Model initialized successfully"));
                     updateAutoTemplatePreview(config);
+                    reapplyPersistedLoraAdapterIfNeeded(); // ロード後に保存済みアダプタを復元
                 });
             } catch (Throwable t) {
                 Log.e(TAG, "Model init error", t);
@@ -3975,6 +3981,9 @@ public class SettingsActivity extends Activity {
         registerNetworkCallback();
         updateActionButtonStateForBusy();
         updateApiServerUrlViews();
+        // 実際に適用中の LoRA アダプタ状態を表示へ反映＋必要なら再適用
+        updateLoraAdapterInfoDisplay();
+        reapplyPersistedLoraAdapterIfNeeded();
     }
 
     @Override
@@ -4115,11 +4124,16 @@ public class SettingsActivity extends Activity {
             final String fError = error;
             final float fScale = scale;
             final String fName = name;
+            final String fPath = destPath;
             runOnUiThread(() -> {
                 applyLoraButton.setEnabled(true);
                 if (fError == null || fError.isEmpty()) {
-                    loraAdapterInfo.setText(localizedText("適用中: ", "Applied: ") + fName
-                            + "  (scale=" + fScale + ")");
+                    // 永続化（表示・再ロード/再起動後の再適用に使う）
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                            .putString(PREF_LORA_ADAPTER_PATH, fPath)
+                            .putFloat(PREF_LORA_ADAPTER_SCALE, fScale)
+                            .apply();
+                    updateLoraAdapterInfoDisplay();
                     showToast(localizedText("LoRAアダプタを適用しました", "LoRA adapter applied"));
                 } else {
                     loraAdapterInfo.setText(localizedText("適用失敗: ", "Apply failed: ") + fError);
@@ -4130,6 +4144,11 @@ public class SettingsActivity extends Activity {
     }
 
     private void clearLoraAdapter() {
+        // 永続化された選択も消す（以後の自動再適用を止める）
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                .remove(PREF_LORA_ADAPTER_PATH)
+                .remove(PREF_LORA_ADAPTER_SCALE)
+                .apply();
         new Thread(() -> {
             boolean acquired = modelManager.tryAcquire();
             try {
@@ -4139,9 +4158,58 @@ public class SettingsActivity extends Activity {
                 if (acquired) modelManager.release();
             }
             runOnUiThread(() -> {
-                loraAdapterInfo.setText(localizedText("LoRA アダプタ未適用", "No LoRA adapter"));
+                updateLoraAdapterInfoDisplay();
                 showToast(localizedText("LoRAアダプタを解除しました", "LoRA adapter cleared"));
             });
+        }).start();
+    }
+
+    /** 永続化された LoRA アダプタ設定を表示に反映する（画面表示・onResume 用）。 */
+    private void updateLoraAdapterInfoDisplay() {
+        if (loraAdapterInfo == null) {
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String path = prefs.getString(PREF_LORA_ADAPTER_PATH, "");
+        if (path == null || path.isEmpty()) {
+            loraAdapterInfo.setText(localizedText("LoRA アダプタ未適用（モデル読込後に適用可）",
+                    "No LoRA adapter (apply after loading a model)"));
+            return;
+        }
+        float scale = prefs.getFloat(PREF_LORA_ADAPTER_SCALE, 1.0f);
+        loraAdapterInfo.setText(localizedText("適用中: ", "Applied: ") + new File(path).getName()
+                + "  (scale=" + scale + ")");
+    }
+
+    /** モデルロード後に、永続化された LoRA アダプタを（未適用なら）自動再適用する。
+     *  ネイティブのスティッキー再適用はプロセス内のみ有効なため、再起動後もここで復元する。 */
+    private void reapplyPersistedLoraAdapterIfNeeded() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        final String path = prefs.getString(PREF_LORA_ADAPTER_PATH, "");
+        if (path == null || path.isEmpty() || !new File(path).exists()) {
+            return;
+        }
+        final float scale = prefs.getFloat(PREF_LORA_ADAPTER_SCALE, 1.0f);
+        new Thread(() -> {
+            if (modelManager == null || !modelManager.isModelLoaded()) {
+                return;
+            }
+            // 既に付いていれば何もしない
+            String cur = "";
+            try { cur = modelManager.getLlama().getLoraAdapterInfo(); } catch (Throwable ignored) {}
+            if (cur != null && cur.startsWith(path)) {
+                return;
+            }
+            if (!modelManager.tryAcquire()) {
+                return;
+            }
+            try {
+                modelManager.getLlama().applyLoraAdapter(path, scale);
+            } catch (Throwable ignored) {
+            } finally {
+                modelManager.release();
+            }
+            runOnUiThread(this::updateLoraAdapterInfoDisplay);
         }).start();
     }
 
