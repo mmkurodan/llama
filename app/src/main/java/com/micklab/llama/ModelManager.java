@@ -884,6 +884,10 @@ public class ModelManager {
             currentConfigName = configName;
             lastLoadedConfig = config;
             modelLoaded = true;
+            // 設定に紐づく LoRA アダプタを（再）適用する（mmproj と同様、ロード時に構成から適用）。
+            if (requiresModelInit) {
+                applyLoraAdapterForConfig(config);
+            }
             // Notify the WebUI that the model has changed → it will reset settings to app defaults.
             if (requiresModelInit) {
                 modelLoadVersion.incrementAndGet();
@@ -1791,5 +1795,30 @@ public class ModelManager {
         }
 
         return null;
+    }
+
+    /** 構成の loraAdapterUrl を解決し、ロード済みモデルへ LoRA アダプタを適用する。
+     *  参照が空/未解決なら解除する（構成ごとに mmproj と同様の適用/解除を行う）。 */
+    private void applyLoraAdapterForConfig(ConfigurationManager.Configuration config) {
+        try {
+            String ref = config != null ? config.loraAdapterUrl : null;
+            if (ref == null || ref.trim().isEmpty()) {
+                llama.clearLoraAdapter();
+                return;
+            }
+            File adapterFile = ModelFileHelper.resolveStoredModelFile(context, ref);
+            if (adapterFile == null || !adapterFile.exists() || adapterFile.length() <= 0) {
+                llama.clearLoraAdapter();
+                DiagnosticsLogger.logEvent(context, "lora-adapter", "reference not resolved: " + ref);
+                return;
+            }
+            float scale = config.loraAdapterScale > 0 ? config.loraAdapterScale : 1.0f;
+            String err = llama.applyLoraAdapter(adapterFile.getAbsolutePath(), scale);
+            DiagnosticsLogger.logEvent(context, "lora-adapter",
+                    (err == null || err.isEmpty() ? "applied " : ("apply failed: " + err + " "))
+                            + adapterFile.getName() + " scale=" + scale);
+        } catch (Throwable t) {
+            Log.w(TAG, "applyLoraAdapterForConfig failed", t);
+        }
     }
 }

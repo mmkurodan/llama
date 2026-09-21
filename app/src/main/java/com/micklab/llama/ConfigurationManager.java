@@ -54,6 +54,8 @@ public class ConfigurationManager {
         // "disable vision" from an unset projector: when disabled, no co-located mmproj is
         // auto-detected, so clearing actually takes effect (previously auto-discovery re-applied it).
         public boolean multimodalProjectorDisabled;
+        public String loraAdapterUrl;        // Optional LoRA adapter (別GGUF) reference（mmproj同様の保存済み参照）
+        public float loraAdapterScale;       // 実効スケール（通常 1.0）
 
         // MTP (multi-token prediction) speculative decoding — per-model (experimental).
         public boolean mtpEnabled;          // explicit enable toggle
@@ -180,6 +182,8 @@ public class ConfigurationManager {
             multimodalProjectorUrl = ""; // Empty by default (use auto-discovery)
             multimodalProjectorManualSelection = false;
             multimodalProjectorDisabled = false; // Auto-discovery allowed until the user explicitly clears
+            loraAdapterUrl = "";         // Empty by default (no adapter)
+            loraAdapterScale = 1.0f;
             mtpEnabled = false;
             mtpModelReference = "";
             mtpNDraft = 2;
@@ -253,6 +257,8 @@ public class ConfigurationManager {
             json.put("multimodalProjectorUrl", multimodalProjectorUrl);
             json.put("multimodalProjectorManualSelection", multimodalProjectorManualSelection);
             json.put("multimodalProjectorDisabled", multimodalProjectorDisabled);
+            json.put("loraAdapterUrl", loraAdapterUrl);
+            json.put("loraAdapterScale", loraAdapterScale);
             json.put("mtpEnabled", mtpEnabled);
             json.put("mtpModelReference", mtpModelReference);
             json.put("mtpNDraft", mtpNDraft);
@@ -333,6 +339,8 @@ public class ConfigurationManager {
             config.systemPrompt = json.optString("systemPrompt", "");
             config.customChatTemplate = json.optString("customChatTemplate", "");
             config.multimodalProjectorUrl = json.optString("multimodalProjectorUrl", "");
+            config.loraAdapterUrl = json.optString("loraAdapterUrl", "");
+            config.loraAdapterScale = (float) json.optDouble("loraAdapterScale", 1.0);
             config.multimodalProjectorManualSelection =
                     json.optBoolean("multimodalProjectorManualSelection", false);
             config.multimodalProjectorDisabled =

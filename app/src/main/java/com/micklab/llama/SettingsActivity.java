@@ -85,6 +85,7 @@ public class SettingsActivity extends Activity {
     private static final int BUSY_QUEUE_WAIT_MAX_SECONDS = 600;
     private static final int REQUEST_IMPORT_MODEL_LOCAL_DEVICE = 1001;
     private static final int REQUEST_RESTORE_DIR = 1002;
+    private static final int REQUEST_IMPORT_LORA_ADAPTER = 1003;
     private static final int MODEL_COPY_BUFFER_SIZE = 1024 * 1024;
     private static final String IMPORT_TEMP_SUFFIX = ".import.tmp";
     
@@ -97,6 +98,9 @@ public class SettingsActivity extends Activity {
     private TextView multimodalProjectorInfo;
     private Button selectProjectorButton;
     private Button clearProjectorButton;
+    private Button applyLoraButton;
+    private Button clearLoraButton;
+    private TextView loraAdapterInfo;
     private Button mtpModelButton;
     private Switch mtpEnableToggle;
     private EditText mtpNDraftInput;
@@ -203,6 +207,7 @@ public class SettingsActivity extends Activity {
     private ArrayAdapter<String> configAdapter;
     private String loadedModelPath = null;
     private String selectedProjectorReference = "";
+    private String selectedAdapterReference = "";   // LoRA アダプタ参照（mmproj同様、構成に保存）
     private String selectedMtpReference = "";   // MTP draft source ("" = model's own head)
     private boolean selectedProjectorManualSelection = false;
     // True when the user explicitly tapped "Clear Projector": disables mmproj auto-discovery
@@ -314,6 +319,10 @@ public class SettingsActivity extends Activity {
         multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
         clearProjectorButton = findViewById(R.id.clearProjectorButton);
+        applyLoraButton = findViewById(R.id.applyLoraButton);
+        clearLoraButton = findViewById(R.id.clearLoraButton);
+        loraAdapterInfo = findViewById(R.id.loraAdapterInfo);
+        updateLoraAdapterInfoDisplay(); // 選択中のアダプタを表示に反映
         mtpModelButton = findViewById(R.id.mtpModelButton);
         mtpEnableToggle = findViewById(R.id.mtpEnableToggle);
         mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
@@ -629,6 +638,18 @@ public class SettingsActivity extends Activity {
             // Explicit user intent to disable vision: suppress mmproj auto-discovery too.
             selectedProjectorDisabled = true;
             setSelectedProjectorReference("", false);
+        });
+        applyLoraButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            showStoredAdapterSelectionDialog();
+        });
+        clearLoraButton.setOnClickListener(v -> {
+            if (isBusyActionBlocked()) {
+                return;
+            }
+            setSelectedAdapterReference("");
         });
         // ---- MTP (experimental) controls. The values live in the per-model config
         //      (updateUIFromConfig loads them, collectConfiguration saves them); here we only
@@ -1274,6 +1295,8 @@ public class SettingsActivity extends Activity {
     private void updateUIFromConfig(ConfigurationManager.Configuration config) {
         configNameInput.setText(config.name, false);
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
+        selectedAdapterReference = normalizeReference(config.loraAdapterUrl);
+        updateLoraAdapterInfoDisplay();
         selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
         selectedProjectorDisabled = config.multimodalProjectorDisabled;
         selectedMtpReference = normalizeReference(config.mtpModelReference);
@@ -1442,6 +1465,8 @@ public class SettingsActivity extends Activity {
             config.promptTemplate = currentConfig.promptTemplate;
         }
         config.multimodalProjectorUrl = normalizeReference(selectedProjectorReference);
+        config.loraAdapterUrl = normalizeReference(selectedAdapterReference);
+        if (config.loraAdapterScale <= 0) config.loraAdapterScale = 1.0f;
         config.multimodalProjectorManualSelection =
                 !config.multimodalProjectorUrl.isEmpty() && selectedProjectorManualSelection;
         // Only meaningful when no projector is configured: true = user cleared it, suppress auto-discovery.
@@ -1989,8 +2014,9 @@ public class SettingsActivity extends Activity {
         String[] fileItems = new String[ggufFiles.length];
         for (int i = 0; i < ggufFiles.length; i++) {
             boolean projector = ModelFileHelper.isLikelyProjectorFilename(ggufFiles[i].getName());
+            boolean adapter = ModelFileHelper.isLikelyAdapterFilename(ggufFiles[i].getName());
             fileItems[i] = ggufFiles[i].getName()
-                    + (projector ? "  [mmproj]" : "")
+                    + (projector ? "  [mmproj]" : (adapter ? "  [LoRA]" : ""))
                     + " (" + ggufFiles[i].length() + " bytes)";
         }
 
@@ -2003,13 +2029,19 @@ public class SettingsActivity extends Activity {
 
     private void showModelFileActionsDialog(File file) {
         boolean projector = ModelFileHelper.isLikelyProjectorFilename(file.getName());
+        boolean adapter = ModelFileHelper.isLikelyAdapterFilename(file.getName());
 
         List<String> actions = new ArrayList<>();
         List<Runnable> handlers = new ArrayList<>();
-        // "Use as model" only makes sense for a regular model, not an mmproj/projector.
-        if (!projector) {
+        // "Use as model" only makes sense for a regular model, not an mmproj/projector/LoRA adapter.
+        if (!projector && !adapter) {
             actions.add(localizedText("このモデルを使用", "Use as model"));
             handlers.add(() -> switchCurrentProfileToDownloadedModel(file));
+        }
+        // アダプタは「アダプタとして選択」も提供
+        if (adapter) {
+            actions.add(localizedText("このアダプタを選択", "Select as adapter"));
+            handlers.add(() -> setSelectedAdapterReference(file.getName()));
         }
         actions.add(localizedText("名前を変更", "Rename"));
         handlers.add(() -> promptRenameModelFile(file));
@@ -2127,6 +2159,10 @@ public class SettingsActivity extends Activity {
 
         boolean deleted = modelFile.delete();
         if (deleted) {
+            // 選択中の LoRA アダプタを削除した場合は参照を外す
+            if (modelFile.getName().equals(extractFilenameFromUrl(normalizeReference(selectedAdapterReference)))) {
+                setSelectedAdapterReference("");
+            }
             if (loadedModelPath != null && loadedModelPath.equals(modelFile.getAbsolutePath())) {
                 loadedModelPath = null;
                 modelLoadedSuccessfully = false;
@@ -3167,11 +3203,25 @@ public class SettingsActivity extends Activity {
         File[] all = getDownloadedProjectorFiles();
         List<File> models = new ArrayList<>();
         for (File file : all) {
-            if (!ModelFileHelper.isLikelyProjectorFilename(file.getName())) {
+            // projector / LoRA アダプタは「ロード可能モデル」ではないため一覧から除外する
+            if (!ModelFileHelper.isLikelyProjectorFilename(file.getName())
+                    && !ModelFileHelper.isLikelyAdapterFilename(file.getName())) {
                 models.add(file);
             }
         }
         return models.toArray(new File[0]);
+    }
+
+    /** 保存済み（モデル領域内）の LoRA アダプタ GGUF 一覧。 */
+    private File[] getDownloadedAdapterFiles() {
+        File[] all = getDownloadedProjectorFiles(); // = モデル領域内の全 GGUF
+        List<File> adapters = new ArrayList<>();
+        for (File file : all) {
+            if (ModelFileHelper.isLikelyAdapterFilename(file.getName())) {
+                adapters.add(file);
+            }
+        }
+        return adapters.toArray(new File[0]);
     }
 
     // "Select downloaded model": pick from already-downloaded models into the model field.
@@ -3956,6 +4006,8 @@ public class SettingsActivity extends Activity {
         registerNetworkCallback();
         updateActionButtonStateForBusy();
         updateApiServerUrlViews();
+        // 選択中の LoRA アダプタを表示へ反映
+        updateLoraAdapterInfoDisplay();
     }
 
     @Override
@@ -3991,6 +4043,19 @@ public class SettingsActivity extends Activity {
             return;
         }
 
+        if (requestCode == REQUEST_IMPORT_LORA_ADAPTER) {
+            if (resultCode != RESULT_OK) {
+                return;
+            }
+            Uri loraUri = data != null ? data.getData() : null;
+            if (loraUri == null) {
+                showToast(localizedText("選択したファイルを開けません", "Could not open the selected file"));
+                return;
+            }
+            importAdapterFromUri(loraUri);
+            return;
+        }
+
         if (requestCode != REQUEST_IMPORT_MODEL_LOCAL_DEVICE || resultCode != RESULT_OK) {
             return;
         }
@@ -4012,6 +4077,83 @@ public class SettingsActivity extends Activity {
         }
 
         importModelFromUri(selectedUri);
+    }
+
+    // ---- LoRA アダプタ（mmproj と同様：アップロード→保存済みから選択→構成に保存） ----
+
+    /** 保存済みアダプタからの選択ダイアログ（「なし」「インポート」を含む）。 */
+    private void showStoredAdapterSelectionDialog() {
+        File[] adapters = getDownloadedAdapterFiles();
+        String current = extractFilenameFromUrl(normalizeReference(selectedAdapterReference));
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+
+        labels.add(localizedText("なし（アダプタを使用しない）", "None (no adapter)"));
+        actions.add(() -> setSelectedAdapterReference(""));
+
+        for (File f : adapters) {
+            String name = f.getName();
+            String mark = name.equals(current) ? "  ✓" : "";
+            labels.add(name + mark);
+            actions.add(() -> setSelectedAdapterReference(name));
+        }
+
+        labels.add(localizedText("端末からインポート…", "Import from device…"));
+        actions.add(() -> launchGgufPicker(REQUEST_IMPORT_LORA_ADAPTER, buildDefaultImportUri()));
+
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("LoRA アダプタを選択", "Select LoRA adapter"))
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .show();
+    }
+
+    /** アダプタ参照（保存済みファイル名）を設定し、表示を更新する。反映は構成保存時（mmproj と同様）。 */
+    private void setSelectedAdapterReference(String reference) {
+        selectedAdapterReference = normalizeReference(reference);
+        updateLoraAdapterInfoDisplay();
+    }
+
+    /** 選択中の LoRA アダプタ参照を表示に反映する。 */
+    private void updateLoraAdapterInfoDisplay() {
+        if (loraAdapterInfo == null) {
+            return;
+        }
+        String ref = extractFilenameFromUrl(normalizeReference(selectedAdapterReference));
+        if (ref == null || ref.isEmpty()) {
+            loraAdapterInfo.setText(localizedText("LoRA アダプタ未設定", "No LoRA adapter"));
+        } else {
+            loraAdapterInfo.setText(localizedText("選択中: ", "Selected: ") + ref);
+        }
+    }
+
+    /** インポートされたアダプタGGUFをモデル領域へ保存し、選択参照にセットする（他モデルと同様の保管）。 */
+    private void importAdapterFromUri(Uri sourceUri) {
+        ImportedModelCandidate candidate = resolveImportedModelCandidate(sourceUri);
+        String displayName = candidate.displayName;
+        if (displayName == null || displayName.isEmpty() || !ModelFileHelper.isGgufFilename(displayName)) {
+            showToast(localizedText(".gguf アダプタを選択してください", "Please select a .gguf adapter"));
+            return;
+        }
+        final String name = displayName;
+        final File destFile = new File(getModelStorageDir(), name);
+        importInProgress = true;
+        updateActionButtonStateForBusy();
+        loraAdapterInfo.setText(localizedText("アダプタ取込中... ", "Importing adapter... ") + name);
+        new Thread(() -> {
+            String error = copyImportedModelToStorage(sourceUri, destFile, candidate.sizeBytes, name);
+            runOnUiThread(() -> {
+                importInProgress = false;
+                updateActionButtonStateForBusy();
+                if (error == null) {
+                    setSelectedAdapterReference(name);
+                    showToast(localizedText("アダプタを取り込みました: ", "Adapter imported: ") + name);
+                } else {
+                    updateLoraAdapterInfoDisplay();
+                    showToast(localizedText("アダプタ取込失敗: ", "Adapter import failed: ") + error);
+                }
+            });
+        }).start();
     }
 
     @Override
