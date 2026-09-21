@@ -1,0 +1,56 @@
+Release notes — changes since v1.590 (Play Console "What's new").
+One block per language; keep each under ~500 characters when pasting per locale.
+
+=== en-US ===
+• LoRA adapters: apply a LoRA GGUF to the base model at runtime; select, save, and manage adapters from Settings.
+• Gemini API: new Google Gemini-compatible endpoints — POST /v1beta/models/{model}:generateContent and :streamGenerateContent (v1 alias included); supports multimodal input, function calling, and thinking.
+• Vision, upgraded: Qwen3-VL is the new default vision model; n_ctx auto-expands for large images; automatic GPU→CPU fallback.
+• Newer engine: llama.cpp b10621 (v0.3.0) / ggml 0.22 — more models, Adreno OpenCL GPU.
+
+=== ja-JP ===
+• LoRAアダプタ: LoRA GGUFをランタイムでベースモデルに適用。設定画面で選択・保存・管理が可能。
+• Gemini API: Google Gemini互換エンドポイント追加（/v1beta/models/…:generateContent / :streamGenerateContent、v1エイリアスも対応）— マルチモーダル入力・Function Calling・Thinking対応。
+• ビジョン刷新: 既定ビジョンモデルを Qwen3‑VL に。大きな画像でコンテキストを自動拡張。GPU→CPU自動フォールバック。
+• エンジン更新: llama.cpp b10621 (v0.3.0) / ggml 0.22。
+
+=== fr-FR ===
+• Adaptateurs LoRA : appliquez un GGUF LoRA au modèle de base à l'exécution ; sélection, sauvegarde et gestion depuis les paramètres.
+• API Gemini : nouveaux endpoints compatibles Google Gemini — /v1beta/models/…:generateContent et :streamGenerateContent (alias v1 inclus) ; entrées multimodales, appel de fonctions et thinking.
+• Vision améliorée : Qwen3‑VL devient le modèle par défaut ; n_ctx s'étend pour les grandes images ; repli GPU→CPU automatique.
+• Moteur mis à jour : llama.cpp b10621 (v0.3.0) / ggml 0.22.
+
+=== es-ES ===
+• Adaptadores LoRA: aplica un GGUF LoRA al modelo base en tiempo de ejecución; selecciona, guarda y gestiona adaptadores desde Ajustes.
+• API Gemini: nuevos endpoints compatibles con Google Gemini — /v1beta/models/…:generateContent y :streamGenerateContent (alias v1 incluido); entrada multimodal, llamada a funciones y thinking.
+• Visión mejorada: Qwen3‑VL es el nuevo modelo por defecto; n_ctx se amplía para imágenes grandes; cambio automático GPU→CPU.
+• Motor actualizado: llama.cpp b10621 (v0.3.0) / ggml 0.22.
+
+=== pt-BR ===
+• Adaptadores LoRA: aplique um GGUF LoRA ao modelo base em tempo de execução; selecione, salve e gerencie adaptadores nas Configurações.
+• API Gemini: novos endpoints compatíveis com Google Gemini — /v1beta/models/…:generateContent e :streamGenerateContent (alias v1 incluído); entrada multimodal, chamada de função e thinking.
+• Visão aprimorada: Qwen3‑VL é o novo modelo padrão; n_ctx se expande para imagens grandes; fallback GPU→CPU automático.
+• Motor atualizado: llama.cpp b10621 (v0.3.0) / ggml 0.22.
+
+=== de-DE ===
+• LoRA-Adapter: LoRA-GGUF zur Laufzeit auf das Basismodell anwenden; Adapter in den Einstellungen auswählen, speichern und verwalten.
+• Gemini-API: neue Google-Gemini-kompatible Endpunkte — /v1beta/models/…:generateContent und :streamGenerateContent (v1-Alias inklusive); multimodaler Input, Function Calling und Thinking.
+• Verbesserte Vision: Qwen3‑VL ist das neue Standardmodell; n_ctx erweitert sich für große Bilder; automatischer GPU→CPU-Fallback.
+• Aktualisierte Engine: llama.cpp b10621 (v0.3.0) / ggml 0.22.
+
+=== it-IT ===
+• Adattatori LoRA: applica un GGUF LoRA al modello base in fase di esecuzione; seleziona, salva e gestisci gli adattatori dalle Impostazioni.
+• API Gemini: nuovi endpoint compatibili con Google Gemini — /v1beta/models/…:generateContent e :streamGenerateContent (alias v1 incluso); input multimodale, chiamata di funzioni e thinking.
+• Visione migliorata: Qwen3‑VL è il nuovo modello predefinito; n_ctx si espande per immagini grandi; fallback GPU→CPU automatico.
+• Motore aggiornato: llama.cpp b10621 (v0.3.0) / ggml 0.22.
+
+=== zh-CN ===
+• LoRA 适配器：运行时将 LoRA GGUF 应用于基础模型；可在设置中选择、保存和管理适配器。
+• Gemini API：新增 Google Gemini 兼容端点 — /v1beta/models/…:generateContent 和 :streamGenerateContent（含 v1 别名）；支持多模态输入、函数调用和思考模式。
+• 视觉升级：Qwen3‑VL 成为新的默认视觉模型；大图片自动扩展 n_ctx；GPU→CPU 自动回退。
+• 引擎更新：llama.cpp b10621 (v0.3.0) / ggml 0.22。
+
+=== ko-KR ===
+• LoRA 어댑터: 런타임에 LoRA GGUF를 기본 모델에 적용; 설정에서 어댑터를 선택·저장·관리.
+• Gemini API: 새로운 Google Gemini 호환 엔드포인트 추가 — /v1beta/models/…:generateContent 및 :streamGenerateContent (v1 별칭 포함); 멀티모달 입력, 함수 호출, thinking 지원.
+• 비전 개선: Qwen3‑VL이 새 기본 비전 모델; 큰 이미지에서 n_ctx 자동 확장; GPU→CPU 자동 폴백.
+• 엔진 업데이트: llama.cpp b10621 (v0.3.0) / ggml 0.22.

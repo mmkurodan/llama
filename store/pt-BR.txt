@@ -1,0 +1,78 @@
+IA ilimitada, zero nuvem. Seu celular é o servidor.
+
+Execute LLMs poderosos localmente, de forma privada e gratuita, com uma interface leve e acessível a todos.
+Um dispositivo Android se torna seu backend de IA pessoal, acessível de PCs, tablets e outros dispositivos na mesma rede.
+
+---
+
+1. Visão geral
+O LLM AI Server com llama.cpp é um servidor LLM totalmente local para Android: geração de texto e multimodal, privada e offline.
+Suporta busca de modelos no Hugging Face, downloads GGUF, carregamento local e decodificação especulativa MTP opcional.
+
+Famílias de modelos suportadas: Gemma‑4 / Gemma‑4 Vision, Qwen / Qwen Vision, Mistral, LLaMA, Phi, Bonsai e outras.
+Um servidor de API integrado é compatível com as APIs do Ollama, do OpenAI, do Anthropic (Claude) Messages e do Google Gemini, oferecendo endpoints para chat, conclusão, geração, embedding, tokenização/contagem de tokens e listagem de modelos.
+A WebUI incluída roda na mesma porta: troca de modelo, edição de parâmetros, logs e instalação como PWA.
+
+MCP e Function Calling permitem fluxos com ferramentas; saída estruturada via GBNF e JSON Schema.
+
+---
+
+2. Usuários e dispositivos compatíveis
+Para quem deseja um ambiente LLM privado e totalmente local:
+
+- Usuários que priorizam o uso offline
+- Desenvolvedores que integram um backend local
+- Usuários avançados que ajustam amostragem e desempenho
+- Pesquisadores que testam o comportamento de inferência
+- Usuários preocupados com privacidade
+
+Desempenho ajustável: tamanho de contexto, threads, lote, offload de GPU, quantização de cache KV e MTP opcional.
+
+---
+
+3. Principais recursos
+- Busca e download de GGUF no Hugging Face
+- Modelo de visão Qwen3‑VL (padrão) com detecção automática do projetor (mmproj)
+- Expansão automática do contexto (n_ctx) para imagens grandes e prompts longos
+- Fallback automático GPU→CPU quando a inicialização da GPU falha
+- Busca no Hugging Face aprimorada: orientação por modelo/tamanho/quantização, avaliação de adequação do dispositivo e download de mmproj com um toque
+- Motor llama.cpp atualizado (b10621, v0.3.0) — modelos mais novos e GPU Adreno OpenCL
+- Obtenção de logs no dispositivo via GET /api/diagnostics
+- Carregamento local de GGUF
+- Adaptadores LoRA: aplique um GGUF LoRA ao modelo base em tempo de execução; selecione, salve e gerencie adaptadores nas Configurações
+- Decodificação especulativa MTP
+- Controle detalhado de parâmetros (Mirostat, DRY, XTC, Min‑p, Typical‑p, penalidades, temperatura dinâmica)
+- Servidor de API integrado compatível com Ollama / OpenAI / Anthropic (Claude) Messages / Google Gemini
+- API Google Gemini: /v1beta(v1)/models/{model}:generateContent e :streamGenerateContent — multimodal, chamada de função, thinking
+- API de embedding
+- Seleção automática de template de prompt
+- WebUI aprimorada com suporte multilíngue
+- Suporte a PWA
+- MCP e Function Calling
+- Backup e restauração de perfis
+
+Endpoints compatíveis com Ollama, OpenAI, Anthropic (Claude) e Google Gemini; lista completa na página de teste abaixo.
+Documentação completa da API, exemplos e testador interativo: https://micklab.web.app/llama-tester-en.html
+
+---
+
+4. Como começar
+Você pode começar imediatamente de uma destas formas:
+
+A) Iniciar API/WebUI → Abrir no navegador
+1. Toque em "Iniciar API/WebUI" na tela principal.
+2. Toque em "Abrir no navegador" para abrir a WebUI integrada.
+3. Você pode conversar e executar o modelo direto na WebUI.
+   - Nota: se o modelo ainda não foi baixado, a WebUI o baixa na primeira mensagem (modelos grandes levam tempo).
+
+B) Execução direta
+1. Abra a seção "Execução direta".
+2. Digite um prompt e toque em "Enviar" para executar o modelo no app.
+   - Se ainda não foi baixado, o app avisa antes do download.
+
+C) Ou prepare um modelo primeiro nas Configurações
+1. Abra as Configurações.
+2. Busque um GGUF no Hugging Face, insira uma URL ou importe um arquivo local.
+3. Ajuste os parâmetros (contexto, temperatura, penalidades, MTP, offload de GPU, etc.).
+4. Toque em "Salvar configuração" e depois "SALVAR E FECHAR" para carregar o modelo.
+5. Opcionalmente, crie um backup de perfil para restauração futura.

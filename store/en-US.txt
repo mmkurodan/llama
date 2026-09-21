@@ -1,0 +1,82 @@
+Unlimited AI, zero cloud. Your phone is the server. 
+
+Run powerful LLMs locally, privately, and freely — with a lightweight UI anyone can use.  
+One Android device becomes your personal AI backend, accessible from PCs, tablets, and other devices on the same network.
+
+---
+
+1. Overview
+LLM AI Server with llama.cpp is a fully local LLM server for Android, enabling private, offline text and multimodal generation.  
+It supports Hugging Face model search, GGUF downloads, local model loading, and optional MTP speculative decoding for faster inference.
+
+Supported model families include Gemma‑4 / Gemma‑4 Vision, Qwen / Qwen Vision, Mistral, LLaMA, Phi, Bonsai, and others.  
+A built‑in API server is compatible with the Ollama, OpenAI, Anthropic (Claude) Messages, and Google Gemini APIs — providing chat, completion, generation, embedding, tokenize/token‑count, and model‑listing endpoints, so existing OpenAI, Ollama, Claude, and Gemini clients and SDKs can point straight at your phone.
+The bundled WebUI runs on the same port and supports model switching, parameter editing, log viewing, and PWA installation.
+
+MCP and Function Calling enable tool‑augmented workflows, and structured output is supported via GBNF and JSON Schema.  
+
+---
+
+2. Intended Users and Supported Devices
+Designed for users who want a private, fully local LLM environment:
+
+- Offline‑first users  
+- Developers integrating a local backend  
+- Advanced users tuning sampling and performance  
+- Researchers testing inference behavior  
+- Privacy‑focused users  
+
+Performance can be tuned via context size, threads, batch size, GPU offload, KV cache quantization, and optional MTP decoding.
+
+---
+
+3. Key Features
+- Hugging Face GGUF search & download  
+- Qwen3-VL vision model (bundled default) with automatic projector (mmproj) detection  
+- Automatic context (n_ctx) expansion for large images and long prompts  
+- Automatic GPU→CPU fallback when GPU init fails  
+- Smarter Hugging Face search: model / size / quantization guidance, device-suitability rating, and one-tap mmproj download  
+- Upgraded llama.cpp engine (b10621, v0.3.0) — newer models and Adreno OpenCL GPU  
+- On-device log retrieval via GET /api/diagnostics  
+- Local GGUF loading  
+- LoRA adapter support: apply a LoRA GGUF to the base model at runtime; select, save, and manage adapters from Settings
+- MTP speculative decoding
+- Detailed parameter control (Mirostat, DRY, XTC, Min‑p, Typical‑p, penalties, dynamic temperature)
+- Integrated Ollama / OpenAI / Anthropic (Claude) Messages / Google Gemini‑compatible API server
+- Google Gemini API: POST /v1beta(v1)/models/{model}:generateContent and :streamGenerateContent — multimodal, function calling, thinking
+- OpenAI Responses API: POST /v1/responses — stateless, streaming response.* events, reasoning output
+- Embedding API
+- Automatic prompt template selection
+- Enhanced WebUI with multi‑language support
+- PWA support
+- MCP and Function Calling
+- Profile backup & restore support
+
+Ollama-, OpenAI-, Anthropic-(Claude-)-, and Google-Gemini-compatible endpoints; full list on the tester page below.
+
+Full API docs, examples & an interactive tester:
+https://micklab.web.app/llama-tester-en.html
+
+---
+
+4. Getting Started
+You can begin using the app immediately in either of the following ways:
+
+A) Start API/WebUI → Open in browser
+1. Tap Start API/WebUI on the main screen.  
+2. Tap Open in browser to launch the bundled WebUI.  
+3. You can chat and run the model directly from the WebUI.  
+   - Note: On first use, if the model is not downloaded yet, the WebUI will download it when you send the first message.  
+     Large models may take time to download.
+
+B) Direct Run
+1. Open the Direct Run section on the main screen.  
+2. Enter a prompt and tap Send to run the model directly inside the app.  
+   - If the model is not downloaded yet, the app will show a notice before downloading.
+
+C) or Use Settings to prepare a model first
+1. Open Settings.  
+2. Search Hugging Face for a GGUF model or enter a direct URL or import a local GGUF file.  
+3. Adjust parameters (context size, temperature, penalties, MTP, GPU offload, etc.).  
+4. Tap Save Config, then SAVE & CLOSE to load the model.  
+5. Optionally create a profile backup for later restoration.

@@ -1,0 +1,91 @@
+クラウド不要でAI使い放題。AndroidスマホをAIサーバにしましょう。
+
+機能が充実したLLMをローカルで、プライベートに、そして課金なしで使えます。
+シンプルなUIで、1台のAndroidがあなた専用のAIバックエンドとなり、同じネットワーク内のPC・タブレット・他のスマホからもアクセスできます。
+
+---
+
+1. 概要
+LLM AI Server with llama.cpp は、Android上で完全ローカルに動作するLLMサーバです。
+テキスト生成からマルチモーダル推論まで、すべてをオフラインで安全に実行できます。
+
+Hugging Faceモデル検索、GGUFダウンロード、ローカルモデル読み込みに対応し、対応モデルでは MTP 推論による高速化も利用できます。
+
+対応モデルファミリーは Gemma‑4 / Gemma‑4 Vision、Qwen / Qwen Vision、Mistral、LLaMA、Phi、Bonsai など。
+内蔵の API サーバは Ollama 互換・OpenAI 互換・Anthropic (Claude) Messages 互換・Google Gemini 互換 — チャット、補完、生成、埋め込み、トークナイズ／トークン数、モデル一覧などのエンドポイントを提供します。
+
+同一ポートで動作する WebUI では、モデル切替、パラメータ編集、ログ閲覧、PWAインストールが可能です。
+MCP や Function Calling により、ツール連携や構造化出力にも対応しています。
+プロファイルのバックアップ／復元機能により、設定を簡単に保存・移行できます。
+
+---
+
+2. 想定ユーザと対応デバイス
+このアプリは、以下のような「ローカルで完結するAI環境」を求めるユーザ向けです。
+
+- オフラインで使いたいユーザ
+- ローカルバックエンドを組み込みたい開発者
+- 詳細なサンプリング調整を行いたい上級ユーザ
+- 推論挙動を検証したい研究者
+- プライバシーを重視するユーザ
+
+性能は、コンテキストサイズ、スレッド数、バッチサイズ、GPUオフロード、KVキャッシュ量子化、MTP推論などで柔軟に調整できます。
+
+---
+
+3. 主な機能
+- Hugging Face からの GGUF モデル検索・ダウンロード
+- Qwen3‑VL ビジョンモデル（既定同梱）＋Projector(mmproj)自動検出
+- 大きな画像・長いプロンプトでコンテキスト(n_ctx)を自動拡張
+- GPU初期化失敗時のGPU→CPU自動フォールバック
+- 賢くなった Hugging Face 検索：モデル/サイズ/量子化のガイド、端末別の適合度、mmproj のワンタップDL
+- llama.cpp エンジン更新（b10621, v0.3.0）— 新モデル対応・Adreno OpenCL GPU
+- GET /api/diagnostics による端末ログ取得
+- ローカル GGUF モデル読み込み
+- 完全オフラインの LLM サーバ
+- Gemma‑4 Vision / Qwen Vision のプロジェクタ自動検出
+- LoRAアダプタ対応: LoRA GGUFをランタイムでベースモデルに適用。設定画面で選択・保存・管理・削除が可能
+- MTP 推論（対応モデルのみ）
+- 詳細なパラメータ制御（Mirostat、DRY、XTC、Min‑p、Typical‑p、各種ペナルティ、動的温度など）
+- KVキャッシュ量子化の拡張
+- nPredict の改善された管理
+- Ollama / OpenAI / Anthropic (Claude) Messages / Google Gemini 互換 API サーバ
+- Google Gemini互換API: /v1beta(v1)/models/{model}:generateContent / :streamGenerateContent — マルチモーダル・Function Calling・Thinking対応
+- OpenAI Responses API: /v1/responses — ステートレス・ストリーミング response.* イベント・推論出力
+- Claude 互換 /v1/messages（＋トークン数カウント）— Anthropic SDK クライアントの drop‑in
+- 埋め込み API
+- トークナイズ API
+- 自動プロンプトテンプレート選択
+- ストリーミング／非ストリーミング出力
+- タイムスタンプ付きログ
+- 多言語対応 WebUI（9言語）
+- PWA サポート
+- MCP / Function Calling
+- GPUロードの安定化
+- プロファイルのバックアップ／復元
+
+利用可能なエンドポイント — Ollama: /api/chat, /api/generate, /api/embed(dings), /api/tokenize, /api/tags, /api/diagnostics ／ OpenAI: /v1/chat/completions, /v1/completions, /v1/embeddings, /v1/responses, /v1/models ／ Anthropic (Claude): /v1/messages, /v1/messages/count_tokens ／ Google Gemini: /v1beta(v1)/models/{model}:generateContent, :streamGenerateContent。
+API の詳細・利用例・インタラクティブなテスターはこちら：https://micklab.web.app/llama-tester-en.html
+
+---
+
+4. 使い始めるには
+アプリは、次のいずれかの方法ですぐに使い始められます。
+
+A) Start API/WebUI → Open in browser（推奨）
+1. メイン画面で Start API/WebUI をタップ。
+2. Open in browser をタップして WebUI を開く。
+3. WebUI からそのままチャットや推論が可能。
+   - 注意: 初回はモデルが未ダウンロードの場合、最初のメッセージ送信時に WebUI がモデルをダウンロードします（大規模モデルは時間がかかることがあります）。
+
+B) Direct Run（アプリ内で即実行）
+1. メイン画面の Direct Run を開く。
+2. プロンプトを入力して Send をタップ。
+   - モデル未ダウンロードの場合は、事前に通知が表示されます。
+
+C) Settings からモデルを準備する方法
+1. Settings を開く。
+2. Hugging Face でモデル検索 または URL入力 または ローカルGGUFのインポート。
+3. コンテキストサイズ、温度、ペナルティ、MTP、GPUオフロードなどを調整。
+4. Save Config → SAVE & CLOSE でモデルを読み込み。
+5. 必要に応じて プロファイルバックアップ を作成。

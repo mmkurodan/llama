@@ -1,0 +1,78 @@
+Unbegrenzte KI, keine Cloud. Dein Smartphone ist der Server.
+
+Führe leistungsstarke LLMs lokal, privat und kostenlos aus – mit einer leichten Oberfläche für alle.
+Ein Android-Gerät wird zu deinem persönlichen KI-Backend, erreichbar von PCs, Tablets und anderen Geräten im selben Netzwerk.
+
+---
+
+1. Überblick
+LLM AI Server mit llama.cpp ist ein vollständig lokaler LLM-Server für Android: Text- und multimodale Generierung, privat und offline.
+Unterstützt Modellsuche auf Hugging Face, GGUF-Downloads, lokales Laden und optionales spekulatives MTP-Decoding.
+
+Unterstützte Modellfamilien: Gemma‑4 / Gemma‑4 Vision, Qwen / Qwen Vision, Mistral, LLaMA, Phi, Bonsai u. a.
+Ein integrierter API-Server ist mit Ollama, OpenAI, der Anthropic (Claude) Messages API und der Google Gemini API kompatibel und bietet Endpunkte für Chat, Completion, Generierung, Embedding, Tokenisierung/Token-Zählung und Modell-Listing.
+Die enthaltene WebUI läuft am selben Port: Modellwechsel, Parameter, Logs und PWA-Installation.
+
+MCP und Function Calling ermöglichen werkzeuggestützte Abläufe; strukturierte Ausgabe über GBNF und JSON Schema.
+
+---
+
+2. Zielgruppe und unterstützte Geräte
+Für alle, die eine private, vollständig lokale LLM-Umgebung wollen:
+
+- Offline-orientierte Nutzer
+- Entwickler, die ein lokales Backend integrieren
+- Fortgeschrittene, die Sampling und Leistung optimieren
+- Forschende, die Inferenzverhalten testen
+- Datenschutzbewusste Nutzer
+
+Leistung anpassbar: Kontextgröße, Threads, Batch, GPU-Offload, KV-Cache-Quantisierung und optionales MTP.
+
+---
+
+3. Hauptfunktionen
+- GGUF-Suche und -Download von Hugging Face
+- Qwen3‑VL-Vision-Modell (vorinstallierter Standard) mit automatischer Projektor-(mmproj-)Erkennung
+- Automatische Kontext-(n_ctx-)Erweiterung für große Bilder und lange Prompts
+- Automatischer GPU→CPU-Fallback, wenn die GPU-Initialisierung fehlschlägt
+- Verbesserte Hugging-Face-Suche: Hinweise nach Modell/Größe/Quantisierung, Geräte-Eignungsbewertung und mmproj-Download mit einem Tippen
+- Aktualisierte llama.cpp-Engine (b10621, v0.3.0) – neuere Modelle und Adreno-OpenCL-GPU
+- Abruf von Geräteprotokollen über GET /api/diagnostics
+- Lokales Laden von GGUF
+- LoRA-Adapter: LoRA-GGUF zur Laufzeit auf das Basismodell anwenden; Adapter in den Einstellungen auswählen, speichern und verwalten
+- Spekulatives MTP-Decoding
+- Detaillierte Parameter (Mirostat, DRY, XTC, Min‑p, Typical‑p, Penalties, dynamische Temperatur)
+- Integrierter API-Server, kompatibel mit Ollama / OpenAI / Anthropic (Claude) Messages / Google Gemini
+- Google-Gemini-API: /v1beta(v1)/models/{model}:generateContent und :streamGenerateContent — multimodal, Function Calling, Thinking
+- Embedding-API
+- Automatische Prompt-Template-Auswahl
+- Verbesserte WebUI mit Mehrsprachigkeit
+- PWA-Unterstützung
+- MCP und Function Calling
+- Profil-Backup und -Wiederherstellung
+
+Mit Ollama, OpenAI, Anthropic (Claude) und Google Gemini kompatible Endpunkte; vollständige Liste auf der Tester-Seite unten.
+Vollständige API-Doku, Beispiele und interaktiver Tester: https://micklab.web.app/llama-tester-en.html
+
+---
+
+4. Erste Schritte
+So kannst du sofort loslegen:
+
+A) API/WebUI starten → im Browser öffnen
+1. Tippe im Hauptbildschirm auf „API/WebUI starten".
+2. Tippe auf „Im Browser öffnen", um die WebUI zu starten.
+3. Chatte und führe das Modell direkt in der WebUI aus.
+   - Hinweis: Ist das Modell noch nicht geladen, lädt die WebUI es bei der ersten Nachricht (große Modelle brauchen Zeit).
+
+B) Direktausführung
+1. Öffne den Bereich „Direktausführung".
+2. Gib einen Prompt ein und tippe auf „Senden".
+   - Ist es noch nicht geladen, warnt die App vor dem Download.
+
+C) Oder bereite ein Modell in den Einstellungen vor
+1. Öffne die Einstellungen.
+2. Suche ein GGUF auf Hugging Face, gib eine URL ein oder importiere eine lokale Datei.
+3. Passe Parameter an (Kontext, Temperatur, Penalties, MTP, GPU-Offload usw.).
+4. Tippe auf „Konfiguration speichern", dann „SPEICHERN & SCHLIESSEN", um das Modell zu laden.
+5. Erstelle optional ein Profil-Backup für eine spätere Wiederherstellung.
