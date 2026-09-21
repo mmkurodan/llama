@@ -4446,17 +4446,48 @@ public class OllamaApiServer {
                     textParts.put(tp);
 
                 } else if (part.has("inlineData")) {
-                    // Inline image: {mimeType, data(base64)}
+                    // Inline media: {mimeType, data(base64)}. Route by mimeType.
                     JSONObject inline = part.optJSONObject("inlineData");
                     if (inline != null) {
                         String mimeType = inline.optString("mimeType", "image/jpeg");
                         String data     = inline.optString("data", "");
-                        JSONObject imgPart = new JSONObject();
-                        imgPart.put("type", "image_url");
-                        JSONObject imgUrl = new JSONObject();
-                        imgUrl.put("url", "data:" + mimeType + ";base64," + data);
-                        imgPart.put("image_url", imgUrl);
-                        textParts.put(imgPart);
+                        if (mimeType.startsWith("audio/")) {
+                            // Audio → input_audio part (format: mp3 or wav/pcm fallback)
+                            String fmt = mimeType.contains("mp3") ? "mp3" : "wav";
+                            JSONObject audioPart = new JSONObject();
+                            audioPart.put("type", "input_audio");
+                            JSONObject audioObj = new JSONObject();
+                            audioObj.put("data", data);
+                            audioObj.put("format", fmt);
+                            audioPart.put("input_audio", audioObj);
+                            textParts.put(audioPart);
+                        } else {
+                            // Image (or unknown) → image_url data-URI
+                            JSONObject imgPart = new JSONObject();
+                            imgPart.put("type", "image_url");
+                            JSONObject imgUrl = new JSONObject();
+                            imgUrl.put("url", "data:" + mimeType + ";base64," + data);
+                            imgPart.put("image_url", imgUrl);
+                            textParts.put(imgPart);
+                        }
+                    }
+
+                } else if (part.has("fileData")) {
+                    // fileData: {mimeType, fileUri}. Only HTTPS URIs can be fetched;
+                    // gs:// Google Cloud URIs require auth and are silently dropped.
+                    JSONObject fd = part.optJSONObject("fileData");
+                    if (fd != null) {
+                        String uri      = fd.optString("fileUri", "");
+                        String mimeType = fd.optString("mimeType", "image/jpeg");
+                        if (uri.startsWith("https://") || uri.startsWith("http://")) {
+                            JSONObject imgPart = new JSONObject();
+                            imgPart.put("type", "image_url");
+                            JSONObject imgUrl = new JSONObject();
+                            imgUrl.put("url", uri);
+                            imgPart.put("image_url", imgUrl);
+                            textParts.put(imgPart);
+                        }
+                        // gs:// or unsupported schemes: drop silently
                     }
 
                 } else if (part.has("functionCall")) {
@@ -5044,12 +5075,35 @@ public class OllamaApiServer {
                                 oaiParts.put(p);
                             } else if ("image_url".equals(btype) || "input_image".equals(btype)) {
                                 allText = false;
-                                String url = blk.optString("image_url", blk.optString("url", ""));
+                                // image_url.url may be a string or an {url} object.
+                                Object imgUrlRaw = blk.opt("image_url");
+                                String url;
+                                if (imgUrlRaw instanceof JSONObject) {
+                                    url = ((JSONObject) imgUrlRaw).optString("url", "");
+                                } else if (imgUrlRaw instanceof String) {
+                                    url = (String) imgUrlRaw;
+                                } else {
+                                    url = blk.optString("url", "");
+                                }
                                 JSONObject p = new JSONObject();
                                 p.put("type", "image_url");
                                 JSONObject img = new JSONObject();
                                 img.put("url", url);
                                 p.put("image_url", img);
+                                oaiParts.put(p);
+                            } else if ("input_audio".equals(btype)) {
+                                allText = false;
+                                // {type, data: base64, format: "wav"|"mp3"|"pcm16"|...}
+                                String audioData = blk.optString("data", "");
+                                String rawFmt    = blk.optString("format", "wav")
+                                        .toLowerCase(Locale.ROOT);
+                                String audioFmt  = "mp3".equals(rawFmt) ? "mp3" : "wav";
+                                JSONObject p = new JSONObject();
+                                p.put("type", "input_audio");
+                                JSONObject audioObj = new JSONObject();
+                                audioObj.put("data", audioData);
+                                audioObj.put("format", audioFmt);
+                                p.put("input_audio", audioObj);
                                 oaiParts.put(p);
                             } else {
                                 allText = false;
