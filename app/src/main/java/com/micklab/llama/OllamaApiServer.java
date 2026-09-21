@@ -4248,7 +4248,12 @@ public class OllamaApiServer {
         if (modelsIdx < 0) return "default";
         String afterModels = path.substring(modelsIdx + "/models/".length());
         int colonIdx = afterModels.lastIndexOf(':');
-        return colonIdx > 0 ? afterModels.substring(0, colonIdx) : afterModels;
+        String raw = colonIdx > 0 ? afterModels.substring(0, colonIdx) : afterModels;
+        try {
+            return java.net.URLDecoder.decode(raw, StandardCharsets.UTF_8.name());
+        } catch (java.io.UnsupportedEncodingException e) {
+            return raw;
+        }
     }
 
     /**
