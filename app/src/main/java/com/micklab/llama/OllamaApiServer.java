@@ -1247,6 +1247,10 @@ public class OllamaApiServer {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
                     handleUnloadModel(outputStream, body);
+                } else if (isGeminiGeneratePath(path)) {
+                    String modelFromPath = geminiModelFromPath(path);
+                    boolean geminiStream = path.endsWith(":streamGenerateContent");
+                    handleGeminiGenerate(outputStream, body, modelFromPath, geminiStream);
                 } else {
                     sendErrorResponse(outputStream, 404, "Not Found");
                 }
@@ -1317,6 +1321,7 @@ public class OllamaApiServer {
         }
         return !path.startsWith("/api")
                 && !path.startsWith("/v1/")
+                && !path.startsWith("/v1beta/")
                 && !"/models".equals(path)
                 && !path.startsWith("/models/")
                 && !"/props".equals(path)
@@ -4216,6 +4221,575 @@ public class OllamaApiServer {
                 sendAnthropicSse(out, "error", error.toString());
             } catch (JSONException ignored) {}
             sendAnthropicSse(out, "message_stop", "{\"type\":\"message_stop\"}");
+        }
+    }
+
+    // ==================== Google Gemini ====================
+
+    /**
+     * Returns true for Gemini generateContent / streamGenerateContent paths:
+     *   POST /v1beta/models/{model}:generateContent
+     *   POST /v1beta/models/{model}:streamGenerateContent
+     *   POST /v1/models/{model}:generateContent        (v1 alias)
+     *   POST /v1/models/{model}:streamGenerateContent  (v1 alias)
+     */
+    private static boolean isGeminiGeneratePath(String path) {
+        if (path == null) return false;
+        return (path.startsWith("/v1beta/models/") || path.startsWith("/v1/models/"))
+                && (path.endsWith(":generateContent") || path.endsWith(":streamGenerateContent"));
+    }
+
+    /** Extracts the model name from a Gemini path (the segment between "models/" and ":action"). */
+    private static String geminiModelFromPath(String path) {
+        // path = "/v1beta/models/gemini-2.0-flash:generateContent"
+        int modelsIdx = path.indexOf("/models/");
+        if (modelsIdx < 0) return "default";
+        String afterModels = path.substring(modelsIdx + "/models/".length());
+        int colonIdx = afterModels.lastIndexOf(':');
+        return colonIdx > 0 ? afterModels.substring(0, colonIdx) : afterModels;
+    }
+
+    /**
+     * Handles Gemini generateContent and streamGenerateContent. Translates the Gemini request into
+     * the internal OpenAI-style representation, runs generation (or shared-tool execution), then
+     * serialises the result as a Gemini GenerateContentResponse.
+     */
+    private void handleGeminiGenerate(OutputStream outputStream, String body,
+            String modelFromPath, boolean stream) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(modelFromPath);
+
+            JSONArray contents = request.optJSONArray("contents");
+            if (contents == null || contents.length() == 0) {
+                sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "'contents' is required");
+                return;
+            }
+
+            // Translate Gemini → internal OpenAI-style messages + tools.
+            Object systemInstruction = request.opt("systemInstruction");
+            JSONArray messages = geminiContentsToInternalMessages(systemInstruction, contents);
+            JSONArray tools = geminiToolsToOpenAi(request.optJSONArray("tools"));
+            String toolChoice = geminiToolChoiceToOpenAi(request.optJSONObject("toolConfig"));
+
+            // Translate generationConfig → synthetic OpenAI-style params.
+            JSONObject oai = new JSONObject();
+            JSONObject genConfig = request.optJSONObject("generationConfig");
+            if (genConfig != null) {
+                if (genConfig.has("maxOutputTokens")) oai.put("max_tokens", genConfig.opt("maxOutputTokens"));
+                if (genConfig.has("temperature"))     oai.put("temperature", genConfig.opt("temperature"));
+                if (genConfig.has("topP"))            oai.put("top_p", genConfig.opt("topP"));
+                if (genConfig.has("topK"))            oai.put("top_k", genConfig.opt("topK"));
+            }
+
+            String geminiEndpoint = stream
+                    ? "/v1beta/models:streamGenerateContent"
+                    : "/v1beta/models:generateContent";
+            if (!acquireGenerationSlot(outputStream, geminiEndpoint, false)) {
+                return;
+            }
+            applyNumCtxOverride(oai);
+            try {
+                RequestedModalities mods = detectRequestedModalities(messages);
+                if (!modelManager.loadConfiguration(model, mods.vision, mods.audio)) {
+                    sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to load configuration: " + model);
+                    return;
+                }
+                if (modelManager.isResetPendingOrInProgress()) {
+                    sendGeminiErrorResponse(outputStream, 503, "UNAVAILABLE", "Model reset requested");
+                    return;
+                }
+                ConfigurationManager.Configuration config = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                    applyRequestOverrides(config, oai);
+                    modelManager.applyConfiguration(config);
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not apply Gemini request overrides", e);
+                }
+                applyNPredictOverride(oai, config);
+                applyStructuredOutputConstraint(new JSONObject());
+
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String customTemplate  = config != null ? config.customChatTemplate : null;
+                String settingsSystemPrompt = config != null ? config.systemPrompt : null;
+                boolean enableThinking = resolveEnableThinking(oai, config);
+
+                PreparedMessages prepared = normalizeMessagesForMedia(
+                        messages, modelManager.supportsVision(), modelManager.supportsAudio());
+
+                // Tool-enabled path.
+                boolean hasSharedToolConfig = hasSharedToolConfig();
+                if ((tools != null && tools.length() > 0) || hasSharedToolConfig) {
+                    SharedToolManager.ChatResult toolResult = SharedToolManager.generateWithTools(
+                            context,
+                            modelManager.getLlama(),
+                            prepared.messages,
+                            tools,
+                            customTemplate,
+                            settingsSystemPrompt,
+                            SharedToolManager.serializeToolChoice(toolChoice),
+                            false,
+                            enableThinking,
+                            prepared.toMediaArray(),
+                            true,
+                            true);
+                    if (toolResult != null) {
+                        if (stream) {
+                            sendGeminiToolStream(outputStream, model, toolResult);
+                        } else {
+                            JSONObject resp = buildGeminiResponse(model,
+                                    toolResult.content, toolResult.reasoningContent,
+                                    toolResult.toolCalls,
+                                    geminiFinishReason(toolResult.finishReason));
+                            sendJsonResponse(outputStream, 200, resp.toString());
+                        }
+                        return;
+                    }
+                }
+
+                String modelPath = modelManager.getCurrentModelPath();
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptFromMessagesWithSelection(
+                                prepared.messages, customTemplate, ggufChatTemplate,
+                                settingsSystemPrompt, modelPath, enableThinking);
+                logTemplateSelection("gemini.generate", promptResult.selection);
+                String promptToUse = promptResult.prompt;
+                logMaxDebugPayload("gemini.generate.prompt", promptToUse);
+
+                if (stream) {
+                    final String modelF = model;
+                    runStreamingGeneration(outputStream, promptToUse, prepared.toMediaArray(), enableThinking,
+                            new GeminiStreamEmitter(modelF, enableThinking));
+                } else {
+                    String rawResponse = modelManager.generate(promptToUse, prepared.toMediaArray());
+                    if (ModelManager.isCtxLimitError(rawResponse)) {
+                        sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT",
+                                ModelManager.ctxLimitMessage(rawResponse));
+                        return;
+                    }
+                    final String reasoning;
+                    final String contentText;
+                    if (enableThinking) {
+                        String[] parts = PromptTemplateManager.extractThinkingContent(rawResponse);
+                        reasoning = parts[0];
+                        contentText = parts[1];
+                    } else {
+                        reasoning = null;
+                        contentText = PromptTemplateManager.stripThinkingBlocks(rawResponse);
+                    }
+                    String finalText = appendPerfMetrics(stripResponseMarkers(contentText));
+                    JSONObject resp = buildGeminiResponse(model, finalText,
+                            (reasoning != null && !reasoning.isEmpty()) ? reasoning : null,
+                            null, "STOP");
+                    sendJsonResponse(outputStream, 200, resp.toString());
+                }
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Invalid JSON in Gemini request", e);
+            sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "Invalid JSON: " + e.getMessage());
+        } catch (InvalidMediaException e) {
+            Log.e(TAG, "Invalid media in Gemini request", e);
+            sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Gemini request failed", e);
+            sendGeminiErrorResponse(outputStream, 500, "INTERNAL",
+                    e.getMessage() != null ? e.getMessage() : "generateContent failed");
+        }
+    }
+
+    // ---- Gemini <-> internal conversion ----
+
+    /**
+     * Converts Gemini {@code contents} (+ optional {@code systemInstruction}) into internal
+     * OpenAI-style messages. Gemini roles: "user" / "model". Parts: text, inlineData (image),
+     * functionCall (→ tool_calls), functionResponse (→ tool role message).
+     */
+    private static JSONArray geminiContentsToInternalMessages(
+            Object systemInstruction, JSONArray contents) throws JSONException {
+        JSONArray out = new JSONArray();
+
+        // systemInstruction: {parts:[{text:"..."}]} or plain string.
+        String sysText = geminiPartsToText(systemInstruction instanceof JSONObject
+                ? ((JSONObject) systemInstruction).optJSONArray("parts") : null);
+        if (sysText != null && !sysText.isEmpty()) {
+            JSONObject sys = new JSONObject();
+            sys.put("role", "system");
+            sys.put("content", sysText);
+            out.put(sys);
+        }
+
+        for (int i = 0; i < contents.length(); i++) {
+            JSONObject content = contents.optJSONObject(i);
+            if (content == null) continue;
+            String role = content.optString("role", "user");
+            // Gemini "model" → OpenAI "assistant"
+            String oaiRole = "model".equals(role) ? "assistant" : "user";
+            JSONArray parts = content.optJSONArray("parts");
+            if (parts == null || parts.length() == 0) continue;
+
+            JSONArray textParts  = new JSONArray();
+            JSONArray toolCalls  = new JSONArray();
+
+            for (int p = 0; p < parts.length(); p++) {
+                JSONObject part = parts.optJSONObject(p);
+                if (part == null) continue;
+
+                if (part.has("text")) {
+                    JSONObject tp = new JSONObject();
+                    tp.put("type", "text");
+                    tp.put("text", part.optString("text", ""));
+                    textParts.put(tp);
+
+                } else if (part.has("inlineData")) {
+                    // Inline image: {mimeType, data(base64)}
+                    JSONObject inline = part.optJSONObject("inlineData");
+                    if (inline != null) {
+                        String mimeType = inline.optString("mimeType", "image/jpeg");
+                        String data     = inline.optString("data", "");
+                        JSONObject imgPart = new JSONObject();
+                        imgPart.put("type", "image_url");
+                        JSONObject imgUrl = new JSONObject();
+                        imgUrl.put("url", "data:" + mimeType + ";base64," + data);
+                        imgPart.put("image_url", imgUrl);
+                        textParts.put(imgPart);
+                    }
+
+                } else if (part.has("functionCall")) {
+                    JSONObject fc = part.optJSONObject("functionCall");
+                    if (fc != null) {
+                        JSONObject call = new JSONObject();
+                        call.put("type", "function");
+                        // Gemini does not always provide an id; generate one.
+                        call.put("id", "call_" + p);
+                        JSONObject fn = new JSONObject();
+                        fn.put("name", fc.optString("name", ""));
+                        Object args = fc.opt("args");
+                        fn.put("arguments", args != null ? args.toString() : "{}");
+                        call.put("function", fn);
+                        toolCalls.put(call);
+                    }
+
+                } else if (part.has("functionResponse")) {
+                    // Tool result: emitted as a separate "tool" role message.
+                    JSONObject fr = part.optJSONObject("functionResponse");
+                    if (fr != null) {
+                        JSONObject toolMsg = new JSONObject();
+                        toolMsg.put("role", "tool");
+                        toolMsg.put("tool_call_id", "call_" + p);
+                        Object response = fr.opt("response");
+                        toolMsg.put("content", response != null ? response.toString() : "{}");
+                        out.put(toolMsg);
+                    }
+                }
+            }
+
+            // Emit the assistant/user message if it carried text or tool_calls.
+            if (textParts.length() > 0 || toolCalls.length() > 0) {
+                JSONObject m = new JSONObject();
+                m.put("role", oaiRole);
+                if (textParts.length() == 1 && "text".equals(textParts.getJSONObject(0).optString("type"))
+                        && toolCalls.length() == 0) {
+                    m.put("content", textParts.getJSONObject(0).optString("text", ""));
+                } else if (textParts.length() > 0) {
+                    m.put("content", textParts);
+                } else {
+                    m.put("content", "");
+                }
+                if (toolCalls.length() > 0) {
+                    m.put("tool_calls", toolCalls);
+                }
+                out.put(m);
+            }
+        }
+        return out;
+    }
+
+    /** Joins text from a Gemini parts array into a plain string. Null-safe. */
+    private static String geminiPartsToText(JSONArray parts) {
+        if (parts == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length(); i++) {
+            JSONObject p = parts.optJSONObject(i);
+            if (p != null && p.has("text")) {
+                sb.append(p.optString("text", ""));
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Converts Gemini tools (array of {functionDeclarations:[...]}) to OpenAI function tools.
+     * Normalises Gemini's uppercase type names ("OBJECT" → "object") in parameter schemas.
+     */
+    private static JSONArray geminiToolsToOpenAi(JSONArray geminiTools) throws JSONException {
+        if (geminiTools == null || geminiTools.length() == 0) return null;
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < geminiTools.length(); i++) {
+            JSONObject toolGroup = geminiTools.optJSONObject(i);
+            if (toolGroup == null) continue;
+            JSONArray decls = toolGroup.optJSONArray("functionDeclarations");
+            if (decls == null) continue;
+            for (int d = 0; d < decls.length(); d++) {
+                JSONObject decl = decls.optJSONObject(d);
+                if (decl == null) continue;
+                JSONObject fn = new JSONObject();
+                fn.put("name", decl.optString("name", ""));
+                if (decl.has("description")) fn.put("description", decl.optString("description", ""));
+                JSONObject schema = decl.optJSONObject("parameters");
+                fn.put("parameters", schema != null ? normalizeGeminiSchema(schema) : new JSONObject());
+                JSONObject wrapper = new JSONObject();
+                wrapper.put("type", "function");
+                wrapper.put("function", fn);
+                out.put(wrapper);
+            }
+        }
+        return out.length() > 0 ? out : null;
+    }
+
+    /** Recursively lower-cases Gemini schema "type" values ("OBJECT" → "object" etc.). */
+    private static JSONObject normalizeGeminiSchema(JSONObject schema) throws JSONException {
+        JSONObject out = new JSONObject(schema.toString());
+        if (out.has("type")) {
+            out.put("type", out.optString("type", "").toLowerCase(java.util.Locale.US));
+        }
+        JSONObject props = out.optJSONObject("properties");
+        if (props != null) {
+            JSONObject normalizedProps = new JSONObject();
+            java.util.Iterator<String> keys = props.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                JSONObject prop = props.optJSONObject(key);
+                normalizedProps.put(key, prop != null ? normalizeGeminiSchema(prop) : props.opt(key));
+            }
+            out.put("properties", normalizedProps);
+        }
+        JSONObject items = out.optJSONObject("items");
+        if (items != null) out.put("items", normalizeGeminiSchema(items));
+        return out;
+    }
+
+    /**
+     * Maps Gemini toolConfig.functionCallingConfig.mode to an OpenAI tool_choice value.
+     * AUTO → null (server default), ANY → "required", NONE → "none".
+     */
+    private static String geminiToolChoiceToOpenAi(JSONObject toolConfig) {
+        if (toolConfig == null) return null;
+        JSONObject fcc = toolConfig.optJSONObject("functionCallingConfig");
+        if (fcc == null) return null;
+        String mode = fcc.optString("mode", "AUTO");
+        if ("ANY".equals(mode))  return "required";
+        if ("NONE".equals(mode)) return "none";
+        return null; // AUTO = server default
+    }
+
+    /** Maps an OpenAI finish reason to a Gemini finishReason string. */
+    private static String geminiFinishReason(String openAiReason) {
+        if ("length".equals(openAiReason))     return "MAX_TOKENS";
+        if ("tool_calls".equals(openAiReason)) return "STOP";
+        return "STOP";
+    }
+
+    // ---- Gemini response serialization ----
+
+    /**
+     * Builds a non-streaming Gemini GenerateContentResponse. Thinking (if any) becomes a
+     * {@code thought:true} part before the text part. Tool calls become {@code functionCall} parts.
+     */
+    private JSONObject buildGeminiResponse(String model, String content, String reasoning,
+            JSONArray toolCalls, String finishReason) throws JSONException {
+        JSONArray parts = new JSONArray();
+
+        if (reasoning != null && !reasoning.isEmpty()) {
+            JSONObject thinkPart = new JSONObject();
+            thinkPart.put("thought", true);
+            thinkPart.put("text", reasoning);
+            parts.put(thinkPart);
+        }
+        if (toolCalls != null && toolCalls.length() > 0) {
+            for (int i = 0; i < toolCalls.length(); i++) {
+                JSONObject call = toolCalls.optJSONObject(i);
+                if (call == null) continue;
+                JSONObject fn = call.optJSONObject("function");
+                JSONObject fcPart = new JSONObject();
+                JSONObject fc = new JSONObject();
+                fc.put("name", fn != null ? fn.optString("name", "") : "");
+                fc.put("args", parseJsonObjectOrEmpty(fn != null ? fn.optString("arguments", "{}") : "{}"));
+                fcPart.put("functionCall", fc);
+                parts.put(fcPart);
+            }
+        } else {
+            JSONObject textPart = new JSONObject();
+            textPart.put("text", content != null ? content : "");
+            parts.put(textPart);
+        }
+
+        JSONObject candidateContent = new JSONObject();
+        candidateContent.put("parts", parts);
+        candidateContent.put("role", "model");
+
+        JSONObject candidate = new JSONObject();
+        candidate.put("content", candidateContent);
+        candidate.put("finishReason", finishReason != null ? finishReason : "STOP");
+        candidate.put("index", 0);
+
+        JSONObject response = new JSONObject();
+        response.put("candidates", new JSONArray().put(candidate));
+        response.put("usageMetadata", geminiUsageMetadata());
+        response.put("modelVersion", model);
+        return response;
+    }
+
+    private JSONObject geminiUsageMetadata() throws JSONException {
+        JSONObject meta = new JSONObject();
+        int inTokens = 0, outTokens = 0;
+        try {
+            LlamaNative llama = modelManager.getLlama();
+            if (llama != null) {
+                inTokens  = llama.getLastNPromptTokens();
+                outTokens = llama.getLastNEvalTokens();
+            }
+        } catch (Exception ignored) {}
+        meta.put("promptTokenCount",     inTokens);
+        meta.put("candidatesTokenCount", outTokens);
+        meta.put("totalTokenCount",      inTokens + outTokens);
+        return meta;
+    }
+
+    /** Sends a completed tool-enabled turn as Gemini SSE events (one data frame per block). */
+    private void sendGeminiToolStream(OutputStream out, String model,
+            SharedToolManager.ChatResult result) throws IOException, JSONException {
+        out.write(sseHeader().getBytes(StandardCharsets.UTF_8));
+        out.flush();
+        // Emit thinking block if present.
+        if (result.reasoningContent != null && !result.reasoningContent.isEmpty()) {
+            JSONArray thinkParts = new JSONArray();
+            JSONObject tp = new JSONObject();
+            tp.put("thought", true);
+            tp.put("text", result.reasoningContent);
+            thinkParts.put(tp);
+            sendGeminiSseChunk(out, model, thinkParts, null);
+        }
+        // Emit final content or tool calls.
+        JSONArray parts = new JSONArray();
+        if (result.toolCalls != null && result.toolCalls.length() > 0) {
+            for (int i = 0; i < result.toolCalls.length(); i++) {
+                JSONObject call = result.toolCalls.optJSONObject(i);
+                if (call == null) continue;
+                JSONObject fn = call.optJSONObject("function");
+                JSONObject fcPart = new JSONObject();
+                JSONObject fc = new JSONObject();
+                fc.put("name", fn != null ? fn.optString("name", "") : "");
+                fc.put("args", parseJsonObjectOrEmpty(fn != null ? fn.optString("arguments", "{}") : "{}"));
+                fcPart.put("functionCall", fc);
+                parts.put(fcPart);
+            }
+        } else {
+            JSONObject textPart = new JSONObject();
+            textPart.put("text", result.content != null ? result.content : "");
+            parts.put(textPart);
+        }
+        sendGeminiSseChunk(out, model, parts, "STOP");
+    }
+
+    private void sendGeminiSseChunk(OutputStream out, String model,
+            JSONArray parts, String finishReason) throws IOException, JSONException {
+        JSONObject candidateContent = new JSONObject();
+        candidateContent.put("parts", parts);
+        candidateContent.put("role", "model");
+        JSONObject candidate = new JSONObject();
+        candidate.put("content", candidateContent);
+        if (finishReason != null) candidate.put("finishReason", finishReason);
+        candidate.put("index", 0);
+        JSONObject chunk = new JSONObject();
+        chunk.put("candidates", new JSONArray().put(candidate));
+        if (finishReason != null) chunk.put("usageMetadata", geminiUsageMetadata());
+        chunk.put("modelVersion", model);
+        sendSseEvent(out, chunk.toString());
+    }
+
+    /** Sends a Gemini error as {@code {"error":{"code":N,"message":"...","status":"S"}}}. */
+    private void sendGeminiErrorResponse(OutputStream out, int code, String status, String message)
+            throws IOException {
+        try {
+            JSONObject err = new JSONObject();
+            err.put("code", code);
+            err.put("message", message);
+            err.put("status", status);
+            JSONObject wrapper = new JSONObject();
+            wrapper.put("error", err);
+            sendJsonResponse(out, code, wrapper.toString());
+        } catch (JSONException e) {
+            sendErrorResponse(out, code, message);
+        }
+    }
+
+    /** Streaming emitter that serialises each token as a Gemini SSE chunk. */
+    private final class GeminiStreamEmitter implements StreamEmitter {
+        private final String model;
+        private final boolean enableThinking;
+        private final StringBuilder thinkBuf = new StringBuilder();
+        private final StringBuilder textBuf  = new StringBuilder();
+
+        GeminiStreamEmitter(String model, boolean enableThinking) {
+            this.model         = model;
+            this.enableThinking = enableThinking;
+        }
+
+        @Override public void onStart(OutputStream out) throws IOException {
+            out.write(sseHeader().getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        }
+
+        @Override public void onText(OutputStream out, String token) throws IOException {
+            try {
+                JSONArray parts = new JSONArray();
+                JSONObject p = new JSONObject();
+                p.put("text", token);
+                parts.put(p);
+                sendGeminiSseChunk(out, model, parts, null);
+            } catch (JSONException ignored) {}
+        }
+
+        @Override public void onReasoning(OutputStream out, String token) throws IOException {
+            if (!enableThinking) return;
+            try {
+                JSONArray parts = new JSONArray();
+                JSONObject p = new JSONObject();
+                p.put("thought", true);
+                p.put("text", token);
+                parts.put(p);
+                sendGeminiSseChunk(out, model, parts, null);
+            } catch (JSONException ignored) {}
+        }
+
+        @Override public void onComplete(OutputStream out) throws IOException {
+            String metrics = buildPerfMetricsSuffix();
+            if (metrics != null && !metrics.isEmpty()) {
+                onText(out, metrics);
+            }
+            try {
+                // Final chunk carries finishReason + usageMetadata.
+                JSONArray parts = new JSONArray();
+                JSONObject p = new JSONObject();
+                p.put("text", "");
+                parts.put(p);
+                sendGeminiSseChunk(out, model, parts, "STOP");
+            } catch (JSONException ignored) {}
+        }
+
+        @Override public void onError(OutputStream out, String message) throws IOException {
+            try {
+                JSONObject errObj = new JSONObject();
+                errObj.put("code", 500);
+                errObj.put("message", message);
+                errObj.put("status", "INTERNAL");
+                JSONObject wrapper = new JSONObject();
+                wrapper.put("error", errObj);
+                sendSseEvent(out, wrapper.toString());
+            } catch (JSONException ignored) {}
         }
     }
 
