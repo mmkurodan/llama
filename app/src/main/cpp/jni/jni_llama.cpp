@@ -4427,8 +4427,12 @@ static jstring generate_openai_chat_completion_locked(
             result["reasoning_content"] = parsed_msg.reasoning_content;
         }
         if (!parsed_msg.tool_calls.empty()) {
+            // to_json_oaicompat returns common_json (b10621+), not nlohmann::json.
+            // Assigning a common_json array directly to a nlohmann value would invoke
+            // common_json::operator std::string() and throw type_error.302 for arrays.
+            // Round-trip through dump/parse to get a proper nlohmann value.
             auto msg_json = parsed_msg.to_json_oaicompat(false);
-            result["tool_calls"] = msg_json["tool_calls"];
+            result["tool_calls"] = json::parse(msg_json["tool_calls"].dump());
         }
 
         if (is_max_debug_mode()) {
