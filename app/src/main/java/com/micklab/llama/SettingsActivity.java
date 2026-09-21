@@ -101,6 +101,7 @@ public class SettingsActivity extends Activity {
     private Button applyLoraButton;
     private Button clearLoraButton;
     private TextView loraAdapterInfo;
+    private EditText loraAdapterScaleInput;
     private Button mtpModelButton;
     private Switch mtpEnableToggle;
     private EditText mtpNDraftInput;
@@ -322,6 +323,21 @@ public class SettingsActivity extends Activity {
         applyLoraButton = findViewById(R.id.applyLoraButton);
         clearLoraButton = findViewById(R.id.clearLoraButton);
         loraAdapterInfo = findViewById(R.id.loraAdapterInfo);
+        loraAdapterScaleInput = findViewById(R.id.loraAdapterScale);
+        // LoRA アダプタは独立した折りたたみセクション（既定=閉）
+        final TextView loraSectionHeader = findViewById(R.id.loraSectionHeader);
+        final View loraSectionBody = findViewById(R.id.loraSectionBody);
+        if (loraSectionHeader != null && loraSectionBody != null) {
+            loraSectionHeader.setText("▶ " + localizedText("LoRA アダプタ", "LoRA adapter")
+                    + localizedText("（タップで開く）", " (tap to open)"));
+            loraSectionHeader.setOnClickListener(v -> {
+                boolean open = loraSectionBody.getVisibility() == View.VISIBLE;
+                loraSectionBody.setVisibility(open ? View.GONE : View.VISIBLE);
+                loraSectionHeader.setText((open ? "▶ " : "▼ ")
+                        + localizedText("LoRA アダプタ", "LoRA adapter")
+                        + (open ? localizedText("（タップで開く）", " (tap to open)") : ""));
+            });
+        }
         updateLoraAdapterInfoDisplay(); // 選択中のアダプタを表示に反映
         mtpModelButton = findViewById(R.id.mtpModelButton);
         mtpEnableToggle = findViewById(R.id.mtpEnableToggle);
@@ -1296,6 +1312,10 @@ public class SettingsActivity extends Activity {
         configNameInput.setText(config.name, false);
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         selectedAdapterReference = normalizeReference(config.loraAdapterUrl);
+        if (loraAdapterScaleInput != null) {
+            float sc = config.loraAdapterScale > 0 ? config.loraAdapterScale : 1.0f;
+            loraAdapterScaleInput.setText(String.valueOf(sc));
+        }
         updateLoraAdapterInfoDisplay();
         selectedProjectorManualSelection = config.multimodalProjectorManualSelection;
         selectedProjectorDisabled = config.multimodalProjectorDisabled;
@@ -1466,7 +1486,7 @@ public class SettingsActivity extends Activity {
         }
         config.multimodalProjectorUrl = normalizeReference(selectedProjectorReference);
         config.loraAdapterUrl = normalizeReference(selectedAdapterReference);
-        if (config.loraAdapterScale <= 0) config.loraAdapterScale = 1.0f;
+        config.loraAdapterScale = parseAdapterScale();
         config.multimodalProjectorManualSelection =
                 !config.multimodalProjectorUrl.isEmpty() && selectedProjectorManualSelection;
         // Only meaningful when no projector is configured: true = user cleared it, suppress auto-discovery.
@@ -4123,8 +4143,21 @@ public class SettingsActivity extends Activity {
         if (ref == null || ref.isEmpty()) {
             loraAdapterInfo.setText(localizedText("LoRA アダプタ未設定", "No LoRA adapter"));
         } else {
-            loraAdapterInfo.setText(localizedText("選択中: ", "Selected: ") + ref);
+            loraAdapterInfo.setText(localizedText("選択中: ", "Selected: ") + ref
+                    + "  (scale=" + parseAdapterScale() + ")");
         }
+    }
+
+    /** スケール入力欄を読む（不正/空は 1.0、範囲 0.01〜4.0 にクランプ）。 */
+    private float parseAdapterScale() {
+        float sc = 1.0f;
+        if (loraAdapterScaleInput != null) {
+            try { sc = Float.parseFloat(loraAdapterScaleInput.getText().toString().trim()); }
+            catch (Exception ignored) { sc = 1.0f; }
+        }
+        if (sc <= 0) sc = 1.0f;
+        if (sc > 4.0f) sc = 4.0f;
+        return sc;
     }
 
     /** インポートされたアダプタGGUFをモデル領域へ保存し、選択参照にセットする（他モデルと同様の保管）。 */

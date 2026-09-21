@@ -160,41 +160,72 @@
                 android:text="Clear mmproj" />
         </LinearLayout>
 
-        <!-- LoRA adapter (適用中モデルへ別ファイルのLoRAアダプタGGUFを重ねる) -->
+        <!-- LoRA adapter: mmproj の直下に独立した折りたたみセクション（既定=閉） -->
         <TextView
+            android:id="@+id/loraSectionHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="LoRA アダプタ:"
-            android:paddingTop="8dp" />
-
-        <TextView
-            android:id="@+id/loraAdapterInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="LoRA アダプタ未適用（モデル読込後に適用可）"
-            android:paddingTop="4dp" />
+            android:text="▶ LoRA アダプタ（タップで開く）"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:paddingTop="12dp"
+            android:paddingBottom="6dp" />
 
         <LinearLayout
+            android:id="@+id/loraSectionBody"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingTop="4dp">
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <Button
-                style="@style/SecondaryButton" android:id="@+id/applyLoraButton"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/loraAdapterInfo"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="アダプタ選択" />
+                android:text="LoRA アダプタ未適用（モデル読込後に適用可）"
+                android:paddingTop="4dp" />
 
-            <Button
-                style="@style/SecondaryButton" android:id="@+id/clearLoraButton"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="アダプタ解除" />
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="スケール(効き, 通常0.3〜1.0): " />
+                <EditText
+                    android:id="@+id/loraAdapterScale"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:inputType="numberDecimal"
+                    android:text="1.0" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
+
+                <Button
+                    style="@style/SecondaryButton" android:id="@+id/applyLoraButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="アダプタ選択" />
+
+                <Button
+                    style="@style/SecondaryButton" android:id="@+id/clearLoraButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:text="アダプタ解除" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Model Management Section -->
