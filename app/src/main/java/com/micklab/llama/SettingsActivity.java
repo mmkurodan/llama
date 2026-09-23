@@ -874,6 +874,9 @@ public class SettingsActivity extends Activity {
             case "No multimodal projector selected": return "mmproj は未選択です";
             case "Select mmproj": return "mmproj を選択";
             case "Clear mmproj": return "mmproj を解除";
+            case "Scale (strength, typically 0.3–1.0): ": return "スケール(効き, 通常0.3〜1.0): ";
+            case "Select adapter": return "アダプタ選択";
+            case "Clear adapter": return "アダプタ解除";
             case "Search GGUF on Hugging Face": return "Hugging FaceでGGUFを検索";
             case "gguf import from local device": return "ローカル端末からggufを取り込む";
             case "Load Model": return "モデルを読み込む";

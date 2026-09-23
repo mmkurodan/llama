@@ -449,5 +449,21 @@ public final class Translations {
         e("Up to 0.5B", "Jusqu'à 0,5 B", "Hasta 0,5B", "Até 0,5B", "Bis zu 0,5B", "Fino a 0,5B", "最多 0.5B", "0.5B 이하");
         e("usable", "utilisable", "utilizable", "utilizável", "nutzbar", "utilizzabile", "可用", "실용 가능");
         e("Versatile: multilingual, coding, long context", "Polyvalent : multilingue, code, contexte long", "Versátil: multilingüe, código, contexto largo", "Versátil: multilíngue, código, contexto longo", "Vielseitig: mehrsprachig, Programmierung, langer Kontext", "Versatile: multilingue, programmazione, contesto lungo", "全能型：多语言、编码、长上下文", "만능형: 다국어, 코딩, 긴 컨텍스트");
+
+        // LoRA adapter section (batch #5).
+        e("LoRA adapter", "Adaptateur LoRA", "Adaptador LoRA", "Adaptador LoRA", "LoRA-Adapter", "Adattatore LoRA", "LoRA 适配器", "LoRA 어댑터");
+        e(" (tap to open)", " (appuyer pour ouvrir)", " (toque para abrir)", " (toque para abrir)", " (zum Öffnen tippen)", " (tocca per aprire)", "（点按打开）", " (탭하여 열기)");
+        e("Select as adapter", "Sélectionner comme adaptateur", "Seleccionar como adaptador", "Selecionar como adaptador", "Als Adapter auswählen", "Seleziona come adattatore", "用作适配器", "어댑터로 선택");
+        e("None (no adapter)", "Aucun (sans adaptateur)", "Ninguno (sin adaptador)", "Nenhum (sem adaptador)", "Keiner (kein Adapter)", "Nessuno (senza adattatore)", "无（不使用适配器）", "없음(어댑터 미사용)");
+        e("Select LoRA adapter", "Sélectionner l'adaptateur LoRA", "Seleccionar adaptador LoRA", "Selecionar adaptador LoRA", "LoRA-Adapter auswählen", "Seleziona adattatore LoRA", "选择 LoRA 适配器", "LoRA 어댑터 선택");
+        e("No LoRA adapter", "Aucun adaptateur LoRA", "Sin adaptador LoRA", "Sem adaptador LoRA", "Kein LoRA-Adapter", "Nessun adattatore LoRA", "无 LoRA 适配器", "LoRA 어댑터 없음");
+        e("Please select a .gguf adapter", "Veuillez sélectionner un adaptateur .gguf", "Seleccione un adaptador .gguf", "Selecione um adaptador .gguf", "Bitte einen .gguf-Adapter auswählen", "Seleziona un adattatore .gguf", "请选择一个 .gguf 适配器", ".gguf 어댑터를 선택하세요");
+        e("Importing adapter... ", "Importation de l'adaptateur... ", "Importando adaptador... ", "Importando adaptador... ", "Adapter wird importiert... ", "Importazione adattatore... ", "正在导入适配器... ", "어댑터 가져오는 중... ");
+        e("Adapter imported: ", "Adaptateur importé : ", "Adaptador importado: ", "Adaptador importado: ", "Adapter importiert: ", "Adattatore importato: ", "已导入适配器：", "어댑터 가져옴: ");
+        e("Adapter import failed: ", "Échec de l'importation de l'adaptateur : ", "Error al importar adaptador: ", "Falha ao importar adaptador: ", "Adapter-Import fehlgeschlagen: ", "Importazione adattatore non riuscita: ", "适配器导入失败：", "어댑터 가져오기 실패: ");
+        e("Selected: ", "Sélectionné : ", "Seleccionado: ", "Selecionado: ", "Ausgewählt: ", "Selezionato: ", "已选择：", "선택됨: ");
+        e("Scale (strength, typically 0.3–1.0): ", "Échelle (intensité, généralement 0,3–1,0) : ", "Escala (intensidad, normalmente 0,3–1,0): ", "Escala (intensidade, geralmente 0,3–1,0): ", "Skalierung (Stärke, typisch 0,3–1,0): ", "Scala (intensità, in genere 0,3–1,0): ", "强度（通常 0.3–1.0）：", "스케일 (강도, 보통 0.3–1.0): ");
+        e("Select adapter", "Sélectionner l'adaptateur", "Seleccionar adaptador", "Selecionar adaptador", "Adapter auswählen", "Seleziona adattatore", "选择适配器", "어댑터 선택");
+        e("Clear adapter", "Effacer l'adaptateur", "Borrar adaptador", "Limpar adaptador", "Adapter entfernen", "Rimuovi adattatore", "清除适配器", "어댑터 해제");
     }
 }

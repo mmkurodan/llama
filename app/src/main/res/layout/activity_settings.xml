@@ -194,7 +194,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
-                    android:text="スケール(効き, 通常0.3〜1.0): " />
+                    android:text="Scale (strength, typically 0.3–1.0): " />
                 <EditText
                     android:id="@+id/loraAdapterScale"
                     android:layout_width="0dp"
@@ -216,7 +216,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
-                    android:text="アダプタ選択" />
+                    android:text="Select adapter" />
 
                 <Button
                     style="@style/SecondaryButton" android:id="@+id/clearLoraButton"
@@ -224,7 +224,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
-                    android:text="アダプタ解除" />
+                    android:text="Clear adapter" />
             </LinearLayout>
         </LinearLayout>
 
