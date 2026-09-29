@@ -1088,12 +1088,7 @@ public class MainActivity extends Activity {
     }
 
     private String buildWebUiUrl() {
-        final String ip = getActiveWifiIpv4Address();
-        // Match SettingsActivity.buildServerUrl for a consistent URL across screens: the loopback is
-        // shown as 127.0.0.1 (not "localhost") and there is no trailing slash, so the copied value is
-        // a clean base URL usable for both the Web UI (browser adds "/") and API clients.
-        final String host = (ip != null && !ip.isEmpty()) ? ip : "127.0.0.1";
-        return "http://" + host + ":" + apiPort;
+        return "http://127.0.0.1:" + apiPort;
     }
 
     private String getActiveWifiIpv4Address() {

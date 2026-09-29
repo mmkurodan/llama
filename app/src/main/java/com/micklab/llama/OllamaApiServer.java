@@ -1243,6 +1243,8 @@ public class OllamaApiServer {
                     handleOllamaTokenize(outputStream, body);
                 } else if ("/v1/responses/input_tokens".equals(path)) {
                     handleOpenAiInputTokens(outputStream, body);
+                } else if ("/api/show".equals(path)) {
+                    handleShow(outputStream, body);
                 } else if ("/models/load".equals(path)) {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
@@ -1259,6 +1261,13 @@ public class OllamaApiServer {
             } else if ("GET".equals(method)) {
                 if ("/api/tags".equals(path) || "/api/tags/".equals(path)) {
                     handleTags(outputStream);
+                } else if ("/api/ps".equals(path)) {
+                    handlePs(outputStream);
+                } else if ("/lora-adapters".equals(path)) {
+                    handleLoraAdapters(outputStream);
+                } else if (path.startsWith("/v1/models/") && path.length() > "/v1/models/".length()) {
+                    String modelId = URLDecoder.decode(path.substring("/v1/models/".length()), StandardCharsets.UTF_8.name());
+                    handleModelGet(outputStream, modelId);
                 } else if ("/".equals(path) || "/index.html".equals(path)) {
                     handleWebUi(outputStream, path);
                 } else if ("/api".equals(path)) {
@@ -1280,6 +1289,21 @@ public class OllamaApiServer {
                 }
             } else if ("OPTIONS".equals(method)) {
                 handleCors(outputStream);
+            } else if ("DELETE".equals(method)) {
+                if ("/api/delete".equals(path)) {
+                    try {
+                        JSONObject req = new JSONObject(body);
+                        String modelId = resolveRequestedModel(req.optString("model", null));
+                        handleModelDelete(outputStream, modelId);
+                    } catch (JSONException e) {
+                        sendErrorResponse(outputStream, 400, "Invalid JSON");
+                    }
+                } else if (path.startsWith("/v1/models/") && path.length() > "/v1/models/".length()) {
+                    String modelId = URLDecoder.decode(path.substring("/v1/models/".length()), StandardCharsets.UTF_8.name());
+                    handleModelDelete(outputStream, modelId);
+                } else {
+                    sendErrorResponse(outputStream, 404, "Not Found");
+                }
             } else {
                 sendErrorResponse(outputStream, 405, "Method Not Allowed");
             }
@@ -1330,7 +1354,8 @@ public class OllamaApiServer {
                 && !"/slots".equals(path)
                 && !"/health".equals(path)
                 && !"/metrics".equals(path)
-                && !"/cors-proxy".equals(path);
+                && !"/cors-proxy".equals(path)
+                && !"/lora-adapters".equals(path);
     }
 
     private String getServerRole() {
@@ -1871,6 +1896,217 @@ public class OllamaApiServer {
         }
     }
 
+    // --- keep_alive parsing -------------------------------------------------------
+
+    /**
+     * Parses the Ollama {@code keep_alive} field from a request object.
+     * Returns the resolved value in seconds: {@code 0} = unload immediately,
+     * negative = keep loaded indefinitely (our default).
+     */
+    private static long parseKeepAlive(JSONObject request) {
+        if (!request.has("keep_alive")) return -1L;
+        Object raw = request.opt("keep_alive");
+        if (raw instanceof Number) return ((Number) raw).longValue();
+        if (raw instanceof String) {
+            String s = ((String) raw).trim();
+            if (s.isEmpty()) return -1L;
+            try { return Long.parseLong(s); } catch (NumberFormatException ignored) {}
+            if (s.length() > 1) {
+                char unit = s.charAt(s.length() - 1);
+                try {
+                    long val = Long.parseLong(s.substring(0, s.length() - 1));
+                    switch (unit) {
+                        case 's': return val;
+                        case 'm': return val * 60L;
+                        case 'h': return val * 3600L;
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return -1L;
+    }
+
+    // --- Phase 1: new endpoints ---------------------------------------------------
+
+    private void handlePs(OutputStream outputStream) throws IOException {
+        try {
+            JSONArray models = new JSONArray();
+            if (modelManager.isModelLoaded()) {
+                String configName = modelManager.getCurrentConfigName();
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                File modelFile = config != null
+                        ? ModelFileHelper.resolveStoredModelFile(context, config.modelUrl) : null;
+                PromptTemplateManager.ModelFamily family = PromptTemplateManager.detectModelFamily(
+                        modelFile != null ? modelFile.getAbsolutePath() : configName);
+                String familyName = family.name().toLowerCase(Locale.US);
+
+                JSONObject entry = new JSONObject();
+                entry.put("name", configName);
+                entry.put("model", configName);
+                entry.put("size", modelFile != null && modelFile.exists() ? modelFile.length() : 0L);
+                entry.put("digest", modelFile != null && modelFile.exists() ? computeModelDigest(modelFile) : "");
+                entry.put("expires_at", "0001-01-01T00:00:00Z");
+                entry.put("size_vram", 0);
+
+                JSONObject details = new JSONObject();
+                details.put("parent_model", "");
+                details.put("format", "gguf");
+                details.put("family", familyName);
+                JSONArray families = new JSONArray();
+                families.put(familyName);
+                details.put("families", families);
+                details.put("parameter_size", "unknown");
+                details.put("quantization_level", "unknown");
+                entry.put("details", details);
+
+                models.put(entry);
+            }
+            JSONObject response = new JSONObject();
+            response.put("models", models);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to build ps response", e);
+            sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    private void handleShow(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String modelName = resolveRequestedModel(request.optString("model", null));
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(modelName);
+            File modelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+            PromptTemplateManager.ModelFamily family = PromptTemplateManager.detectModelFamily(
+                    modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
+            String familyName = family.name().toLowerCase(Locale.US);
+
+            String chatTemplate = "";
+            if (modelManager.isModelLoaded() && modelName.equals(modelManager.getCurrentConfigName())) {
+                chatTemplate = modelManager.getLlama().getChatTemplate();
+            }
+            if ((chatTemplate == null || chatTemplate.isEmpty()) && config.customChatTemplate != null) {
+                chatTemplate = config.customChatTemplate;
+            }
+
+            JSONObject details = new JSONObject();
+            details.put("parent_model", "");
+            details.put("format", "gguf");
+            details.put("family", familyName);
+            JSONArray families = new JSONArray();
+            families.put(familyName);
+            details.put("families", families);
+            details.put("parameter_size", "unknown");
+            details.put("quantization_level", "unknown");
+
+            JSONObject modalities = buildModelModalities(modelName, config);
+            JSONArray capabilities = new JSONArray();
+            if (modalities.optBoolean("vision", false) || modalities.optBoolean("audio", false)) {
+                capabilities.put("multimodal");
+            }
+
+            JSONObject response = new JSONObject();
+            response.put("license", "");
+            response.put("modelfile", "");
+            response.put("parameters", "");
+            response.put("template", chatTemplate != null ? chatTemplate : "");
+            response.put("details", details);
+            response.put("model_info", new JSONObject());
+            response.put("capabilities", capabilities);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException | IOException e) {
+            Log.e(TAG, "Failed to build show response", e);
+            sendErrorResponse(outputStream, 404, "model not found");
+        }
+    }
+
+    private void handleModelGet(OutputStream outputStream, String modelId) throws IOException {
+        try {
+            String loadedConfig = modelManager.getCurrentConfigName();
+            boolean isLoaded = modelManager.isModelLoaded();
+            long created = System.currentTimeMillis() / 1000L;
+
+            for (String configName : configManager.listConfigurations()) {
+                if (!configName.equals(modelId)) continue;
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                File modelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+                PromptTemplateManager.ModelFamily family = PromptTemplateManager.detectModelFamily(
+                        modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
+
+                JSONObject entry = new JSONObject();
+                entry.put("id", configName);
+                entry.put("name", configName);
+                entry.put("object", "model");
+                entry.put("owned_by", "llamacpp");
+                entry.put("created", created);
+                entry.put("in_cache", modelFile != null && modelFile.exists());
+                entry.put("path", modelFile != null ? modelFile.getAbsolutePath() : config.modelUrl);
+                JSONObject status = new JSONObject();
+                status.put("value", (isLoaded && configName.equals(loadedConfig)) ? "loaded" : "unloaded");
+                entry.put("status", status);
+                entry.put("tags", new JSONArray());
+                JSONObject details = new JSONObject();
+                details.put("format", "gguf");
+                details.put("family", family.name().toLowerCase(Locale.US));
+                details.put("parameter_size", "unknown");
+                details.put("quantization_level", "unknown");
+                entry.put("details", details);
+
+                sendJsonResponse(outputStream, 200, entry.toString());
+                return;
+            }
+            sendErrorResponse(outputStream, 404, "model '" + modelId + "' not found");
+        } catch (JSONException | IOException e) {
+            Log.e(TAG, "Failed to build model-get response", e);
+            sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    private void handleModelDelete(OutputStream outputStream, String modelId) throws IOException {
+        try {
+            if (!configManager.listConfigurations().contains(modelId)) {
+                sendErrorResponse(outputStream, 404, "model '" + modelId + "' not found");
+                return;
+            }
+            if (modelManager.isBusy()) {
+                sendErrorResponse(outputStream, 503, "Model is busy");
+                return;
+            }
+            if (modelManager.isModelLoaded() && modelId.equals(modelManager.getCurrentConfigName())) {
+                modelManager.free();
+            }
+            if (!configManager.deleteConfiguration(modelId)) {
+                sendErrorResponse(outputStream, 500, "Failed to delete model");
+                return;
+            }
+            sendJsonResponse(outputStream, 200, "{\"status\":\"success\"}");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to delete model: " + modelId, e);
+            sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
+    private void handleLoraAdapters(OutputStream outputStream) throws IOException {
+        try {
+            JSONArray result = new JSONArray();
+            int id = 0;
+            for (String configName : configManager.listConfigurations()) {
+                ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+                if (config.loraAdapterUrl == null || config.loraAdapterUrl.isEmpty()) continue;
+                File adapterFile = ModelFileHelper.resolveStoredModelFile(context, config.loraAdapterUrl);
+                if (adapterFile == null) continue;
+                JSONObject entry = new JSONObject();
+                entry.put("id", id++);
+                entry.put("path", adapterFile.getAbsolutePath());
+                entry.put("scale", config.loraAdapterScale);
+                result.put(entry);
+            }
+            sendJsonResponse(outputStream, 200, result.toString());
+        } catch (JSONException | IOException e) {
+            Log.e(TAG, "Failed to build lora-adapters response", e);
+            sendErrorResponse(outputStream, 500, "Internal Server Error");
+        }
+    }
+
     private void applyNPredictOverride(JSONObject request, ConfigurationManager.Configuration config) {
         if (request == null || config == null) return;
         int override = -1;
@@ -2110,6 +2346,7 @@ public class OllamaApiServer {
             JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
             boolean hasSharedToolConfig = hasSharedToolConfig();
+            long keepAlive = parseKeepAlive(request);
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "generate request model=" + model + " stream=" + stream + " promptLen=" + prompt.length());
             }
@@ -2117,7 +2354,27 @@ public class OllamaApiServer {
                 sendErrorResponse(outputStream, 400, "'tools' must be an array");
                 return;
             }
-            
+
+            if (prompt.isEmpty()) {
+                if (!acquireGenerationSlot(outputStream, "/api/generate")) return;
+                try {
+                    if (keepAlive != 0 && !modelManager.loadConfiguration(model)) {
+                        sendErrorResponse(outputStream, 500, "Failed to load model: " + model);
+                        return;
+                    }
+                    JSONObject result = new JSONObject();
+                    result.put("model", model);
+                    result.put("created_at", getTimestamp());
+                    result.put("response", "");
+                    result.put("done", true);
+                    sendJsonResponse(outputStream, 200, result.toString());
+                } finally {
+                    modelManager.release();
+                    if (keepAlive == 0) modelManager.free();
+                }
+                return;
+            }
+
             if (!acquireGenerationSlot(outputStream, "/api/generate")) {
                 return;
             }
@@ -2416,6 +2673,7 @@ public class OllamaApiServer {
                 }
             } finally {
                 modelManager.release();
+                if (keepAlive == 0) modelManager.free();
             }
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in generate request", e);
@@ -2434,16 +2692,31 @@ public class OllamaApiServer {
             JSONArray tools = request.optJSONArray("tools");
             boolean stream = request.optBoolean("stream", true);
             boolean hasSharedToolConfig = hasSharedToolConfig();
-            
+            long keepAlive = parseKeepAlive(request);
+
             if (messages == null || messages.length() == 0) {
-                sendErrorResponse(outputStream, 400, "No messages provided");
+                if (!acquireGenerationSlot(outputStream, "/api/chat")) return;
+                try {
+                    if (keepAlive != 0 && !modelManager.loadConfiguration(model)) {
+                        sendErrorResponse(outputStream, 500, "Failed to load model: " + model);
+                        return;
+                    }
+                    JSONObject result = new JSONObject();
+                    result.put("model", model);
+                    result.put("created_at", getTimestamp());
+                    result.put("done", true);
+                    sendJsonResponse(outputStream, 200, result.toString());
+                } finally {
+                    modelManager.release();
+                    if (keepAlive == 0) modelManager.free();
+                }
                 return;
             }
             if (request.has("tools") && tools == null) {
                 sendErrorResponse(outputStream, 400, "'tools' must be an array");
                 return;
             }
-            
+
             if (!acquireGenerationSlot(outputStream, "/api/chat")) {
                 return;
             }
@@ -2782,6 +3055,7 @@ public class OllamaApiServer {
                 }
             } finally {
                 modelManager.release();
+                if (keepAlive == 0) modelManager.free();
             }
         } catch (JSONException e) {
             Log.e(TAG, "Invalid JSON in chat request", e);

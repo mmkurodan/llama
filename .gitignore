@@ -23,6 +23,7 @@ local.properties
 build/
 /release.keystore
 /release.keystore.base64
+app/release.keystore
 
 # build-local.sh が CI から取得する再利用 .so（CIの externalNativeBuild と重複するためコミットしない）
 /app/src/main/jniLibs/arm64-v8a/libllama_jni.so
