@@ -774,7 +774,18 @@ const spec = {
       post: {
         tags: ["Server"],
         summary: "Unload model",
-        responses: { "200": { description: "Model unloaded" } }
+        description: "Unload the currently loaded model. Body is optional (omit or send `{}`).",
+        requestBody: {
+          required: false,
+          content: { "application/json": { schema: {
+            type: "object",
+            properties: { model: { type: "string", description: "Model name to unload (defaults to current)" } }
+          }}}
+        },
+        responses: {
+          "200": { description: "Unloaded successfully", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" } } } } } },
+          "503": { description: "Model is busy" }
+        }
       }
     }
   }

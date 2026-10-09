@@ -1889,7 +1889,7 @@ public class OllamaApiServer {
 
     private void handleUnloadModel(OutputStream outputStream, String body) throws IOException {
         try {
-            JSONObject request = new JSONObject(body);
+            JSONObject request = body.isEmpty() ? new JSONObject() : new JSONObject(body);
             String model = resolveRequestedModel(request.optString("model", null));
             if (modelManager.isBusy()) {
                 sendErrorResponse(outputStream, 503, "Model is busy");
@@ -1897,6 +1897,10 @@ public class OllamaApiServer {
             }
             if (modelManager.isModelLoaded() && model.equals(modelManager.getCurrentConfigName())) {
                 modelManager.free();
+                if (modelManager.isModelLoaded()) {
+                    sendErrorResponse(outputStream, 503, "Model is busy, unload skipped");
+                    return;
+                }
             }
             JSONObject response = new JSONObject();
             response.put("success", true);
@@ -6157,12 +6161,15 @@ public class OllamaApiServer {
                     return;
                 }
                 JSONArray data = new JSONArray();
+                int totalPromptTokens = 0;
                 for (int i = 0; i < inputs.size(); i++) {
                     float[] vec = computeEmbeddingOrNull(inputs.get(i));
                     if (vec == null) {
                         sendOpenAiErrorResponse(outputStream, 500, "Embedding generation failed", "server_error");
                         return;
                     }
+                    LlamaNative llama = modelManager.getLlama();
+                    if (llama != null) totalPromptTokens += llama.getLastNPromptTokens();
                     JSONObject item = new JSONObject();
                     item.put("object", "embedding");
                     item.put("index", i);
@@ -6173,7 +6180,9 @@ public class OllamaApiServer {
                 result.put("object", "list");
                 result.put("data", data);
                 result.put("model", model);
-                result.put("usage", new JSONObject().put("prompt_tokens", 0).put("total_tokens", 0));
+                result.put("usage", new JSONObject()
+                        .put("prompt_tokens", totalPromptTokens)
+                        .put("total_tokens", totalPromptTokens));
                 sendJsonResponse(outputStream, 200, result.toString());
             } finally {
                 modelManager.release();
