@@ -4,7 +4,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.pdf.PdfRenderer;
 import android.os.BatteryManager;
+import android.os.ParcelFileDescriptor;
 import android.content.res.AssetManager;
 import android.util.Base64;
 import android.util.Log;
@@ -16,6 +19,7 @@ import org.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -1237,7 +1241,7 @@ public class OllamaApiServer {
                 } else if ("/v1/completions".equals(path)) {
                     handleOpenAiCompletions(outputStream, body);
                 } else if ("/v1/messages".equals(path)) {
-                    handleAnthropicMessages(outputStream, body);
+                    handleAnthropicMessages(outputStream, body, headers);
                 } else if ("/v1/messages/count_tokens".equals(path)) {
                     handleAnthropicCountTokens(outputStream, body);
                 } else if ("/api/embed".equals(path)) {
@@ -1264,6 +1268,10 @@ public class OllamaApiServer {
                     String modelFromPath = geminiModelFromPath(path);
                     boolean geminiStream = path.endsWith(":streamGenerateContent");
                     handleGeminiGenerate(outputStream, body, modelFromPath, geminiStream);
+                } else if (isGeminiCountTokensPath(path)) {
+                    handleGeminiCountTokens(outputStream, body, geminiModelFromPath(path));
+                } else if (isGeminiEmbedContentPath(path)) {
+                    handleGeminiEmbedContent(outputStream, body, geminiModelFromPath(path));
                 } else if ("/v1/responses".equals(path)) {
                     handleOpenAiResponses(outputStream, body);
                 } else {
@@ -1286,7 +1294,13 @@ public class OllamaApiServer {
                 } else if ("/health".equals(path) || "/v1/health".equals(path)) {
                     handleHealth(outputStream);
                 } else if ("/v1/models".equals(path) || "/models".equals(path)) {
-                    handleModelsList(outputStream);
+                    handleModelsList(outputStream, headers);
+                } else if ("/v1beta/models".equals(path) || "/v1beta/models/".equals(path)) {
+                    handleGeminiModelsList(outputStream);
+                } else if (path.startsWith("/v1beta/models/") && path.length() > "/v1beta/models/".length()
+                        && !isGeminiGeneratePath(path) && !isGeminiCountTokensPath(path) && !isGeminiEmbedContentPath(path)) {
+                    String geminiModelId = URLDecoder.decode(path.substring("/v1beta/models/".length()), StandardCharsets.UTF_8.name());
+                    handleGeminiModelGet(outputStream, geminiModelId);
                 } else if ("/props".equals(path)) {
                     handleProps(outputStream, queryParams);
                 } else if ("/slots".equals(path)) {
@@ -1473,9 +1487,32 @@ public class OllamaApiServer {
         }
     }
 
-    private void handleModelsList(OutputStream outputStream) throws IOException {
+    private void handleModelsList(OutputStream outputStream, Map<String, String> headers) throws IOException {
         try {
+            // Anthropic clients send 'anthropic-version' or 'x-api-key' headers.
+            boolean anthropicClient = headers != null
+                    && (headers.containsKey("anthropic-version") || headers.containsKey("x-api-key"));
             List<String> configNames = new ArrayList<>(configManager.listConfigurations());
+            if (anthropicClient) {
+                JSONArray data = new JSONArray();
+                for (String name : configNames) {
+                    JSONObject m = new JSONObject();
+                    m.put("type", "model");
+                    m.put("id", name);
+                    m.put("display_name", name);
+                    m.put("created_at", "2024-01-01T00:00:00Z");
+                    data.put(m);
+                }
+                JSONObject response = new JSONObject();
+                response.put("data", data);
+                response.put("has_more", false);
+                if (!configNames.isEmpty()) {
+                    response.put("first_id", configNames.get(0));
+                    response.put("last_id", configNames.get(configNames.size() - 1));
+                }
+                sendJsonResponse(outputStream, 200, response.toString());
+                return;
+            }
             JSONArray data = new JSONArray();
             JSONArray models = new JSONArray();
             long created = System.currentTimeMillis() / 1000L;
@@ -3954,7 +3991,7 @@ public class OllamaApiServer {
      * and SSE event shapes. Supports system prompts, multi-turn, thinking blocks, image/audio input and
      * basic tool_use/tool_result round-trips.
      */
-    private void handleAnthropicMessages(OutputStream outputStream, String body) throws IOException {
+    private void handleAnthropicMessages(OutputStream outputStream, String body, Map<String, String> headers) throws IOException {
         try {
             JSONObject request = new JSONObject(body);
             String model = resolveRequestedModel(request.optString("model", null));
@@ -3970,6 +4007,10 @@ public class OllamaApiServer {
             boolean stream = request.optBoolean("stream", false);
             final String msgId = "msg_" + UUID.randomUUID().toString().replace("-", "");
 
+            // Parse anthropic-beta header for feature flags.
+            String betaHeader = headers != null ? headers.getOrDefault("anthropic-beta", "") : "";
+            boolean interleavedThinkingBeta = betaHeader.contains("interleaved-thinking");
+
             // Translate Anthropic → internal OpenAI-style messages + tools.
             JSONArray messages = anthropicToInternalMessages(request.opt("system"), anthropicMessages);
             JSONArray tools = anthropicToolsToOpenAi(request.optJSONArray("tools"));
@@ -3983,6 +4024,8 @@ public class OllamaApiServer {
             JSONObject thinking = request.optJSONObject("thinking");
             if (thinking != null) {
                 oai.put("think", "enabled".equalsIgnoreCase(thinking.optString("type", "")));
+            } else if (interleavedThinkingBeta) {
+                oai.put("think", true);
             }
 
             if (!acquireGenerationSlot(outputStream, "/v1/messages", false)) {
@@ -4169,7 +4212,7 @@ public class OllamaApiServer {
      * parts; {@code tool_use} becomes assistant {@code tool_calls}; {@code tool_result} becomes a
      * {@code tool} role message.
      */
-    private static JSONArray anthropicToInternalMessages(Object system, JSONArray anthropicMessages) throws JSONException {
+    private JSONArray anthropicToInternalMessages(Object system, JSONArray anthropicMessages) throws JSONException {
         JSONArray out = new JSONArray();
         String systemText = anthropicTextFromBlocks(system);
         if (systemText != null && !systemText.isEmpty()) {
@@ -4214,6 +4257,20 @@ public class OllamaApiServer {
                         parts.put(anthropicAudioToOpenAiPart(block.optJSONObject("source")));
                         break;
                     }
+                    case "thinking": {
+                        // Extended thinking block in prior assistant turns — preserve as context.
+                        String thinkText = block.optString("thinking", "");
+                        if (!thinkText.isEmpty()) {
+                            JSONObject p = new JSONObject();
+                            p.put("type", "text");
+                            p.put("text", "<thinking>" + thinkText + "</thinking>");
+                            parts.put(p);
+                        }
+                        break;
+                    }
+                    case "redacted_thinking":
+                        // Opaque redacted block — drop silently.
+                        break;
                     case "tool_use": {
                         JSONObject call = new JSONObject();
                         call.put("id", block.optString("id", "call_" + b));
@@ -4232,6 +4289,64 @@ public class OllamaApiServer {
                         toolMsg.put("tool_call_id", block.optString("tool_use_id", ""));
                         toolMsg.put("content", anthropicTextFromBlocks(block.opt("content")));
                         out.put(toolMsg);
+                        break;
+                    }
+                    case "document": {
+                        JSONObject source = block.optJSONObject("source");
+                        String title = block.optString("title", "");
+                        String context = block.optString("context", "");
+                        if (source != null) {
+                            String sourceType = source.optString("type", "");
+                            if ("text".equals(sourceType)) {
+                                String docText = source.optString("data", "");
+                                StringBuilder sb = new StringBuilder();
+                                if (!title.isEmpty()) sb.append("[").append(title).append("]\n");
+                                if (!context.isEmpty()) sb.append(context).append("\n");
+                                sb.append(docText);
+                                JSONObject p = new JSONObject();
+                                p.put("type", "text");
+                                p.put("text", sb.toString());
+                                parts.put(p);
+                            } else if ("base64".equals(sourceType)) {
+                                String mediaType = source.optString("media_type", "");
+                                String data = source.optString("data", "");
+                                if ("application/pdf".equals(mediaType)) {
+                                    List<byte[]> pages = renderPdfToImages(data);
+                                    if (pages != null && !pages.isEmpty()) {
+                                        if (!title.isEmpty()) {
+                                            JSONObject tp = new JSONObject();
+                                            tp.put("type", "text");
+                                            tp.put("text", "[Document: " + title + "]");
+                                            parts.put(tp);
+                                        }
+                                        for (byte[] pageBytes : pages) {
+                                            String b64 = Base64.encodeToString(pageBytes, Base64.NO_WRAP);
+                                            JSONObject imgPart = new JSONObject();
+                                            imgPart.put("type", "image_url");
+                                            JSONObject imgUrl = new JSONObject();
+                                            imgUrl.put("url", "data:image/png;base64," + b64);
+                                            imgPart.put("image_url", imgUrl);
+                                            parts.put(imgPart);
+                                        }
+                                    } else {
+                                        JSONObject p = new JSONObject();
+                                        p.put("type", "text");
+                                        p.put("text", title.isEmpty() ? "[PDF document]" : "[PDF document: " + title + "]");
+                                        parts.put(p);
+                                    }
+                                }
+                            } else if ("url".equals(sourceType)) {
+                                String url = source.optString("url", "");
+                                if (!url.isEmpty()) {
+                                    JSONObject imgPart = new JSONObject();
+                                    imgPart.put("type", "image_url");
+                                    JSONObject imgUrl = new JSONObject();
+                                    imgUrl.put("url", url);
+                                    imgPart.put("image_url", imgUrl);
+                                    parts.put(imgPart);
+                                }
+                            }
+                        }
                         break;
                     }
                     default:
@@ -4444,6 +4559,44 @@ public class OllamaApiServer {
         } catch (JSONException e) {
             return new JSONObject();
         }
+    }
+
+    /** Renders up to 10 pages of a base64-encoded PDF to PNG byte arrays (max 1024px wide). */
+    private List<byte[]> renderPdfToImages(String base64Data) {
+        List<byte[]> images = new ArrayList<>();
+        File tmpFile = null;
+        PdfRenderer renderer = null;
+        ParcelFileDescriptor pfd = null;
+        try {
+            byte[] pdfBytes = Base64.decode(base64Data, Base64.DEFAULT);
+            tmpFile = File.createTempFile("pdf_doc", ".pdf", context.getCacheDir());
+            try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
+                fos.write(pdfBytes);
+            }
+            pfd = ParcelFileDescriptor.open(tmpFile, ParcelFileDescriptor.MODE_READ_ONLY);
+            renderer = new PdfRenderer(pfd);
+            int maxPages = Math.min(renderer.getPageCount(), 10);
+            for (int p = 0; p < maxPages; p++) {
+                PdfRenderer.Page page = renderer.openPage(p);
+                int w = page.getWidth(), h = page.getHeight();
+                if (w > 1024) { h = h * 1024 / w; w = 1024; }
+                Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                page.close();
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.PNG, 80, baos);
+                bmp.recycle();
+                images.add(baos.toByteArray());
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "PDF rendering failed", e);
+            return null;
+        } finally {
+            if (renderer != null) try { renderer.close(); } catch (Exception ignored) {}
+            if (pfd != null) try { pfd.close(); } catch (Exception ignored) {}
+            if (tmpFile != null) tmpFile.delete();
+        }
+        return images.isEmpty() ? null : images;
     }
 
     /** Anthropic SSE frame: {@code event: <type>\n data: <json>\n\n}. */
@@ -4749,6 +4902,190 @@ public class OllamaApiServer {
                 && (path.endsWith(":generateContent") || path.endsWith(":streamGenerateContent"));
     }
 
+    private static boolean isGeminiCountTokensPath(String path) {
+        if (path == null) return false;
+        return (path.startsWith("/v1beta/models/") || path.startsWith("/v1/models/"))
+                && path.endsWith(":countTokens");
+    }
+
+    private static boolean isGeminiEmbedContentPath(String path) {
+        if (path == null) return false;
+        return (path.startsWith("/v1beta/models/") || path.startsWith("/v1/models/"))
+                && (path.endsWith(":embedContent") || path.endsWith(":batchEmbedContents"));
+    }
+
+    /** GET /v1beta/models — lists all configs in Gemini model format. */
+    private void handleGeminiModelsList(OutputStream outputStream) throws IOException {
+        try {
+            List<String> configs = new ArrayList<>(configManager.listConfigurations());
+            JSONArray models = new JSONArray();
+            for (String name : configs) {
+                models.put(buildGeminiModelObject(name));
+            }
+            JSONObject response = new JSONObject();
+            response.put("models", models);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to list models");
+        }
+    }
+
+    /** GET /v1beta/models/{model} — returns a single config in Gemini model format. */
+    private void handleGeminiModelGet(OutputStream outputStream, String modelId) throws IOException {
+        try {
+            String resolved = resolveRequestedModel(modelId);
+            if (!configManager.listConfigurations().contains(resolved)) {
+                sendGeminiErrorResponse(outputStream, 404, "NOT_FOUND", "model '" + modelId + "' not found");
+                return;
+            }
+            sendJsonResponse(outputStream, 200, buildGeminiModelObject(resolved).toString());
+        } catch (JSONException e) {
+            sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to get model");
+        }
+    }
+
+    private JSONObject buildGeminiModelObject(String name) throws JSONException {
+        ConfigurationManager.Configuration config = null;
+        try { config = configManager.loadConfiguration(name); } catch (Exception ignored) {}
+        int nCtx = config != null ? config.nCtx : 2048;
+        JSONObject model = new JSONObject();
+        model.put("name", "models/" + name);
+        model.put("baseModelId", "");
+        model.put("version", "1.0");
+        model.put("displayName", name);
+        model.put("description", "");
+        model.put("inputTokenLimit", nCtx);
+        model.put("outputTokenLimit", nCtx);
+        JSONArray methods = new JSONArray();
+        methods.put("generateContent");
+        methods.put("streamGenerateContent");
+        methods.put("countTokens");
+        methods.put("embedContent");
+        model.put("supportedGenerationMethods", methods);
+        return model;
+    }
+
+    /** POST /v1beta/models/{model}:countTokens — tokenises the prompt and returns totalTokens. */
+    private void handleGeminiCountTokens(OutputStream outputStream, String body,
+            String modelFromPath) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            String model = resolveRequestedModel(modelFromPath);
+            JSONArray contents = request.optJSONArray("contents");
+            if (contents == null || contents.length() == 0) {
+                sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "'contents' is required");
+                return;
+            }
+            Object systemInstruction = request.opt("systemInstruction");
+            JSONArray messages = geminiContentsToInternalMessages(systemInstruction, contents);
+            if (!acquireGenerationSlot(outputStream, "/v1beta/models:countTokens", false)) return;
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to load configuration: " + model);
+                    return;
+                }
+                ConfigurationManager.Configuration config = null;
+                String customTemplate = null, settingsSystemPrompt = null;
+                try {
+                    config = configManager.loadConfiguration(model);
+                    customTemplate = config.customChatTemplate;
+                    settingsSystemPrompt = config.systemPrompt;
+                } catch (Exception ignored) {}
+                PreparedMessages prepared = normalizeMessagesForMedia(messages, false, false);
+                String ggufChatTemplate = modelManager.getLlama().getChatTemplate();
+                String modelPath = modelManager.getCurrentModelPath();
+                PromptTemplateManager.PromptBuildResult promptResult =
+                        PromptTemplateManager.buildPromptFromMessagesWithSelection(
+                                prepared.messages, customTemplate, ggufChatTemplate,
+                                settingsSystemPrompt, modelPath, false);
+                int tokenCount = 0;
+                try {
+                    JSONObject tok = new JSONObject(modelManager.getLlama().tokenize(promptResult.prompt));
+                    if (tok.has("ids")) tokenCount = tok.getJSONArray("ids").length();
+                } catch (Exception e) {
+                    Log.w(TAG, "Gemini countTokens tokenize failed", e);
+                }
+                JSONObject response = new JSONObject();
+                response.put("totalTokens", Math.max(0, tokenCount));
+                sendJsonResponse(outputStream, 200, response.toString());
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "Invalid JSON: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Gemini countTokens failed", e);
+            sendGeminiErrorResponse(outputStream, 500, "INTERNAL",
+                    e.getMessage() != null ? e.getMessage() : "countTokens failed");
+        }
+    }
+
+    /**
+     * POST /v1beta/models/{model}:embedContent — Gemini embedding endpoint.
+     * Accepts single {@code content} or batch {@code requests:[{model,content},...]} form.
+     * Response: {@code {"embedding":{"values":[...]}}} or
+     *           {@code {"embeddings":[{"values":[...]},...]}} for batch.
+     */
+    private void handleGeminiEmbedContent(OutputStream outputStream, String body,
+            String modelFromPath) throws IOException {
+        try {
+            JSONObject request = new JSONObject(body);
+            boolean isBatch = body.contains("\"requests\"");
+            String model = resolveRequestedModel(modelFromPath);
+            if (!acquireGenerationSlot(outputStream, "/v1beta/models:embedContent", false)) return;
+            try {
+                if (!modelManager.loadConfiguration(model)) {
+                    sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to load configuration: " + model);
+                    return;
+                }
+                if (isBatch) {
+                    JSONArray reqs = request.optJSONArray("requests");
+                    if (reqs == null || reqs.length() == 0) {
+                        sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "'requests' is required");
+                        return;
+                    }
+                    JSONArray embeddings = new JSONArray();
+                    for (int i = 0; i < reqs.length(); i++) {
+                        JSONObject r = reqs.optJSONObject(i);
+                        String text = r != null ? geminiContentToText(r.optJSONObject("content")) : "";
+                        float[] vec = computeEmbeddingOrNull(text);
+                        JSONObject emb = new JSONObject();
+                        emb.put("values", vec != null ? floatArrayToJson(vec) : new JSONArray());
+                        embeddings.put(emb);
+                    }
+                    sendJsonResponse(outputStream, 200,
+                            new JSONObject().put("embeddings", embeddings).toString());
+                } else {
+                    String text = geminiContentToText(request.optJSONObject("content"));
+                    if (text.isEmpty()) {
+                        sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "'content' is required");
+                        return;
+                    }
+                    float[] vec = computeEmbeddingOrNull(text);
+                    JSONObject values = new JSONObject();
+                    values.put("values", vec != null ? floatArrayToJson(vec) : new JSONArray());
+                    sendJsonResponse(outputStream, 200,
+                            new JSONObject().put("embedding", values).toString());
+                }
+            } finally {
+                modelManager.release();
+            }
+        } catch (JSONException e) {
+            sendGeminiErrorResponse(outputStream, 400, "INVALID_ARGUMENT", "Invalid JSON: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Gemini embedContent failed", e);
+            sendGeminiErrorResponse(outputStream, 500, "INTERNAL",
+                    e.getMessage() != null ? e.getMessage() : "embedContent failed");
+        }
+    }
+
+    /** Extracts plain text from a Gemini content object ({parts:[{text:"..."},...]}). */
+    private static String geminiContentToText(JSONObject content) {
+        if (content == null) return "";
+        JSONArray parts = content.optJSONArray("parts");
+        return parts != null ? geminiPartsToText(parts) : "";
+    }
+
     /** Extracts the model name from a Gemini path (the segment between "models/" and ":action"). */
     private static String geminiModelFromPath(String path) {
         // path = "/v1beta/models/gemini-2.0-flash:generateContent"
@@ -4795,6 +5132,18 @@ public class OllamaApiServer {
                 if (genConfig.has("temperature"))     oai.put("temperature", genConfig.opt("temperature"));
                 if (genConfig.has("topP"))            oai.put("top_p", genConfig.opt("topP"));
                 if (genConfig.has("topK"))            oai.put("top_k", genConfig.opt("topK"));
+                // responseMimeType: "application/json" → JSON mode
+                String mimeType = genConfig.optString("responseMimeType", "");
+                if ("application/json".equals(mimeType)) {
+                    oai.put("response_format", new JSONObject().put("type", "json_object"));
+                }
+                // thinkingConfig: enable thinking with optional budget
+                JSONObject thinkingConfig = genConfig.optJSONObject("thinkingConfig");
+                if (thinkingConfig != null) {
+                    int budget = thinkingConfig.optInt("thinkingBudget", -1);
+                    // budget > 0 → enable thinking; budget == 0 → disable; -1 or absent → model default
+                    if (budget != 0) oai.put("think", true);
+                }
             }
 
             String geminiEndpoint = stream

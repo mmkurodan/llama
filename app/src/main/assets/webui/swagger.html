@@ -355,16 +355,22 @@ const spec = {
 
     "/v1/models": {
       get: {
-        tags: ["OpenAI"],
+        tags: ["OpenAI", "Anthropic"],
         summary: "List models",
+        description: "Returns OpenAI-format list by default. When `anthropic-version` or `x-api-key` header is present, returns Anthropic format (`{data:[{type,id,display_name,created_at}], has_more}`).",
+        parameters: [
+          { name: "anthropic-version", in: "header", schema: { type: "string", example: "2023-06-01" }, description: "Anthropic API version — triggers Anthropic-format response" },
+          { name: "x-api-key", in: "header", schema: { type: "string" }, description: "API key (presence triggers Anthropic-format response)" }
+        ],
         responses: {
           "200": {
-            description: "OpenAI-style model list",
+            description: "OpenAI or Anthropic format model list depending on headers",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
                 object: { type: "string", example: "list" },
-                data: { type: "array", items: { type: "object" } }
+                data: { type: "array", items: { type: "object" } },
+                has_more: { type: "boolean" }
               }
             }}}
           }
@@ -576,7 +582,11 @@ const spec = {
       post: {
         tags: ["Anthropic"],
         summary: "Messages",
-        description: "Anthropic-compatible Messages API. Supports text, images (base64/URL), audio, tool_use, and thinking.",
+        description: "Anthropic-compatible Messages API.\n\nContent block types supported: `text`, `image` (base64/URL), `audio`, `document` (text/base64-PDF renders pages as images, URL), `tool_use`, `tool_result`, `thinking`, `redacted_thinking`.\n\nHeader `anthropic-beta: interleaved-thinking-*` enables thinking without explicit `thinking` field.",
+        parameters: [
+          { name: "anthropic-version", in: "header", schema: { type: "string", example: "2023-06-01" } },
+          { name: "anthropic-beta", in: "header", schema: { type: "string", example: "interleaved-thinking-2025-05-14" }, description: "Beta features: interleaved-thinking-* enables thinking" }
+        ],
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
@@ -592,7 +602,7 @@ const spec = {
                     role: { type: "string", enum: ["user", "assistant"] },
                     content: { oneOf: [
                       { type: "string" },
-                      { type: "array", items: { type: "object" } }
+                      { type: "array", items: { type: "object" }, description: "Content blocks: text, image, document, tool_use, tool_result, thinking" }
                     ]}
                   }
                 }
@@ -602,7 +612,7 @@ const spec = {
               stream: { type: "boolean", default: false },
               temperature: { type: "number" },
               tools: { type: "array", items: { type: "object" } },
-              thinking: { type: "object", description: "Extended thinking config: {type: 'enabled', budget_tokens: N}" }
+              thinking: { type: "object", description: "Extended thinking: {type: 'enabled', budget_tokens: N}" }
             }
           }}}
         },
@@ -654,24 +664,67 @@ const spec = {
       }
     },
 
+    "/v1beta/models": {
+      get: {
+        tags: ["Gemini"],
+        summary: "List models (Gemini format)",
+        description: "Returns all configs as Gemini model objects with `supportedGenerationMethods`.",
+        responses: {
+          "200": {
+            description: "Model list",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: { models: { type: "array", items: { type: "object",
+                properties: {
+                  name: { type: "string", example: "models/default" },
+                  displayName: { type: "string" },
+                  inputTokenLimit: { type: "integer" },
+                  outputTokenLimit: { type: "integer" },
+                  supportedGenerationMethods: { type: "array", items: { type: "string" } }
+                }
+              }}}
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1beta/models/{model}": {
+      get: {
+        tags: ["Gemini"],
+        summary: "Get model (Gemini format)",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
+        responses: { "200": { description: "Gemini model object" }, "404": { description: "Not found" } }
+      }
+    },
+
     "/v1beta/models/{model}:generateContent": {
       post: {
         tags: ["Gemini"],
         summary: "Generate content",
-        description: "Google Gemini-compatible generateContent endpoint.",
-        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "gemma-3-4b" }],
+        description: "Google Gemini-compatible generateContent.\n\n`generationConfig` supports: `maxOutputTokens`, `temperature`, `topP`, `topK`, `responseMimeType` (`application/json` → JSON mode), `thinkingConfig.thinkingBudget` (>0 enables thinking).",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             properties: {
               contents: { type: "array", items: { type: "object" } },
-              systemInstruction: { type: "object" },
-              generationConfig: { type: "object" }
+              systemInstruction: { type: "object", description: "{parts:[{text:'...'}]}" },
+              tools: { type: "array", items: { type: "object" } },
+              toolConfig: { type: "object", description: "functionCallingConfig: {mode: AUTO|ANY|NONE}" },
+              generationConfig: { type: "object", properties: {
+                maxOutputTokens: { type: "integer" },
+                temperature: { type: "number" },
+                topP: { type: "number" },
+                topK: { type: "integer" },
+                responseMimeType: { type: "string", enum: ["text/plain", "application/json"], description: "application/json → JSON mode" },
+                thinkingConfig: { type: "object", properties: { thinkingBudget: { type: "integer", description: ">0 enables thinking; 0 disables" } } }
+              }}
             }
           }}}
         },
-        responses: { "200": { description: "Gemini response" } }
+        responses: { "200": { description: "Gemini GenerateContentResponse" } }
       }
     },
 
@@ -684,7 +737,58 @@ const spec = {
           required: true,
           content: { "application/json": { schema: { type: "object" } }}
         },
-        responses: { "200": { description: "SSE stream of Gemini response chunks" } }
+        responses: { "200": { description: "SSE stream of GenerateContentResponse chunks" } }
+      }
+    },
+
+    "/v1beta/models/{model}:countTokens": {
+      post: {
+        tags: ["Gemini"],
+        summary: "Count tokens",
+        description: "Tokenises the given contents and returns the total token count.",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["contents"],
+            properties: {
+              contents: { type: "array", items: { type: "object" } },
+              systemInstruction: { type: "object" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Token count",
+            content: { "application/json": { schema: { type: "object", properties: { totalTokens: { type: "integer" } } } } }
+          }
+        }
+      }
+    },
+
+    "/v1beta/models/{model}:embedContent": {
+      post: {
+        tags: ["Gemini"],
+        summary: "Embed content",
+        description: "Generates embeddings for a single content object or a batch (`requests` array).",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            properties: {
+              content: { type: "object", description: "Single: {parts:[{text:'...'}]}" },
+              requests: { type: "array", description: "Batch: [{model, content}, ...]", items: { type: "object" } }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Single: `{embedding:{values:[]}}` — Batch: `{embeddings:[{values:[]},...]}`",
+            content: { "application/json": { schema: { type: "object" } } }
+          }
+        }
       }
     },
 
