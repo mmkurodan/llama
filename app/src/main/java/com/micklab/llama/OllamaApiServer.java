@@ -4313,12 +4313,17 @@ public class OllamaApiServer {
                                 if ("application/pdf".equals(mediaType)) {
                                     List<byte[]> pages = renderPdfToImages(data);
                                     if (pages != null && !pages.isEmpty()) {
-                                        if (!title.isEmpty()) {
-                                            JSONObject tp = new JSONObject();
-                                            tp.put("type", "text");
-                                            tp.put("text", "[Document: " + title + "]");
-                                            parts.put(tp);
-                                        }
+                                        // Always add a text header so text-only models still get
+                                        // context even if images are stripped by normalizeMessagesForMedia.
+                                        StringBuilder hdr = new StringBuilder();
+                                        if (!title.isEmpty()) hdr.append("[Document: ").append(title).append("]\n");
+                                        hdr.append("[PDF — ").append(pages.size()).append(" page(s) attached as image(s)]");
+                                        if (!context.isEmpty()) hdr.append("\n").append(context);
+                                        JSONObject tp = new JSONObject();
+                                        tp.put("type", "text");
+                                        tp.put("text", hdr.toString());
+                                        parts.put(tp);
+                                        // Page images for vision models.
                                         for (byte[] pageBytes : pages) {
                                             String b64 = Base64.encodeToString(pageBytes, Base64.NO_WRAP);
                                             JSONObject imgPart = new JSONObject();
@@ -4329,6 +4334,7 @@ public class OllamaApiServer {
                                             parts.put(imgPart);
                                         }
                                     } else {
+                                        // Rendering failed — text fallback.
                                         JSONObject p = new JSONObject();
                                         p.put("type", "text");
                                         p.put("text", title.isEmpty() ? "[PDF document]" : "[PDF document: " + title + "]");
