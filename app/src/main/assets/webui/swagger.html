@@ -19,38 +19,157 @@ const spec = {
   info: {
     title: "LLM AI Server API",
     version: "1.0.0",
-    description: "Ollama-compatible on-device LLM API server.\n\nSupports Ollama, OpenAI, Anthropic, and Gemini compatible endpoints.\n\nBase URL: `http://127.0.0.1:11434` (or the configured port)"
+    description: "On-device LLM API server compatible with Ollama, OpenAI, Anthropic, and Gemini APIs.\n\n**Base URL**: `http://127.0.0.1:11434` (or the configured port)\n\n**Model names** correspond to profile names created in the app settings. The special name `default` refers to the currently active profile."
   },
   servers: [{ url: window.location.origin, description: "On-device server (current)" }],
   tags: [
-    { name: "Ollama", description: "Ollama-compatible endpoints" },
-    { name: "OpenAI", description: "OpenAI-compatible endpoints" },
-    { name: "Anthropic", description: "Anthropic-compatible endpoints" },
-    { name: "Gemini", description: "Google Gemini-compatible endpoints" },
-    { name: "Server", description: "Server management and diagnostics" }
+    { name: "Ollama", description: "Ollama-compatible endpoints (`/api/*`)" },
+    { name: "OpenAI", description: "OpenAI-compatible endpoints (`/v1/*`)" },
+    { name: "Anthropic", description: "Anthropic-compatible endpoints (`/v1/messages`)" },
+    { name: "Gemini", description: "Google Gemini-compatible endpoints (`/v1beta/*`)" },
+    { name: "Server", description: "Server management, diagnostics, and model control" }
   ],
+  components: {
+    schemas: {
+      SamplingOptions: {
+        type: "object",
+        description: "Per-request sampling parameter overrides. All fields are optional and override the profile defaults.",
+        properties: {
+          temperature:      { type: "number",  example: 0.7,   description: "Sampling temperature (0.0–2.0). Lower = more deterministic." },
+          top_p:            { type: "number",  example: 0.9,   description: "Nucleus sampling: keep top tokens whose cumulative prob ≥ top_p." },
+          top_k:            { type: "integer", example: 40,    description: "Keep only the top_k most probable tokens. 0 = disabled." },
+          min_p:            { type: "number",  example: 0.05,  description: "Min-p sampling: discard tokens below min_p × max_token_prob." },
+          typ_p:            { type: "number",  example: 1.0,   description: "Typical-p sampling. 1.0 = disabled." },
+          repeat_penalty:   { type: "number",  example: 1.1,   description: "Repetition penalty (1.0 = no penalty, >1.0 penalises repeats)." },
+          repeat_last_n:    { type: "integer", example: 64,    description: "Window of tokens considered for repeat penalty." },
+          presence_penalty: { type: "number",  example: 0.0,   description: "OpenAI-style presence penalty." },
+          frequency_penalty:{ type: "number",  example: 0.0,   description: "OpenAI-style frequency penalty." },
+          mirostat:         { type: "integer", example: 0,     description: "Mirostat sampling mode. 0 = off, 1 = v1, 2 = v2." },
+          mirostat_tau:     { type: "number",  example: 5.0,   description: "Mirostat target entropy τ." },
+          mirostat_eta:     { type: "number",  example: 0.1,   description: "Mirostat learning rate η." },
+          dynatemp_range:   { type: "number",  example: 0.0,   description: "Dynamic temperature range. 0 = disabled." },
+          dynatemp_exponent:{ type: "number",  example: 1.0,   description: "Dynamic temperature exponent." },
+          xtc_probability:  { type: "number",  example: 0.0,   description: "XTC (eXtreme Token Culling) probability. 0 = disabled." },
+          xtc_threshold:    { type: "number",  example: 0.1,   description: "XTC minimum token probability threshold." },
+          top_n_sigma:      { type: "number",  example: -1.0,  description: "Top-N-sigma sampling. -1 = disabled." },
+          dry_multiplier:   { type: "number",  example: 0.0,   description: "DRY (Don't Repeat Yourself) multiplier. 0 = disabled." },
+          dry_base:         { type: "number",  example: 1.75,  description: "DRY base." },
+          dry_allowed_length:{ type: "integer",example: 2,     description: "DRY minimum sequence length before penalty applies." },
+          dry_penalty_last_n:{ type: "integer",example: -1,    description: "DRY penalty window. -1 = entire context." },
+          num_ctx:          { type: "integer", example: 2048,  description: "Override context size for this request." },
+          num_predict:      { type: "integer", example: -1,    description: "Max tokens to predict. -1 = unlimited." },
+          seed:             { type: "integer", example: -1,    description: "RNG seed. -1 = random." },
+          stop:             { type: "array", items: { type: "string" }, description: "Stop sequences." }
+        }
+      },
+      ConfigurationFields: {
+        type: "object",
+        description: "All profile configuration fields. Any of these can be passed directly in the request body or nested inside `overrides`.",
+        properties: {
+          nCtx:             { type: "integer", example: 2048,  description: "Context window size (tokens)." },
+          nThreads:         { type: "integer", example: 4,     description: "CPU inference threads." },
+          nBatch:           { type: "integer", example: 128,   description: "Prompt processing batch size." },
+          nPredict:         { type: "integer", example: -1,    description: "Max output tokens. -1 = unlimited." },
+          nCtxAutoExpand:   { type: "boolean", example: true,  description: "Automatically increase nCtx if the prompt exceeds it." },
+          temp:             { type: "number",  example: 0.7,   description: "Default sampling temperature." },
+          topP:             { type: "number",  example: 0.9 },
+          topK:             { type: "integer", example: 40 },
+          minP:             { type: "number",  example: 0.01 },
+          typicalP:         { type: "number",  example: 1.0 },
+          penaltyLastN:     { type: "integer", example: 64 },
+          penaltyRepeat:    { type: "number",  example: 1.1 },
+          penaltyFreq:      { type: "number",  example: 0.0 },
+          penaltyPresent:   { type: "number",  example: 0.0 },
+          mirostat:         { type: "integer", example: 0,     description: "0=off, 1=v1, 2=v2." },
+          mirostatTau:      { type: "number",  example: 5.0 },
+          mirostatEta:      { type: "number",  example: 0.1 },
+          dynatempRange:    { type: "number",  example: 0.0 },
+          dynatempExponent: { type: "number",  example: 1.0 },
+          xtcProbability:   { type: "number",  example: 0.0 },
+          xtcThreshold:     { type: "number",  example: 0.1 },
+          topNSigma:        { type: "number",  example: -1.0 },
+          dryMultiplier:    { type: "number",  example: 0.0 },
+          dryBase:          { type: "number",  example: 1.75 },
+          dryAllowedLength: { type: "integer", example: 2 },
+          dryPenaltyLastN:  { type: "integer", example: -1 },
+          drySequenceBreakers:{ type: "string",example: "\\n,:,\".*", description: "Comma-separated sequence-breaker characters." },
+          streaming:        { type: "boolean", example: true,  description: "Enable streaming output by default." },
+          enableThinking:   { type: "boolean", example: false, description: "Enable chain-of-thought thinking blocks." },
+          useMmap:          { type: "boolean", example: true,  description: "Use memory-mapped file loading." },
+          backendType:      { type: "integer", example: 0,     description: "0 = CPU, 1 = GPU (OpenCL/Adreno)." },
+          gpuOffloadEnabled:{ type: "boolean", example: false },
+          gpuOffloadLayers: { type: "integer", example: -1,   description: "Number of layers to offload to GPU. -1 = all." },
+          gpuSwitchStabilization: { type: "integer", example: 0, description: "GPU reload stabilization delay. 0=none, 1=200ms, 2=300ms, 3=500ms." },
+          kvCacheTypeK:     { type: "integer", example: 1,    description: "KV cache quantization for K: 0=f32, 1=f16, 2=q8_0, 3=q4_0, 4=q4_1, 5=iq4_nl, 6=q5_0, 7=q5_1." },
+          kvCacheTypeV:     { type: "integer", example: 1,    description: "KV cache quantization for V (same values as kvCacheTypeK)." },
+          systemPrompt:     { type: "string", description: "System prompt used when the API request does not provide one." },
+          customChatTemplate: { type: "string", description: "Jinja2 chat template override. Leave blank for auto-detection." },
+          multimodalProjectorUrl: { type: "string", description: "Path or URL of the mmproj GGUF file." },
+          multimodalProjectorDisabled: { type: "boolean", example: false, description: "Disable mmproj even if auto-detected." },
+          loraAdapterUrl:   { type: "string", description: "Path or URL of the LoRA adapter GGUF file." },
+          loraAdapterScale: { type: "number", example: 1.0,  description: "LoRA adapter strength (0.0–1.0+)." },
+          mtpEnabled:       { type: "boolean", example: false, description: "Enable MTP (Multi-Token Prediction) speculative decoding." },
+          mtpNDraft:        { type: "integer", example: 2,    description: "Max tokens drafted per MTP step." },
+          mtpModelReference:{ type: "string", description: "Draft model path for MTP. Empty = use the main model's own head." }
+        }
+      },
+      OllamaUsage: {
+        type: "object",
+        properties: {
+          total_duration:    { type: "integer", description: "Total wall-clock time (ns)." },
+          load_duration:     { type: "integer", description: "Model load time (ns)." },
+          prompt_eval_count: { type: "integer", description: "Number of input tokens." },
+          prompt_eval_duration: { type: "integer", description: "Prompt evaluation time (ns)." },
+          eval_count:        { type: "integer", description: "Number of output tokens." },
+          eval_duration:     { type: "integer", description: "Generation time (ns)." }
+        }
+      },
+      ModelDetails: {
+        type: "object",
+        properties: {
+          format:            { type: "string", example: "gguf" },
+          family:            { type: "string", example: "gemma" },
+          families:          { type: "array", items: { type: "string" } },
+          parameter_size:    { type: "string", example: "unknown" },
+          quantization_level:{ type: "string", example: "unknown" }
+        }
+      }
+    }
+  },
   paths: {
 
     "/api/tags": {
       get: {
         tags: ["Ollama"],
-        summary: "List models",
-        description: "Returns a list of all available model configurations.",
+        summary: "List all profiles (models)",
+        description: "Returns all configured profiles. Each entry includes Ollama `models[]` format and OpenAI `data[]` format in the same response.",
         responses: {
           "200": {
-            description: "Model list",
+            description: "Profile list",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                models: { type: "array", items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    model: { type: "string" },
-                    modified_at: { type: "string" },
-                    size: { type: "integer" }
+                models: {
+                  type: "array",
+                  description: "Ollama-format list.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name:        { type: "string", example: "default" },
+                      model:       { type: "string", example: "default" },
+                      modified_at: { type: "string", example: "2025-01-01T00:00:00.000Z" },
+                      size:        { type: "integer", description: "Model file size in bytes. 0 if not downloaded." },
+                      details:     { "$ref": "#/components/schemas/ModelDetails" },
+                      capabilities:{ type: "array", items: { type: "string" }, example: ["multimodal"] },
+                      modalities:  { type: "object", properties: { vision: { type: "boolean" }, audio: { type: "boolean" } } }
+                    }
                   }
-                }}
+                },
+                data: {
+                  type: "array",
+                  description: "OpenAI-format list (same profiles).",
+                  items: { type: "object" }
+                }
               }
             }}}
           }
@@ -58,45 +177,46 @@ const spec = {
       },
       post: {
         tags: ["Ollama"],
-        summary: "List models (POST)",
-        responses: { "200": { description: "Model list (same as GET)" } }
+        summary: "List all profiles (POST alias)",
+        responses: { "200": { description: "Same response as GET /api/tags." } }
       }
     },
 
     "/api/generate": {
       post: {
         tags: ["Ollama"],
-        summary: "Generate completion",
-        description: "Generate a text completion for a given prompt.",
+        summary: "Generate text completion",
+        description: "Generate a text completion for a given prompt. Streaming returns NDJSON lines; non-streaming returns a single JSON object.\n\n`keep_alive` controls whether the model stays loaded after the call: `0` = unload immediately, negative = keep indefinitely (default), or a duration string like `\"5m\"`, `\"1h\"`.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "prompt"],
             properties: {
-              model: { type: "string", example: "default", description: "Model/profile name" },
-              prompt: { type: "string", example: "Why is the sky blue?" },
-              system: { type: "string", description: "System prompt override" },
-              stream: { type: "boolean", default: true },
-              format: { type: "string", description: "Response format (e.g. json)" },
-              options: { type: "object", description: "Sampling options (temperature, top_p, …)" },
-              keep_alive: { type: "string", description: "How long to keep model loaded (e.g. '5m')" }
+              model:      { type: "string",  example: "default",     description: "Profile name. `default` uses the currently loaded profile." },
+              prompt:     { type: "string",  example: "Why is the sky blue?", description: "Input prompt text." },
+              system:     { type: "string",  description: "System prompt override (replaces the profile's system prompt for this request)." },
+              stream:     { type: "boolean", default: true,          description: "Stream tokens as NDJSON. Set false for a single response." },
+              format:     { type: "string",  example: "json",        description: "Force JSON output mode. Pass `\"json\"` to enable." },
+              keep_alive: { description: "Keep model loaded duration. `0` = unload, `-1` = forever, `\"5m\"`, `\"1h\"` etc.", oneOf: [{ type: "integer" }, { type: "string" }], example: "5m" },
+              options:    { "$ref": "#/components/schemas/SamplingOptions" },
+              images:     { type: "array", items: { type: "string" }, description: "Base64-encoded images (for vision models)." }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Streaming NDJSON or final JSON response",
+            description: "Streaming: one NDJSON line per token. Final line has `done:true` and timing fields. Non-streaming: single JSON.",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                model: { type: "string" },
-                created_at: { type: "string" },
-                response: { type: "string" },
-                done: { type: "boolean" },
-                total_duration: { type: "integer" },
-                eval_count: { type: "integer" },
-                eval_duration: { type: "integer" }
+                model:     { type: "string" },
+                created_at:{ type: "string" },
+                response:  { type: "string", description: "Generated text (non-streaming) or token chunk (streaming)." },
+                thinking:  { type: "string", description: "Thinking/reasoning content, if enable_thinking is on." },
+                done:      { type: "boolean" },
+                context:   { type: "array", items: { type: "integer" }, description: "Token IDs of the full context (final chunk only)." },
+                ...{ "$ref": "#/components/schemas/OllamaUsage" }
               }
             }}}
           }
@@ -107,52 +227,60 @@ const spec = {
     "/api/chat": {
       post: {
         tags: ["Ollama"],
-        summary: "Chat completion",
-        description: "Multi-turn chat completion. Supports text, images (base64 or URL), and audio.",
+        summary: "Multi-turn chat completion",
+        description: "Multi-turn chat. Supports text, base64/URL images, and audio (for multimodal models).\n\nContent blocks in messages: `text` (plain string or `{type:\"text\",text:\"...\"}`) and `image_url` / `input_audio` dicts in the `content` array. Also accepts `images` shorthand at message level.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "messages"],
             properties: {
-              model: { type: "string", example: "default" },
+              model:    { type: "string", example: "default" },
               messages: {
                 type: "array",
                 items: {
                   type: "object",
+                  required: ["role", "content"],
                   properties: {
-                    role: { type: "string", enum: ["system", "user", "assistant"] },
-                    content: { oneOf: [
-                      { type: "string" },
-                      { type: "array", items: { type: "object" } }
-                    ]},
-                    images: { type: "array", items: { type: "string" }, description: "Base64 images or URLs" }
+                    role:    { type: "string", enum: ["system", "user", "assistant", "tool"] },
+                    content: {
+                      description: "Plain string or array of content blocks: `{type:\"text\",text:\"...\"}`, `{type:\"image_url\",image_url:{url:\"data:image/jpeg;base64,...\"}}`, `{type:\"input_audio\",input_audio:{data:\"...\",format:\"wav\"|\"mp3\"}}`.",
+                      oneOf: [{ type: "string" }, { type: "array", items: { type: "object" } }]
+                    },
+                    images:       { type: "array", items: { type: "string" }, description: "Shorthand: base64 images or HTTP(S) URLs (vision models only)." },
+                    tool_calls:   { type: "array", items: { type: "object" }, description: "Tool call results (assistant role)." },
+                    tool_call_id: { type: "string", description: "Tool call ID (tool role)." }
                   }
                 }
               },
-              stream: { type: "boolean", default: true },
-              format: { type: "string" },
-              options: { type: "object" },
-              keep_alive: { type: "string" }
+              stream:     { type: "boolean", default: true },
+              format:     { type: "string",  example: "json", description: "Force JSON output: pass `\"json\"`." },
+              keep_alive: { oneOf: [{ type: "integer" }, { type: "string" }], example: "5m" },
+              options:    { "$ref": "#/components/schemas/SamplingOptions" },
+              tools:      { type: "array", items: { type: "object" }, description: "OpenAI-style function tool definitions." },
+              tool_choice:{ description: "Tool choice: `\"auto\"`, `\"none\"`, `\"required\"`, or `{type:\"function\",function:{name:\"...\"}}`.", oneOf: [{ type: "string" }, { type: "object" }] }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Streaming NDJSON or final JSON",
+            description: "Streaming NDJSON (one `message.content` chunk per line, final line `done:true`) or single JSON.",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                model: { type: "string" },
+                model:   { type: "string" },
                 created_at: { type: "string" },
                 message: {
                   type: "object",
                   properties: {
-                    role: { type: "string" },
-                    content: { type: "string" }
+                    role:       { type: "string", example: "assistant" },
+                    content:    { type: "string", description: "Generated text." },
+                    thinking:   { type: "string", description: "Chain-of-thought content (if enabled)." },
+                    tool_calls: { type: "array", items: { type: "object" } }
                   }
                 },
-                done: { type: "boolean" }
+                done:    { type: "boolean" },
+                ...{ "$ref": "#/components/schemas/OllamaUsage" }
               }
             }}}
           }
@@ -163,19 +291,34 @@ const spec = {
     "/api/show": {
       post: {
         tags: ["Ollama"],
-        summary: "Show model info",
-        description: "Returns detailed information about a model/profile including parameters and template.",
+        summary: "Show profile / model info",
+        description: "Returns detailed profile configuration including the chat template, model family, and capabilities.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model"],
-            properties: {
-              model: { type: "string", example: "default" }
-            }
+            properties: { model: { type: "string", example: "default" } }
           }}}
         },
-        responses: { "200": { description: "Model info JSON" } }
+        responses: {
+          "200": {
+            description: "Profile info",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                license:      { type: "string" },
+                modelfile:    { type: "string" },
+                parameters:   { type: "string" },
+                template:     { type: "string", description: "Active Jinja2 chat template." },
+                details:      { "$ref": "#/components/schemas/ModelDetails" },
+                model_info:   { type: "object" },
+                capabilities: { type: "array", items: { type: "string" }, example: ["multimodal"] }
+              }
+            }}}
+          },
+          "404": { description: "Profile not found." }
+        }
       }
     },
 
@@ -183,7 +326,7 @@ const spec = {
       post: {
         tags: ["Ollama"],
         summary: "Generate embeddings",
-        description: "Generate embeddings for one or more input strings.",
+        description: "Generate embedding vectors for one or more input strings. The embedding dimensionality depends on the loaded model.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
@@ -192,24 +335,27 @@ const spec = {
             properties: {
               model: { type: "string", example: "default" },
               input: {
+                description: "Single string or array of strings.",
                 oneOf: [
-                  { type: "string", example: "Hello world" },
-                  { type: "array", items: { type: "string" } }
+                  { type: "string",  example: "Hello world" },
+                  { type: "array",   items: { type: "string" }, example: ["Hello", "World"] }
                 ]
-              }
+              },
+              keep_alive: { oneOf: [{ type: "integer" }, { type: "string" }] }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Embeddings",
+            description: "Embedding vectors",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                model: { type: "string" },
-                embeddings: { type: "array", items: { type: "array", items: { type: "number" } } },
-                total_duration: { type: "integer" },
-                prompt_eval_count: { type: "integer" }
+                model:             { type: "string" },
+                embeddings:        { type: "array", items: { type: "array", items: { type: "number" } }, description: "One float array per input string." },
+                total_duration:    { type: "integer" },
+                load_duration:     { type: "integer" },
+                prompt_eval_count: { type: "integer", description: "Total number of tokens across all inputs." }
               }
             }}}
           }
@@ -220,15 +366,15 @@ const spec = {
     "/api/embeddings": {
       post: {
         tags: ["Ollama"],
-        summary: "Generate embeddings (legacy)",
-        description: "Legacy single-input embedding endpoint.",
+        summary: "Generate embeddings (legacy single-input)",
+        description: "Legacy Ollama embedding endpoint. Accepts a single `prompt` string and returns a single `embedding` vector.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "prompt"],
             properties: {
-              model: { type: "string", example: "default" },
+              model:  { type: "string", example: "default" },
               prompt: { type: "string", example: "Hello world" }
             }
           }}}
@@ -238,9 +384,7 @@ const spec = {
             description: "Embedding vector",
             content: { "application/json": { schema: {
               type: "object",
-              properties: {
-                embedding: { type: "array", items: { type: "number" } }
-              }
+              properties: { embedding: { type: "array", items: { type: "number" } } }
             }}}
           }
         }
@@ -251,13 +395,14 @@ const spec = {
       post: {
         tags: ["Ollama"],
         summary: "Tokenize text",
+        description: "Tokenizes the input string using the active model's tokenizer and returns an array of token IDs.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "content"],
             properties: {
-              model: { type: "string", example: "default" },
+              model:   { type: "string", example: "default" },
               content: { type: "string", example: "Hello world" }
             }
           }}}
@@ -267,7 +412,7 @@ const spec = {
             description: "Token IDs",
             content: { "application/json": { schema: {
               type: "object",
-              properties: { tokens: { type: "array", items: { type: "integer" } } }
+              properties: { tokens: { type: "array", items: { type: "integer" }, example: [9259, 1902] } }
             }}}
           }
         }
@@ -277,26 +422,53 @@ const spec = {
     "/api/ps": {
       get: {
         tags: ["Ollama"],
-        summary: "List running models",
-        responses: { "200": { description: "Currently loaded models" } }
+        summary: "List currently loaded models",
+        description: "Returns the model that is currently loaded in memory. At most one model is loaded at a time.",
+        responses: {
+          "200": {
+            description: "Running models",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                models: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name:       { type: "string", example: "default" },
+                      model:      { type: "string" },
+                      size:       { type: "integer", description: "Model file size in bytes." },
+                      digest:     { type: "string", example: "sha256:..." },
+                      expires_at: { type: "string", example: "0001-01-01T00:00:00Z" },
+                      size_vram:  { type: "integer" },
+                      details:    { "$ref": "#/components/schemas/ModelDetails" }
+                    }
+                  }
+                }
+              }
+            }}}
+          }
+        }
       }
     },
 
     "/api/delete": {
       delete: {
         tags: ["Ollama"],
-        summary: "Delete a model",
+        summary: "Delete a profile",
+        description: "Deletes the named profile configuration. The underlying model file on disk is **not** deleted — only the profile entry is removed.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model"],
-            properties: { model: { type: "string", example: "my-model" } }
+            properties: { model: { type: "string", example: "my-profile", description: "Profile name to delete." } }
           }}}
         },
         responses: {
-          "200": { description: "Deleted" },
-          "404": { description: "Not found" }
+          "200": { description: "Deleted successfully.", content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", example: "success" } } } } } },
+          "404": { description: "Profile not found." },
+          "503": { description: "Model is busy (currently loaded and generating)." }
         }
       }
     },
@@ -304,52 +476,163 @@ const spec = {
     "/api/profiles": {
       post: {
         tags: ["Ollama"],
-        summary: "Create / update profile",
-        description: "Create or update a model configuration profile.",
+        summary: "Create or update a profile (model configuration)",
+        description: "Creates a new profile (or updates an existing one when `overwrite:true`). The model file is **not** downloaded here — it is fetched lazily the first time the profile is loaded.\n\n**How parameters are merged:**\n1. Start with base: a copy of the `from` profile (if specified), else app defaults.\n2. Apply any top-level fields from this request (e.g. `nCtx`, `temp`).\n3. Apply `overrides` object last (highest priority).\n4. `name` and `model`/`modelUrl` are always authoritative.\n\n**`gguf_data` (one-shot import + profile creation):** provide a Base64-encoded GGUF binary and the server imports the file to local storage, then creates the profile pointing to it. `model` must contain the target filename (e.g. `\"my-model.gguf\"`).",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["name"],
             properties: {
-              name: { type: "string", example: "my-profile" },
-              modelfile: { type: "string", description: "Modelfile content" }
+              name: {
+                type: "string",
+                example: "my-llama-3",
+                description: "**Required.** Profile name. Must be unique unless `overwrite:true`."
+              },
+              model: {
+                type: "string",
+                example: "https://huggingface.co/org/repo/resolve/main/model.gguf",
+                description: "Model reference. Accepts:\n- HuggingFace URL (`https://huggingface.co/...`)\n- Local filename (e.g. `model.gguf`) — must already exist in the app's model storage\n- Alias: `modelUrl`"
+              },
+              from: {
+                type: "string",
+                example: "default",
+                description: "Copy all settings from this existing profile as a starting point. Only `model` and explicit overrides are changed. Alias: `source`."
+              },
+              overwrite: {
+                type: "boolean",
+                default: false,
+                description: "Allow overwriting an existing profile with the same name. Returns 409 if false and the profile exists."
+              },
+              gguf_data: {
+                type: "string",
+                description: "Base64-encoded GGUF model binary. When provided, the server imports the binary to local storage **before** creating the profile. `model` must contain the target filename (e.g. `\"my-model.gguf\"`). If `overwrite:true` and `model` is omitted, inherits the filename from the existing profile."
+              },
+              overrides: {
+                type: "object",
+                description: "Fine-grained parameter overrides applied last (highest priority). Accepts any field from `ConfigurationFields`.",
+                "$ref": "#/components/schemas/ConfigurationFields"
+              },
+              nCtx:             { "$ref": "#/components/schemas/ConfigurationFields/properties/nCtx" },
+              nThreads:         { "$ref": "#/components/schemas/ConfigurationFields/properties/nThreads" },
+              nBatch:           { "$ref": "#/components/schemas/ConfigurationFields/properties/nBatch" },
+              nPredict:         { "$ref": "#/components/schemas/ConfigurationFields/properties/nPredict" },
+              nCtxAutoExpand:   { "$ref": "#/components/schemas/ConfigurationFields/properties/nCtxAutoExpand" },
+              temp:             { "$ref": "#/components/schemas/ConfigurationFields/properties/temp" },
+              topP:             { "$ref": "#/components/schemas/ConfigurationFields/properties/topP" },
+              topK:             { "$ref": "#/components/schemas/ConfigurationFields/properties/topK" },
+              minP:             { "$ref": "#/components/schemas/ConfigurationFields/properties/minP" },
+              typicalP:         { "$ref": "#/components/schemas/ConfigurationFields/properties/typicalP" },
+              penaltyLastN:     { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyLastN" },
+              penaltyRepeat:    { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyRepeat" },
+              penaltyFreq:      { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyFreq" },
+              penaltyPresent:   { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyPresent" },
+              mirostat:         { "$ref": "#/components/schemas/ConfigurationFields/properties/mirostat" },
+              mirostatTau:      { "$ref": "#/components/schemas/ConfigurationFields/properties/mirostatTau" },
+              mirostatEta:      { "$ref": "#/components/schemas/ConfigurationFields/properties/mirostatEta" },
+              streaming:        { "$ref": "#/components/schemas/ConfigurationFields/properties/streaming" },
+              enableThinking:   { "$ref": "#/components/schemas/ConfigurationFields/properties/enableThinking" },
+              useMmap:          { "$ref": "#/components/schemas/ConfigurationFields/properties/useMmap" },
+              backendType:      { "$ref": "#/components/schemas/ConfigurationFields/properties/backendType" },
+              gpuOffloadEnabled:{ "$ref": "#/components/schemas/ConfigurationFields/properties/gpuOffloadEnabled" },
+              gpuOffloadLayers: { "$ref": "#/components/schemas/ConfigurationFields/properties/gpuOffloadLayers" },
+              gpuSwitchStabilization: { "$ref": "#/components/schemas/ConfigurationFields/properties/gpuSwitchStabilization" },
+              kvCacheTypeK:     { "$ref": "#/components/schemas/ConfigurationFields/properties/kvCacheTypeK" },
+              kvCacheTypeV:     { "$ref": "#/components/schemas/ConfigurationFields/properties/kvCacheTypeV" },
+              systemPrompt:     { "$ref": "#/components/schemas/ConfigurationFields/properties/systemPrompt" },
+              customChatTemplate:{ "$ref": "#/components/schemas/ConfigurationFields/properties/customChatTemplate" },
+              multimodalProjectorUrl:  { "$ref": "#/components/schemas/ConfigurationFields/properties/multimodalProjectorUrl" },
+              multimodalProjectorDisabled: { "$ref": "#/components/schemas/ConfigurationFields/properties/multimodalProjectorDisabled" },
+              loraAdapterUrl:   { "$ref": "#/components/schemas/ConfigurationFields/properties/loraAdapterUrl" },
+              loraAdapterScale: { "$ref": "#/components/schemas/ConfigurationFields/properties/loraAdapterScale" },
+              mtpEnabled:       { "$ref": "#/components/schemas/ConfigurationFields/properties/mtpEnabled" },
+              mtpNDraft:        { "$ref": "#/components/schemas/ConfigurationFields/properties/mtpNDraft" },
+              mtpModelReference:{ "$ref": "#/components/schemas/ConfigurationFields/properties/mtpModelReference" }
             }
           }}}
         },
-        responses: { "200": { description: "Profile created/updated" } }
+        responses: {
+          "200": {
+            description: "Profile created (or updated).",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                status:           { type: "string", example: "created" },
+                name:             { type: "string", example: "my-llama-3" },
+                copiedFrom:       { type: "string", nullable: true, description: "Source profile name if `from` was specified, else null." },
+                model:            { type: "string", description: "Resolved model URL / filename." },
+                download_pending: { type: "boolean", description: "True if the model file is a remote URL not yet downloaded." },
+                configuration:    { type: "object", description: "Full persisted configuration object.", "$ref": "#/components/schemas/ConfigurationFields" }
+              }
+            }}}
+          },
+          "400": { description: "Validation error (missing `name`, invalid `gguf_data`, etc.)." },
+          "404": { description: "`from` source profile not found." },
+          "409": { description: "Profile already exists and `overwrite` is false." },
+          "500": { description: "GGUF import or save failure." }
+        }
       }
     },
 
     "/api/import/gguf": {
       post: {
         tags: ["Ollama"],
-        summary: "Import GGUF model",
-        description: "Import a GGUF model file as Base64. Max 256 MB.",
+        summary: "Import a GGUF model file (standalone)",
+        description: "Imports a Base64-encoded GGUF binary to the app's local model storage. This endpoint only saves the file — it does **not** create a profile. Use `/api/profiles` with `gguf_data` for an all-in-one import + profile creation.\n\n**Max body size:** 256 MB (≈190 MB binary before Base64 expansion).",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
-            required: ["name", "data"],
+            required: ["filename", "data"],
             properties: {
-              name: { type: "string", example: "my-model" },
-              data: { type: "string", description: "Base64-encoded GGUF binary" }
+              filename: { type: "string", example: "my-model-q4.gguf", description: "Target filename. **Must end in `.gguf`**. If a file with this name already exists it is overwritten." },
+              data:     { type: "string", description: "Base64-encoded GGUF binary (standard or no-wrap)." }
             }
           }}}
         },
-        responses: { "200": { description: "Import started" } }
+        responses: {
+          "200": {
+            description: "Import successful.",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                status:   { type: "string", example: "ok" },
+                filename: { type: "string", example: "my-model-q4.gguf" }
+              }
+            }}}
+          },
+          "400": { description: "Missing or invalid `filename` (must be `.gguf`), or missing `data`." },
+          "500": { description: "Decode or write failure." }
+        }
       }
     },
 
     "/api/diagnostics": {
       get: {
         tags: ["Server"],
-        summary: "Get diagnostics / logs",
+        summary: "Get logs and diagnostics",
+        description: "Returns log content or a structured diagnostic snapshot.\n\n- `file=process` — live device diagnostics (memory, CPU, battery, FD count) as JSON.\n- `file=ollama` — latest Ollama process log lines as plain text.\n- `file=state` — recent generation events (timing, token counts, memory) as plain text.\n- No `file` parameter — full structured JSON snapshot.",
         parameters: [
-          { name: "file", in: "query", schema: { type: "string", enum: ["process", "ollama", "state"] }, description: "Log file type" },
-          { name: "tail", in: "query", schema: { type: "integer" }, description: "Number of tail lines" }
+          {
+            name: "file", in: "query",
+            schema: { type: "string", enum: ["process", "ollama", "state"] },
+            description: "Log type to fetch."
+          },
+          {
+            name: "tail", in: "query",
+            schema: { type: "integer", example: 100 },
+            description: "Return only the last N lines (text logs only)."
+          }
         ],
-        responses: { "200": { description: "Log content or diagnostics JSON" } }
+        responses: {
+          "200": {
+            description: "Log text or JSON diagnostic object.",
+            content: {
+              "text/plain":       { schema: { type: "string" } },
+              "application/json": { schema: { type: "object" } }
+            }
+          }
+        }
       }
     },
 
@@ -357,22 +640,15 @@ const spec = {
       get: {
         tags: ["OpenAI", "Anthropic"],
         summary: "List models",
-        description: "Returns OpenAI-format list by default. When `anthropic-version` or `x-api-key` header is present, returns Anthropic format (`{data:[{type,id,display_name,created_at}], has_more}`).",
+        description: "Returns OpenAI-format list by default.\n\nWhen `anthropic-version` or `x-api-key` header is present, returns **Anthropic** format:\n```json\n{\"data\":[{\"type\":\"model\",\"id\":\"default\",\"display_name\":\"default\",\"created_at\":\"...\"}], \"has_more\":false}\n```",
         parameters: [
-          { name: "anthropic-version", in: "header", schema: { type: "string", example: "2023-06-01" }, description: "Anthropic API version — triggers Anthropic-format response" },
-          { name: "x-api-key", in: "header", schema: { type: "string" }, description: "API key (presence triggers Anthropic-format response)" }
+          { name: "anthropic-version", in: "header", schema: { type: "string", example: "2023-06-01" }, description: "Triggers Anthropic-format response." },
+          { name: "x-api-key",         in: "header", schema: { type: "string" },                        description: "Presence triggers Anthropic-format response." }
         ],
         responses: {
           "200": {
-            description: "OpenAI or Anthropic format model list depending on headers",
-            content: { "application/json": { schema: {
-              type: "object",
-              properties: {
-                object: { type: "string", example: "list" },
-                data: { type: "array", items: { type: "object" } },
-                has_more: { type: "boolean" }
-              }
-            }}}
+            description: "OpenAI or Anthropic format depending on headers.",
+            content: { "application/json": { schema: { type: "object" } } }
           }
         }
       }
@@ -381,15 +657,35 @@ const spec = {
     "/v1/models/{model}": {
       get: {
         tags: ["OpenAI"],
-        summary: "Get model info",
-        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
-        responses: { "200": { description: "Model object" } }
+        summary: "Get model info (OpenAI format)",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
+        responses: {
+          "200": {
+            description: "OpenAI model object.",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                id:       { type: "string" },
+                object:   { type: "string", example: "model" },
+                owned_by: { type: "string", example: "llamacpp" },
+                in_cache: { type: "boolean", description: "Whether the model file is downloaded." },
+                path:     { type: "string",  description: "Local file path or remote URL." },
+                status:   { type: "object",  properties: { value: { type: "string", enum: ["loaded", "unloaded"] } } },
+                details:  { "$ref": "#/components/schemas/ModelDetails" }
+              }
+            }}}
+          },
+          "404": { description: "Not found." }
+        }
       },
       delete: {
         tags: ["OpenAI"],
-        summary: "Delete model",
-        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
-        responses: { "200": { description: "Deleted" } }
+        summary: "Delete model / profile (OpenAI format)",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "my-profile" }],
+        responses: {
+          "200": { description: "Deleted." },
+          "404": { description: "Not found." }
+        }
       }
     },
 
@@ -397,73 +693,50 @@ const spec = {
       post: {
         tags: ["OpenAI"],
         summary: "Chat completions",
-        description: "OpenAI-compatible chat completions. Supports text and vision (image_url / base64).",
+        description: "OpenAI-compatible chat completions.\n\n- Streaming returns `text/event-stream` SSE (`data: {...}` chunks, final `data: [DONE]`).\n- Supports vision (`image_url` content parts) and audio (`input_audio` content parts) for multimodal models.\n- `reasoning_effort`: maps to enable_thinking (`\"low\"`=off, `\"medium\"`/`\"high\"`=on).\n- `reasoning_format`: `\"auto\"` (default), `\"none\"` (strip thinking), `\"raw\"` (expose thinking in content).",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "messages"],
             properties: {
-              model: { type: "string", example: "default" },
-              messages: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    role: { type: "string", enum: ["system", "user", "assistant"] },
-                    content: { oneOf: [
-                      { type: "string" },
-                      { type: "array", items: { type: "object" } }
-                    ]}
-                  }
-                }
-              },
-              stream: { type: "boolean", default: false },
-              temperature: { type: "number" },
-              top_p: { type: "number" },
-              max_tokens: { type: "integer" },
-              tools: { type: "array", items: { type: "object" } },
-              tool_choice: { oneOf: [{ type: "string" }, { type: "object" }] },
-              reasoning_effort: { type: "string", enum: ["low", "medium", "high"] },
-              response_format: { type: "object" }
+              model:            { type: "string",  example: "default" },
+              messages:         { type: "array", items: { type: "object" }, description: "Array of `{role, content}` objects. `content` may be a string or array of content part objects." },
+              stream:           { type: "boolean", default: false },
+              temperature:      { type: "number" },
+              top_p:            { type: "number" },
+              max_tokens:       { type: "integer" },
+              stop:             { type: "array", items: { type: "string" } },
+              tools:            { type: "array", items: { type: "object" }, description: "Function tool definitions." },
+              tool_choice:      { oneOf: [{ type: "string" }, { type: "object" }] },
+              response_format:  { type: "object", properties: { type: { type: "string", enum: ["text", "json_object"] } }, description: "`{type:\"json_object\"}` enables JSON mode." },
+              reasoning_effort: { type: "string",  enum: ["low", "medium", "high"], description: "Thinking control: `low`=off, `medium`/`high`=on." },
+              reasoning_format: { type: "string",  enum: ["auto", "none", "raw"],   description: "How thinking blocks appear in the response." }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Chat completion (streaming SSE or JSON)",
+            description: "Chat completion response or SSE stream.",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                id: { type: "string" },
-                object: { type: "string" },
+                id:      { type: "string" },
+                object:  { type: "string", example: "chat.completion" },
                 created: { type: "integer" },
-                model: { type: "string" },
+                model:   { type: "string" },
                 choices: {
                   type: "array",
                   items: {
                     type: "object",
                     properties: {
-                      index: { type: "integer" },
-                      message: {
-                        type: "object",
-                        properties: {
-                          role: { type: "string" },
-                          content: { type: "string" }
-                        }
-                      },
-                      finish_reason: { type: "string" }
+                      index:         { type: "integer" },
+                      message:       { type: "object", properties: { role: { type: "string" }, content: { type: "string" }, tool_calls: { type: "array", items: { type: "object" } } } },
+                      finish_reason: { type: "string", enum: ["stop", "length", "tool_calls"] }
                     }
                   }
                 },
-                usage: {
-                  type: "object",
-                  properties: {
-                    prompt_tokens: { type: "integer" },
-                    completion_tokens: { type: "integer" },
-                    total_tokens: { type: "integer" }
-                  }
-                }
+                usage: { type: "object", properties: { prompt_tokens: { type: "integer" }, completion_tokens: { type: "integer" }, total_tokens: { type: "integer" } } }
               }
             }}}
           }
@@ -475,28 +748,43 @@ const spec = {
       post: {
         tags: ["OpenAI"],
         summary: "Legacy text completions",
+        description: "OpenAI legacy completions endpoint. Feeds the prompt directly to the model without chat template formatting.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "prompt"],
             properties: {
-              model: { type: "string", example: "default" },
-              prompt: { type: "string" },
-              stream: { type: "boolean", default: false },
-              max_tokens: { type: "integer" },
-              temperature: { type: "number" }
+              model:       { type: "string", example: "default" },
+              prompt:      { type: "string" },
+              stream:      { type: "boolean", default: false },
+              max_tokens:  { type: "integer" },
+              temperature: { type: "number" },
+              stop:        { type: "array", items: { type: "string" } }
             }
           }}}
         },
-        responses: { "200": { description: "Completion response" } }
+        responses: {
+          "200": {
+            description: "Completion response.",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                id:      { type: "string" },
+                object:  { type: "string", example: "text_completion" },
+                choices: { type: "array", items: { type: "object", properties: { text: { type: "string" }, finish_reason: { type: "string" } } } },
+                usage:   { type: "object" }
+              }
+            }}}
+          }
+        }
       }
     },
 
     "/v1/embeddings": {
       post: {
         tags: ["OpenAI"],
-        summary: "Embeddings",
+        summary: "Embeddings (OpenAI format)",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
@@ -510,14 +798,14 @@ const spec = {
         },
         responses: {
           "200": {
-            description: "Embeddings",
+            description: "Embeddings.",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                object: { type: "string" },
-                data: { type: "array", items: { type: "object" } },
-                model: { type: "string" },
-                usage: { type: "object" }
+                object: { type: "string", example: "list" },
+                data:   { type: "array", items: { type: "object", properties: { object: { type: "string" }, index: { type: "integer" }, embedding: { type: "array", items: { type: "number" } } } } },
+                model:  { type: "string" },
+                usage:  { type: "object", properties: { prompt_tokens: { type: "integer" }, total_tokens: { type: "integer" } } }
               }
             }}}
           }
@@ -529,22 +817,23 @@ const spec = {
       post: {
         tags: ["OpenAI"],
         summary: "Responses API",
-        description: "OpenAI Responses API compatible endpoint.",
+        description: "OpenAI Responses API. `input` can be a plain string or an array of input items. Streaming returns `data:` SSE events with `type` fields like `response.output_text.delta`.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "input"],
             properties: {
-              model: { type: "string", example: "default" },
-              input: { oneOf: [{ type: "string" }, { type: "array", items: { type: "object" } }] },
-              stream: { type: "boolean" },
-              instructions: { type: "string" },
-              tools: { type: "array", items: { type: "object" } }
+              model:             { type: "string", example: "default" },
+              input:             { oneOf: [{ type: "string" }, { type: "array", items: { type: "object" } }] },
+              stream:            { type: "boolean" },
+              instructions:      { type: "string", description: "System-level instructions." },
+              max_output_tokens: { type: "integer" },
+              tools:             { type: "array", items: { type: "object" } }
             }
           }}}
         },
-        responses: { "200": { description: "Response object or SSE stream" } }
+        responses: { "200": { description: "Response object or SSE stream." } }
       }
     },
 
@@ -565,14 +854,8 @@ const spec = {
         },
         responses: {
           "200": {
-            description: "Token count",
-            content: { "application/json": { schema: {
-              type: "object",
-              properties: {
-                input_tokens: { type: "integer" },
-                object: { type: "string", example: "response.input_tokens" }
-              }
-            }}}
+            description: "Token count.",
+            content: { "application/json": { schema: { type: "object", properties: { input_tokens: { type: "integer" }, object: { type: "string", example: "response.input_tokens" } } } } }
           }
         }
       }
@@ -582,10 +865,10 @@ const spec = {
       post: {
         tags: ["Anthropic"],
         summary: "Messages",
-        description: "Anthropic-compatible Messages API.\n\nContent block types supported: `text`, `image` (base64/URL), `audio`, `document` (text/base64-PDF renders pages as images, URL), `tool_use`, `tool_result`, `thinking`, `redacted_thinking`.\n\nHeader `anthropic-beta: interleaved-thinking-*` enables thinking without explicit `thinking` field.",
+        description: "Anthropic Messages API.\n\n**Content block types in `content` arrays:**\n- `{type:\"text\", text:\"...\"}` — plain text\n- `{type:\"image\", source:{type:\"base64\",media_type:\"image/jpeg\",data:\"...\"}}` — base64 image\n- `{type:\"image\", source:{type:\"url\",url:\"...\"}}` — image URL\n- `{type:\"document\", source:{type:\"text\",data:\"...\"}, title:\"...\"}` — plain-text document\n- `{type:\"document\", source:{type:\"base64\",media_type:\"application/pdf\",data:\"...\"}}` — PDF (rendered as images via PdfRenderer, up to 10 pages)\n- `{type:\"document\", source:{type:\"url\",url:\"...\"}}` — document URL (treated as image URL)\n- `{type:\"tool_use\", ...}` / `{type:\"tool_result\", ...}` — function calling round-trip\n- `{type:\"thinking\", thinking:\"...\"}` — prior thinking block (preserved as context)\n- `{type:\"redacted_thinking\"}` — silently dropped\n- `cache_control` attributes on blocks are accepted and silently ignored\n\n**`anthropic-beta` header:**\n- `interleaved-thinking-2025-05-14` — enables thinking without explicit `thinking` field",
         parameters: [
           { name: "anthropic-version", in: "header", schema: { type: "string", example: "2023-06-01" } },
-          { name: "anthropic-beta", in: "header", schema: { type: "string", example: "interleaved-thinking-2025-05-14" }, description: "Beta features: interleaved-thinking-* enables thinking" }
+          { name: "anthropic-beta",    in: "header", schema: { type: "string", example: "interleaved-thinking-2025-05-14" }, description: "Beta features flag." }
         ],
         requestBody: {
           required: true,
@@ -593,42 +876,33 @@ const spec = {
             type: "object",
             required: ["model", "messages", "max_tokens"],
             properties: {
-              model: { type: "string", example: "default" },
-              messages: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    role: { type: "string", enum: ["user", "assistant"] },
-                    content: { oneOf: [
-                      { type: "string" },
-                      { type: "array", items: { type: "object" }, description: "Content blocks: text, image, document, tool_use, tool_result, thinking" }
-                    ]}
-                  }
-                }
-              },
-              system: { type: "string" },
-              max_tokens: { type: "integer", example: 1024 },
-              stream: { type: "boolean", default: false },
+              model:       { type: "string",  example: "default" },
+              messages:    { type: "array", items: { type: "object" }, description: "Array of `{role:\"user\"|\"assistant\", content}` objects." },
+              system:      { type: "string",  description: "System prompt (string or array of text blocks)." },
+              max_tokens:  { type: "integer", example: 1024 },
+              stream:      { type: "boolean", default: false },
               temperature: { type: "number" },
-              tools: { type: "array", items: { type: "object" } },
-              thinking: { type: "object", description: "Extended thinking: {type: 'enabled', budget_tokens: N}" }
+              top_p:       { type: "number" },
+              top_k:       { type: "integer" },
+              tools:       { type: "array", items: { type: "object" }, description: "Tool definitions: `{name, description, input_schema}`." },
+              tool_choice: { type: "object", description: "`{type:\"auto\"|\"any\"|\"tool\", name?}`." },
+              thinking:    { type: "object", description: "Extended thinking: `{type:\"enabled\",budget_tokens:N}`." }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Message response or SSE stream",
+            description: "Message response or SSE stream (events: `message_start`, `content_block_start/delta/stop`, `message_delta`, `message_stop`).",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                id: { type: "string" },
-                type: { type: "string" },
-                role: { type: "string" },
-                content: { type: "array", items: { type: "object" } },
-                model: { type: "string" },
-                stop_reason: { type: "string" },
-                usage: { type: "object" }
+                id:          { type: "string" },
+                type:        { type: "string", example: "message" },
+                role:        { type: "string", example: "assistant" },
+                content:     { type: "array", items: { type: "object" }, description: "Array of content blocks: `text`, `thinking`, `tool_use`." },
+                model:       { type: "string" },
+                stop_reason: { type: "string", enum: ["end_turn", "max_tokens", "tool_use"] },
+                usage:       { type: "object", properties: { input_tokens: { type: "integer" }, output_tokens: { type: "integer" } } }
               }
             }}}
           }
@@ -640,25 +914,23 @@ const spec = {
       post: {
         tags: ["Anthropic"],
         summary: "Count tokens",
+        description: "Tokenises the given messages (without generating) and returns the prompt token count.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model", "messages"],
             properties: {
-              model: { type: "string", example: "default" },
+              model:    { type: "string", example: "default" },
               messages: { type: "array", items: { type: "object" } },
-              system: { type: "string" }
+              system:   { type: "string" }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Token count",
-            content: { "application/json": { schema: {
-              type: "object",
-              properties: { input_tokens: { type: "integer" } }
-            }}}
+            description: "Token count.",
+            content: { "application/json": { schema: { type: "object", properties: { input_tokens: { type: "integer" } } } } }
           }
         }
       }
@@ -668,21 +940,28 @@ const spec = {
       get: {
         tags: ["Gemini"],
         summary: "List models (Gemini format)",
-        description: "Returns all configs as Gemini model objects with `supportedGenerationMethods`.",
+        description: "Returns all profiles as Gemini model objects.",
         responses: {
           "200": {
-            description: "Model list",
+            description: "Model list.",
             content: { "application/json": { schema: {
               type: "object",
-              properties: { models: { type: "array", items: { type: "object",
-                properties: {
-                  name: { type: "string", example: "models/default" },
-                  displayName: { type: "string" },
-                  inputTokenLimit: { type: "integer" },
-                  outputTokenLimit: { type: "integer" },
-                  supportedGenerationMethods: { type: "array", items: { type: "string" } }
+              properties: {
+                models: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name:                     { type: "string", example: "models/default" },
+                      displayName:              { type: "string", example: "default" },
+                      version:                  { type: "string", example: "1.0" },
+                      inputTokenLimit:          { type: "integer" },
+                      outputTokenLimit:         { type: "integer" },
+                      supportedGenerationMethods: { type: "array", items: { type: "string" }, example: ["generateContent", "streamGenerateContent", "countTokens", "embedContent"] }
+                    }
+                  }
                 }
-              }}}
+              }
             }}}
           }
         }
@@ -694,7 +973,10 @@ const spec = {
         tags: ["Gemini"],
         summary: "Get model (Gemini format)",
         parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
-        responses: { "200": { description: "Gemini model object" }, "404": { description: "Not found" } }
+        responses: {
+          "200": { description: "Gemini model object." },
+          "404": { description: "Not found." }
+        }
       }
     },
 
@@ -702,50 +984,7 @@ const spec = {
       post: {
         tags: ["Gemini"],
         summary: "Generate content",
-        description: "Google Gemini-compatible generateContent.\n\n`generationConfig` supports: `maxOutputTokens`, `temperature`, `topP`, `topK`, `responseMimeType` (`application/json` → JSON mode), `thinkingConfig.thinkingBudget` (>0 enables thinking).",
-        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
-        requestBody: {
-          required: true,
-          content: { "application/json": { schema: {
-            type: "object",
-            properties: {
-              contents: { type: "array", items: { type: "object" } },
-              systemInstruction: { type: "object", description: "{parts:[{text:'...'}]}" },
-              tools: { type: "array", items: { type: "object" } },
-              toolConfig: { type: "object", description: "functionCallingConfig: {mode: AUTO|ANY|NONE}" },
-              generationConfig: { type: "object", properties: {
-                maxOutputTokens: { type: "integer" },
-                temperature: { type: "number" },
-                topP: { type: "number" },
-                topK: { type: "integer" },
-                responseMimeType: { type: "string", enum: ["text/plain", "application/json"], description: "application/json → JSON mode" },
-                thinkingConfig: { type: "object", properties: { thinkingBudget: { type: "integer", description: ">0 enables thinking; 0 disables" } } }
-              }}
-            }
-          }}}
-        },
-        responses: { "200": { description: "Gemini GenerateContentResponse" } }
-      }
-    },
-
-    "/v1beta/models/{model}:streamGenerateContent": {
-      post: {
-        tags: ["Gemini"],
-        summary: "Stream generate content",
-        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          required: true,
-          content: { "application/json": { schema: { type: "object" } }}
-        },
-        responses: { "200": { description: "SSE stream of GenerateContentResponse chunks" } }
-      }
-    },
-
-    "/v1beta/models/{model}:countTokens": {
-      post: {
-        tags: ["Gemini"],
-        summary: "Count tokens",
-        description: "Tokenises the given contents and returns the total token count.",
+        description: "Gemini-compatible `generateContent`.\n\n**`generationConfig` fields:**\n- `maxOutputTokens` — max output tokens\n- `temperature`, `topP`, `topK` — sampling\n- `responseMimeType: \"application/json\"` — enables JSON mode\n- `thinkingConfig.thinkingBudget` — `>0` enables thinking; `0` disables; omitted = model default\n\n**`contents` roles:** `\"user\"` / `\"model\"` (maps to assistant). Parts: `{text}`, `{inlineData:{mimeType,data}}`, `{fileData:{mimeType,fileUri}}`, `{functionCall}`, `{functionResponse}`.",
         parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
         requestBody: {
           required: true,
@@ -753,14 +992,83 @@ const spec = {
             type: "object",
             required: ["contents"],
             properties: {
-              contents: { type: "array", items: { type: "object" } },
+              contents: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    role:  { type: "string", enum: ["user", "model"] },
+                    parts: { type: "array", items: { type: "object" }, description: "Array of part objects: `{text}`, `{inlineData:{mimeType,data}}`, `{fileData:{mimeType,fileUri}}`, `{functionCall}`, `{functionResponse}`." }
+                  }
+                }
+              },
+              systemInstruction: { type: "object", description: "`{parts:[{text:\"...\"}]}`" },
+              tools:             { type: "array",  items: { type: "object" }, description: "`[{functionDeclarations:[{name,description,parameters}]}]`" },
+              toolConfig:        { type: "object", description: "`{functionCallingConfig:{mode:\"AUTO\"|\"ANY\"|\"NONE\"}}`" },
+              generationConfig:  {
+                type: "object",
+                properties: {
+                  maxOutputTokens:{ type: "integer" },
+                  temperature:    { type: "number" },
+                  topP:           { type: "number" },
+                  topK:           { type: "integer" },
+                  responseMimeType:{ type: "string", enum: ["text/plain", "application/json"], description: "`application/json` enables JSON mode." },
+                  thinkingConfig: { type: "object", properties: { thinkingBudget: { type: "integer", description: ">0 enables thinking, 0 disables." } } }
+                }
+              }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "GenerateContentResponse.",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                candidates:   { type: "array", items: { type: "object", properties: { content: { type: "object" }, finishReason: { type: "string" }, index: { type: "integer" } } } },
+                usageMetadata:{ type: "object", properties: { promptTokenCount: { type: "integer" }, candidatesTokenCount: { type: "integer" }, totalTokenCount: { type: "integer" } } },
+                modelVersion: { type: "string" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1beta/models/{model}:streamGenerateContent": {
+      post: {
+        tags: ["Gemini"],
+        summary: "Stream generate content",
+        description: "Same as `generateContent` but returns SSE `data:` chunks (one JSON object per chunk, final chunk includes `usageMetadata`).",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", description: "Same request body as generateContent." } } }
+        },
+        responses: { "200": { description: "SSE stream of `GenerateContentResponse` chunks." } }
+      }
+    },
+
+    "/v1beta/models/{model}:countTokens": {
+      post: {
+        tags: ["Gemini"],
+        summary: "Count tokens",
+        description: "Tokenises the given contents and returns the total token count without generating.",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["contents"],
+            properties: {
+              contents:          { type: "array", items: { type: "object" } },
               systemInstruction: { type: "object" }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Token count",
+            description: "Token count.",
             content: { "application/json": { schema: { type: "object", properties: { totalTokens: { type: "integer" } } } } }
           }
         }
@@ -770,22 +1078,22 @@ const spec = {
     "/v1beta/models/{model}:embedContent": {
       post: {
         tags: ["Gemini"],
-        summary: "Embed content",
-        description: "Generates embeddings for a single content object or a batch (`requests` array).",
+        summary: "Embed content / batch embed",
+        description: "Generates embeddings for one `content` object (single mode) or a `requests` array (batch mode, endpoint suffix `:batchEmbedContents` also accepted).\n\n- Single: `{content:{parts:[{text:\"...\"}]}}` → `{embedding:{values:[...]}}`\n- Batch:  `{requests:[{model,content},...]}`  → `{embeddings:[{values:[]},...]}`",
         parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "default" }],
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             properties: {
-              content: { type: "object", description: "Single: {parts:[{text:'...'}]}" },
-              requests: { type: "array", description: "Batch: [{model, content}, ...]", items: { type: "object" } }
+              content:  { type: "object", description: "Single mode: `{parts:[{text:\"...\"}]}`." },
+              requests: { type: "array",  description: "Batch mode: `[{model:\"...\",content:{parts:[...]}}]`.", items: { type: "object" } }
             }
           }}}
         },
         responses: {
           "200": {
-            description: "Single: `{embedding:{values:[]}}` — Batch: `{embeddings:[{values:[]},...]}`",
+            description: "Single: `{embedding:{values:[]}}`. Batch: `{embeddings:[{values:[]},...]}`.",
             content: { "application/json": { schema: { type: "object" } } }
           }
         }
@@ -798,11 +1106,8 @@ const spec = {
         summary: "Health check",
         responses: {
           "200": {
-            description: "Server is running",
-            content: { "application/json": { schema: {
-              type: "object",
-              properties: { status: { type: "string", example: "ok" } }
-            }}}
+            description: "Server is running.",
+            content: { "application/json": { schema: { type: "object", properties: { status: { type: "string", example: "ok" }, role: { type: "string", enum: ["model", "router"] }, webui: { type: "boolean" } } } } }
           }
         }
       }
@@ -812,7 +1117,7 @@ const spec = {
       get: {
         tags: ["Server"],
         summary: "Health check (v1 alias)",
-        responses: { "200": { description: "Server status" } }
+        responses: { "200": { description: "Same as GET /health." } }
       }
     },
 
@@ -820,8 +1125,9 @@ const spec = {
       get: {
         tags: ["Server"],
         summary: "Server properties",
-        description: "Returns model and server properties (llama.cpp WebUI compatible).",
-        responses: { "200": { description: "Server/model properties JSON" } }
+        description: "Returns current model properties and default generation settings in llama.cpp WebUI format. Accepts optional `?model=<name>` query parameter.",
+        parameters: [{ name: "model", in: "query", schema: { type: "string" } }],
+        responses: { "200": { description: "Server and model properties JSON." } }
       }
     },
 
@@ -829,28 +1135,22 @@ const spec = {
       get: {
         tags: ["Server"],
         summary: "Server slots",
-        description: "Returns generation slot state (llama.cpp WebUI compatible).",
-        responses: { "200": { description: "Slots JSON" } }
+        description: "Returns the current generation slot state in llama.cpp WebUI format.",
+        responses: { "200": { description: "Array of slot objects." } }
       }
     },
 
     "/lora-adapters": {
       get: {
         tags: ["Server"],
-        summary: "List LoRA adapters",
+        summary: "List active LoRA adapters",
+        description: "Returns the currently applied LoRA adapter(s), or an empty array if none are active.",
         responses: {
           "200": {
-            description: "Available LoRA adapters",
+            description: "Active LoRA adapters.",
             content: { "application/json": { schema: {
               type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  id: { type: "integer" },
-                  path: { type: "string" },
-                  scale: { type: "number" }
-                }
-              }
+              items: { type: "object", properties: { id: { type: "integer" }, path: { type: "string" }, scale: { type: "number" } } }
             }}}
           }
         }
@@ -860,35 +1160,48 @@ const spec = {
     "/models/load": {
       post: {
         tags: ["Server"],
-        summary: "Load model",
-        description: "Load a model configuration by name.",
+        summary: "Load a model into memory",
+        description: "Explicitly loads (or reloads) a profile's model into memory. The call blocks until the model is fully loaded. If the same model is already loaded, this is a no-op.\n\nUse this before sending generation requests to avoid cold-start latency, or to pre-warm a specific profile.",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
             type: "object",
             required: ["model"],
-            properties: { model: { type: "string", example: "default" } }
+            properties: {
+              model: { type: "string", example: "default", description: "Profile name to load." }
+            }
           }}}
         },
-        responses: { "200": { description: "Load initiated" } }
+        responses: {
+          "200": {
+            description: "Load result.",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, error: { type: "string" } } } } }
+          },
+          "503": { description: "Server is busy (another generation is running)." }
+        }
       }
     },
 
     "/models/unload": {
       post: {
         tags: ["Server"],
-        summary: "Unload model",
-        description: "Unload the currently loaded model. Body is optional (omit or send `{}`).",
+        summary: "Unload the current model from memory",
+        description: "Releases the loaded model and frees native memory. The request body is optional — omit it or send `{}`.\n\nIf `model` is specified, only unloads if the named profile is currently loaded.",
         requestBody: {
           required: false,
           content: { "application/json": { schema: {
             type: "object",
-            properties: { model: { type: "string", description: "Model name to unload (defaults to current)" } }
+            properties: {
+              model: { type: "string", description: "Profile name to unload. Defaults to the currently loaded model." }
+            }
           }}}
         },
         responses: {
-          "200": { description: "Unloaded successfully", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" } } } } } },
-          "503": { description: "Model is busy" }
+          "200": {
+            description: "Unloaded (or already unloaded).",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" } } } } }
+          },
+          "503": { description: "Model is busy — unload skipped." }
         }
       }
     }
