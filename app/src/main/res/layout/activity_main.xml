@@ -103,6 +103,15 @@
                 android:layout_marginTop="10dp"
                 android:text="Open in browser" />
 
+            <TextView
+                android:id="@+id/apiProbeStatusMain"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="11sp"
+                android:textColor="#666666"
+                android:visibility="gone" />
+
         </LinearLayout>
 
         <!-- ④ DIRECT RUN CARD (collapsed by default) -->

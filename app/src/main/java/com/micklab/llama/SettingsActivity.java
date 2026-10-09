@@ -119,7 +119,8 @@ public class SettingsActivity extends Activity {
     private Button loadModelButton;
     private Button selectModelButton;
     private Button maintainModelButton;
-    
+    private Button ggufGenerateButton;
+
     // Penalty parameter inputs
     private EditText penaltyLastNInput;
     private EditText penaltyRepeatInput;
@@ -186,6 +187,13 @@ public class SettingsActivity extends Activity {
     private LinearLayout apiWifiUrlContainer;
     private TextView apiWifiUrlView;
     private TextView apiWifiUrlHintView;
+    private TextView apiProbeHeader;
+    private LinearLayout apiProbeBodyContainer;
+    private Button apiProbeButton;
+    private LinearLayout apiProbeResultsContainer;
+    private Button swaggerButton;
+    private boolean apiProbeExpanded = false;
+    private final ApiConnectivityProber apiProber = new ApiConnectivityProber();
     private EditText mcpConfigJsonInput;
     private EditText functionDefinitionsJsonInput;
     private Switch sharedMcpEnabledSwitch;
@@ -202,6 +210,7 @@ public class SettingsActivity extends Activity {
     private Button restoreProfilesButton;
     private Button backButton;
     private Button cancelButton;
+    private Button feedbackButton;
     private LinearLayout settingsContentContainer;
     
     private ConfigurationManager.Configuration currentConfig;
@@ -357,6 +366,7 @@ public class SettingsActivity extends Activity {
         loadModelButton = findViewById(R.id.loadModelButton);
         selectModelButton = findViewById(R.id.selectModelButton);
         maintainModelButton = findViewById(R.id.maintainModelButton);
+        ggufGenerateButton = findViewById(R.id.ggufGenerateButton);
         
         // Penalty parameter inputs
         penaltyLastNInput = findViewById(R.id.penaltyLastNInput);
@@ -526,6 +536,11 @@ public class SettingsActivity extends Activity {
         apiWifiUrlContainer = findViewById(R.id.apiWifiUrlContainer);
         apiWifiUrlView = findViewById(R.id.apiWifiUrlView);
         apiWifiUrlHintView = findViewById(R.id.apiWifiUrlHintView);
+        apiProbeHeader = findViewById(R.id.apiProbeHeader);
+        apiProbeBodyContainer = findViewById(R.id.apiProbeBodyContainer);
+        apiProbeButton = findViewById(R.id.apiProbeButton);
+        apiProbeResultsContainer = findViewById(R.id.apiProbeResultsContainer);
+        swaggerButton = findViewById(R.id.swaggerButton);
         mcpConfigJsonInput = findViewById(R.id.mcpConfigJsonInput);
         functionDefinitionsJsonInput = findViewById(R.id.functionDefinitionsJsonInput);
         sharedMcpEnabledSwitch = findViewById(R.id.sharedMcpEnabledSwitch);
@@ -578,6 +593,7 @@ public class SettingsActivity extends Activity {
         restoreProfilesButton = findViewById(R.id.restoreProfilesButton);
         backButton = findViewById(R.id.backButton);
         cancelButton = findViewById(R.id.cancelButton);
+        feedbackButton = findViewById(R.id.feedbackButton);
 
         saveConfigButton.setOnClickListener(v -> {
             if (isBusyActionBlocked()) return;
@@ -701,11 +717,31 @@ public class SettingsActivity extends Activity {
         cancelButton.setOnClickListener(v -> cancelAndReturn());
         licenseButton.setOnClickListener(v -> showLicenseDialog());
         documentsButton.setOnClickListener(v -> openDocuments());
+        if (ggufGenerateButton != null) {
+            ggufGenerateButton.setOnClickListener(v -> launchGgufGeneratorApp());
+        }
+        if (feedbackButton != null) {
+            feedbackButton.setOnClickListener(v -> openPlayStoreListing(getPackageName()));
+        }
         setupApiUrlCopyTarget(apiLoopbackUrlView, localizedText("ローカルURL", "Local URL"));
         setupApiUrlCopyTarget(apiWifiUrlView, localizedText("LAN URL", "LAN URL"));
+        if (swaggerButton != null) {
+            swaggerButton.setOnClickListener(v -> openSwaggerUi());
+        }
+        if (apiProbeHeader != null) {
+            apiProbeHeader.setOnClickListener(v -> setApiProbeExpanded(!apiProbeExpanded));
+        }
+        if (apiProbeButton != null) {
+            apiProbeButton.setOnClickListener(v -> runApiProbe());
+        }
         setupCollapsibleSections();
         applyLocalizedUiText();
         updateApiServerUrlViews();
+        if (OllamaForegroundService.isApiEnabled(this)) {
+            // Keep the connection-check section collapsed even when the API is enabled; the probe
+            // still runs so results are ready the moment the user expands it.
+            runApiProbe();
+        }
         updateActionButtonStateForBusy();
     }
 
@@ -721,6 +757,49 @@ public class SettingsActivity extends Activity {
     private void openDocuments() {
         Intent intent = new Intent(this, DocumentsActivity.class);
         startActivity(intent);
+    }
+
+    /** Package of the companion GGUF-creation app launched from Model Management. */
+    private static final String GGUF_APP_PACKAGE = "com.micklab.gguf";
+
+    /**
+     * Launch the companion GGUF-generation app. If it isn't installed, send the user to its
+     * Google Play listing instead.
+     */
+    private void launchGgufGeneratorApp() {
+        Intent launch = getPackageManager().getLaunchIntentForPackage(GGUF_APP_PACKAGE);
+        if (launch != null) {
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(launch);
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to launch " + GGUF_APP_PACKAGE, e);
+            }
+        }
+        openPlayStoreListing(GGUF_APP_PACKAGE);
+    }
+
+    /** Open a package's Google Play listing, preferring the Play Store app and falling back to the web. */
+    private void openPlayStoreListing(String packageName) {
+        Intent marketIntent = new Intent(Intent.ACTION_VIEW,
+                Uri.parse("market://details?id=" + packageName));
+        marketIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(marketIntent);
+            return;
+        } catch (Exception ignored) {
+            // Play Store app not available — fall through to the browser.
+        }
+        try {
+            Intent webIntent = new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=" + packageName));
+            webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(webIntent);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to open Play Store listing for " + packageName, e);
+            showToast(localizedText("Google Play を開けませんでした", "Could not open Google Play"));
+        }
     }
 
     private boolean isBusyActionBlocked() {
@@ -884,6 +963,8 @@ public class SettingsActivity extends Activity {
             case "Get models": return "モデル取得";
             case "Rename / delete models": return "モデルの名称変更・削除";
             case "MAINTAIN MODEL": return "モデル管理";
+            case "Generate Model": return "モデル生成";
+            case "Support & Feedback": return "応援・フィードバック";
             case "Model file: (none)": return "モデルファイル: （なし）";
             case "Model Parameters": return "モデルパラメータ";
             case "Context Size (n_ctx):": return "コンテキストサイズ (n_ctx):";
@@ -940,6 +1021,10 @@ public class SettingsActivity extends Activity {
             case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
             case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
             case "Connect to Wi-Fi to show the LAN URL.": return "Wi-Fi接続時にLAN URLを表示します。";
+            case "Connection check:": return "接続確認:";
+            case "Check": return "確認";
+            case "▼ Connection check": return "▼ 接続確認";
+            case "▶ Connection check (tap to expand)": return "▶ 接続確認（タップで展開）";
             case "MCP Settings": return "MCP設定";
             case "Enable MCP outside Web UI:": return "Web UI 以外でMCPを有効化:";
             case "Enable Function Calling outside Web UI:": return "Web UI 以外でFunction Callingを有効化:";
@@ -948,6 +1033,7 @@ public class SettingsActivity extends Activity {
             case "Function Definitions JSON (shared):": return "Function Definitions JSON（共通）:";
             case "Log Settings": return "ログ設定";
             case "Log Level:": return "ログレベル:";
+            case "Open API Docs (Swagger UI)": return "API仕様を開く (Swagger UI)";
             case "Show License": return "ライセンス表示";
             case "Documents": return "ドキュメント";
             case "SAVE & CLOSE": return "保存して閉じる";
@@ -1831,6 +1917,17 @@ public class SettingsActivity extends Activity {
         });
     }
 
+    private void openSwaggerUi() {
+        Integer port = parseApiPortFromUi();
+        if (port == null) port = OllamaApiServer.DEFAULT_PORT;
+        String url = "http://127.0.0.1:" + port + "/swagger";
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            showToast(localizedText("ブラウザを開けません: ", "Cannot open browser: ") + url);
+        }
+    }
+
     private void openUrlInBrowser(TextView sourceView) {
         if (sourceView == null) {
             return;
@@ -1946,6 +2043,205 @@ public class SettingsActivity extends Activity {
             Log.w(TAG, "Unable to inspect Wi-Fi network state", e);
         }
         return null;
+    }
+
+    private void setApiProbeExpanded(boolean expanded) {
+        apiProbeExpanded = expanded;
+        if (apiProbeBodyContainer != null) {
+            apiProbeBodyContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+        if (apiProbeHeader != null) {
+            String title = expanded
+                    ? localizedText("▼ 接続確認", "▼ Connection check")
+                    : localizedText("▶ 接続確認（タップで展開）", "▶ Connection check (tap to expand)");
+            apiProbeHeader.setText(title);
+        }
+    }
+
+    private void runApiProbe() {
+        if (apiProbeResultsContainer == null) return;
+        Integer port = parseApiPortFromUi();
+        if (port == null) return;
+
+        List<ApiConnectivityProber.Candidate> extras = collectExtraCandidates();
+
+        // Build placeholder labels in the same order as buildCandidates will produce.
+        apiProbeResultsContainer.removeAllViews();
+        apiProbeResultsContainer.addView(makeProbeRow("127.0.0.1", "…", false));
+        apiProbeResultsContainer.addView(makeProbeRow("0.0.0.0", "…", false));
+        apiProbeResultsContainer.addView(makeProbeRow("localhost", "…", false));
+        apiProbeResultsContainer.addView(makeProbeRow(localizedText("LAN", "LAN"), "…", false));
+        apiProbeResultsContainer.addView(makeProbeRow(localizedText("キャリア回線", "Carrier"), "…", false));
+        for (ApiConnectivityProber.Candidate c : extras) {
+            apiProbeResultsContainer.addView(makeProbeRow(c.label, "…", false));
+        }
+        apiProbeResultsContainer.addView(makeProbeRow("android.local", "…", false));
+
+        if (apiProbeButton != null) apiProbeButton.setEnabled(false);
+
+        String lanIp  = getActiveWifiIpv4Address();
+        String cellIp = getActiveCellularIpv4Address();
+        apiProber.probe(port, lanIp, cellIp, extras, (results, bestUrl) -> {
+            if (apiProbeResultsContainer == null) return;
+            renderProbeResults(results);
+            if (apiProbeButton != null) apiProbeButton.setEnabled(true);
+        });
+    }
+
+    private void renderProbeResults(java.util.List<ApiConnectivityProber.ProbeResult> results) {
+        apiProbeResultsContainer.removeAllViews();
+        for (ApiConnectivityProber.ProbeResult r : results) {
+            String statusText;
+            boolean ok;
+            if (r.host.equals("—")) {
+                statusText = localizedText("未接続", "not connected");
+                ok = false;
+            } else if (r.reachable) {
+                statusText = "✓ " + r.latencyMs + "ms";
+                ok = true;
+            } else {
+                statusText = "✗ " + (r.errorMsg != null ? r.errorMsg : "error");
+                ok = false;
+            }
+            apiProbeResultsContainer.addView(makeProbeRow(r.label, statusText, ok));
+        }
+    }
+
+    private android.view.View makeProbeRow(String label, String status, boolean ok) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        android.view.ViewGroup.MarginLayoutParams lp =
+                new android.view.ViewGroup.MarginLayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = (int) (2 * getResources().getDisplayMetrics().density);
+        row.setLayoutParams(lp);
+
+        TextView lblView = new TextView(this);
+        LinearLayout.LayoutParams lblLp = new LinearLayout.LayoutParams(0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        lblView.setLayoutParams(lblLp);
+        lblView.setText(label);
+        lblView.setTextSize(12f);
+
+        TextView statusView = new TextView(this);
+        statusView.setLayoutParams(new LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        statusView.setText(status);
+        statusView.setTextSize(12f);
+        if (ok) {
+            statusView.setTextColor(0xFF1A7F37);  // green
+        } else if (status.equals("…")) {
+            statusView.setTextColor(0xFF888888);
+        } else {
+            statusView.setTextColor(0xFFCC0000);  // red
+        }
+
+        row.addView(lblView);
+        row.addView(statusView);
+        return row;
+    }
+
+    private String getActiveCellularIpv4Address() {
+        if (connectivityManager == null) return null;
+        try {
+            for (Network net : connectivityManager.getAllNetworks()) {
+                NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(net);
+                if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) continue;
+                LinkProperties lp = connectivityManager.getLinkProperties(net);
+                if (lp == null) continue;
+                for (LinkAddress la : lp.getLinkAddresses()) {
+                    InetAddress addr = la.getAddress();
+                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (SecurityException e) {
+            Log.w(TAG, "Unable to inspect cellular network state", e);
+        }
+        return null;
+    }
+
+    /** Collect Ethernet + all non-WiFi/non-cellular interface IPs (hotspot, USB tether, BT tether). */
+    private List<ApiConnectivityProber.Candidate> collectExtraCandidates() {
+        List<ApiConnectivityProber.Candidate> extras = new ArrayList<>();
+
+        // Known IPs to exclude from the "other interfaces" scan.
+        java.util.Set<String> knownIps = new java.util.HashSet<>();
+        String lanIp = getActiveWifiIpv4Address();
+        String cellIp = getActiveCellularIpv4Address();
+        if (lanIp  != null) knownIps.add(lanIp);
+        if (cellIp != null) knownIps.add(cellIp);
+
+        // Ethernet via ConnectivityManager.
+        if (connectivityManager != null) {
+            try {
+                for (Network net : connectivityManager.getAllNetworks()) {
+                    NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(net);
+                    if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) continue;
+                    LinkProperties lp = connectivityManager.getLinkProperties(net);
+                    if (lp == null) continue;
+                    for (LinkAddress la : lp.getLinkAddresses()) {
+                        InetAddress addr = la.getAddress();
+                        if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                            String ip = addr.getHostAddress();
+                            if (!knownIps.contains(ip)) {
+                                knownIps.add(ip);
+                                extras.add(new ApiConnectivityProber.Candidate(
+                                        localizedText("有線LAN", "Ethernet"), ip));
+                            }
+                        }
+                    }
+                }
+            } catch (SecurityException ignored) {}
+        }
+
+        // Hotspot / USB tether / BT tether via NetworkInterface enumeration.
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> ifaces =
+                    java.net.NetworkInterface.getNetworkInterfaces();
+            if (ifaces != null) {
+                while (ifaces.hasMoreElements()) {
+                    java.net.NetworkInterface iface = ifaces.nextElement();
+                    if (iface.isLoopback() || !iface.isUp()) continue;
+                    String name = iface.getName().toLowerCase(Locale.ROOT);
+                    // Skip well-known Wi-Fi / cellular interface names.
+                    if (name.startsWith("wlan") || name.startsWith("rmnet")
+                            || name.startsWith("ccmni") || name.startsWith("dummy")
+                            || name.startsWith("v4-")) continue;
+
+                    String label = ifaceLabel(name);
+                    java.util.Enumeration<InetAddress> addrs = iface.getInetAddresses();
+                    while (addrs.hasMoreElements()) {
+                        InetAddress addr = addrs.nextElement();
+                        if (!(addr instanceof Inet4Address) || addr.isLoopbackAddress()) continue;
+                        String ip = addr.getHostAddress();
+                        if (!knownIps.contains(ip)) {
+                            knownIps.add(ip);
+                            extras.add(new ApiConnectivityProber.Candidate(label, ip));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "NetworkInterface scan failed", e);
+        }
+
+        return extras;
+    }
+
+    private String ifaceLabel(String name) {
+        if (name.startsWith("rndis") || name.startsWith("usb"))
+            return localizedText("USBテザリング", "USB tether");
+        if (name.startsWith("bt-pan") || name.startsWith("bnep"))
+            return localizedText("BTテザリング", "BT tether");
+        if (name.startsWith("ap") || name.startsWith("swlan") || name.startsWith("wl"))
+            return localizedText("ホットスポット", "Hotspot");
+        if (name.startsWith("eth") || name.startsWith("enp"))
+            return localizedText("有線LAN", "Ethernet");
+        return name;
     }
 
     private void registerNetworkCallback() {

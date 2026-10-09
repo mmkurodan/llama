@@ -286,6 +286,24 @@
             android:layout_height="wrap_content"
             android:text="MAINTAIN MODEL" />
 
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/ggufGenerateButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="@color/light_blue"
+            android:text="Generate Model" />
+
+        <TextView
+            android:id="@+id/ggufGenerateCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GGUF Generator Link"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:paddingTop="2dp"
+            android:paddingBottom="4dp" />
+
         <!-- MTP Settings Section -->
         <TextView
             android:id="@+id/mtpSettingsHeader"
@@ -1205,6 +1223,13 @@
             android:text="http://localhost:11434"
             android:textColor="#0B57D0" />
 
+        <Button
+            android:id="@+id/swaggerButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Open API Docs (Swagger UI)" />
+
         <LinearLayout
             android:id="@+id/apiWifiUrlContainer"
             android:layout_width="match_parent"
@@ -1236,6 +1261,48 @@
             android:textColor="#666666"
             android:textSize="12sp"
             android:paddingTop="8dp" />
+
+        <!-- API Connection Check: collapsible section -->
+        <TextView
+            android:id="@+id/apiProbeHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="▶ Connection check (tap to expand)"
+            android:textStyle="bold"
+            android:textSize="13sp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <LinearLayout
+            android:id="@+id/apiProbeBodyContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/apiProbeButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Check"
+                android:textSize="12sp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp" />
+
+            <LinearLayout
+                android:id="@+id/apiProbeResultsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="6dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp" />
+
+        </LinearLayout>
 
         <View
             android:layout_width="match_parent"
@@ -1419,6 +1486,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Show License" />
+
+        <!-- Support / feedback: opens this app's Google Play listing (rating screen) -->
+        <Button
+            style="@style/SecondaryButton" android:id="@+id/feedbackButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Support &amp; Feedback"
+            android:layout_marginTop="8dp" />
 
         <Button
             style="@style/SecondaryButton" android:id="@+id/documentsButton"

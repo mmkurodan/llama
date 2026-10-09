@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM AI Server – API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; padding: 0; background: #fafafa; }
+    .topbar { display: none !important; }
+  </style>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin="anonymous"></script>
+<script>
+const spec = {
+  openapi: "3.0.3",
+  info: {
+    title: "LLM AI Server API",
+    version: "1.0.0",
+    description: "Ollama-compatible on-device LLM API server.\n\nSupports Ollama, OpenAI, Anthropic, and Gemini compatible endpoints.\n\nBase URL: `http://127.0.0.1:11434` (or the configured port)"
+  },
+  servers: [{ url: window.location.origin, description: "On-device server (current)" }],
+  tags: [
+    { name: "Ollama", description: "Ollama-compatible endpoints" },
+    { name: "OpenAI", description: "OpenAI-compatible endpoints" },
+    { name: "Anthropic", description: "Anthropic-compatible endpoints" },
+    { name: "Gemini", description: "Google Gemini-compatible endpoints" },
+    { name: "Server", description: "Server management and diagnostics" }
+  ],
+  paths: {
+
+    "/api/tags": {
+      get: {
+        tags: ["Ollama"],
+        summary: "List models",
+        description: "Returns a list of all available model configurations.",
+        responses: {
+          "200": {
+            description: "Model list",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                models: { type: "array", items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    model: { type: "string" },
+                    modified_at: { type: "string" },
+                    size: { type: "integer" }
+                  }
+                }}
+              }
+            }}}
+          }
+        }
+      },
+      post: {
+        tags: ["Ollama"],
+        summary: "List models (POST)",
+        responses: { "200": { description: "Model list (same as GET)" } }
+      }
+    },
+
+    "/api/generate": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Generate completion",
+        description: "Generate a text completion for a given prompt.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "prompt"],
+            properties: {
+              model: { type: "string", example: "default", description: "Model/profile name" },
+              prompt: { type: "string", example: "Why is the sky blue?" },
+              system: { type: "string", description: "System prompt override" },
+              stream: { type: "boolean", default: true },
+              format: { type: "string", description: "Response format (e.g. json)" },
+              options: { type: "object", description: "Sampling options (temperature, top_p, …)" },
+              keep_alive: { type: "string", description: "How long to keep model loaded (e.g. '5m')" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Streaming NDJSON or final JSON response",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                model: { type: "string" },
+                created_at: { type: "string" },
+                response: { type: "string" },
+                done: { type: "boolean" },
+                total_duration: { type: "integer" },
+                eval_count: { type: "integer" },
+                eval_duration: { type: "integer" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/api/chat": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Chat completion",
+        description: "Multi-turn chat completion. Supports text, images (base64 or URL), and audio.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "messages"],
+            properties: {
+              model: { type: "string", example: "default" },
+              messages: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    role: { type: "string", enum: ["system", "user", "assistant"] },
+                    content: { oneOf: [
+                      { type: "string" },
+                      { type: "array", items: { type: "object" } }
+                    ]},
+                    images: { type: "array", items: { type: "string" }, description: "Base64 images or URLs" }
+                  }
+                }
+              },
+              stream: { type: "boolean", default: true },
+              format: { type: "string" },
+              options: { type: "object" },
+              keep_alive: { type: "string" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Streaming NDJSON or final JSON",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                model: { type: "string" },
+                created_at: { type: "string" },
+                message: {
+                  type: "object",
+                  properties: {
+                    role: { type: "string" },
+                    content: { type: "string" }
+                  }
+                },
+                done: { type: "boolean" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/api/show": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Show model info",
+        description: "Returns detailed information about a model/profile including parameters and template.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model"],
+            properties: {
+              model: { type: "string", example: "default" }
+            }
+          }}}
+        },
+        responses: { "200": { description: "Model info JSON" } }
+      }
+    },
+
+    "/api/embed": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Generate embeddings",
+        description: "Generate embeddings for one or more input strings.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "input"],
+            properties: {
+              model: { type: "string", example: "default" },
+              input: {
+                oneOf: [
+                  { type: "string", example: "Hello world" },
+                  { type: "array", items: { type: "string" } }
+                ]
+              }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Embeddings",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                model: { type: "string" },
+                embeddings: { type: "array", items: { type: "array", items: { type: "number" } } },
+                total_duration: { type: "integer" },
+                prompt_eval_count: { type: "integer" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/api/embeddings": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Generate embeddings (legacy)",
+        description: "Legacy single-input embedding endpoint.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "prompt"],
+            properties: {
+              model: { type: "string", example: "default" },
+              prompt: { type: "string", example: "Hello world" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Embedding vector",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                embedding: { type: "array", items: { type: "number" } }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/api/tokenize": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Tokenize text",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "content"],
+            properties: {
+              model: { type: "string", example: "default" },
+              content: { type: "string", example: "Hello world" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Token IDs",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: { tokens: { type: "array", items: { type: "integer" } } }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/api/ps": {
+      get: {
+        tags: ["Ollama"],
+        summary: "List running models",
+        responses: { "200": { description: "Currently loaded models" } }
+      }
+    },
+
+    "/api/delete": {
+      delete: {
+        tags: ["Ollama"],
+        summary: "Delete a model",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model"],
+            properties: { model: { type: "string", example: "my-model" } }
+          }}}
+        },
+        responses: {
+          "200": { description: "Deleted" },
+          "404": { description: "Not found" }
+        }
+      }
+    },
+
+    "/api/profiles": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Create / update profile",
+        description: "Create or update a model configuration profile.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["name"],
+            properties: {
+              name: { type: "string", example: "my-profile" },
+              modelfile: { type: "string", description: "Modelfile content" }
+            }
+          }}}
+        },
+        responses: { "200": { description: "Profile created/updated" } }
+      }
+    },
+
+    "/api/import/gguf": {
+      post: {
+        tags: ["Ollama"],
+        summary: "Import GGUF model",
+        description: "Import a GGUF model file as Base64. Max 256 MB.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["name", "data"],
+            properties: {
+              name: { type: "string", example: "my-model" },
+              data: { type: "string", description: "Base64-encoded GGUF binary" }
+            }
+          }}}
+        },
+        responses: { "200": { description: "Import started" } }
+      }
+    },
+
+    "/api/diagnostics": {
+      get: {
+        tags: ["Server"],
+        summary: "Get diagnostics / logs",
+        parameters: [
+          { name: "file", in: "query", schema: { type: "string", enum: ["process", "ollama", "state"] }, description: "Log file type" },
+          { name: "tail", in: "query", schema: { type: "integer" }, description: "Number of tail lines" }
+        ],
+        responses: { "200": { description: "Log content or diagnostics JSON" } }
+      }
+    },
+
+    "/v1/models": {
+      get: {
+        tags: ["OpenAI"],
+        summary: "List models",
+        responses: {
+          "200": {
+            description: "OpenAI-style model list",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                object: { type: "string", example: "list" },
+                data: { type: "array", items: { type: "object" } }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1/models/{model}": {
+      get: {
+        tags: ["OpenAI"],
+        summary: "Get model info",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Model object" } }
+      },
+      delete: {
+        tags: ["OpenAI"],
+        summary: "Delete model",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Deleted" } }
+      }
+    },
+
+    "/v1/chat/completions": {
+      post: {
+        tags: ["OpenAI"],
+        summary: "Chat completions",
+        description: "OpenAI-compatible chat completions. Supports text and vision (image_url / base64).",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "messages"],
+            properties: {
+              model: { type: "string", example: "default" },
+              messages: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    role: { type: "string", enum: ["system", "user", "assistant"] },
+                    content: { oneOf: [
+                      { type: "string" },
+                      { type: "array", items: { type: "object" } }
+                    ]}
+                  }
+                }
+              },
+              stream: { type: "boolean", default: false },
+              temperature: { type: "number" },
+              top_p: { type: "number" },
+              max_tokens: { type: "integer" },
+              tools: { type: "array", items: { type: "object" } },
+              tool_choice: { oneOf: [{ type: "string" }, { type: "object" }] },
+              reasoning_effort: { type: "string", enum: ["low", "medium", "high"] },
+              response_format: { type: "object" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Chat completion (streaming SSE or JSON)",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                object: { type: "string" },
+                created: { type: "integer" },
+                model: { type: "string" },
+                choices: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      index: { type: "integer" },
+                      message: {
+                        type: "object",
+                        properties: {
+                          role: { type: "string" },
+                          content: { type: "string" }
+                        }
+                      },
+                      finish_reason: { type: "string" }
+                    }
+                  }
+                },
+                usage: {
+                  type: "object",
+                  properties: {
+                    prompt_tokens: { type: "integer" },
+                    completion_tokens: { type: "integer" },
+                    total_tokens: { type: "integer" }
+                  }
+                }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1/completions": {
+      post: {
+        tags: ["OpenAI"],
+        summary: "Legacy text completions",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "prompt"],
+            properties: {
+              model: { type: "string", example: "default" },
+              prompt: { type: "string" },
+              stream: { type: "boolean", default: false },
+              max_tokens: { type: "integer" },
+              temperature: { type: "number" }
+            }
+          }}}
+        },
+        responses: { "200": { description: "Completion response" } }
+      }
+    },
+
+    "/v1/embeddings": {
+      post: {
+        tags: ["OpenAI"],
+        summary: "Embeddings",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "input"],
+            properties: {
+              model: { type: "string", example: "default" },
+              input: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Embeddings",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                object: { type: "string" },
+                data: { type: "array", items: { type: "object" } },
+                model: { type: "string" },
+                usage: { type: "object" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1/responses": {
+      post: {
+        tags: ["OpenAI"],
+        summary: "Responses API",
+        description: "OpenAI Responses API compatible endpoint.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "input"],
+            properties: {
+              model: { type: "string", example: "default" },
+              input: { oneOf: [{ type: "string" }, { type: "array", items: { type: "object" } }] },
+              stream: { type: "boolean" },
+              instructions: { type: "string" },
+              tools: { type: "array", items: { type: "object" } }
+            }
+          }}}
+        },
+        responses: { "200": { description: "Response object or SSE stream" } }
+      }
+    },
+
+    "/v1/responses/input_tokens": {
+      post: {
+        tags: ["OpenAI"],
+        summary: "Count input tokens",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "input"],
+            properties: {
+              model: { type: "string" },
+              input: { type: "string" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Token count",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                input_tokens: { type: "integer" },
+                object: { type: "string", example: "response.input_tokens" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1/messages": {
+      post: {
+        tags: ["Anthropic"],
+        summary: "Messages",
+        description: "Anthropic-compatible Messages API. Supports text, images (base64/URL), audio, tool_use, and thinking.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "messages", "max_tokens"],
+            properties: {
+              model: { type: "string", example: "default" },
+              messages: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    role: { type: "string", enum: ["user", "assistant"] },
+                    content: { oneOf: [
+                      { type: "string" },
+                      { type: "array", items: { type: "object" } }
+                    ]}
+                  }
+                }
+              },
+              system: { type: "string" },
+              max_tokens: { type: "integer", example: 1024 },
+              stream: { type: "boolean", default: false },
+              temperature: { type: "number" },
+              tools: { type: "array", items: { type: "object" } },
+              thinking: { type: "object", description: "Extended thinking config: {type: 'enabled', budget_tokens: N}" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Message response or SSE stream",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                type: { type: "string" },
+                role: { type: "string" },
+                content: { type: "array", items: { type: "object" } },
+                model: { type: "string" },
+                stop_reason: { type: "string" },
+                usage: { type: "object" }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1/messages/count_tokens": {
+      post: {
+        tags: ["Anthropic"],
+        summary: "Count tokens",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model", "messages"],
+            properties: {
+              model: { type: "string", example: "default" },
+              messages: { type: "array", items: { type: "object" } },
+              system: { type: "string" }
+            }
+          }}}
+        },
+        responses: {
+          "200": {
+            description: "Token count",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: { input_tokens: { type: "integer" } }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1beta/models/{model}:generateContent": {
+      post: {
+        tags: ["Gemini"],
+        summary: "Generate content",
+        description: "Google Gemini-compatible generateContent endpoint.",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" }, example: "gemma-3-4b" }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            properties: {
+              contents: { type: "array", items: { type: "object" } },
+              systemInstruction: { type: "object" },
+              generationConfig: { type: "object" }
+            }
+          }}}
+        },
+        responses: { "200": { description: "Gemini response" } }
+      }
+    },
+
+    "/v1beta/models/{model}:streamGenerateContent": {
+      post: {
+        tags: ["Gemini"],
+        summary: "Stream generate content",
+        parameters: [{ name: "model", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object" } }}
+        },
+        responses: { "200": { description: "SSE stream of Gemini response chunks" } }
+      }
+    },
+
+    "/health": {
+      get: {
+        tags: ["Server"],
+        summary: "Health check",
+        responses: {
+          "200": {
+            description: "Server is running",
+            content: { "application/json": { schema: {
+              type: "object",
+              properties: { status: { type: "string", example: "ok" } }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/v1/health": {
+      get: {
+        tags: ["Server"],
+        summary: "Health check (v1 alias)",
+        responses: { "200": { description: "Server status" } }
+      }
+    },
+
+    "/props": {
+      get: {
+        tags: ["Server"],
+        summary: "Server properties",
+        description: "Returns model and server properties (llama.cpp WebUI compatible).",
+        responses: { "200": { description: "Server/model properties JSON" } }
+      }
+    },
+
+    "/slots": {
+      get: {
+        tags: ["Server"],
+        summary: "Server slots",
+        description: "Returns generation slot state (llama.cpp WebUI compatible).",
+        responses: { "200": { description: "Slots JSON" } }
+      }
+    },
+
+    "/lora-adapters": {
+      get: {
+        tags: ["Server"],
+        summary: "List LoRA adapters",
+        responses: {
+          "200": {
+            description: "Available LoRA adapters",
+            content: { "application/json": { schema: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "integer" },
+                  path: { type: "string" },
+                  scale: { type: "number" }
+                }
+              }
+            }}}
+          }
+        }
+      }
+    },
+
+    "/models/load": {
+      post: {
+        tags: ["Server"],
+        summary: "Load model",
+        description: "Load a model configuration by name.",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: {
+            type: "object",
+            required: ["model"],
+            properties: { model: { type: "string", example: "default" } }
+          }}}
+        },
+        responses: { "200": { description: "Load initiated" } }
+      }
+    },
+
+    "/models/unload": {
+      post: {
+        tags: ["Server"],
+        summary: "Unload model",
+        responses: { "200": { description: "Model unloaded" } }
+      }
+    }
+  }
+};
+
+window.onload = function () {
+  SwaggerUIBundle({
+    spec: spec,
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: "BaseLayout",
+    deepLinking: true,
+    tryItOutEnabled: true,
+    requestInterceptor: function(req) {
+      req.headers['Content-Type'] = 'application/json';
+      return req;
+    }
+  });
+};
+</script>
+</body>
+</html>

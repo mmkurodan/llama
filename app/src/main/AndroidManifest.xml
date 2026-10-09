@@ -14,6 +14,20 @@
          (screen off / idle). The exemption is only ever requested via the system dialog, on user action. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Package visibility (Android 11+): allow launching the companion GGUF app and resolving
+         the Play Store listing intents from Settings. -->
+    <queries>
+        <package android:name="com.micklab.gguf" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name="com.micklab.llama.LlamaApplication"
         android:label="LLM AI Server with llama.cpp"

@@ -76,6 +76,8 @@ public class OllamaApiServer {
     // Hard cap on a single request body. Guards against a malicious/buggy Content-Length (or a huge
     // inline base64 image) allocating an unbounded buffer and OOM-killing the app.
     private static final int MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024;
+    // /api/import/gguf: Base64 encoded GGUF. 256 MB covers ~190 MB binary model.
+    private static final int MAX_IMPORT_BODY_BYTES = 256 * 1024 * 1024;
     private static final String BUILD_INFO = "llama.cpp build 8653 (1f34806c441f335f7d66e56fdb8ab3f5d09684e9)";
     private static final Map<String, String> WEBUI_CONTENT_TYPES;
 
@@ -91,6 +93,7 @@ public class OllamaApiServer {
         contentTypes.put("icon-192.png", "image/png");
         contentTypes.put("icon-512.png", "image/png");
         contentTypes.put("icon-512-maskable.png", "image/png");
+        contentTypes.put("swagger.html", "text/html; charset=utf-8");
         WEBUI_CONTENT_TYPES = Collections.unmodifiableMap(contentTypes);
     }
     
@@ -1182,9 +1185,13 @@ public class OllamaApiServer {
                 clientSocket.close();
                 return;
             }
-            if (contentLength > MAX_REQUEST_BODY_BYTES) {
+            int effectiveBodyLimit = ("/api/import/gguf".equals(path)
+                    || "/api/profiles/create".equals(path)
+                    || "/api/profiles".equals(path))
+                    ? MAX_IMPORT_BODY_BYTES : MAX_REQUEST_BODY_BYTES;
+            if (contentLength > effectiveBodyLimit) {
                 sendErrorResponse(outputStream, 413,
-                        "Request body too large (max " + MAX_REQUEST_BODY_BYTES + " bytes)");
+                        "Request body too large (max " + effectiveBodyLimit + " bytes)");
                 clientSocket.close();
                 return;
             }
@@ -1249,6 +1256,10 @@ public class OllamaApiServer {
                     handleLoadModel(outputStream, body);
                 } else if ("/models/unload".equals(path)) {
                     handleUnloadModel(outputStream, body);
+                } else if ("/api/profiles/create".equals(path) || "/api/profiles".equals(path)) {
+                    handleCreateProfile(outputStream, body);
+                } else if ("/api/import/gguf".equals(path)) {
+                    handleImportGguf(outputStream, body);
                 } else if (isGeminiGeneratePath(path)) {
                     String modelFromPath = geminiModelFromPath(path);
                     boolean geminiStream = path.endsWith(":streamGenerateContent");
@@ -2019,6 +2030,222 @@ public class OllamaApiServer {
         }
     }
 
+    /**
+     * Create a new profile (configuration) referencing a given model path — WITHOUT downloading or
+     * importing the model. Remote/HuggingFace URLs are fetched lazily on the next run that loads the
+     * profile; local filenames are resolved from storage at that time.
+     *
+     * Request body (JSON):
+     *   {
+     *     "name":  "<new profile name>",   // required
+     *     "model": "<path or URL>",        // model reference (alias: "modelUrl")
+     *     "from":  "<source profile>",     // optional: copy this profile, then swap only the model
+     *     "overwrite": false,              // optional: allow replacing an existing profile
+     *     "overrides": { ... },            // optional: individual Configuration field overrides
+     *     "<configField>": <value>         // optional: individual fields may also be set at top level
+     *   }
+     *
+     * With "from", the source profile is copied and only the model (plus any explicit overrides) is
+     * replaced. Without it, a fresh default configuration is the base.
+     *
+    /**
+     * POST /api/import/gguf — standalone GGUF import (no profile creation).
+     * Body: {"filename": "model.gguf", "data": "<Base64>"}
+     * Response: {"status":"ok","filename":"model.gguf"}
+     */
+    private void handleImportGguf(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject req = new JSONObject(body != null ? body : "{}");
+            String filename = req.optString("filename", "").trim();
+            String data64   = req.optString("data", "").trim();
+            if (filename.isEmpty() || !ModelFileHelper.isGgufFilename(filename)) {
+                sendErrorResponse(outputStream, 400, "Missing or invalid .gguf filename");
+                return;
+            }
+            if (data64.isEmpty()) {
+                sendErrorResponse(outputStream, 400, "Missing field: data (Base64)");
+                return;
+            }
+            String err = importGgufData(data64, filename);
+            if (err != null) {
+                sendErrorResponse(outputStream, 500, "Import failed: " + err);
+                return;
+            }
+            JSONObject resp = new JSONObject();
+            resp.put("status", "ok");
+            resp.put("filename", filename);
+            sendJsonResponse(outputStream, 200, resp.toString());
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 400, "Invalid JSON: " + e.getMessage());
+        }
+    }
+
+    /** Base64 デコードして getModelStorageDir() に保存する共通ヘルパー。成功時 null、失敗時エラー文字列。 */
+    private String importGgufData(String data64, String filename) {
+        byte[] bytes;
+        try {
+            bytes = android.util.Base64.decode(data64, android.util.Base64.NO_WRAP);
+        } catch (IllegalArgumentException e) {
+            return "Base64 decode failed: " + e.getMessage();
+        }
+        File destDir = ModelFileHelper.getModelStorageDir(context);
+        if (!destDir.exists()) destDir.mkdirs();
+        File tmp = new File(destDir, filename + ".import_tmp");
+        File dest = new File(destDir, filename);
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tmp, false)) {
+            fos.write(bytes);
+        } catch (IOException e) {
+            tmp.delete();
+            return "Write failed: " + e.getMessage();
+        }
+        if (dest.exists()) dest.delete();
+        if (!tmp.renameTo(dest)) {
+            tmp.delete();
+            return "Rename failed for: " + filename;
+        }
+        return null;
+    }
+
+    /**
+     * Extended field:
+     *   "gguf_data": "<Base64-encoded GGUF bytes>"  // optional: import model file before creating profile
+     *
+     * When "gguf_data" is present the server decodes and saves the bytes as "model" filename into
+     * getModelStorageDir(), then proceeds with profile creation using that filename.
+     */
+    private void handleCreateProfile(OutputStream outputStream, String body) throws IOException {
+        try {
+            JSONObject request = (body != null && !body.trim().isEmpty())
+                    ? new JSONObject(body) : new JSONObject();
+
+            String name = request.optString("name", "").trim();
+            if (name.isEmpty()) {
+                sendErrorResponse(outputStream, 400, "Missing required field: name");
+                return;
+            }
+
+            String model = request.optString("model", request.optString("modelUrl", "")).trim();
+            String from = request.optString("from", request.optString("source", "")).trim();
+
+            // Don't clobber an existing profile unless explicitly allowed.
+            boolean overwrite = request.optBoolean("overwrite", false);
+            if (!overwrite && configManager.listConfigurations().contains(name)) {
+                sendErrorResponse(outputStream, 409, "Profile already exists: " + name);
+                return;
+            }
+
+            // If gguf_data is provided, import the model file.
+            // Done AFTER the profile existence check so the model is not overwritten
+            // when the profile creation would be rejected anyway.
+            String ggufData = request.optString("gguf_data", "").trim();
+            if (!ggufData.isEmpty()) {
+                String filename = ModelFileHelper.extractFilename(model);
+
+                // overwrite=true かつ model が空 → 既存プロファイルのモデルファイル名を継承する
+                if ((filename == null || filename.isEmpty() || !ModelFileHelper.isGgufFilename(filename))
+                        && overwrite) {
+                    try {
+                        ConfigurationManager.Configuration existing =
+                                configManager.loadConfiguration(name);
+                        filename = ModelFileHelper.extractFilename(existing.modelUrl);
+                    } catch (Exception ignored) {}
+                }
+
+                if (filename == null || filename.isEmpty() || !ModelFileHelper.isGgufFilename(filename)) {
+                    sendErrorResponse(outputStream, 400,
+                            "gguf_data requires a valid .gguf filename in \"model\"");
+                    return;
+                }
+
+                File destFile = new File(ModelFileHelper.getModelStorageDir(context), filename);
+                if (!overwrite && destFile.exists()) {
+                    // overwrite=false かつ同名ファイルあり → 既存ファイルを再利用してインポートをスキップ
+                } else {
+                    String importError = importGgufData(ggufData, filename);
+                    if (importError != null) {
+                        sendErrorResponse(outputStream, 500, "GGUF import failed: " + importError);
+                        return;
+                    }
+                }
+                request.put("model", filename);
+                model = filename;
+            }
+
+            // Base config: a copy of the source profile ("from"), else a fresh default.
+            JSONObject base;
+            if (!from.isEmpty()) {
+                ConfigurationManager.Configuration src;
+                try {
+                    src = configManager.loadConfiguration(from);
+                } catch (IOException e) {
+                    sendErrorResponse(outputStream, 404, "Source profile not found: " + from);
+                    return;
+                }
+                base = src.toJSON();
+            } else {
+                base = new ConfigurationManager.Configuration().toJSON();
+            }
+
+            // Merge individual field values. Top-level request keys (except control keys) override the
+            // base; an explicit "overrides" object then takes final precedence.
+            java.util.Set<String> controlKeys = new java.util.HashSet<>(java.util.Arrays.asList(
+                    "name", "model", "modelUrl", "from", "source", "overwrite", "overrides"));
+            java.util.Iterator<String> keys = request.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                if (controlKeys.contains(key)) continue;
+                base.put(key, request.get(key));
+            }
+            JSONObject overrides = request.optJSONObject("overrides");
+            if (overrides != null) {
+                java.util.Iterator<String> oKeys = overrides.keys();
+                while (oKeys.hasNext()) {
+                    String key = oKeys.next();
+                    base.put(key, overrides.get(key));
+                }
+            }
+
+            // Name + model are authoritative regardless of base/overrides.
+            base.put("name", name);
+            if (!model.isEmpty()) {
+                base.put("modelUrl", model);
+            }
+
+            ConfigurationManager.Configuration config = ConfigurationManager.Configuration.fromJSON(base);
+            config.name = name;
+            if (!model.isEmpty()) {
+                config.modelUrl = model;
+            }
+
+            // Persist only — no download/import here. Remote (HuggingFace) models are fetched lazily
+            // on the next run that loads this profile.
+            try {
+                configManager.saveConfiguration(config);
+            } catch (IOException | JSONException e) {
+                Log.e(TAG, "Failed to save new profile", e);
+                sendErrorResponse(outputStream, 500, "Failed to save profile");
+                return;
+            }
+
+            boolean remote = ModelFileHelper.isRemoteModelReference(config.modelUrl);
+            File modelFile = ModelFileHelper.resolveStoredModelFile(context, config.modelUrl);
+            boolean present = modelFile != null && modelFile.exists();
+
+            JSONObject response = new JSONObject();
+            response.put("status", "created");
+            response.put("name", config.name);
+            response.put("copiedFrom", from.isEmpty() ? JSONObject.NULL : from);
+            response.put("model", config.modelUrl);
+            // download_pending: not on-device yet; fetched on next run that loads the profile.
+            response.put("download_pending", remote && !present);
+            response.put("configuration", config.toJSON());
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to create profile", e);
+            sendErrorResponse(outputStream, 400, "Invalid request: " + e.getMessage());
+        }
+    }
+
     private void handleModelGet(OutputStream outputStream, String modelId) throws IOException {
         try {
             String loadedConfig = modelManager.getCurrentConfigName();
@@ -2309,6 +2536,9 @@ public class OllamaApiServer {
     private String resolveWebUiAssetName(String path) {
         if (path == null || path.isEmpty() || "/".equals(path) || "/index.html".equals(path)) {
             return "index.html";
+        }
+        if ("/swagger".equals(path) || "/swagger/".equals(path)) {
+            return "swagger.html";
         }
         String normalized = path.startsWith("/") ? path.substring(1) : path;
         if (WEBUI_CONTENT_TYPES.containsKey(normalized)) {

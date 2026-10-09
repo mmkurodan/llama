@@ -47,8 +47,12 @@ import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import android.widget.EditText;
@@ -100,6 +104,7 @@ public class MainActivity extends Activity {
     private View     processingSectionContent;  // collapsible body of the processing/log section
     private TextView webChatTitle;          // "Web AI Chat" card title
     private Button   openWebUiButton;       // opens the Web UI in the browser
+    private TextView apiProbeStatusMain;    // shows best reachable URL below the WebUI button
     private ConnectivityManager connectivityManager;
     private TextView promptLabel;
     private TextView outputSectionLabel;
@@ -135,6 +140,8 @@ public class MainActivity extends Activity {
     private boolean pendingApiStartAfterPermission = false;
     private boolean continueStartupDialogsAfterPermission = false;
     private final AtomicInteger directGenerationSessionId = new AtomicInteger(0);
+    private final ApiConnectivityProber apiProber = new ApiConnectivityProber();
+    private String bestProbeUrl = null;
     
     // Timestamp formatter for log messages
     private final SimpleDateFormat timestampFormat = new SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault());
@@ -262,6 +269,7 @@ public class MainActivity extends Activity {
         directSectionContent = findViewById(R.id.directSectionContent);
         webChatTitle = findViewById(R.id.webChatTitle);
         openWebUiButton = findViewById(R.id.openWebUiButton);
+        apiProbeStatusMain = findViewById(R.id.apiProbeStatusMain);
         processingSectionContent = findViewById(R.id.processingSectionContent);
         processingSectionLabel = findViewById(R.id.processingSectionLabel);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
@@ -324,6 +332,9 @@ public class MainActivity extends Activity {
         if (!isServiceRunning && OllamaForegroundService.isApiEnabled(this)) {
             appendMessage("Re-enabling API/WebUI server (persisted enabled state)");
             startApiService();
+        } else if (isServiceRunning) {
+            // Server was already running before this activity was created; probe it now.
+            runApiProbeAsync();
         }
 
         // Send button behavior
@@ -365,7 +376,9 @@ public class MainActivity extends Activity {
     }
 
     private void openWebUiInBrowser() {
-        final String url = buildWebUiUrl();
+        // Prefer the best probe URL so the browser gets the most accessible address.
+        // Always fall back to loopback if probing hasn't completed yet.
+        final String url = (bestProbeUrl != null) ? bestProbeUrl : buildWebUiUrl();
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception e) {
@@ -1772,6 +1785,7 @@ public class MainActivity extends Activity {
         isServiceRunning = true;
         updateApiServerUI();
         appendMessage("Starting API/WebUI server service on port " + apiPort + " (WebUI: /)");
+        runApiProbeAsync();
     }
     
     private void stopApiService() {
@@ -1827,6 +1841,115 @@ public class MainActivity extends Activity {
             }
         }
         return false;
+    }
+
+    private void runApiProbeAsync() {
+        if (apiProbeStatusMain != null) {
+            // Only the connection URL is shown here. Display the loopback URL immediately as a
+            // placeholder; the probe swaps in the best reachable URL once it completes.
+            apiProbeStatusMain.setVisibility(View.VISIBLE);
+            apiProbeStatusMain.setText(buildWebUiUrl());
+        }
+        String lanIp  = getActiveWifiIpv4Address();
+        String cellIp = getActiveCellularIpv4Address();
+        List<ApiConnectivityProber.Candidate> extras = collectExtraCandidates(lanIp, cellIp);
+        apiProber.probe(apiPort, lanIp, cellIp, extras, (results, bestUrl) -> {
+            bestProbeUrl = bestUrl;
+            updateProbeStatusView(results, bestUrl);
+        });
+    }
+
+    private void updateProbeStatusView(java.util.List<ApiConnectivityProber.ProbeResult> results, String bestUrl) {
+        if (apiProbeStatusMain == null) return;
+        // Show only the connection URL (reachable count / "best" label intentionally omitted).
+        String url = (bestUrl != null && !bestUrl.isEmpty()) ? bestUrl : buildWebUiUrl();
+        apiProbeStatusMain.setVisibility(View.VISIBLE);
+        apiProbeStatusMain.setText(url);
+    }
+
+    private String getActiveCellularIpv4Address() {
+        if (connectivityManager == null) return null;
+        try {
+            for (Network net : connectivityManager.getAllNetworks()) {
+                NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(net);
+                if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) continue;
+                LinkProperties lp = connectivityManager.getLinkProperties(net);
+                if (lp == null) continue;
+                for (LinkAddress la : lp.getLinkAddresses()) {
+                    InetAddress a = la.getAddress();
+                    if (a instanceof Inet4Address && !a.isLoopbackAddress()) {
+                        return a.getHostAddress();
+                    }
+                }
+            }
+        } catch (SecurityException ignored) {}
+        return null;
+    }
+
+    private List<ApiConnectivityProber.Candidate> collectExtraCandidates(String lanIp, String cellIp) {
+        List<ApiConnectivityProber.Candidate> extras = new ArrayList<>();
+        Set<String> known = new HashSet<>();
+        if (lanIp  != null) known.add(lanIp);
+        if (cellIp != null) known.add(cellIp);
+
+        if (connectivityManager != null) {
+            try {
+                for (Network net : connectivityManager.getAllNetworks()) {
+                    NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(net);
+                    if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) continue;
+                    LinkProperties lp = connectivityManager.getLinkProperties(net);
+                    if (lp == null) continue;
+                    for (LinkAddress la : lp.getLinkAddresses()) {
+                        InetAddress addr = la.getAddress();
+                        if (!(addr instanceof Inet4Address) || addr.isLoopbackAddress()) continue;
+                        String ip = addr.getHostAddress();
+                        if (known.add(ip)) {
+                            extras.add(new ApiConnectivityProber.Candidate(
+                                    localizedText("有線LAN", "Ethernet"), ip));
+                        }
+                    }
+                }
+            } catch (SecurityException ignored) {}
+        }
+
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> ifaces =
+                    java.net.NetworkInterface.getNetworkInterfaces();
+            if (ifaces != null) {
+                while (ifaces.hasMoreElements()) {
+                    java.net.NetworkInterface iface = ifaces.nextElement();
+                    if (iface.isLoopback() || !iface.isUp()) continue;
+                    String name = iface.getName().toLowerCase(Locale.ROOT);
+                    if (name.startsWith("wlan") || name.startsWith("rmnet")
+                            || name.startsWith("ccmni") || name.startsWith("dummy")
+                            || name.startsWith("v4-")) continue;
+                    String label = ifaceLabelMain(name);
+                    java.util.Enumeration<InetAddress> addrs = iface.getInetAddresses();
+                    while (addrs.hasMoreElements()) {
+                        InetAddress addr = addrs.nextElement();
+                        if (!(addr instanceof Inet4Address) || addr.isLoopbackAddress()) continue;
+                        String ip = addr.getHostAddress();
+                        if (known.add(ip)) {
+                            extras.add(new ApiConnectivityProber.Candidate(label, ip));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return extras;
+    }
+
+    private String ifaceLabelMain(String name) {
+        if (name.startsWith("rndis") || name.startsWith("usb"))
+            return localizedText("USBテザリング", "USB tether");
+        if (name.startsWith("bt-pan") || name.startsWith("bnep"))
+            return localizedText("BTテザリング", "BT tether");
+        if (name.startsWith("ap") || name.startsWith("swlan") || name.startsWith("wl"))
+            return localizedText("ホットスポット", "Hotspot");
+        if (name.startsWith("eth") || name.startsWith("enp"))
+            return localizedText("有線LAN", "Ethernet");
+        return name;
     }
     
     @Override

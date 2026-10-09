@@ -305,6 +305,8 @@ public final class Translations {
         e("gguf import from local device", "Importer un gguf depuis l'appareil local", "Importar gguf desde el dispositivo local", "Importar gguf do dispositivo local", "gguf vom lokalen Gerät importieren", "Importa gguf dal dispositivo locale", "从本地设备导入 gguf", "로컬 기기에서 gguf 가져오기");
         e("Load Model", "Charger le modèle", "Cargar modelo", "Carregar modelo", "Modell laden", "Carica modello", "加载模型", "모델 로드");
         e("MAINTAIN MODEL", "GÉRER LE MODÈLE", "MANTENER MODELO", "MANTER MODELO", "MODELL VERWALTEN", "GESTISCI MODELLO", "模型管理", "모델 관리");
+        e("Generate Model", "Générer un modèle", "Generar modelo", "Gerar modelo", "Modell erstellen", "Genera modello", "生成模型", "모델 생성");
+        e("Support & Feedback", "Soutien et commentaires", "Apoyo y comentarios", "Apoio e feedback", "Unterstützung & Feedback", "Supporto e feedback", "支持与反馈", "응원·피드백");
         e("Model file: (none)", "Fichier du modèle : (aucun)", "Archivo del modelo: (ninguno)", "Arquivo do modelo: (nenhum)", "Modelldatei: (keine)", "File del modello: (nessuno)", "模型文件：（无）", "모델 파일: (없음)");
         e("Model Parameters", "Paramètres du modèle", "Parámetros del modelo", "Parâmetros do modelo", "Modellparameter", "Parametri del modello", "模型参数", "모델 매개변수");
         e("Context Size (n_ctx):", "Taille du contexte (n_ctx) :", "Tamaño de contexto (n_ctx):", "Tamanho do contexto (n_ctx):", "Kontextgröße (n_ctx):", "Dimensione contesto (n_ctx):", "上下文大小 (n_ctx)：", "컨텍스트 크기 (n_ctx):");
@@ -465,5 +467,23 @@ public final class Translations {
         e("Scale (strength, typically 0.3–1.0): ", "Échelle (intensité, généralement 0,3–1,0) : ", "Escala (intensidad, normalmente 0,3–1,0): ", "Escala (intensidade, geralmente 0,3–1,0): ", "Skalierung (Stärke, typisch 0,3–1,0): ", "Scala (intensità, in genere 0,3–1,0): ", "强度（通常 0.3–1.0）：", "스케일 (강도, 보통 0.3–1.0): ");
         e("Select adapter", "Sélectionner l'adaptateur", "Seleccionar adaptador", "Selecionar adaptador", "Adapter auswählen", "Seleziona adattatore", "选择适配器", "어댑터 선택");
         e("Clear adapter", "Effacer l'adaptateur", "Borrar adaptador", "Limpar adaptador", "Adapter entfernen", "Rimuovi adattatore", "清除适配器", "어댑터 해제");
+        e("Connection check:", "Vérification de connexion :", "Verificación de conexión:", "Verificação de conexão:", "Verbindungstest:", "Verifica connessione:", "连接检查：", "연결 확인:");
+        e("Check", "Vérifier", "Verificar", "Verificar", "Prüfen", "Verifica", "检查", "확인");
+        e("Checking connections…", "Vérification des connexions…", "Verificando conexiones…", "Verificando conexões…", "Verbindungen werden geprüft…", "Verifica connessioni in corso…", "正在检查连接…", "연결 확인 중…");
+        e("Reachable: ", "Accessible : ", "Accesible: ", "Acessível: ", "Erreichbar: ", "Raggiungibile: ", "可达：", "도달 가능: ");
+        e("Best: ", "Meilleure : ", "Mejor: ", "Melhor: ", "Beste: ", "Migliore: ", "最佳：", "최적: ");
+        e("not connected", "non connecté", "no conectado", "não conectado", "nicht verbunden", "non connesso", "未连接", "연결 안 됨");
+        e("未接続", "Non connecté", "No conectado", "Não conectado", "Nicht verbunden", "Non connesso", "未连接", "연결 안 됨");
+        e("接続確認中…", "Vérification…", "Verificando…", "Verificando…", "Prüfe…", "Verifica…", "检查中…", "확인 중…");
+        e("接続可能: ", "Accessible : ", "Accesible: ", "Acessível: ", "Erreichbar: ", "Raggiungibile: ", "可达：", "도달 가능: ");
+        e("最良: ", "Meilleure : ", "Mejor: ", "Melhor: ", "Beste: ", "Migliore: ", "最佳：", "최적: ");
+        e("キャリア回線", "Opérateur mobile", "Operador móvil", "Operadora móvel", "Mobilfunknetz", "Rete cellulare", "运营商网络", "이동통신망");
+        e("有線LAN", "Ethernet", "Ethernet", "Ethernet", "Ethernet", "Ethernet", "有线网络", "유선 LAN");
+        e("USBテザリング", "Partage USB", "Tethering USB", "Tethering USB", "USB-Tethering", "Tethering USB", "USB网络共享", "USB 테더링");
+        e("BTテザリング", "Partage Bluetooth", "Tethering BT", "Tethering BT", "BT-Tethering", "Tethering BT", "蓝牙网络共享", "BT 테더링");
+        e("ホットスポット", "Point d'accès", "Punto de acceso", "Ponto de acesso", "Hotspot", "Hotspot", "热点", "핫스팟");
+        e("▼ 接続確認", "▼ Vérif. connexion", "▼ Verif. conexión", "▼ Verif. conexão", "▼ Verbindungstest", "▼ Verifica conn.", "▼ 连接检查", "▼ 연결 확인");
+        e("▶ 接続確認（タップで展開）", "▶ Vérif. connexion (ouvrir)", "▶ Verif. conexión (abrir)", "▶ Verif. conexão (abrir)", "▶ Verbindungstest (öffnen)", "▶ Verifica conn. (apri)", "▶ 连接检查（点击展开）", "▶ 연결 확인 (탭하여 열기)");
+        e("Open API Docs (Swagger UI)", "Ouvrir la doc API (Swagger UI)", "Abrir docs de API (Swagger UI)", "Abrir docs da API (Swagger UI)", "API-Doku öffnen (Swagger UI)", "Apri doc API (Swagger UI)", "打开 API 文档 (Swagger UI)", "API 문서 열기 (Swagger UI)");
     }
 }
