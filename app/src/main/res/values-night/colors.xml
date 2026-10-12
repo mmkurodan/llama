@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-mode overrides for the card-based UI palette. -->
+    <color name="primary_blue">#FF8AB4F8</color>
+    <color name="primary_blue_pressed">#FF669DF6</color>
+    <color name="secondary_grey">#FF3C4043</color>
+    <color name="secondary_grey_pressed">#FF4C5155</color>
+    <color name="secondary_grey_disabled">#FF2A2D2F</color>
+    <color name="card_bg">#FF1E2023</color>
+    <color name="screen_bg">#FF121416</color>
+    <color name="divider">#FF3C4043</color>
+    <color name="text_primary">#FFE8EAED</color>
+    <color name="text_secondary">#FF9AA0A6</color>
+    <color name="link_blue">#FF8AB4F8</color>
+    <color name="badge_blue">#FF8AB4F8</color>
+    <color name="light_blue">#FF1E4976</color>
+    <color name="on_primary">#FF202124</color>
+    <color name="section_icon_bg">#FF3C4043</color>
+</resources>

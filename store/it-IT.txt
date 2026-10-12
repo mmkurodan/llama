@@ -7,72 +7,60 @@ Un dispositivo Android diventa il tuo backend AI personale, accessibile da PC, t
 
 1. Panoramica
 LLM AI Server con llama.cpp è un server LLM completamente locale per Android: generazione di testo e multimodale, privata e offline.
-Supporta ricerca modelli su Hugging Face, download GGUF, caricamento locale e decodifica speculativa MTP opzionale.
-
-Famiglie di modelli supportate: Gemma‑4 / Gemma‑4 Vision, Qwen / Qwen Vision, Mistral, LLaMA, Phi, Bonsai e altre.
-Un server API integrato, compatibile con Ollama, OpenAI, Anthropic (Claude) Messages e Google Gemini, offre endpoint per chat, completamento, generazione, embedding, tokenizzazione/conteggio token e listato modelli.
-La WebUI inclusa funziona sulla stessa porta: cambio modello, modifica parametri, log e installazione come PWA.
-
-MCP e Function Calling abilitano flussi con strumenti; output strutturato via GBNF e JSON Schema.
+Famiglie supportate: Gemma-4/Vision, Qwen/Vision, Mistral, LLaMA, Phi, Bonsai e altre.
+Server API integrato compatibile con Ollama, OpenAI, Anthropic (Claude) Messages e Google Gemini.
+WebUI sulla stessa porta: cambio modello, parametri, log e installazione PWA.
+MCP e Function Calling per flussi con strumenti; output strutturato via GBNF/JSON Schema.
 
 ---
 
-2. Utenti e Dispositivi Supportati
+2. Utenti e dispositivi
 Per chi desidera un ambiente LLM privato e completamente locale:
-
 - Utenti che privilegiano l'uso offline
 - Sviluppatori che integrano un backend locale
-- Utenti esperti che ottimizzano campionamento e prestazioni
+- Utenti esperti che ottimizzano sampling e prestazioni
 - Ricercatori che testano l'inferenza
 - Utenti attenti alla privacy
 
-Prestazioni regolabili: dimensione del contesto, thread, batch, offload GPU, quantizzazione KV e MTP opzionale.
+Prestazioni regolabili: contesto, thread, batch, offload GPU, quantizzazione KV e MTP.
 
 ---
 
-3. Caratteristiche Principali
-- Ricerca e download GGUF da Hugging Face
-- Modello di visione Qwen3‑VL (predefinito) con rilevamento automatico del proiettore (mmproj)
-- Espansione automatica del contesto (n_ctx) per immagini grandi e prompt lunghi
-- Fallback automatico GPU→CPU in caso di errore di inizializzazione della GPU
-- Ricerca Hugging Face migliorata: guida per modello/dimensione/quantizzazione, valutazione di idoneità del dispositivo e download mmproj con un tocco
-- Motore llama.cpp aggiornato (b10621, v0.3.0) — modelli più recenti e GPU Adreno OpenCL
-- Recupero dei log sul dispositivo tramite GET /api/diagnostics
-- Caricamento GGUF locale
-- Adattatori LoRA: applica un GGUF LoRA al modello base in fase di esecuzione; seleziona, salva e gestisci gli adattatori dalle Impostazioni
-- Decodifica speculativa MTP
-- Controllo dettagliato dei parametri (Mirostat, DRY, XTC, Min‑p, Typical‑p, penalità, temperatura dinamica)
-- Server API integrato compatibile con Ollama / OpenAI / Anthropic (Claude) Messages / Google Gemini
-- API Google Gemini: /v1beta(v1)/models/{model}:generateContent e :streamGenerateContent — multimodale, chiamata di funzioni, thinking
-- API per embedding
-- Selezione automatica del template di prompt
-- WebUI migliorata con supporto multilingua
-- Supporto PWA
-- MCP e Function Calling
-- Backup e ripristino del profilo
+3. Caratteristiche principali
+- Ricerca/download GGUF da Hugging Face; valutazione idoneità dispositivo, download mmproj con un tocco
+- Qwen3-VL vision (predefinito); espansione automatica n_ctx per immagini grandi; fallback GPU→CPU auto
+- Import GGUF locale; rinomina/elimina; adattatori LoRA (runtime, gestione nelle Impostazioni)
+- Decodifica speculativa MTP; parametri dettagliati (Mirostat, DRY, XTC, Min-p, Typical-p, penalità, dynatemp)
+- Motore llama.cpp b10621 (v0.3.0) — modelli più recenti, GPU Adreno OpenCL
+- API Ollama: /api/chat, /api/generate, /api/ps, /api/show, /api/delete, /api/embed(dings), /api/tokenize, /api/tags; keep_alive
+- API OpenAI: /v1/chat/completions, /v1/completions, /v1/responses, /v1/embeddings, /v1/models
+- API Anthropic (Claude): /v1/messages, /v1/messages/count_tokens, GET /v1/models; blocchi documento/PDF; Thinking via intestazione anthropic-beta
+- API Google Gemini: generateContent/streamGenerateContent; GET /v1beta/models (lista/singolo); countTokens; embedContent; modalità JSON; thinkingBudget
+- Swagger UI su /swagger: documentazione OpenAPI interattiva (Impostazioni → «Open API Docs»)
+- Pannello verifica connessione nelle Impostazioni: URLs raggiungibili per interfaccia di rete
+- Log via GET /api/diagnostics; profilo LLM AI Server Guide incluso
+- WebUI multilingua (9 lingue), PWA; MCP e Function Calling
+- Backup/ripristino profili; selezione automatica del template di prompt
 
-Endpoint compatibili con Ollama, OpenAI, Anthropic (Claude) e Google Gemini; elenco completo nella pagina di test qui sotto.
-Dettagli completi, esempi e tester interattivo: https://micklab.web.app/llama-tester-en.html
+Documentazione completa, esempi e tester interattivo:
+https://micklab.web.app/llama-tester-en.html
 
 ---
 
-4. Come Iniziare
-Puoi iniziare subito in uno dei seguenti modi:
-
+4. Come iniziare
 A) Avvia API/WebUI → Apri nel browser
-1. Tocca "Avvia API/WebUI" nella schermata principale.
-2. Tocca "Apri nel browser" per lanciare la WebUI integrata.
+1. Tocca «Avvia API/WebUI» nella schermata principale.
+2. Tocca «Apri nel browser» per lanciare la WebUI.
 3. Puoi chattare ed eseguire il modello dalla WebUI.
-   - Nota: se il modello non è ancora scaricato, la WebUI lo scarica al primo messaggio (i modelli grandi richiedono tempo).
+   - Nota: se il modello non è scaricato, la WebUI lo scarica al primo messaggio.
 
-B) Esecuzione Diretta
-1. Apri la sezione "Esecuzione Diretta".
-2. Inserisci un prompt e tocca "Invia" per eseguire il modello nell'app.
-   - Se non ancora scaricato, l'app avvisa prima del download.
+B) Esecuzione diretta
+1. Apri la sezione «Esecuzione diretta».
+2. Inserisci un prompt e tocca «Invia».
 
-C) Oppure prepara prima un modello dalle Impostazioni
+C) Oppure prepara un modello dalle Impostazioni
 1. Apri le Impostazioni.
-2. Cerca un GGUF su Hugging Face, inserisci un URL o importa un file locale.
+2. Cerca su Hugging Face, inserisci un URL o importa localmente.
 3. Regola i parametri (contesto, temperatura, penalità, MTP, offload GPU, ecc.).
-4. Tocca "Salva Configurazione", quindi "SALVA E CHIUDI" per caricare il modello.
-5. Opzionalmente, crea un backup del profilo per un ripristino futuro.
+4. Tocca «Salva Configurazione», quindi «SALVA E CHIUDI».
+5. Opzionalmente, crea un backup del profilo.

@@ -36,7 +36,7 @@ public class DocumentsActivity extends Activity {
 
     @Override
     protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+        super.attachBaseContext(AppThemeManager.wrap(AppLanguageManager.wrap(newBase)));
     }
 
     @Override
@@ -178,11 +178,19 @@ public class DocumentsActivity extends Activity {
             sb.append("Anthropic（Claude）互換:\n");
             sb.append("  POST /v1/messages              … Messages API（stream可・system・マルチターン・thinking・画像/音声・tool_use対応）\n");
             sb.append("  POST /v1/messages/count_tokens … 入力トークン数の見積り（生成なし）\n");
+            sb.append("  GET  /v1/models                … Anthropicヘッダ（anthropic-version / x-api-key）存在時にAnthropicフォーマットで返す\n");
+            sb.append("  ドキュメントブロック（type:document）: base64 PDF→PdfRendererで画像化, URL→image_urlパススルー; anthropic-betaヘッダでThinking有効化\n");
+            sb.append("Google Gemini互換:\n");
+            sb.append("  POST /v1beta(v1)/models/{model}:generateContent, :streamGenerateContent, :countTokens, :embedContent, :batchEmbedContents\n");
+            sb.append("  GET /v1beta(v1)/models … モデル一覧; GET /v1beta/models/{model} … 単一モデル取得\n");
+            sb.append("  generationConfig.responseMimeType=application/json → JSONモード; thinkingConfig.thinkingBudget > 0 → Thinking有効\n");
             sb.append("Ollama互換:\n");
-            sb.append("  POST /api/chat, /api/generate, /api/embed, /api/embeddings, /api/tokenize、GET /api/tags\n");
+            sb.append("  POST /api/chat, /api/generate, /api/embed(dings), /api/tokenize; GET /api/tags, /api/ps; POST /api/show; DELETE /api/delete\n");
+            sb.append("  keep_alive: 0=生成後アンロード、-1=保持（既定）; 空プロンプト=プリロードのみ\n");
             sb.append("llama.cpp互換・管理:\n");
-            sb.append("  GET /props, GET /slots, GET /health（/v1/health）, POST /models/load, POST /models/unload\n");
-            sb.append("  POST /api/profiles/create（別名 /api/profiles） … 新規プロファイル登録（モデル取り込みは行わない）\n\n");
+            sb.append("  GET /props, /slots, /health（/v1/health）, /lora-adapters; POST /models/load, /models/unload\n");
+            sb.append("  POST /api/profiles/create（別名 /api/profiles） … 新規プロファイル登録（モデル取り込みは行わない）\n");
+            sb.append("  GET /swagger … OpenAPI 3.0インタラクティブAPIドキュメント（設定画面「Open API Docs (Swagger UI)」ボタン）\n\n");
             sb.append("■ 共通の生成パラメータ（リクエストbodyの直下、またはOllamaは options 内）\n");
             sb.append("- 上限: max_tokens / num_predict / n_predict（Anthropicは max_tokens 必須）。0は「無制限＝プロファイル設定に従う」。\n");
             sb.append("- サンプリング: temperature, top_p, top_k, min_p, typ_p, dynatemp_range, dynatemp_exponent, xtc_probability, xtc_threshold。\n");
@@ -242,11 +250,19 @@ public class DocumentsActivity extends Activity {
             sb.append("Anthropic (Claude)-compatible:\n");
             sb.append("  POST /v1/messages              … Messages API (streaming, system, multi-turn, thinking, image/audio, tool_use)\n");
             sb.append("  POST /v1/messages/count_tokens … estimate input tokens (no generation)\n");
+            sb.append("  GET  /v1/models                … returns Anthropic format when anthropic-version or x-api-key header is present\n");
+            sb.append("  Document blocks (type:document): base64 PDF→PdfRenderer page images; URL→image_url passthrough; thinking via anthropic-beta header\n");
+            sb.append("Google Gemini-compatible:\n");
+            sb.append("  POST /v1beta(v1)/models/{model}:generateContent, :streamGenerateContent, :countTokens, :embedContent, :batchEmbedContents\n");
+            sb.append("  GET /v1beta(v1)/models … model list; GET /v1beta/models/{model} … single model\n");
+            sb.append("  generationConfig.responseMimeType=application/json → JSON mode; thinkingConfig.thinkingBudget > 0 → enable thinking\n");
             sb.append("Ollama-compatible:\n");
-            sb.append("  POST /api/chat, /api/generate, /api/embed, /api/embeddings, /api/tokenize; GET /api/tags\n");
+            sb.append("  POST /api/chat, /api/generate, /api/embed(dings), /api/tokenize; GET /api/tags, /api/ps; POST /api/show; DELETE /api/delete\n");
+            sb.append("  keep_alive: 0=unload after response, -1=keep loaded (default); empty prompt=preload only\n");
             sb.append("llama.cpp-compatible / management:\n");
-            sb.append("  GET /props, GET /slots, GET /health (/v1/health), POST /models/load, POST /models/unload\n");
-            sb.append("  POST /api/profiles/create (alias /api/profiles) … register a new profile (no model import)\n\n");
+            sb.append("  GET /props, /slots, /health (/v1/health), /lora-adapters; POST /models/load, /models/unload\n");
+            sb.append("  POST /api/profiles/create (alias /api/profiles) … register a new profile (no model import)\n");
+            sb.append("  GET /swagger … interactive OpenAPI 3.0 docs (Settings → 'Open API Docs (Swagger UI)' button)\n\n");
             sb.append("■ Common generation parameters (top level of the body, or inside 'options' for Ollama)\n");
             sb.append("- Limit: max_tokens / num_predict / n_predict (Anthropic requires max_tokens). 0 means 'unlimited = follow the profile'.\n");
             sb.append("- Sampling: temperature, top_p, top_k, min_p, typ_p, dynatemp_range, dynatemp_exponent, xtc_probability, xtc_threshold.\n");
@@ -330,7 +346,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- モデルパラメータ: 生成パラメータを設定します（GPUオフロード層を含む）。\n");
         sb.append("- 出力設定: ストリーミング出力の有効/無効、および性能指標（速度・温度）の表示を切り替えます。\n");
         sb.append("- プロンプトテンプレート: システムプロンプト、Think有効/無効（chat-template-kwargs.enable_thinking）、カスタムテンプレートを設定できます。カスタム未設定時はGGUFのchat_templateメタデータを優先し、必要に応じてモデルファミリーから自動選択されます。Bonsai系の既定テンプレートにも対応しています。\n");
-        sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURL(http://127.0.0.1:ポート番号)を表示し、Wi-Fi接続中はLAN URLも表示します。各URLはタップで既定ブラウザを開き、長押しでURLをコピーできます。起動時ポップアップまたはメイン画面で有効化すると、APIとWebUIが同じポートで利用可能になります。\n");
+        sb.append("- Llama APIサーバー: サーバーポートを指定します。ローカルURL(http://127.0.0.1:ポート番号)とWi-Fi接続時のLAN URLを表示します（長押しでコピー、タップでブラウザを開く）。▶ 接続確認を展開すると、各ネットワークインターフェース（127.0.0.1・LAN・キャリア回線など）の到達可能URLをプローブして一覧表示します。「Open API Docs (Swagger UI)」ボタンで /swagger のインタラクティブなOpenAPI 3.0ドキュメントを開けます。\n");
         sb.append("- MCP設定: モデル設定とは別のアプリ共通設定としてMCPコンフィグJSONとFunction Definitions JSONを保存できます。各スイッチをオフにした場合は WebUI でのみ利用され、メイン画面のプロンプト入力や /api/chat、/api/generate、/v1/chat/completions では未設定として扱われます。オンにした場合のみ、それぞれ共有MCP設定と共有 function calling 定義として利用されます。\n");
         sb.append("- 表示言語: 表示言語を切り替えます。日本語・英語・フランス語・スペイン語・ポルトガル語・ドイツ語・イタリア語・中国語・韓国語の9言語に対応します。初回は端末設定から自動選択（非対応時は英語）され、次回以降は選択が保存されます。\n");
         sb.append("- ログ設定: ログレベルを選択します（初回起動時の既定値: INFO）。\n");
@@ -478,7 +494,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Model Parameters: Set generation parameters (including GPU Offload Layers).\n");
         sb.append("- Output Settings: Toggle streaming output on/off and show/hide performance metrics.\n");
         sb.append("- Prompt Template: Set System Prompt, Think on/off (chat-template-kwargs.enable_thinking), and custom chat template. When no custom template is set, the app first uses GGUF chat_template metadata and otherwise auto-selects by model family. A Bonsai fallback template is included.\n");
-        sb.append("- Llama API Server: Set the server port. The Local URL (http://127.0.0.1:<port>) is shown, and while connected to Wi-Fi the LAN URL is shown too. Tap a URL to open it in the default browser and long-press to copy it. Enabling it from the startup popup or the main screen makes both the API and WebUI available on that port.\n");
+        sb.append("- Llama API Server: Set the server port. Shows the Local URL (http://127.0.0.1:<port>) and, while on Wi-Fi, the LAN URL (long-press to copy, tap to open in browser). Expand \"Connection check\" to probe each network interface and see which URLs are reachable. The \"Open API Docs (Swagger UI)\" button opens interactive OpenAPI 3.0 documentation at /swagger.\n");
         sb.append("- MCP Settings: Save MCP config JSON and Function Definitions JSON as app-wide shared settings separate from model profiles. When the new switches are off, they are available only in the WebUI and are treated as absent everywhere else. When enabled, they are also used as shared MCP and function-calling settings for the main prompt input, /api/chat, /api/generate, and /v1/chat/completions.\n");
         sb.append("- Display Language: Switch the UI language. Nine languages are supported: Japanese, English, French, Spanish, Portuguese, German, Italian, Chinese, and Korean. On first launch it follows your device locale (English when unsupported), and your choice is saved for later launches.\n");
         sb.append("- Log Settings: Select log level (default on first launch: INFO).\n");

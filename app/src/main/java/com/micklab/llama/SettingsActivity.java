@@ -200,6 +200,7 @@ public class SettingsActivity extends Activity {
     private Switch sharedFunctionCallingEnabledSwitch;
     private TextView languageLabel;
     private Spinner languageSpinner;
+    private Switch darkModeSwitch;
     private Spinner logLevelSpinner;
     private Button licenseButton;
     private Button documentsButton;
@@ -284,7 +285,7 @@ public class SettingsActivity extends Activity {
 
     @Override
     protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+        super.attachBaseContext(AppThemeManager.wrap(AppLanguageManager.wrap(newBase)));
     }
 
     @Override
@@ -547,6 +548,7 @@ public class SettingsActivity extends Activity {
         sharedFunctionCallingEnabledSwitch = findViewById(R.id.sharedFunctionCallingEnabledSwitch);
         languageLabel = findViewById(R.id.languageLabel);
         languageSpinner = findViewById(R.id.languageSpinner);
+        darkModeSwitch = findViewById(R.id.darkModeSwitch);
         logLevelSpinner = findViewById(R.id.logLevelSpinner);
         settingsContentContainer = findViewById(R.id.settingsContentContainer);
         licenseButton = findViewById(R.id.licenseButton);
@@ -584,6 +586,7 @@ public class SettingsActivity extends Activity {
                 ? prefs.getInt(PREF_LOG_LEVEL, defaultLogLevel)
                 : defaultLogLevel;
         setupLanguageSpinner();
+        setupDarkModeSwitch();
         setupLogLevelSpinner(savedLogLevel);
         
         saveConfigButton = findViewById(R.id.saveConfigButton);
@@ -936,6 +939,7 @@ public class SettingsActivity extends Activity {
         switch (text) {
             case "Configuration Management": return "設定管理";
             case "Display Language": return "表示言語";
+            case "Dark Mode": return "ダークモード";
             case "Profile:": return "プロファイル:";
             case "Configuration Name:": return "設定名:";
             case "Save Config": return "設定を保存";
@@ -1258,6 +1262,21 @@ public class SettingsActivity extends Activity {
             public void onNothingSelected(AdapterView<?> parent) {
                 // No-op
             }
+        });
+    }
+
+    private void setupDarkModeSwitch() {
+        if (darkModeSwitch == null) {
+            return;
+        }
+        TextView darkModeLabel = findViewById(R.id.darkModeLabel);
+        if (darkModeLabel != null) {
+            darkModeLabel.setText(localizedText("ダークモード", "Dark Mode"));
+        }
+        darkModeSwitch.setChecked(AppThemeManager.isDarkMode(this));
+        darkModeSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            AppThemeManager.saveDarkMode(SettingsActivity.this, checked);
+            recreate();
         });
     }
 

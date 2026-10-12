@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Dark-mode override: switch to the framework's dark Material theme so that system
+        widgets (dialogs, spinners, scroll bars, etc.) are also dark.
+        windowLightStatusBar / windowLightNavigationBar = false → light icons on dark bars.
+    -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">@color/screen_bg</item>
+    </style>
+</resources>

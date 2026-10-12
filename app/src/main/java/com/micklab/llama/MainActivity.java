@@ -133,6 +133,7 @@ public class MainActivity extends Activity {
     private ConfigurationManager configManager;
     private ConfigurationManager.Configuration currentConfig;
     private String currentDisplayLanguage;
+    private boolean currentDarkMode;
     
     // API Server (via Foreground Service)
     private int apiPort = OllamaApiServer.DEFAULT_PORT;
@@ -232,7 +233,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(AppLanguageManager.wrap(newBase));
+        super.attachBaseContext(AppThemeManager.wrap(AppLanguageManager.wrap(newBase)));
     }
 
     @Override
@@ -240,6 +241,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         currentDisplayLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+        currentDarkMode = AppThemeManager.isDarkMode(this);
         
         // Initialize configuration manager
         configManager = new ConfigurationManager(this);
@@ -1956,10 +1958,12 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         String latestLanguage = AppLanguageManager.getOrInitDisplayLanguage(this);
+        boolean latestDarkMode = AppThemeManager.isDarkMode(this);
         if (currentDisplayLanguage == null) {
             currentDisplayLanguage = latestLanguage;
-        } else if (!currentDisplayLanguage.equals(latestLanguage)) {
+        } else if (!currentDisplayLanguage.equals(latestLanguage) || currentDarkMode != latestDarkMode) {
             currentDisplayLanguage = latestLanguage;
+            currentDarkMode = latestDarkMode;
             recreate();
             return;
         }

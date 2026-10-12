@@ -4,8 +4,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +39,7 @@ public class ApiConnectivityProber {
         public final String label;
         public final String host;   // "—" when address was unavailable
         public final String url;    // "http://host:port" or "" when host is "—"
+        public final int port;
         public boolean reachable;
         public long latencyMs = -1;
         public String errorMsg;     // non-null when !reachable
@@ -44,6 +47,7 @@ public class ApiConnectivityProber {
         ProbeResult(String label, String host, int port) {
             this.label = label;
             this.host = host;
+            this.port = port;
             this.url = host.equals("—") ? "" : "http://" + host + ":" + port;
         }
     }
@@ -133,17 +137,29 @@ public class ApiConnectivityProber {
         if (r.host.equals("—")) return;
         long start = System.currentTimeMillis();
         try {
-            URL url = new URL(r.url + PROBE_PATH);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(TIMEOUT_MS);
-            conn.setReadTimeout(TIMEOUT_MS);
-            conn.setRequestMethod("GET");
-            conn.setInstanceFollowRedirects(false);
-            int code = conn.getResponseCode();
-            conn.disconnect();
+            // Raw socket bypasses Android NSC cleartext restrictions for non-whitelisted hosts
+            // (NSC only intercepts Java HTTP(S) client APIs, not raw TCP sockets).
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress(r.host, r.port), TIMEOUT_MS);
+            socket.setSoTimeout(TIMEOUT_MS);
+            OutputStream out = socket.getOutputStream();
+            String req = "GET " + PROBE_PATH + " HTTP/1.0\r\nHost: " + r.host + "\r\nConnection: close\r\n\r\n";
+            out.write(req.getBytes("US-ASCII"));
+            out.flush();
+            InputStream in = socket.getInputStream();
+            StringBuilder sb = new StringBuilder();
+            int ch;
+            while ((ch = in.read()) != -1 && sb.length() < 64) {
+                if (ch == '\n') break;
+                sb.append((char) ch);
+            }
+            socket.close();
+            String status = sb.toString().trim();
             r.latencyMs = System.currentTimeMillis() - start;
-            r.reachable = (code == 200);
-            if (!r.reachable) r.errorMsg = "HTTP " + code;
+            r.reachable = status.startsWith("HTTP/") && status.contains(" 200");
+            if (!r.reachable) {
+                r.errorMsg = status.isEmpty() ? "no response" : (status.length() > 20 ? status.substring(0, 20) : status);
+            }
         } catch (Exception e) {
             r.latencyMs = System.currentTimeMillis() - start;
             r.reachable = false;

@@ -35,6 +35,19 @@
             android:minHeight="48dp" />
 
         <TextView
+            android:id="@+id/darkModeLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dark Mode"
+            android:paddingTop="8dp" />
+
+        <Switch
+            android:id="@+id/darkModeSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Profile:"
@@ -84,7 +97,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -353,7 +366,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -599,7 +612,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -672,7 +685,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -731,7 +744,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -846,7 +859,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -933,7 +946,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1010,7 +1023,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1035,7 +1048,7 @@
             android:layout_height="wrap_content"
             android:text="Used when API doesn't provide a system message."
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:paddingBottom="4dp" />
 
         <EditText
@@ -1059,7 +1072,7 @@
             android:layout_height="wrap_content"
             android:text="Overrides auto-detection. Use {SYSTEM} and {USER} placeholders."
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:paddingBottom="4dp" />
 
         <EditText
@@ -1083,7 +1096,7 @@
             android:layout_height="wrap_content"
             android:text="Based on custom template or model family detection."
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:paddingBottom="4dp" />
 
         <TextView
@@ -1092,8 +1105,8 @@
             android:layout_height="wrap_content"
             android:text="(auto-selected template will appear here)"
             android:textSize="12sp"
-            android:textColor="#333333"
-            android:background="#F5F5F5"
+            android:textColor="@color/text_primary"
+            android:background="@color/card_bg"
             android:padding="8dp"
             android:textIsSelectable="true" />
 
@@ -1101,7 +1114,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1218,10 +1231,10 @@
             android:id="@+id/apiLoopbackUrlView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#F5F5F5"
+            android:background="@color/card_bg"
             android:padding="12dp"
             android:text="http://localhost:11434"
-            android:textColor="#0B57D0" />
+            android:textColor="@color/link_blue" />
 
         <Button
             android:id="@+id/swaggerButton"
@@ -1248,9 +1261,9 @@
                 android:id="@+id/apiWifiUrlView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="#F5F5F5"
+                android:background="@color/card_bg"
                 android:padding="12dp"
-                android:textColor="#0B57D0" />
+                android:textColor="@color/link_blue" />
         </LinearLayout>
 
         <TextView
@@ -1258,7 +1271,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Connect to Wi-Fi to show the LAN URL."
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:paddingTop="8dp" />
 
@@ -1307,7 +1320,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1344,7 +1357,7 @@
             android:layout_height="wrap_content"
             android:text="Available only in Web UI when disabled."
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:paddingBottom="4dp" />
 
         <TextView
@@ -1387,7 +1400,7 @@
             android:layout_height="wrap_content"
             android:text="Available only in Web UI when disabled."
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:paddingBottom="4dp" />
 
         <TextView
@@ -1410,7 +1423,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1439,7 +1452,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1447,7 +1460,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
@@ -1477,7 +1490,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC"
+            android:background="@color/divider"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 

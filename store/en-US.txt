@@ -1,82 +1,66 @@
-Unlimited AI, zero cloud. Your phone is the server. 
+Unlimited AI, zero cloud. Your phone is the server.
 
-Run powerful LLMs locally, privately, and freely — with a lightweight UI anyone can use.  
+Run powerful LLMs locally, privately, and freely — with a lightweight UI anyone can use.
 One Android device becomes your personal AI backend, accessible from PCs, tablets, and other devices on the same network.
 
 ---
 
 1. Overview
-LLM AI Server with llama.cpp is a fully local LLM server for Android, enabling private, offline text and multimodal generation.  
-It supports Hugging Face model search, GGUF downloads, local model loading, and optional MTP speculative decoding for faster inference.
-
-Supported model families include Gemma‑4 / Gemma‑4 Vision, Qwen / Qwen Vision, Mistral, LLaMA, Phi, Bonsai, and others.  
-A built‑in API server is compatible with the Ollama, OpenAI, Anthropic (Claude) Messages, and Google Gemini APIs — providing chat, completion, generation, embedding, tokenize/token‑count, and model‑listing endpoints, so existing OpenAI, Ollama, Claude, and Gemini clients and SDKs can point straight at your phone.
+LLM AI Server with llama.cpp is a fully local LLM server for Android, enabling private, offline text and multimodal generation.
+Supported model families: Gemma-4 / Gemma-4 Vision, Qwen / Qwen Vision, Mistral, LLaMA, Phi, Bonsai, and others.
+A built-in API server is compatible with Ollama, OpenAI, Anthropic (Claude) Messages, and Google Gemini APIs — providing chat, completion, generation, embedding, tokenize/token-count, and model-listing endpoints.
 The bundled WebUI runs on the same port and supports model switching, parameter editing, log viewing, and PWA installation.
-
-MCP and Function Calling enable tool‑augmented workflows, and structured output is supported via GBNF and JSON Schema.  
+MCP and Function Calling enable tool-augmented workflows; structured output via GBNF and JSON Schema.
 
 ---
 
 2. Intended Users and Supported Devices
 Designed for users who want a private, fully local LLM environment:
+- Offline-first users
+- Developers integrating a local backend
+- Advanced users tuning sampling and performance
+- Researchers testing inference behavior
+- Privacy-focused users
 
-- Offline‑first users  
-- Developers integrating a local backend  
-- Advanced users tuning sampling and performance  
-- Researchers testing inference behavior  
-- Privacy‑focused users  
-
-Performance can be tuned via context size, threads, batch size, GPU offload, KV cache quantization, and optional MTP decoding.
+Performance tunable via context size, threads, batch size, GPU offload, KV cache quantization, and optional MTP decoding.
 
 ---
 
 3. Key Features
-- Hugging Face GGUF search & download  
-- Qwen3-VL vision model (bundled default) with automatic projector (mmproj) detection  
-- Automatic context (n_ctx) expansion for large images and long prompts  
-- Automatic GPU→CPU fallback when GPU init fails  
-- Smarter Hugging Face search: model / size / quantization guidance, device-suitability rating, and one-tap mmproj download  
-- Upgraded llama.cpp engine (b10621, v0.3.0) — newer models and Adreno OpenCL GPU  
-- On-device log retrieval via GET /api/diagnostics  
-- Local GGUF loading  
-- LoRA adapter support: apply a LoRA GGUF to the base model at runtime; select, save, and manage adapters from Settings
-- MTP speculative decoding
-- Detailed parameter control (Mirostat, DRY, XTC, Min‑p, Typical‑p, penalties, dynamic temperature)
-- Integrated Ollama / OpenAI / Anthropic (Claude) Messages / Google Gemini‑compatible API server
-- Google Gemini API: POST /v1beta(v1)/models/{model}:generateContent and :streamGenerateContent — multimodal, function calling, thinking
-- OpenAI Responses API: POST /v1/responses — stateless, streaming response.* events, reasoning output
-- Embedding API
-- Automatic prompt template selection
-- Enhanced WebUI with multi‑language support
-- PWA support
-- MCP and Function Calling
-- Profile backup & restore support
+- Hugging Face GGUF search & download; device-suitability guidance, one-tap mmproj download
+- Qwen3-VL vision (bundled default); automatic n_ctx expansion for large images; GPU→CPU auto-fallback
+- Local GGUF import; model rename/delete; LoRA adapter support (apply at runtime, manage from Settings)
+- MTP speculative decoding; detailed parameters (Mirostat, DRY, XTC, Min-p, Typical-p, penalties, dynatemp)
+- Upgraded llama.cpp engine (b10621, v0.3.0) — newer models, Adreno OpenCL GPU
+- Ollama API: /api/chat, /api/generate, /api/ps, /api/show, /api/delete, /api/embed(dings), /api/tokenize, /api/tags; keep_alive (unload / preload / duration strings)
+- OpenAI API: /v1/chat/completions, /v1/completions, /v1/responses, /v1/embeddings, /v1/models
+- Anthropic (Claude) API: /v1/messages (streaming, thinking, image/audio, tool_use), /v1/messages/count_tokens, GET /v1/models; document/PDF content blocks; thinking via anthropic-beta header
+- Google Gemini API: generateContent/streamGenerateContent; GET /v1beta/models (list/single); countTokens; embedContent/batchEmbedContents; JSON mode (responseMimeType); thinkingBudget
+- Swagger UI at /swagger: interactive OpenAPI 3.0 docs, open from Settings → "Open API Docs"
+- Connection check panel in Settings: probes all interfaces and shows reachable URLs (LAN, carrier, etc.)
+- Bundled LLM AI Server Guide profile; on-device log retrieval via GET /api/diagnostics
+- Multi-language WebUI (9 languages), PWA support; MCP and Function Calling
+- Profile backup & restore; automatic prompt template selection
 
-Ollama-, OpenAI-, Anthropic-(Claude-)-, and Google-Gemini-compatible endpoints; full list on the tester page below.
-
-Full API docs, examples & an interactive tester:
+Full API docs, examples & interactive tester:
 https://micklab.web.app/llama-tester-en.html
 
 ---
 
 4. Getting Started
-You can begin using the app immediately in either of the following ways:
-
 A) Start API/WebUI → Open in browser
-1. Tap Start API/WebUI on the main screen.  
-2. Tap Open in browser to launch the bundled WebUI.  
-3. You can chat and run the model directly from the WebUI.  
-   - Note: On first use, if the model is not downloaded yet, the WebUI will download it when you send the first message.  
-     Large models may take time to download.
+1. Tap Start API/WebUI on the main screen.
+2. Tap Open in browser to launch the bundled WebUI.
+3. Chat and run the model directly from the WebUI.
+   - Note: On first use, if the model is not downloaded, the WebUI will download it when you send the first message.
 
 B) Direct Run
-1. Open the Direct Run section on the main screen.  
-2. Enter a prompt and tap Send to run the model directly inside the app.  
-   - If the model is not downloaded yet, the app will show a notice before downloading.
+1. Open the Direct Run section on the main screen.
+2. Enter a prompt and tap Send to run the model directly inside the app.
 
 C) or Use Settings to prepare a model first
-1. Open Settings.  
-2. Search Hugging Face for a GGUF model or enter a direct URL or import a local GGUF file.  
-3. Adjust parameters (context size, temperature, penalties, MTP, GPU offload, etc.).  
-4. Tap Save Config, then SAVE & CLOSE to load the model.  
+1. Open Settings.
+2. Search Hugging Face for a GGUF model, enter a direct URL, or import a local GGUF file.
+3. Adjust parameters (context size, temperature, penalties, MTP, GPU offload, etc.).
+4. Tap Save Config, then SAVE & CLOSE to load the model.
 5. Optionally create a profile backup for later restoration.

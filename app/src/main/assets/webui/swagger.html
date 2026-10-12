@@ -872,23 +872,148 @@ const spec = {
         ],
         requestBody: {
           required: true,
-          content: { "application/json": { schema: {
-            type: "object",
-            required: ["model", "messages", "max_tokens"],
-            properties: {
-              model:       { type: "string",  example: "default" },
-              messages:    { type: "array", items: { type: "object" }, description: "Array of `{role:\"user\"|\"assistant\", content}` objects." },
-              system:      { type: "string",  description: "System prompt (string or array of text blocks)." },
-              max_tokens:  { type: "integer", example: 1024 },
-              stream:      { type: "boolean", default: false },
-              temperature: { type: "number" },
-              top_p:       { type: "number" },
-              top_k:       { type: "integer" },
-              tools:       { type: "array", items: { type: "object" }, description: "Tool definitions: `{name, description, input_schema}`." },
-              tool_choice: { type: "object", description: "`{type:\"auto\"|\"any\"|\"tool\", name?}`." },
-              thinking:    { type: "object", description: "Extended thinking: `{type:\"enabled\",budget_tokens:N}`." }
+          content: { "application/json": {
+            schema: {
+              type: "object",
+              required: ["model", "messages", "max_tokens"],
+              properties: {
+                model:       { type: "string",  example: "default" },
+                messages: {
+                  type: "array",
+                  description: "Array of `{role, content}` objects. `content` may be a string or an array of content blocks.",
+                  items: {
+                    type: "object",
+                    required: ["role", "content"],
+                    properties: {
+                      role:    { type: "string", enum: ["user", "assistant"] },
+                      content: {
+                        description: "String or array of content blocks.",
+                        oneOf: [
+                          { type: "string" },
+                          {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              description: "Content block. Supported types:\n- `text` — plain text\n- `image` — base64 or URL image (PNG/JPEG/BMP/GIF)\n- `document` — text, base64 PDF, or URL document (see examples)\n- `tool_use` — function call result from the model\n- `tool_result` — result you return to the model\n- `thinking` — prior thinking block (preserved as context)\n- `redacted_thinking` — silently dropped",
+                              properties: {
+                                type: {
+                                  type: "string",
+                                  enum: ["text", "image", "document", "tool_use", "tool_result", "thinking", "redacted_thinking"]
+                                },
+                                text:   { type: "string", description: "For type=`text`." },
+                                source: {
+                                  type: "object",
+                                  description: "For type=`image` or `document`. Structure depends on source type.",
+                                  properties: {
+                                    type:       { type: "string", enum: ["base64", "text", "url"], description: "`base64` / `text` / `url`" },
+                                    media_type: { type: "string", example: "application/pdf", description: "MIME type. For PDF: `application/pdf`. For images: `image/jpeg`, `image/png`, etc." },
+                                    data:       { type: "string", description: "Base64-encoded content (for type=`base64` or `text`)." },
+                                    url:        { type: "string", description: "HTTP(S) URL (for type=`url`)." }
+                                  }
+                                },
+                                title:           { type: "string",  description: "Optional document title (for type=`document`)." },
+                                cache_control:   { type: "object",  description: "Accepted and silently ignored." },
+                                id:              { type: "string",  description: "Block ID (for tool_use / tool_result)." },
+                                name:            { type: "string",  description: "Tool name (for tool_use)." },
+                                input:           { type: "object",  description: "Tool input arguments (for tool_use)." },
+                                tool_use_id:     { type: "string",  description: "ID of the tool_use block being answered (for tool_result)." },
+                                content:         { type: "string",  description: "Tool result content (for tool_result)." },
+                                thinking:        { type: "string",  description: "Prior thinking text (for type=`thinking`)." }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                system:      { type: "string",  description: "System prompt (string or array of text blocks)." },
+                max_tokens:  { type: "integer", example: 1024 },
+                stream:      { type: "boolean", default: false },
+                temperature: { type: "number" },
+                top_p:       { type: "number" },
+                top_k:       { type: "integer" },
+                tools:       { type: "array", items: { type: "object" }, description: "Tool definitions: `{name, description, input_schema}`." },
+                tool_choice: { type: "object", description: "`{type:\"auto\"|\"any\"|\"tool\", name?}`." },
+                thinking:    { type: "object", description: "Extended thinking: `{type:\"enabled\",budget_tokens:N}`." }
+              }
+            },
+            examples: {
+              text: {
+                summary: "Text only",
+                value: { model: "default", max_tokens: 512, messages: [{ role: "user", content: "Hello!" }] }
+              },
+              document_text: {
+                summary: "Document — plain text",
+                value: {
+                  model: "default", max_tokens: 512,
+                  messages: [{
+                    role: "user",
+                    content: [
+                      { type: "document", title: "Meeting notes", source: { type: "text", data: "Q3 review: revenue up 12%.\nAction: expand team." } },
+                      { type: "text", text: "Summarise the key points." }
+                    ]
+                  }]
+                }
+              },
+              document_pdf: {
+                summary: "Document — base64 PDF (up to 10 pages, rendered via PdfRenderer)",
+                value: {
+                  model: "default", max_tokens: 1024,
+                  messages: [{
+                    role: "user",
+                    content: [
+                      { type: "document", source: { type: "base64", media_type: "application/pdf", data: "<base64-encoded-pdf>" } },
+                      { type: "text", text: "What does this PDF say?" }
+                    ]
+                  }]
+                }
+              },
+              document_url: {
+                summary: "Document — URL (passed through as image URL)",
+                value: {
+                  model: "default", max_tokens: 512,
+                  messages: [{
+                    role: "user",
+                    content: [
+                      { type: "document", source: { type: "url", url: "https://example.com/report.png" } },
+                      { type: "text", text: "Describe this document." }
+                    ]
+                  }]
+                }
+              },
+              image_base64: {
+                summary: "Image — base64",
+                value: {
+                  model: "default", max_tokens: 512,
+                  messages: [{
+                    role: "user",
+                    content: [
+                      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "<base64>" } },
+                      { type: "text", text: "What is in this image?" }
+                    ]
+                  }]
+                }
+              },
+              thinking: {
+                summary: "Extended thinking (anthropic-beta header required)",
+                value: { model: "default", max_tokens: 2048, thinking: { type: "enabled", budget_tokens: 1024 }, messages: [{ role: "user", content: "Solve: 17 × 23" }] }
+              },
+              tool_use: {
+                summary: "Tool use (function calling)",
+                value: {
+                  model: "default", max_tokens: 512,
+                  tools: [{ name: "get_weather", description: "Get the weather for a city.", input_schema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } }],
+                  tool_choice: { type: "auto" },
+                  messages: [{ role: "user", content: "What's the weather in Tokyo?" }]
+                }
+              },
+              stream: {
+                summary: "Streaming response",
+                value: { model: "default", max_tokens: 256, stream: true, messages: [{ role: "user", content: "Tell me a joke." }] }
+              }
             }
-          }}}
+          }}
         },
         responses: {
           "200": {
