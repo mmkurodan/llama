@@ -1040,6 +1040,32 @@ public class ModelManager {
     // ---- n_ctx auto-promotion (Q2) helpers ----
 
     /**
+     * Called from SharedToolManager when generateOpenAiChatCompletion returns a CTX_TOO_SMALL
+     * error (mmproj requests that go through the tools path bypass ModelManager.generate(), so
+     * they never reach the inline auto-expand loop). Attempts to auto-expand n_ctx and reload.
+     * Returns true if the reload succeeded and the caller should retry the generation.
+     */
+    public boolean handleCtxTooSmallForToolsPath(String ctxTooSmallMsg) {
+        int need = parseCtxTooSmallNeed(ctxTooSmallMsg);
+        if (need <= 0) {
+            return false;
+        }
+        boolean autoExpand = lastLoadedConfig != null && lastLoadedConfig.nCtxAutoExpand;
+        int newNCtx = autoExpand ? computePromotedNCtx(need) : 0;
+        if (newNCtx > 0 && currentConfigName != null) {
+            DiagnosticsLogger.logEvent(context, "ctx-autopromote",
+                    "tools-path need=" + need + " from=" + currentNCtx + " to=" + newNCtx
+                            + " backend=" + (isCurrentBackendGpu() ? "GPU" : "CPU"));
+            setNCtxOverrideForNextLoad(newNCtx);
+            return loadConfiguration(currentConfigName);
+        }
+        DiagnosticsLogger.logEvent(context, "ctx-autopromote",
+                "tools-path need=" + need + " have=" + currentNCtx
+                        + " result=" + (autoExpand ? "capped(no-promote)" : "disabled"));
+        return false;
+    }
+
+    /**
      * If {@code result} is a context-too-small error (multimodal CTX_TOO_SMALL, or a text-path
      * overflow), return the number of prompt tokens that need to fit (including a small generation
      * headroom); otherwise 0. Used to decide whether to auto-promote n_ctx and retry.

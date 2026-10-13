@@ -101,11 +101,18 @@ fi
 # -------- 4) local.properties --------
 grep -q "^sdk.dir=" "$REPO_ROOT/local.properties" 2>/dev/null || echo "sdk.dir=$ANDROID_SDK_ROOT" > "$REPO_ROOT/local.properties"
 
-# -------- 5) assemble --------
-TASK="assembleDebug"; OUT_DIR="$MODULE/build/outputs/apk/debug"
-[ "$VARIANT" = "release" ] && { TASK="assembleRelease"; OUT_DIR="$MODULE/build/outputs/apk/release"; }
+# -------- 5) assemble + bundle --------
+TASK="assembleDebug"; OUT_DIR="$MODULE/build/outputs/apk/debug"; BUNDLE_TASK=""; BUNDLE_OUT_DIR=""
+if [ "$VARIANT" = "release" ]; then
+  TASK="assembleRelease"; OUT_DIR="$MODULE/build/outputs/apk/release"
+  BUNDLE_TASK="bundleRelease"; BUNDLE_OUT_DIR="$MODULE/build/outputs/bundle/release"
+fi
 echo "== $GRADLE_RUNNER :$MODULE:$TASK (QEMU_CPU=$QEMU_CPU) =="
 "$GRADLE_RUNNER" --no-daemon --console=plain ":$MODULE:$TASK"
+if [ -n "$BUNDLE_TASK" ]; then
+  echo "== $GRADLE_RUNNER :$MODULE:$BUNDLE_TASK =="
+  "$GRADLE_RUNNER" --no-daemon --console=plain ":$MODULE:$BUNDLE_TASK"
+fi
 
 # -------- 6) 配置 --------
 APK="$(find "$REPO_ROOT/$OUT_DIR" -name '*.apk' | sort | tail -1)"
@@ -113,4 +120,12 @@ DEST_DIR="${APK_OUTPUT_DIR:-}"; [ -z "$DEST_DIR" ] && { [ -d /sdcard/Download ] 
 mkdir -p "$DEST_DIR"
 PROJ="$(basename "$REPO_ROOT")"
 cp -f "$APK" "$DEST_DIR/$PROJ-app-$VARIANT.apk"
-echo "== DONE: $DEST_DIR/$PROJ-app-$VARIANT.apk =="
+echo "== APK: $DEST_DIR/$PROJ-app-$VARIANT.apk =="
+if [ -n "$BUNDLE_OUT_DIR" ]; then
+  AAB="$(find "$REPO_ROOT/$BUNDLE_OUT_DIR" -name '*.aab' | sort | tail -1)"
+  if [ -n "$AAB" ]; then
+    cp -f "$AAB" "$DEST_DIR/$PROJ-app-$VARIANT.aab"
+    echo "== AAB: $DEST_DIR/$PROJ-app-$VARIANT.aab =="
+  fi
+fi
+echo "== DONE =="

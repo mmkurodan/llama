@@ -125,7 +125,8 @@ final class SharedToolManager {
             String toolsJson = catalog.combinedTools.toString();
 
             int toolExecFailures = 0;
-            
+            boolean ctxExpandTried = false;
+
             for (int turn = 0; turn < MAX_AUTO_TOOL_TURNS; turn++) {
                 String rawResult = llama.generateOpenAiChatCompletion(
                         conversation.toString(),
@@ -136,7 +137,23 @@ final class SharedToolManager {
                         enableThinking,
                         mediaFiles
                 );
-                ChatResult result = ChatResult.fromJson(rawResult);
+                ChatResult result;
+                try {
+                    result = ChatResult.fromJson(rawResult);
+                } catch (IOExceptionWrappedException e) {
+                    // CTX_TOO_SMALL from mmproj prefill: auto-expand n_ctx and retry once.
+                    // (ModelManager.generate()'s inline expand loop is bypassed when we go
+                    // through this tools path, so we handle it here instead.)
+                    String msg = e.getMessage() != null ? e.getMessage() : "";
+                    if (!ctxExpandTried && msg.startsWith("CTX_TOO_SMALL")) {
+                        ctxExpandTried = true;
+                        ModelManager mm = ModelManager.getInstance(context);
+                        if (mm != null && mm.handleCtxTooSmallForToolsPath(msg)) {
+                            continue;
+                        }
+                    }
+                    throw e;
+                }
                 
                 // Diagnostics: log tool extraction results
                 if (result.toolCalls != null && result.toolCalls.length() > 0) {
