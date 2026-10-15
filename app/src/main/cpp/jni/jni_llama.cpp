@@ -811,6 +811,11 @@ static llama_model_params build_model_params_locked(bool has_explicit_mmproj) {
     // b10621/v0.3.0 replaced the use_mmap/use_mlock booleans with a load_mode enum.
     // We never used mlock, so map the app's mmap toggle onto MMAP vs NONE.
     mparams.load_mode = g_use_mmap ? LLAMA_LOAD_MODE_MMAP : LLAMA_LOAD_MODE_NONE;
+    // For embedded MTP (Qwen3.5, DeepSeek etc.), the MTP head tensors live inside the
+    // same GGUF as the main model. load_mtp must be true at model-load time so those
+    // tensors are mapped into memory; without it nextn.* stay null and the MTP context
+    // build crashes with GGML_ASSERT "MTP block missing nextn.eh_proj".
+    mparams.load_mtp = g_mtp_enabled;
 
     // ---- Backend device list ----
     // backendType: 0=CPU  1=GPU  2=NPU/HTP  3=GPU+NPU
