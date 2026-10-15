@@ -2760,7 +2760,12 @@ static std::unique_ptr<llm_graph_input_attn_kv> build_attn_inp_kv_impl(
     auto inp = std::make_unique<llm_graph_input_attn_kv>(hparams, cparams, mctx_cur);
 
     {
-        GGML_ASSERT(hparams.swa_type == LLAMA_SWA_TYPE_NONE && "Use llama_kv_cache_iswa for SWA");
+        // MTP draft contexts use a plain KV cache for the single full-dense attention
+        // head even on hybrid SWA models (the MTP head is always full attention).
+        // All other contexts must use build_attn_inp_kv_iswa() when swa_type != NONE.
+        GGML_ASSERT((hparams.swa_type == LLAMA_SWA_TYPE_NONE ||
+                     cparams.ctx_type == LLAMA_CONTEXT_TYPE_MTP) &&
+                    "Use llama_kv_cache_iswa for SWA");
 
         inp->self_k_idxs = mctx_cur->build_input_k_idxs(ctx0, ubatch);
         inp->self_v_idxs = mctx_cur->build_input_v_idxs(ctx0, ubatch);
