@@ -2521,7 +2521,7 @@ llama_memory_i * llama_model::create_memory(const llama_memory_params & params, 
                         }
                     }
 
-                    if (hparams.swa_type != LLAMA_SWA_TYPE_NONE) {
+                    if (hparams.swa_type != LLAMA_SWA_TYPE_NONE && !mtp_on_hybrid_qwen && !mtp_on_hybrid_nemotron) {
                         GGML_ASSERT(hparams.is_swa_any());
 
                         if (arch == LLM_ARCH_GEMMA4_ASSISTANT) {
@@ -2572,7 +2572,12 @@ llama_memory_i * llama_model::create_memory(const llama_memory_params & params, 
                                     share);
                         }
                     } else {
-                        GGML_ASSERT(!hparams.is_swa_any());
+                        // For MTP contexts on hybrid SWA models (Qwen35/Nemotron-H MoE), the MTP
+                        // head layer is always full dense attention — no SWA needed. Force plain
+                        // llama_kv_cache with swa_type=NONE so build_attn_inp_kv() can be used
+                        // without its "use llama_kv_cache_iswa for SWA" assertion firing.
+                        const bool mtp_plain_override = mtp_on_hybrid_qwen || mtp_on_hybrid_nemotron;
+                        GGML_ASSERT(!hparams.is_swa_any() || mtp_plain_override);
 
                         res = new llama_kv_cache(
                                 *this,
@@ -2585,8 +2590,8 @@ llama_memory_i * llama_model::create_memory(const llama_memory_params & params, 
                                 cparams.n_ctx_seq,
                                 cparams.n_seq_max,
                                 1,
-                                hparams.n_swa,
-                                hparams.swa_type,
+                                mtp_plain_override ? 0u : hparams.n_swa,
+                                mtp_plain_override ? LLAMA_SWA_TYPE_NONE : hparams.swa_type,
                                 nullptr,
                                 filter,
                                 nullptr,
