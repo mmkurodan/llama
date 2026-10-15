@@ -248,7 +248,7 @@ static ggml_cl_version get_opencl_c_version(ggml_cl_version platform_version, cl
 }
 
 static ADRENO_GPU_GEN get_adreno_gpu_gen(const char *device_name) {
-    if (strstr(device_name, "610") || strstr(device_name, "612") ||
+    if (strstr(device_name, "605") || strstr(device_name, "610") || strstr(device_name, "612") ||
         strstr(device_name, "613") || strstr(device_name, "615") ||
         strstr(device_name, "616") || strstr(device_name, "618") ||
         strstr(device_name, "619") || strstr(device_name, "620") ||
