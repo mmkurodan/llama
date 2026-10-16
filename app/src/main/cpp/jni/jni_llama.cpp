@@ -4287,7 +4287,23 @@ static jstring generate_openai_chat_completion_locked(
         inputs.use_jinja = true;
 
         auto chat_templates = common_chat_templates_init(g_model, chat_template_override);
-        auto chat_params = common_chat_templates_apply(chat_templates.get(), inputs);
+        // Jinja auto-parser generation may fail for strict templates (e.g. Gemma requires
+        // alternating roles which the diff-analyzer violates with its test messages, or tool
+        // messages break the alternation check).  Fall back to the legacy (non-Jinja) path so
+        // the request still succeeds.
+        common_chat_params chat_params;
+        try {
+            chat_params = common_chat_templates_apply(chat_templates.get(), inputs);
+        } catch (const std::exception & e) {
+            std::string what = e.what();
+            if (what.find("Unable to generate parser") != std::string::npos) {
+                log_to_file(std::string("generateOpenAiChatCompletion: Jinja parser failed (") + what + "); retrying with legacy template", GGML_LOG_LEVEL_WARN);
+                inputs.use_jinja = false;
+                chat_params = common_chat_templates_apply(chat_templates.get(), inputs);
+            } else {
+                throw;
+            }
+        }
 
         common_chat_parser_params parser_params(chat_params);
         parser_params.parse_tool_calls = true;
@@ -4422,6 +4438,12 @@ static jstring generate_openai_chat_completion_locked(
         }
         if (parsed_msg.empty() && !output.empty()) {
             parsed_msg.content = output;
+        }
+        // If the parser extracted everything as reasoning_content but left content empty
+        // (e.g. a thinking model that puts its final answer inside <think>), promote the
+        // reasoning content to visible text so the answer isn't hidden in a collapsed block.
+        if (parsed_msg.content.empty() && !parsed_msg.reasoning_content.empty()) {
+            parsed_msg.content = std::move(parsed_msg.reasoning_content);
         }
 
         json result = {
