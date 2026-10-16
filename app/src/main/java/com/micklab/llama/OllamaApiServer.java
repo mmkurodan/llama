@@ -689,7 +689,7 @@ public class OllamaApiServer {
                         int endIdx = text.indexOf(CLOSE_TAG);
                         if (endIdx >= 0) {
                             String inside = text.substring(0, endIdx);
-                            if (!inside.isEmpty()) reasoningSink.accept(inside);
+                            if (!inside.isBlank()) reasoningSink.accept(inside);
                             inThinkBlock = false;
                             int after = endIdx + CLOSE_TAG.length();
                             while (after < text.length()
