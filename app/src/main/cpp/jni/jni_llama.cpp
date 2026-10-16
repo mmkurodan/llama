@@ -4439,12 +4439,6 @@ static jstring generate_openai_chat_completion_locked(
         if (parsed_msg.empty() && !output.empty()) {
             parsed_msg.content = output;
         }
-        // If the parser extracted everything as reasoning_content but left content empty
-        // (e.g. a thinking model that puts its final answer inside <think>), promote the
-        // reasoning content to visible text so the answer isn't hidden in a collapsed block.
-        if (parsed_msg.content.empty() && !parsed_msg.reasoning_content.empty()) {
-            parsed_msg.content = std::move(parsed_msg.reasoning_content);
-        }
 
         json result = {
                 {"content", parsed_msg.content},
