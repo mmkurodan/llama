@@ -269,7 +269,7 @@ done < <(_candidate_names)
 # substituted) so the MTP path stays covered — see the regression memory. Only applied when
 # no explicit --profile filter is set.
 if [[ ${#FILTER_PROFILES[@]} -eq 0 ]]; then
-  E4B_PROFILES=("Test09 MTP" "Test10 mmproj")
+  E4B_PROFILES=("Test09 MTP" "Test09 MTP 2" "Test10 mmproj")
   E4B_SUBSTITUTE="default Vision"
   _filtered=(); _removed=0
   for _p in "${AVAILABLE_PROFILES[@]}"; do
