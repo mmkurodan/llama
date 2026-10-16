@@ -477,12 +477,20 @@ public class OllamaApiServer {
                 "finish_reason",
                 toolCalls != null && toolCalls.length() > 0 ? "tool_calls" : "stop"
         );
-        return new NativeChatCompletionResult(
-                json.optString("content", ""),
-                json.optString("reasoning_content", null),
-                toolCalls,
-                finishReason
-        );
+        String content = json.optString("content", "");
+        String reasoningContent = json.optString("reasoning_content", null);
+
+        // Jinja parser fallback (legacy template) leaves raw <think>…</think> tags in
+        // content without populating reasoning_content.  Extract them here.
+        if (reasoningContent == null && content.contains("<think>")) {
+            String[] parts = PromptTemplateManager.extractThinkingContent(content);
+            reasoningContent = parts[0].isEmpty() ? null : parts[0];
+            content = parts[1];
+        } else {
+            content = PromptTemplateManager.stripBlankThinkingBlocks(content);
+        }
+
+        return new NativeChatCompletionResult(content, reasoningContent, toolCalls, finishReason);
     }
 
     private static JSONArray buildToolCallDeltas(JSONArray toolCalls) throws JSONException {

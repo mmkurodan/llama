@@ -88,9 +88,23 @@ final class SharedToolManager {
                 }
             }
             
+            String content = json.optString("content", "");
+            String reasoningContentFinal = json.optString("reasoning_content", null);
+
+            // When the Jinja parser falls back to the legacy template, reasoning is not
+            // extracted by the JNI and the raw <think>…</think> tags end up in content.
+            // Pull them out here so the caller gets clean content + proper reasoning_content.
+            if (reasoningContentFinal == null && content.contains("<think>")) {
+                String[] parts = PromptTemplateManager.extractThinkingContent(content);
+                reasoningContentFinal = parts[0].isEmpty() ? null : parts[0];
+                content = parts[1];
+            } else {
+                content = PromptTemplateManager.stripBlankThinkingBlocks(content);
+            }
+
             return new ChatResult(
-                    json.optString("content", ""),
-                    json.optString("reasoning_content", null),
+                    content,
+                    reasoningContentFinal,
                     toolCalls,
                     json.optString("finish_reason", toolCalls != null && toolCalls.length() > 0 ? "tool_calls" : "stop")
             );
