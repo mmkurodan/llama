@@ -385,6 +385,8 @@ if [[ $FAST -eq 0 ]]; then
       skip "/api/chat [$p]" "profile too heavy to load on this device"
     elif [[ -z "$resp" ]] && _is_mmproj "$p"; then
       skip "/api/chat [$p]" "empty reply — mmproj memory pressure (covered in §13)"
+      # mmproj load may have crashed the server; wait for recovery before next profile
+      await_server_ready "${AVAILABLE_PROFILES[0]}"
     else
       fail "/api/chat [$p]" "${resp:0:200}"
     fi
@@ -421,6 +423,7 @@ if [[ $FAST -eq 0 ]]; then
       skip "/api/generate [$p]" "profile too heavy to load on this device"
     elif [[ -z "$resp" ]] && _is_mmproj "$p"; then
       skip "/api/generate [$p]" "empty reply — mmproj memory pressure (covered in §13)"
+      await_server_ready "${AVAILABLE_PROFILES[0]}"
     else
       fail "/api/generate [$p]" "${resp:0:200}"
     fi
@@ -456,6 +459,7 @@ if [[ $FAST -eq 0 ]]; then
       skip "/v1/chat/completions [$p]" "profile too heavy to load on this device"
     elif [[ -z "$resp" ]] && _is_mmproj "$p"; then
       skip "/v1/chat/completions [$p]" "empty reply — mmproj memory pressure (covered in §13)"
+      await_server_ready "${AVAILABLE_PROFILES[0]}"
     else
       fail "/v1/chat/completions [$p]" "${resp:0:200}"
     fi
@@ -886,6 +890,7 @@ if [[ $FAST -eq 0 ]]; then
       skip "Consistency [$p]" "profile too heavy to load on this device"
     elif [[ -z "$r_ollama" && -z "$r_openai" ]] && _is_mmproj "$p"; then
       skip "Consistency [$p]" "empty reply — mmproj memory pressure (covered in §13)"
+      await_server_ready "${AVAILABLE_PROFILES[0]}"
     else
       fail "Consistency [$p]: both endpoints failed"
     fi
