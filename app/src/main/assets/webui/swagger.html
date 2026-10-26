@@ -206,17 +206,22 @@ const spec = {
         },
         responses: {
           "200": {
-            description: "Streaming: one NDJSON line per token. Final line has `done:true` and timing fields. Non-streaming: single JSON.",
+            description: "Streaming: one NDJSON line per token (set `stream:false` for a single JSON response). Final line has `done:true` and timing fields.",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                model:     { type: "string" },
-                created_at:{ type: "string" },
-                response:  { type: "string", description: "Generated text (non-streaming) or token chunk (streaming)." },
-                thinking:  { type: "string", description: "Thinking/reasoning content, if enable_thinking is on." },
-                done:      { type: "boolean" },
-                context:   { type: "array", items: { type: "integer" }, description: "Token IDs of the full context (final chunk only)." },
-                ...{ "$ref": "#/components/schemas/OllamaUsage" }
+                model:                { type: "string" },
+                created_at:           { type: "string" },
+                response:             { type: "string", description: "Generated text (non-streaming) or token chunk (streaming)." },
+                thinking:             { type: "string", description: "Thinking/reasoning content, if enable_thinking is on." },
+                done:                 { type: "boolean" },
+                context:              { type: "array", items: { type: "integer" }, description: "Token IDs of the full context (final chunk only)." },
+                total_duration:       { type: "integer", description: "Total wall-clock time (ns)." },
+                load_duration:        { type: "integer", description: "Model load time (ns)." },
+                prompt_eval_count:    { type: "integer", description: "Number of input tokens." },
+                prompt_eval_duration: { type: "integer", description: "Prompt evaluation time (ns)." },
+                eval_count:           { type: "integer", description: "Number of output tokens." },
+                eval_duration:        { type: "integer", description: "Generation time (ns)." }
               }
             }}}
           }
@@ -231,45 +236,70 @@ const spec = {
         description: "Multi-turn chat. Supports text, base64/URL images, and audio (for multimodal models).\n\nContent blocks in messages: `text` (plain string or `{type:\"text\",text:\"...\"}`) and `image_url` / `input_audio` dicts in the `content` array. Also accepts `images` shorthand at message level.",
         requestBody: {
           required: true,
-          content: { "application/json": { schema: {
-            type: "object",
-            required: ["model", "messages"],
-            properties: {
-              model:    { type: "string", example: "default" },
-              messages: {
-                type: "array",
-                items: {
-                  type: "object",
-                  required: ["role", "content"],
-                  properties: {
-                    role:    { type: "string", enum: ["system", "user", "assistant", "tool"] },
-                    content: {
-                      description: "Plain string or array of content blocks: `{type:\"text\",text:\"...\"}`, `{type:\"image_url\",image_url:{url:\"data:image/jpeg;base64,...\"}}`, `{type:\"input_audio\",input_audio:{data:\"...\",format:\"wav\"|\"mp3\"}}`.",
-                      oneOf: [{ type: "string" }, { type: "array", items: { type: "object" } }]
-                    },
-                    images:       { type: "array", items: { type: "string" }, description: "Shorthand: base64 images or HTTP(S) URLs (vision models only)." },
-                    tool_calls:   { type: "array", items: { type: "object" }, description: "Tool call results (assistant role)." },
-                    tool_call_id: { type: "string", description: "Tool call ID (tool role)." }
+          content: { "application/json": {
+            schema: {
+              type: "object",
+              required: ["model", "messages"],
+              properties: {
+                model:    { type: "string", example: "default" },
+                messages: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["role", "content"],
+                    properties: {
+                      role:    { type: "string", enum: ["system", "user", "assistant", "tool"] },
+                      content: {
+                        description: "Plain string or array of content blocks: `{type:\"text\",text:\"...\"}`, `{type:\"image_url\",image_url:{url:\"data:image/jpeg;base64,...\"}}`, `{type:\"input_audio\",input_audio:{data:\"...\",format:\"wav\"|\"mp3\"}}`.",
+                        oneOf: [{ type: "string" }, { type: "array", items: { type: "object" } }]
+                      },
+                      images:       { type: "array", items: { type: "string" }, description: "Shorthand: base64 images or HTTP(S) URLs (vision models only)." },
+                      tool_calls:   { type: "array", items: { type: "object" }, description: "Tool call results (assistant role)." },
+                      tool_call_id: { type: "string", description: "Tool call ID (tool role)." }
+                    }
                   }
-                }
+                },
+                stream:     { type: "boolean", default: true, example: false, description: "Stream tokens as NDJSON. Set `false` for a single JSON response (recommended for testing)." },
+                think:      { type: "boolean", description: "Enable thinking/reasoning for this request (overrides profile setting)." },
+                format:     { type: "string",  example: "json", description: "Force JSON output: pass `\"json\"`." },
+                keep_alive: { oneOf: [{ type: "integer" }, { type: "string" }], example: "5m" },
+                options:    { "$ref": "#/components/schemas/SamplingOptions" },
+                tools:      { type: "array", items: { type: "object" }, description: "OpenAI-style function tool definitions." },
+                tool_choice:{ description: "Tool choice: `\"auto\"`, `\"none\"`, `\"required\"`, or `{type:\"function\",function:{name:\"...\"}}`.", oneOf: [{ type: "string" }, { type: "object" }] }
+              }
+            },
+            examples: {
+              simple: {
+                summary: "Text chat — non-streaming",
+                value: { model: "default", stream: false, messages: [{ role: "user", content: "Why is the sky blue?" }] }
               },
-              stream:     { type: "boolean", default: true },
-              format:     { type: "string",  example: "json", description: "Force JSON output: pass `\"json\"`." },
-              keep_alive: { oneOf: [{ type: "integer" }, { type: "string" }], example: "5m" },
-              options:    { "$ref": "#/components/schemas/SamplingOptions" },
-              tools:      { type: "array", items: { type: "object" }, description: "OpenAI-style function tool definitions." },
-              tool_choice:{ description: "Tool choice: `\"auto\"`, `\"none\"`, `\"required\"`, or `{type:\"function\",function:{name:\"...\"}}`.", oneOf: [{ type: "string" }, { type: "object" }] }
+              thinking: {
+                summary: "With thinking enabled",
+                value: { model: "default", stream: false, think: true, messages: [{ role: "user", content: "Solve: 17 × 23" }] }
+              },
+              vision: {
+                summary: "Vision (multimodal)",
+                value: { model: "default", stream: false, messages: [{ role: "user", images: ["<base64-image>"], content: "Describe this image." }] }
+              },
+              tools: {
+                summary: "Function calling",
+                value: {
+                  model: "default", stream: false,
+                  tools: [{ type: "function", function: { name: "get_weather", description: "Get weather for a city.", parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] } } }],
+                  messages: [{ role: "user", content: "What is the weather in Tokyo?" }]
+                }
+              }
             }
-          }}}
+          }}
         },
         responses: {
           "200": {
-            description: "Streaming NDJSON (one `message.content` chunk per line, final line `done:true`) or single JSON.",
+            description: "Streaming NDJSON (one `message.content` chunk per line, final line `done:true`) or single JSON (set `stream:false`).",
             content: { "application/json": { schema: {
               type: "object",
               properties: {
-                model:   { type: "string" },
-                created_at: { type: "string" },
+                model:                { type: "string" },
+                created_at:           { type: "string" },
                 message: {
                   type: "object",
                   properties: {
@@ -279,8 +309,13 @@ const spec = {
                     tool_calls: { type: "array", items: { type: "object" } }
                   }
                 },
-                done:    { type: "boolean" },
-                ...{ "$ref": "#/components/schemas/OllamaUsage" }
+                done:                 { type: "boolean" },
+                total_duration:       { type: "integer", description: "Total wall-clock time (ns)." },
+                load_duration:        { type: "integer", description: "Model load time (ns)." },
+                prompt_eval_count:    { type: "integer", description: "Number of input tokens." },
+                prompt_eval_duration: { type: "integer", description: "Prompt evaluation time (ns)." },
+                eval_count:           { type: "integer", description: "Number of output tokens." },
+                eval_duration:        { type: "integer", description: "Generation time (ns)." }
               }
             }}}
           }
@@ -477,7 +512,7 @@ const spec = {
       post: {
         tags: ["Ollama"],
         summary: "Create or update a profile (model configuration)",
-        description: "Creates a new profile (or updates an existing one when `overwrite:true`). The model file is **not** downloaded here — it is fetched lazily the first time the profile is loaded.\n\n**How parameters are merged:**\n1. Start with base: a copy of the `from` profile (if specified), else app defaults.\n2. Apply any top-level fields from this request (e.g. `nCtx`, `temp`).\n3. Apply `overrides` object last (highest priority).\n4. `name` and `model`/`modelUrl` are always authoritative.\n\n**`gguf_data` (one-shot import + profile creation):** provide a Base64-encoded GGUF binary and the server imports the file to local storage, then creates the profile pointing to it. `model` must contain the target filename (e.g. `\"my-model.gguf\"`).",
+        description: "Creates a new profile (or updates an existing one when `overwrite:true`). The model file is **not** downloaded here — it is fetched lazily the first time the profile is loaded.\n\n**How parameters are merged:**\n1. Start with base: a copy of the `from` profile (if specified), else app defaults.\n2. Apply any top-level fields from this request (e.g. `nCtx`, `temp`).\n3. Apply `overrides` object last (highest priority).\n4. `name` and `model`/`modelUrl` are always authoritative.\n\nAll properties from the **`ConfigurationFields`** schema (nCtx, temp, enableThinking, gpuOffloadLayers, etc.) can be passed directly at the top level **or** nested inside `overrides`.\n\n**`gguf_data` (one-shot import + profile creation):** provide a Base64-encoded GGUF binary and the server imports the file to local storage, then creates the profile pointing to it. `model` must contain the target filename (e.g. `\"my-model.gguf\"`).",
         requestBody: {
           required: true,
           content: { "application/json": { schema: {
@@ -509,45 +544,34 @@ const spec = {
                 description: "Base64-encoded GGUF model binary. When provided, the server imports the binary to local storage **before** creating the profile. `model` must contain the target filename (e.g. `\"my-model.gguf\"`). If `overwrite:true` and `model` is omitted, inherits the filename from the existing profile."
               },
               overrides: {
-                type: "object",
-                description: "Fine-grained parameter overrides applied last (highest priority). Accepts any field from `ConfigurationFields`.",
-                "$ref": "#/components/schemas/ConfigurationFields"
+                allOf: [{ "$ref": "#/components/schemas/ConfigurationFields" }],
+                description: "Fine-grained parameter overrides applied last (highest priority). Accepts any field from the `ConfigurationFields` schema."
               },
-              nCtx:             { "$ref": "#/components/schemas/ConfigurationFields/properties/nCtx" },
-              nThreads:         { "$ref": "#/components/schemas/ConfigurationFields/properties/nThreads" },
-              nBatch:           { "$ref": "#/components/schemas/ConfigurationFields/properties/nBatch" },
-              nPredict:         { "$ref": "#/components/schemas/ConfigurationFields/properties/nPredict" },
-              nCtxAutoExpand:   { "$ref": "#/components/schemas/ConfigurationFields/properties/nCtxAutoExpand" },
-              temp:             { "$ref": "#/components/schemas/ConfigurationFields/properties/temp" },
-              topP:             { "$ref": "#/components/schemas/ConfigurationFields/properties/topP" },
-              topK:             { "$ref": "#/components/schemas/ConfigurationFields/properties/topK" },
-              minP:             { "$ref": "#/components/schemas/ConfigurationFields/properties/minP" },
-              typicalP:         { "$ref": "#/components/schemas/ConfigurationFields/properties/typicalP" },
-              penaltyLastN:     { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyLastN" },
-              penaltyRepeat:    { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyRepeat" },
-              penaltyFreq:      { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyFreq" },
-              penaltyPresent:   { "$ref": "#/components/schemas/ConfigurationFields/properties/penaltyPresent" },
-              mirostat:         { "$ref": "#/components/schemas/ConfigurationFields/properties/mirostat" },
-              mirostatTau:      { "$ref": "#/components/schemas/ConfigurationFields/properties/mirostatTau" },
-              mirostatEta:      { "$ref": "#/components/schemas/ConfigurationFields/properties/mirostatEta" },
-              streaming:        { "$ref": "#/components/schemas/ConfigurationFields/properties/streaming" },
-              enableThinking:   { "$ref": "#/components/schemas/ConfigurationFields/properties/enableThinking" },
-              useMmap:          { "$ref": "#/components/schemas/ConfigurationFields/properties/useMmap" },
-              backendType:      { "$ref": "#/components/schemas/ConfigurationFields/properties/backendType" },
-              gpuOffloadEnabled:{ "$ref": "#/components/schemas/ConfigurationFields/properties/gpuOffloadEnabled" },
-              gpuOffloadLayers: { "$ref": "#/components/schemas/ConfigurationFields/properties/gpuOffloadLayers" },
-              gpuSwitchStabilization: { "$ref": "#/components/schemas/ConfigurationFields/properties/gpuSwitchStabilization" },
-              kvCacheTypeK:     { "$ref": "#/components/schemas/ConfigurationFields/properties/kvCacheTypeK" },
-              kvCacheTypeV:     { "$ref": "#/components/schemas/ConfigurationFields/properties/kvCacheTypeV" },
-              systemPrompt:     { "$ref": "#/components/schemas/ConfigurationFields/properties/systemPrompt" },
-              customChatTemplate:{ "$ref": "#/components/schemas/ConfigurationFields/properties/customChatTemplate" },
-              multimodalProjectorUrl:  { "$ref": "#/components/schemas/ConfigurationFields/properties/multimodalProjectorUrl" },
-              multimodalProjectorDisabled: { "$ref": "#/components/schemas/ConfigurationFields/properties/multimodalProjectorDisabled" },
-              loraAdapterUrl:   { "$ref": "#/components/schemas/ConfigurationFields/properties/loraAdapterUrl" },
-              loraAdapterScale: { "$ref": "#/components/schemas/ConfigurationFields/properties/loraAdapterScale" },
-              mtpEnabled:       { "$ref": "#/components/schemas/ConfigurationFields/properties/mtpEnabled" },
-              mtpNDraft:        { "$ref": "#/components/schemas/ConfigurationFields/properties/mtpNDraft" },
-              mtpModelReference:{ "$ref": "#/components/schemas/ConfigurationFields/properties/mtpModelReference" }
+              nCtx:             { type: "integer", example: 2048,  description: "Context window size (tokens). See ConfigurationFields for all options." },
+              nThreads:         { type: "integer", example: 4 },
+              nBatch:           { type: "integer", example: 128 },
+              nPredict:         { type: "integer", example: -1 },
+              nCtxAutoExpand:   { type: "boolean", example: true },
+              temp:             { type: "number",  example: 0.7 },
+              topP:             { type: "number",  example: 0.9 },
+              topK:             { type: "integer", example: 40 },
+              minP:             { type: "number",  example: 0.01 },
+              streaming:        { type: "boolean", example: true },
+              enableThinking:   { type: "boolean", example: false, description: "Enable chain-of-thought thinking." },
+              useMmap:          { type: "boolean", example: true },
+              backendType:      { type: "integer", example: 0, description: "0=CPU, 1=GPU." },
+              gpuOffloadLayers: { type: "integer", example: -1, description: "GPU layers to offload. -1=all." },
+              kvCacheTypeK:     { type: "integer", example: 1, description: "KV-K quant: 0=f32,1=f16,2=q8_0,3=q4_0,…" },
+              kvCacheTypeV:     { type: "integer", example: 1 },
+              systemPrompt:     { type: "string" },
+              customChatTemplate: { type: "string" },
+              multimodalProjectorUrl: { type: "string" },
+              multimodalProjectorDisabled: { type: "boolean", example: false },
+              loraAdapterUrl:   { type: "string" },
+              loraAdapterScale: { type: "number", example: 1.0 },
+              mtpEnabled:       { type: "boolean", example: false },
+              mtpNDraft:        { type: "integer", example: 2 },
+              mtpModelReference:{ type: "string" }
             }
           }}}
         },
@@ -731,7 +755,7 @@ const spec = {
                     type: "object",
                     properties: {
                       index:         { type: "integer" },
-                      message:       { type: "object", properties: { role: { type: "string" }, content: { type: "string" }, tool_calls: { type: "array", items: { type: "object" } } } },
+                      message:       { type: "object", properties: { role: { type: "string" }, content: { type: "string" }, reasoning_content: { type: "string", description: "Thinking/reasoning content (present when reasoning is enabled)." }, tool_calls: { type: "array", items: { type: "object" } } } },
                       finish_reason: { type: "string", enum: ["stop", "length", "tool_calls"] }
                     }
                   }

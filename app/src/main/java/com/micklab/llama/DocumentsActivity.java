@@ -704,6 +704,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Au lancement de l'application, une fenêtre demande s'il faut activer le serveur API/WebUI local, et vous pouvez cocher \"Don't show next time\" pour l'ignorer aux lancements futurs.\n");
         sb.append("- Fournit /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots et la WebUI intégrée sur l'appareil.\n");
         sb.append("- API Tokenize : POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"texte\"}) et POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"texte\"}) retournent les tokens, leur nombre et leurs IDs.\n");
+        sb.append("- CORS autorise toutes les origines (Access-Control-Allow-Origin: *) ; les requêtes preflight OPTIONS reçoivent une réponse.\n");
         sb.append("- La WebUI est disponible à http://<device-ip>:<port>/ sur le même port.\n");
         sb.append("- La WebUI est une PWA : vous pouvez l'ajouter à votre écran d'accueil depuis le menu du navigateur et l'utiliser comme une application (aucune invite d'installation automatique n'est affichée). Pour l'installer sur l'appareil, ouvrez http://127.0.0.1:<port>/ (l'installation sur l'écran d'accueil et l'usage hors ligne nécessitent un contexte sécurisé et ne sont pas disponibles via l'IP LAN).\n");
         sb.append("- Le JSON de configuration MCP enregistré dans les paramètres de l'application est exposé à la WebUI via /props en tant que réglage partagé et est utilisé avec les réglages MCP locaux de la WebUI.\n");
@@ -851,6 +852,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Al iniciar la aplicación, una ventana pregunta si activar el servidor local de API/WebUI, y puede marcar \"Don't show next time\" para omitirla en el futuro.\n");
         sb.append("- Proporciona /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots y la WebUI incluida en el dispositivo.\n");
         sb.append("- API Tokenize: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"texto\"}) y POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"texto\"}) devuelven tokens, cantidad e IDs.\n");
+        sb.append("- CORS permite todos los orígenes (Access-Control-Allow-Origin: *); las solicitudes preflight OPTIONS reciben respuesta.\n");
         sb.append("- La WebUI está disponible en http://<device-ip>:<puerto>/ en el mismo puerto.\n");
         sb.append("- La WebUI es una PWA: puede añadirla a su pantalla de inicio desde el menú del navegador y usarla como una aplicación (no se muestra ningún aviso de instalación automática). Para instalarla en el dispositivo, abra http://127.0.0.1:<puerto>/ (la instalación en la pantalla de inicio y el uso sin conexión requieren un contexto seguro y no están disponibles a través de la IP de LAN).\n");
         sb.append("- El JSON de configuración de MCP guardado en los ajustes de la aplicación se expone a la WebUI a través de /props como ajuste compartido y se usa junto con los ajustes locales de MCP de la WebUI.\n");
@@ -998,6 +1000,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Ao iniciar o aplicativo, uma janela pergunta se deve ativar o servidor local de API/WebUI, e você pode marcar \"Don't show next time\" para ignorá-la em execuções futuras.\n");
         sb.append("- Fornece /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots e a WebUI incluída no dispositivo.\n");
         sb.append("- API Tokenize: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"texto\"}) e POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"texto\"}) retornam tokens, quantidade e IDs.\n");
+        sb.append("- O CORS permite todas as origens (Access-Control-Allow-Origin: *); solicitações preflight OPTIONS são respondidas.\n");
         sb.append("- A WebUI está disponível em http://<device-ip>:<porta>/ na mesma porta.\n");
         sb.append("- A WebUI é um PWA: você pode adicioná-la à sua tela inicial pelo menu do navegador e usá-la como um aplicativo (nenhum aviso de instalação automática é mostrado). Para instalá-la no dispositivo, abra http://127.0.0.1:<porta>/ (a instalação na tela inicial e o uso off-line exigem um contexto seguro e não estão disponíveis pelo IP da LAN).\n");
         sb.append("- O JSON de configuração do MCP salvo nas configurações do aplicativo é exposto à WebUI por meio de /props como configuração compartilhada e é usado junto com as configurações locais de MCP da WebUI.\n");
@@ -1145,6 +1148,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- Beim Start der App fragt ein Fenster, ob der lokale API/WebUI-Server aktiviert werden soll, und Sie können \"Don't show next time\" aktivieren, um es künftig zu überspringen.\n");
         sb.append("- Stellt /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots und die integrierte WebUI auf dem Gerät bereit.\n");
         sb.append("- Tokenize-API: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"Text\"}) und POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"Text\"}) geben Tokens, Anzahl und IDs zurück.\n");
+        sb.append("- CORS erlaubt alle Ursprünge (Access-Control-Allow-Origin: *); Preflight-OPTIONS-Anfragen werden beantwortet.\n");
         sb.append("- Die WebUI ist unter http://<device-ip>:<Port>/ auf demselben Port verfügbar.\n");
         sb.append("- Die WebUI ist eine PWA: Sie können sie über das Browsermenü zum Startbildschirm hinzufügen und wie eine App verwenden (es wird keine automatische Installationsaufforderung angezeigt). Um sie auf dem Gerät zu installieren, öffnen Sie http://127.0.0.1:<Port>/ (Installation auf dem Startbildschirm und Offline-Nutzung erfordern einen sicheren Kontext und sind über die LAN-IP nicht verfügbar).\n");
         sb.append("- Das in den App-Einstellungen gespeicherte MCP-Konfigurations-JSON wird der WebUI über /props als gemeinsame Einstellung bereitgestellt und zusammen mit den lokalen MCP-Einstellungen der WebUI verwendet.\n");
@@ -1292,6 +1296,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- All'avvio dell'app, una finestra chiede se attivare il server locale API/WebUI, e puoi selezionare \"Don't show next time\" per ignorarla agli avvii futuri.\n");
         sb.append("- Fornisce /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots e la WebUI integrata sul dispositivo.\n");
         sb.append("- API Tokenize: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"testo\"}) e POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"testo\"}) restituiscono token, conteggio e IDs.\n");
+        sb.append("- CORS consente tutte le origini (Access-Control-Allow-Origin: *); le richieste preflight OPTIONS ricevono risposta.\n");
         sb.append("- La WebUI è disponibile su http://<device-ip>:<porta>/ sulla stessa porta.\n");
         sb.append("- La WebUI è una PWA: puoi aggiungerla alla schermata Home dal menu del browser e usarla come un'app (non viene mostrato alcun avviso di installazione automatica). Per installarla sul dispositivo, apri http://127.0.0.1:<porta>/ (l'installazione nella schermata Home e l'uso offline richiedono un contesto sicuro e non sono disponibili tramite l'IP LAN).\n");
         sb.append("- Il JSON di configurazione MCP salvato nelle impostazioni dell'app viene esposto alla WebUI tramite /props come impostazione condivisa ed è usato insieme alle impostazioni MCP locali della WebUI.\n");
@@ -1439,6 +1444,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 应用启动时，会弹窗询问是否启用本地 API/WebUI 服务器，可勾选 \"Don't show next time\" 以后不再提示。\n");
         sb.append("- 在设备上提供 /api/chat、/api/generate、/api/tags、/api/tokenize、/v1/chat/completions、/v1/models、/v1/tokenize、/props、/slots 以及内置的 WebUI。\n");
         sb.append("- Tokenize API：POST /api/tokenize（Ollama，body: {\"model\":\"...\",\"content\":\"文本\"}）和 POST /v1/tokenize（OpenAI，body: {\"model\":\"...\",\"input\":\"文本\"}）返回 token 列表、数量和 ID。\n");
+        sb.append("- CORS 允许所有来源（Access-Control-Allow-Origin: *）；预检 OPTIONS 请求也会得到响应。\n");
         sb.append("- WebUI 在同一端口的 http://<device-ip>:<端口>/ 上可用。\n");
         sb.append("- WebUI 是一个 PWA：您可以从浏览器菜单将其添加到主屏幕，像应用一样使用（不会显示自动安装提示）。若要在设备上安装，请打开 http://127.0.0.1:<端口>/（主屏幕安装和离线使用需要安全上下文，无法通过 LAN IP 使用）。\n");
         sb.append("- 保存在应用设置中的 MCP 配置 JSON 会通过 /props 作为共享设置暴露给 WebUI，并与 WebUI 的本地 MCP 设置一起使用。\n");
@@ -1586,6 +1592,7 @@ public class DocumentsActivity extends Activity {
         sb.append("- 앱 시작 시 로컬 API/WebUI 서버를 활성화할지 묻는 팝업이 표시되며, \"Don't show next time\"을 선택하여 이후 실행에서 건너뛸 수 있습니다.\n");
         sb.append("- 기기에서 /api/chat, /api/generate, /api/tags, /api/tokenize, /v1/chat/completions, /v1/models, /v1/tokenize, /props, /slots 및 내장 WebUI를 제공합니다.\n");
         sb.append("- Tokenize API: POST /api/tokenize (Ollama, body: {\"model\":\"...\",\"content\":\"텍스트\"}) 및 POST /v1/tokenize (OpenAI, body: {\"model\":\"...\",\"input\":\"텍스트\"})로 토큰 목록·수·ID를 반환합니다.\n");
+        sb.append("- CORS는 모든 출처를 허용합니다(Access-Control-Allow-Origin: *); 프리플라이트 OPTIONS 요청도 응답합니다.\n");
         sb.append("- WebUI는 같은 포트의 http://<device-ip>:<포트>/ 에서 사용할 수 있습니다.\n");
         sb.append("- WebUI는 PWA입니다: 브라우저 메뉴에서 홈 화면에 추가하여 앱처럼 사용할 수 있습니다(자동 설치 안내는 표시되지 않음). 기기에 설치하려면 http://127.0.0.1:<포트>/ 를 여세요(홈 화면 설치와 오프라인 사용은 보안 컨텍스트가 필요하며 LAN IP로는 사용할 수 없습니다).\n");
         sb.append("- 앱 설정에 저장된 MCP 구성 JSON은 /props를 통해 공유 설정으로 WebUI에 노출되며 WebUI의 로컬 MCP 설정과 함께 사용됩니다.\n");

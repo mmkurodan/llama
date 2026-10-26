@@ -27,10 +27,7 @@ import android.os.Looper;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.ScrollView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.view.Gravity;
@@ -98,7 +95,9 @@ public class MainActivity extends Activity {
     private MaxHeightScrollView logScroll;       // bounds logView to <=50% screen
     private TextView statsView;         // generation speed (tok/s) + device temperature (under output)
     private TextView headerStatsView;   // top header: speed + temp + active backend
-    private Spinner  profileSpinner;    // profile (configuration) selector in the direct section
+    private LinearLayout profilePickerButton; // tappable profile picker for direct section
+    private TextView     profilePickerName;   // selected profile name shown in picker
+    private TextView     profilePickerDesc;   // selected profile description shown in picker
     private TextView directSectionHeader;   // collapsible header for the direct-run section
     private View     directSectionContent;  // collapsible body of the direct-run section
     private View     processingSectionContent;  // collapsible body of the processing/log section
@@ -266,7 +265,9 @@ public class MainActivity extends Activity {
         if (logScroll != null) logScroll.setMaxHeightPx(halfScreenPx);
         statsView = findViewById(R.id.statsView);
         headerStatsView = findViewById(R.id.headerStatsView);
-        profileSpinner = findViewById(R.id.profileSpinner);
+        profilePickerButton = findViewById(R.id.profilePickerButton);
+        profilePickerName   = findViewById(R.id.profilePickerName);
+        profilePickerDesc   = findViewById(R.id.profilePickerDesc);
         directSectionHeader = findViewById(R.id.directSectionHeader);
         directSectionContent = findViewById(R.id.directSectionContent);
         webChatTitle = findViewById(R.id.webChatTitle);
@@ -1163,47 +1164,208 @@ public class MainActivity extends Activity {
         });
     }
 
-    /** Populate the profile (configuration) selector and switch currentConfig on selection. */
+    /** Refresh the profile picker button display and wire up the tap-to-select dialog. */
     private void setupProfileSpinner() {
-        if (profileSpinner == null) {
-            return;
-        }
-        java.util.List<String> names = configManager.listConfigurations();
+        if (profilePickerButton == null) return;
+
+        // Validate currentConfig is still present after potential settings changes.
+        List<String> names = configManager.listConfigurations();
         if (names == null || names.isEmpty()) {
             names = new java.util.ArrayList<>();
             names.add("default");
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, names);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        profileSpinner.setAdapter(adapter);
-        if (currentConfig != null && currentConfig.name != null) {
-            int idx = names.indexOf(currentConfig.name);
-            if (idx >= 0) {
-                profileSpinner.setSelection(idx, false);
+        if (currentConfig == null || !names.contains(currentConfig.name)) {
+            try { currentConfig = configManager.loadConfiguration(names.get(0)); }
+            catch (Exception ignored) {}
+        }
+
+        updateProfilePickerDisplay();
+        profilePickerButton.setOnClickListener(v -> showProfilePickerDialog());
+    }
+
+    private void updateProfilePickerDisplay() {
+        if (profilePickerName == null) return;
+        String name = (currentConfig != null && currentConfig.name != null)
+                ? currentConfig.name : "default";
+        profilePickerName.setText(name);
+        if (profilePickerDesc != null) {
+            String desc = (currentConfig != null && currentConfig.description != null)
+                    ? currentConfig.description.trim() : "";
+            if (desc.isEmpty()) {
+                profilePickerDesc.setVisibility(View.GONE);
+            } else {
+                profilePickerDesc.setText(desc);
+                profilePickerDesc.setVisibility(View.VISIBLE);
             }
         }
-        profileSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String name = (String) parent.getItemAtPosition(position);
-                if (name == null || (currentConfig != null && name.equals(currentConfig.name))) {
-                    return;  // programmatic / no-op selection
-                }
-                try {
-                    ConfigurationManager.Configuration loaded = configManager.loadConfiguration(name);
-                    if (loaded != null) {
-                        currentConfig = loaded;
-                        modelManager.notifySettingsChanged();
-                        appendMessage(localizedText("プロファイル選択: ", "Profile selected: ") + name
-                                + localizedText("（次回プロンプトで適用）", " (applied on next prompt)"));
-                    }
-                } catch (Exception e) {
-                    appendMessage(localizedText("プロファイル読込失敗: ", "Failed to load profile: ") + name);
-                }
+    }
+
+    private void showProfilePickerDialog() {
+        List<String> names = configManager.listConfigurations();
+        if (names == null || names.isEmpty()) {
+            names = new java.util.ArrayList<>();
+            names.add("default");
+        }
+        final List<String> profileNames = new java.util.ArrayList<>(names);
+        float d = getResources().getDisplayMetrics().density;
+        int p8 = Math.round(8 * d), p12 = Math.round(12 * d);
+        String selected = currentConfig != null ? currentConfig.name : null;
+
+        ScrollView sv = new ScrollView(this);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(p12, p8, p12, p8);
+
+        for (String name : profileNames) {
+            ConfigurationManager.Configuration cfg = null;
+            try { cfg = configManager.loadConfiguration(name); } catch (Exception ignored) {}
+            LinearLayout card = buildProfileCard(name, cfg, name.equals(selected), d);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, 0, p8);
+            container.addView(card, lp);
+        }
+        sv.addView(container);
+
+        final AlertDialog[] ref = {null};
+        ref[0] = new AlertDialog.Builder(this)
+                .setTitle(localizedText("プロファイルを選択", "Select Profile"))
+                .setView(sv)
+                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
+                .create();
+
+        for (int i = 0; i < container.getChildCount(); i++) {
+            final String name = profileNames.get(i);
+            container.getChildAt(i).setOnClickListener(v -> {
+                applySelectedProfile(name);
+                if (ref[0] != null) ref[0].dismiss();
+            });
+        }
+        ref[0].show();
+    }
+
+    private LinearLayout buildProfileCard(
+            String name, ConfigurationManager.Configuration cfg, boolean selected, float d) {
+        int p8 = Math.round(8 * d), p12 = Math.round(12 * d), p4 = Math.round(4 * d);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(p12, p8, p12, p8);
+        card.setBackground(getDrawable(R.drawable.bg_card));
+        card.setClickable(true);
+        card.setFocusable(true);
+
+        // Profile name — bold; blue + checkmark when currently selected
+        TextView nameTv = new TextView(this);
+        nameTv.setText((selected ? "✓  " : "") + name);
+        nameTv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15);
+        nameTv.setTypeface(null, android.graphics.Typeface.BOLD);
+        nameTv.setTextColor(selected
+                ? getResources().getColor(R.color.primary_blue, getTheme())
+                : getResources().getColor(R.color.text_primary, getTheme()));
+        card.addView(nameTv);
+
+        // Description — full text, up to 4 lines
+        String desc = (cfg != null && cfg.description != null) ? cfg.description.trim() : "";
+        if (!desc.isEmpty()) {
+            TextView descTv = new TextView(this);
+            descTv.setText(desc);
+            descTv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+            descTv.setTextColor(getResources().getColor(R.color.text_secondary, getTheme()));
+            descTv.setMaxLines(4);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, p4, 0, 0);
+            card.addView(descTv, lp);
+        }
+
+        // Divider
+        View div = new View(this);
+        div.setBackgroundColor(getResources().getColor(R.color.divider, getTheme()));
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, Math.round(d)));
+        divLp.setMargins(0, p8, 0, p4);
+        card.addView(div, divLp);
+
+        // Model filename
+        addCardInfoRow(card, localizedText("モデル: ", "Model: "),
+                cfg != null ? modelBaseName(cfg.modelUrl) : "—", d);
+
+        if (cfg != null) {
+            String mmproj;
+            if (cfg.multimodalProjectorDisabled) {
+                mmproj = "—";
+            } else if (cfg.multimodalProjectorUrl != null && !cfg.multimodalProjectorUrl.isEmpty()) {
+                mmproj = "✓  " + modelBaseName(cfg.multimodalProjectorUrl);
+            } else {
+                mmproj = localizedText("（自動検出）", "(auto)");
             }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
-        });
+            addCardInfoRow(card, "mmproj: ", mmproj, d);
+
+            String lora = (cfg.loraAdapterUrl != null && !cfg.loraAdapterUrl.isEmpty())
+                    ? "✓  " + modelBaseName(cfg.loraAdapterUrl)
+                      + String.format(Locale.US, "  ×%.1f", cfg.loraAdapterScale)
+                    : "—";
+            addCardInfoRow(card, "LoRA: ", lora, d);
+
+            String mtp = cfg.mtpEnabled
+                    ? "✓  draft=" + cfg.mtpNDraft
+                      + (cfg.mtpModelReference != null && !cfg.mtpModelReference.isEmpty()
+                         ? "  / " + modelBaseName(cfg.mtpModelReference) : "")
+                    : "—";
+            addCardInfoRow(card, "MTP: ", mtp, d);
+        }
+        return card;
+    }
+
+    private void addCardInfoRow(LinearLayout card, String label, String value, float d) {
+        int p2 = Math.round(2 * d);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, p2, 0, 0);
+
+        TextView labelTv = new TextView(this);
+        labelTv.setText(label);
+        labelTv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        labelTv.setTextColor(getResources().getColor(R.color.text_secondary, getTheme()));
+        labelTv.setMinWidth(Math.round(56 * d));
+
+        TextView valueTv = new TextView(this);
+        valueTv.setText(value);
+        valueTv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        valueTv.setTextColor(getResources().getColor(R.color.text_primary, getTheme()));
+        valueTv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        valueTv.setMaxLines(1);
+        LinearLayout.LayoutParams valueLp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+
+        row.addView(labelTv);
+        row.addView(valueTv, valueLp);
+        card.addView(row, rowLp);
+    }
+
+    private void applySelectedProfile(String name) {
+        try {
+            ConfigurationManager.Configuration loaded = configManager.loadConfiguration(name);
+            if (loaded != null) {
+                currentConfig = loaded;
+                modelManager.notifySettingsChanged();
+                updateProfilePickerDisplay();
+                appendMessage(localizedText("プロファイル選択: ", "Profile selected: ") + name
+                        + localizedText("（次回プロンプトで適用）", " (applied on next prompt)"));
+            }
+        } catch (Exception e) {
+            appendMessage(localizedText("プロファイル読込失敗: ", "Failed to load profile: ") + name);
+        }
+    }
+
+    private static String modelBaseName(String url) {
+        if (url == null || url.isEmpty()) return "—";
+        String s = url.replaceAll("[?#].*$", "");
+        int slash = s.lastIndexOf('/');
+        return slash >= 0 ? s.substring(slash + 1) : s;
     }
 
     /** Battery temperature in degrees Celsius (proxy for device temperature), NaN if unavailable. */

@@ -1543,10 +1543,26 @@ public class ModelManager {
      * {@code null} on failure. The caller is responsible for the busy lock (as with other downloads).
      */
     public String downloadStandaloneFile(String url) {
+        return downloadStandaloneFile(url, "");
+    }
+
+    /**
+     * Downloads {@code url} into the model storage directory and returns the saved filename.
+     * When {@code pairedModelUrl} is non-empty and {@code url} is a remote reference, the file
+     * is saved as {@code <modelStem>-<mmprojFilename>} so that projectors from different
+     * repositories with identical generic basenames (e.g., "mmproj-F16.gguf") don't collide.
+     */
+    public String downloadStandaloneFile(String url, String pairedModelUrl) {
         if (url == null || url.trim().isEmpty()) {
             return null;
         }
-        String base = extractFilenameFromUrl(url);
+        String base;
+        if (pairedModelUrl != null && !pairedModelUrl.isEmpty()
+                && ModelFileHelper.isRemoteModelReference(url)) {
+            base = ModelFileHelper.deriveLocalMmprojName(pairedModelUrl, url);
+        } else {
+            base = extractFilenameFromUrl(url);
+        }
         if (base == null || base.isEmpty()) {
             base = "download.gguf";
         }
@@ -1660,7 +1676,12 @@ public class ModelManager {
                     "Configured mmproj is incompatible with the selected model. Open Settings and choose a matching mmproj.");
         }
 
-        File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+        File configuredFile;
+        if (config.multimodalProjectorLocalName != null && !config.multimodalProjectorLocalName.isEmpty()) {
+            configuredFile = new File(ModelFileHelper.getModelStorageDir(context), config.multimodalProjectorLocalName);
+        } else {
+            configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+        }
         if (configuredFile == null) {
             return new MultimodalProjectorResolution(
                     null,

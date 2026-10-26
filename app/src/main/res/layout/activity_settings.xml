@@ -63,6 +63,21 @@
             android:drawableEnd="@drawable/ic_arrow_drop_down"
             android:drawablePadding="8dp" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Profile Description:"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/profileDescriptionInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Describe this profile (optional)"
+            android:inputType="textMultiLine"
+            android:minLines="3"
+            android:gravity="top|start" />
+
         <Button
             style="@style/PrimaryButton" android:id="@+id/loadConfigButton"
             android:layout_width="match_parent"
@@ -1169,6 +1184,14 @@
                 android:paddingTop="4dp"
                 android:gravity="center" />
         </LinearLayout>
+
+        <Switch
+            android:id="@+id/corsEnabledSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:checked="true"
+            android:text="Enable CORS (browser access)" />
 
         <Switch
             android:id="@+id/keepAwakeSwitch"
