@@ -71,7 +71,23 @@ public class LlamaNative {
 
     // Embedding generation: returns JSON {"embedding":[...]} or {"error":"..."}.
     // Mean-pools per-token hidden states for generative models; best with an embedding model.
+    // Uses the main chat model (g_model); triggers no load by itself.
     public native String embed(String text);
+
+    // ---- Resident embedding model (hybrid fast-lane) ----
+    // Loads a dedicated small (<=~1B) embedding model into a SECOND, resident native slot that
+    // coexists with the main chat model, so embedding requests never evict it (and vice-versa).
+    // CPU-only + mmap. Returns "ok" | "already-loaded" | an error string. Re-loading the same
+    // path is a no-op. Mirrors the MTP dual-model precedent.
+    public native String loadEmbeddingModel(String path);
+
+    // Embeds using the resident embedding model (loadEmbeddingModel) without touching the main
+    // chat model. Returns JSON {"embedding":[...]} or {"error":"..."} ("embedding model not
+    // loaded" if none is resident).
+    public native String embedResident(String text);
+
+    // Frees the resident embedding model + context. Safe to call when none is loaded.
+    public native void unloadEmbeddingModel();
 
     // Tokenize text; returns JSON {"tokens":[...],"count":N,"ids":[...]} or {"error":"..."}.
     public native String tokenize(String text);

@@ -118,6 +118,22 @@ static std::string g_mtp_path;            // path to the MTP-head draft GGUF (""
 static int32_t     g_mtp_n_draft = 2;     // max tokens drafted per step (MTP heads reliably predict ~1-2 ahead)
 static bool        g_mtp_enabled = false; // master toggle (default off = unchanged behaviour)
 
+// ---- Resident embedding model (hybrid fast-lane) ----
+// A SECOND, dedicated small model held in memory alongside g_model/g_ctx so that
+// embedding requests never evict the main chat model (and vice-versa). Like the MTP
+// draft handles above, this proves two models can coexist. It is loaded CPU-only with
+// mmap (weights stay file-backed, avoiding the device's anon-RSS force-stop governor and
+// never contending for GPU VRAM with the main model). Guarded to <=~1B params so the
+// resident slot cannot be abused with a large model that blows the memory budget.
+// Access is serialized through g_mutex (same single-slot policy as everything else).
+static llama_model   *g_embd_model   = nullptr;
+static llama_context *g_embd_ctx     = nullptr;
+static std::string    g_embd_path;                 // path of the loaded embedding model ("" = none)
+static int            g_embd_n_ctx   = 2048;       // context/batch size for the embedding model
+// Upper bound on the resident embedding model size. "1B scale or less" per product
+// requirement, with margin so models labelled ~1B that are slightly over are still allowed.
+static constexpr int64_t EMBD_MODEL_MAX_PARAMS = 1500000000LL;
+
 static JavaVM *g_jvm = nullptr;
 // Token listener global ref and method IDs
 static jobject g_token_listener = nullptr;
@@ -988,6 +1004,25 @@ static void release_model_locked(const char * log_prefix) {
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": model freed");
     }
+}
+
+// Frees the resident embedding model + its context. Independent of the main g_model/g_ctx
+// (the two never share handles), so this can run at any time without disturbing an active
+// chat session. Safe to call when nothing is loaded.
+static void release_embedding_locked(const char * log_prefix) {
+    if (g_embd_ctx) {
+        llama_synchronize(g_embd_ctx);
+        llama_free(g_embd_ctx);
+        g_embd_ctx = nullptr;
+    }
+    if (g_embd_model) {
+        llama_model_free(g_embd_model);
+        g_embd_model = nullptr;
+    }
+    if (!g_embd_path.empty() && log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": resident embedding model freed (" + g_embd_path + ")");
+    }
+    g_embd_path.clear();
 }
 
 static void release_backend_locked(const char * log_prefix) {
@@ -2238,6 +2273,7 @@ static void llama_jni_free() {
     release_multimodal_locked("llama_jni_free");
     release_context_locked("llama_jni_free");
     release_model_locked("llama_jni_free");
+    release_embedding_locked("llama_jni_free");
     release_backend_locked("llama_jni_free");
     g_current_mmproj_path.clear();
     g_supports_vision = false;
@@ -3230,48 +3266,42 @@ Java_com_micklab_llama_LlamaNative_setGrammar(
                                      : "set (" + std::to_string(g_grammar.grammar.size()) + " bytes)"));
 }
 
-// ---------------- JNI: embed ----------------
-// Computes a sentence embedding for `text` with the loaded model and returns JSON
+// ---------------- embedding (shared) ----------------
+// Computes a sentence embedding for `text` with the given model/context and returns JSON
 // {"embedding":[...]} (or {"error":"..."}). For generative (causal) models the per-token
 // hidden states are mean-pooled (pooling_type NONE) and L2-normalized; a dedicated embedding
 // model with mean/cls pooling yields better quality. The KV cache is cleared before and after
-// so an in-progress chat session is not polluted.
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_micklab_llama_LlamaNative_embed(
-        JNIEnv * env, jobject, jstring jtext) {
-    std::lock_guard<std::mutex> lock(g_mutex);
-    if (!g_model || !g_ctx) {
-        return new_java_string_utf8(env, "{\"error\":\"model not loaded\"}");
-    }
-    std::string text;
-    if (jtext != nullptr) {
-        const char * c = env->GetStringUTFChars(jtext, nullptr);
-        if (c) { text = c; env->ReleaseStringUTFChars(jtext, c); }
+// so an in-progress session is not polluted. Caller must hold g_mutex. Shared by the main
+// embed() (uses g_model/g_ctx) and embedResident() (uses the resident g_embd_* handles);
+// n_ctx/n_batch are the owning context's limits used to truncate overly long inputs.
+static std::string compute_embedding_json_locked(
+        llama_model * model, llama_context * ctx, int n_ctx, int n_batch, const std::string & text) {
+    if (!model || !ctx) {
+        return "{\"error\":\"model not loaded\"}";
     }
 
-    const llama_vocab * vocab = llama_model_get_vocab(g_model);
+    const llama_vocab * vocab = llama_model_get_vocab(model);
     std::vector<llama_token> tokens = common_tokenize(vocab, text, true, false);
     if (tokens.empty()) {
-        return new_java_string_utf8(env, "{\"error\":\"empty input\"}");
+        return "{\"error\":\"empty input\"}";
     }
-    if ((int) tokens.size() > g_n_ctx) {
-        tokens.resize(g_n_ctx);
+    if ((int) tokens.size() > n_ctx) {
+        tokens.resize(n_ctx);
     }
     // llama_decode asserts n_tokens <= n_batch; truncate so long texts don't SIGABRT.
     // Mean-pooling over the first n_batch tokens is acceptable for embedding quality.
-    if ((int) tokens.size() > g_n_batch) {
-        tokens.resize(g_n_batch);
+    if ((int) tokens.size() > n_batch) {
+        tokens.resize(n_batch);
     }
 
-    const int n_embd = llama_model_n_embd_out(g_model);
+    const int n_embd = llama_model_n_embd_out(model);
     if (n_embd <= 0) {
-        return new_java_string_utf8(env, "{\"error\":\"model has no embedding output\"}");
+        return "{\"error\":\"model has no embedding output\"}";
     }
 
     reusable_token_batch batch((int32_t) tokens.size());
     if (!batch.valid()) {
-        return new_java_string_utf8(env, "{\"error\":\"batch alloc failed\"}");
+        return "{\"error\":\"batch alloc failed\"}";
     }
     batch.batch.n_tokens = (int32_t) tokens.size();
     for (int i = 0; i < (int) tokens.size(); ++i) {
@@ -3279,20 +3309,20 @@ Java_com_micklab_llama_LlamaNative_embed(
         batch.set_token(i, tokens[i], (llama_pos) i, true);
     }
 
-    llama_memory_t mem = llama_get_memory(g_ctx);
+    llama_memory_t mem = llama_get_memory(ctx);
     llama_memory_clear(mem, true);
-    llama_set_embeddings(g_ctx, true);
+    llama_set_embeddings(ctx, true);
 
-    const int rc = llama_decode(g_ctx, batch.batch);
+    const int rc = llama_decode(ctx, batch.batch);
 
     std::vector<float> pooled(n_embd, 0.0f);
     bool ok = (rc >= 0);
     if (ok) {
-        const enum llama_pooling_type pooling = llama_pooling_type(g_ctx);
+        const enum llama_pooling_type pooling = llama_pooling_type(ctx);
         if (pooling == LLAMA_POOLING_TYPE_NONE) {
             int counted = 0;
             for (int i = 0; i < (int) tokens.size(); ++i) {
-                const float * e = llama_get_embeddings_ith(g_ctx, i);
+                const float * e = llama_get_embeddings_ith(ctx, i);
                 if (e == nullptr) continue;
                 for (int d = 0; d < n_embd; ++d) pooled[d] += e[d];
                 ++counted;
@@ -3303,7 +3333,7 @@ Java_com_micklab_llama_LlamaNative_embed(
                 ok = false;
             }
         } else {
-            const float * e = llama_get_embeddings_seq(g_ctx, 0);
+            const float * e = llama_get_embeddings_seq(ctx, 0);
             if (e != nullptr) {
                 for (int d = 0; d < n_embd; ++d) pooled[d] = e[d];
             } else {
@@ -3313,11 +3343,11 @@ Java_com_micklab_llama_LlamaNative_embed(
     }
 
     // restore generation mode and drop the scratch tokens from the KV cache
-    llama_set_embeddings(g_ctx, false);
+    llama_set_embeddings(ctx, false);
     llama_memory_clear(mem, true);
 
     if (!ok) {
-        return new_java_string_utf8(env, "{\"error\":\"embedding decode failed\"}");
+        return "{\"error\":\"embedding decode failed\"}";
     }
 
     std::vector<float> normed(n_embd, 0.0f);
@@ -3333,7 +3363,139 @@ Java_com_micklab_llama_LlamaNative_embed(
         out += buf;
     }
     out += "]}";
-    return new_java_string_utf8(env, out);
+    return out;
+}
+
+// ---------------- JNI: embed ----------------
+// Embeds using the main chat model (g_model/g_ctx). See compute_embedding_json_locked.
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_embed(
+        JNIEnv * env, jobject, jstring jtext) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    std::string text;
+    if (jtext != nullptr) {
+        const char * c = env->GetStringUTFChars(jtext, nullptr);
+        if (c) { text = c; env->ReleaseStringUTFChars(jtext, c); }
+    }
+    return new_java_string_utf8(env, compute_embedding_json_locked(g_model, g_ctx, g_n_ctx, g_n_batch, text));
+}
+
+// ---------------- JNI: loadEmbeddingModel ----------------
+// Loads a dedicated small embedding model into the resident slot (g_embd_*), independent of
+// the main chat model. CPU-only + mmap (weights stay file-backed; no GPU VRAM contention).
+// Rejects models larger than EMBD_MODEL_MAX_PARAMS. Returns "ok" | "already-loaded" |
+// error string. Re-loading the same path is a no-op.
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_loadEmbeddingModel(
+        JNIEnv * env, jobject, jstring jpath) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    std::string path;
+    if (jpath != nullptr) {
+        const char * c = env->GetStringUTFChars(jpath, nullptr);
+        if (c) { path = c; env->ReleaseStringUTFChars(jpath, c); }
+    }
+    if (path.empty()) {
+        return new_java_string_utf8(env, "empty path");
+    }
+    if (path == g_embd_path && g_embd_model && g_embd_ctx) {
+        return new_java_string_utf8(env, "already-loaded");
+    }
+
+    // Replacing whatever resident model was there before.
+    release_embedding_locked("loadEmbeddingModel");
+    ensure_backend_initialized_locked("loadEmbeddingModel");
+    if (ggml_backend_reg_count() == 0) {
+        return new_java_string_utf8(env, "no ggml backends registered");
+    }
+
+    // Pure-CPU model params. An explicit empty (NULL-terminated) device list forces CPU layer
+    // placement (mirrors the main CPU path) so no auto-registered accelerator steals layers.
+    // static so the pointer handed to llama via mparams.devices outlives the load call (same
+    // reason the main path uses the persistent g_accel_devices); safe because g_mutex is held.
+    static ggml_backend_dev_t embd_devices[1] = { nullptr };
+    llama_model_params mparams = llama_model_default_params();
+    mparams.n_gpu_layers = 0;
+    mparams.devices      = embd_devices;
+    mparams.load_mode    = LLAMA_LOAD_MODE_MMAP;  // file-backed weights (anon-RSS friendly)
+    mparams.load_mtp     = false;
+
+    llama_model * model = llama_model_load_from_file(path.c_str(), mparams);
+    if (!model) {
+        log_to_file("loadEmbeddingModel: model load failed path=" + path, GGML_LOG_LEVEL_ERROR);
+        return new_java_string_utf8(env, "embedding model load failed");
+    }
+
+    // Enforce the <=~1B resident-size guard now that the true param count is known.
+    const int64_t n_params = llama_model_n_params(model);
+    if (n_params > EMBD_MODEL_MAX_PARAMS) {
+        std::ostringstream ss;
+        ss << "loadEmbeddingModel: model too large for resident slot (" << n_params
+           << " params > " << EMBD_MODEL_MAX_PARAMS << ") path=" << path;
+        log_to_file(ss.str(), GGML_LOG_LEVEL_ERROR);
+        llama_model_free(model);
+        return new_java_string_utf8(env, "embedding model too large (>1B params)");
+    }
+
+    // Embedding context: pooling enabled, batch large enough to hold the whole input in one
+    // decode (pooled models require n_tokens <= n_batch/n_ubatch). Threads follow the global.
+    llama_context_params cparams = llama_context_default_params();
+    cparams.n_ctx           = g_embd_n_ctx;
+    cparams.n_batch         = g_embd_n_ctx;
+    cparams.n_ubatch        = g_embd_n_ctx;
+    cparams.n_threads       = g_n_threads;
+    cparams.n_threads_batch = g_n_threads;
+    cparams.embeddings      = true;   // produce embeddings; pooling_type stays model default
+    cparams.no_perf         = false;
+
+    llama_context * ctx = llama_init_from_model(model, cparams);
+    if (!ctx) {
+        log_to_file("loadEmbeddingModel: context creation failed path=" + path, GGML_LOG_LEVEL_ERROR);
+        llama_model_free(model);
+        return new_java_string_utf8(env, "embedding context creation failed");
+    }
+
+    g_embd_model = model;
+    g_embd_ctx   = ctx;
+    g_embd_path  = path;
+    {
+        std::ostringstream ss;
+        ss << "loadEmbeddingModel: resident embedding model loaded (" << n_params
+           << " params, n_ctx=" << g_embd_n_ctx << ") path=" << path;
+        log_to_file(ss.str());
+    }
+    return new_java_string_utf8(env, "ok");
+}
+
+// ---------------- JNI: embedResident ----------------
+// Embeds using the resident embedding model (g_embd_*) without touching the main chat model.
+// Returns {"error":"embedding model not loaded"} if no resident model is set.
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_micklab_llama_LlamaNative_embedResident(
+        JNIEnv * env, jobject, jstring jtext) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_embd_model || !g_embd_ctx) {
+        return new_java_string_utf8(env, "{\"error\":\"embedding model not loaded\"}");
+    }
+    std::string text;
+    if (jtext != nullptr) {
+        const char * c = env->GetStringUTFChars(jtext, nullptr);
+        if (c) { text = c; env->ReleaseStringUTFChars(jtext, c); }
+    }
+    return new_java_string_utf8(env,
+            compute_embedding_json_locked(g_embd_model, g_embd_ctx, g_embd_n_ctx, g_embd_n_ctx, text));
+}
+
+// ---------------- JNI: unloadEmbeddingModel ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_unloadEmbeddingModel(
+        JNIEnv * /*env*/, jobject) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    release_embedding_locked("unloadEmbeddingModel");
 }
 
 // ---------------- JNI: cancelGeneration ----------------
@@ -4866,6 +5028,7 @@ JNI_OnUnload(JavaVM *, void *) {
     release_multimodal_locked("JNI_OnUnload");
     release_context_locked("JNI_OnUnload");
     release_model_locked("JNI_OnUnload");
+    release_embedding_locked("JNI_OnUnload");
     g_current_mmproj_path.clear();
     g_supports_vision = false;
     g_supports_audio = false;

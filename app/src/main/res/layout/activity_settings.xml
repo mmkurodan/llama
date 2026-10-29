@@ -1193,6 +1193,28 @@
             android:checked="true"
             android:text="Enable CORS (browser access)" />
 
+        <TextView
+            android:id="@+id/residentEmbeddingLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="Resident embedding model (fast-lane):" />
+
+        <TextView
+            android:id="@+id/residentEmbeddingHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="2dp"
+            android:paddingBottom="4dp"
+            android:text="Keep a small (≤1B) embedding model in memory so embedding requests never reload the chat model." />
+
+        <Spinner
+            android:id="@+id/residentEmbeddingSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+
         <Switch
             android:id="@+id/keepAwakeSwitch"
             android:layout_width="match_parent"

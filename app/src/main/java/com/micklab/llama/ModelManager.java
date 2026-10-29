@@ -81,6 +81,9 @@ public class ModelManager {
     private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
+    // Name of the configuration whose model is held resident in the dedicated embedding slot
+    // (hybrid fast-lane). Empty/absent = feature off (embeddings fall back to the main model).
+    private static final String PREF_RESIDENT_EMBEDDING_CONFIG = "resident_embedding_config";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
     private static final int DEFAULT_N_CTX = 2048;
     private static final int DEFAULT_N_THREADS = 2;
@@ -118,6 +121,11 @@ public class ModelManager {
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
     private volatile ConfigurationManager.Configuration lastLoadedConfig = null;
+    // Resident embedding model (hybrid fast-lane). residentEmbeddingConfigName is the
+    // user-selected config (persisted); residentEmbeddingLoadedPath is the model file path
+    // currently loaded into the native resident slot ("" = none), used to skip redundant loads.
+    private volatile String residentEmbeddingConfigName = null;
+    private volatile String residentEmbeddingLoadedPath = null;
     private volatile String currentConfiguredMmprojPath = null;
     // (model, mmproj) pairs whose projector failed to activate at native init in this session
     // (init returned "ok" but the model came up text-only — i.e. the mmproj is incompatible).
@@ -242,6 +250,11 @@ public class ModelManager {
         llama.setLogLevel(savedLogLevel);
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Initial log level set to " + savedLogLevel);
+        }
+
+        String savedResidentEmbd = prefs.getString(PREF_RESIDENT_EMBEDDING_CONFIG, null);
+        if (savedResidentEmbd != null && !savedResidentEmbd.trim().isEmpty()) {
+            residentEmbeddingConfigName = savedResidentEmbd.trim();
         }
     }
     
@@ -1368,6 +1381,121 @@ public class ModelManager {
             return llama.embed(text == null ? "" : text);
         } catch (Throwable t) {
             Log.e(TAG, "embed failed", t);
+            return "{\"error\":\"embed exception\"}";
+        }
+    }
+
+    // ==================== Resident embedding model (hybrid fast-lane) ====================
+
+    /** Config name whose model is held resident in the dedicated embedding slot, or null if off. */
+    public String getResidentEmbeddingConfigName() {
+        return residentEmbeddingConfigName;
+    }
+
+    /** True when a resident embedding model is configured (embeddings should use the fast-lane). */
+    public boolean isResidentEmbeddingEnabled() {
+        String name = residentEmbeddingConfigName;
+        return name != null && !name.trim().isEmpty();
+    }
+
+    /**
+     * Select (and persist) the configuration whose model is held resident for embeddings, or pass
+     * null/empty to disable the feature. Disabling immediately frees the native resident slot.
+     * The model itself is (re)loaded lazily on the next {@link #embedResident(String)} call so this
+     * never blocks on a model load.
+     */
+    public void setResidentEmbeddingConfigName(String configName) {
+        String normalized = (configName == null || configName.trim().isEmpty())
+                ? null : configName.trim();
+        residentEmbeddingConfigName = normalized;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            if (normalized == null) {
+                prefs.edit().remove(PREF_RESIDENT_EMBEDDING_CONFIG).apply();
+            } else {
+                prefs.edit().putString(PREF_RESIDENT_EMBEDDING_CONFIG, normalized).apply();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to persist resident embedding config", t);
+        }
+        if (normalized == null) {
+            unloadResidentEmbeddingModel();
+        }
+    }
+
+    /** Frees the native resident embedding slot (if any) and clears the loaded-path cache. */
+    public void unloadResidentEmbeddingModel() {
+        try {
+            llama.unloadEmbeddingModel();
+        } catch (Throwable t) {
+            Log.w(TAG, "unloadEmbeddingModel failed", t);
+        }
+        residentEmbeddingLoadedPath = null;
+    }
+
+    /**
+     * Ensure the configured resident embedding model is loaded into the native resident slot.
+     * Resolves the config's model file (must already be present on disk — this path never
+     * downloads) and loads it CPU-only. No-op when the same model is already resident. Returns
+     * false when the feature is off, the config/model file is missing, or the native load fails
+     * (e.g. the model exceeds the ~1B resident-size guard). Caller holds the busy lock.
+     */
+    public boolean ensureEmbeddingModelLoaded() {
+        String configName = residentEmbeddingConfigName;
+        if (configName == null || configName.trim().isEmpty()) {
+            return false;
+        }
+        String modelPath;
+        try {
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+            String filename = extractFilenameFromUrl(config.modelUrl);
+            if (filename == null || filename.isEmpty()) {
+                Log.e(TAG, "Resident embedding: cannot determine filename for config " + configName);
+                return false;
+            }
+            modelPath = new File(getModelStorageDir(), filename).getAbsolutePath();
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Resident embedding: failed to load config " + configName, e);
+            return false;
+        }
+        if (modelPath.equals(residentEmbeddingLoadedPath)) {
+            return true;
+        }
+        if (!new File(modelPath).exists()) {
+            Log.e(TAG, "Resident embedding: model file not found: " + modelPath);
+            return false;
+        }
+        try {
+            String result = llama.loadEmbeddingModel(modelPath);
+            if ("ok".equals(result) || "already-loaded".equals(result)) {
+                residentEmbeddingLoadedPath = modelPath;
+                DiagnosticsLogger.logEvent(context, "resident-embedding-load",
+                        "config=" + configName + " path=" + modelPath + " result=" + result);
+                return true;
+            }
+            Log.e(TAG, "Resident embedding load failed (" + configName + "): " + result);
+            residentEmbeddingLoadedPath = null;
+            return false;
+        } catch (Throwable t) {
+            Log.e(TAG, "loadEmbeddingModel failed", t);
+            residentEmbeddingLoadedPath = null;
+            return false;
+        }
+    }
+
+    /**
+     * Compute a sentence embedding using the resident embedding model, loading it on demand.
+     * Returns the native JSON string, or {@code {"error":...}} if the resident model is
+     * unavailable. Does NOT touch the main chat model. Caller holds the busy lock.
+     */
+    public String embedResident(String text) {
+        if (!ensureEmbeddingModelLoaded()) {
+            return "{\"error\":\"resident embedding model unavailable\"}";
+        }
+        try {
+            return llama.embedResident(text == null ? "" : text);
+        } catch (Throwable t) {
+            Log.e(TAG, "embedResident failed", t);
             return "{\"error\":\"embed exception\"}";
         }
     }

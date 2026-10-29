@@ -5072,7 +5072,7 @@ public class OllamaApiServer {
             String model = resolveRequestedModel(modelFromPath);
             if (!acquireGenerationSlot(outputStream, "/v1beta/models:embedContent", false)) return;
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to load configuration: " + model);
                     return;
                 }
@@ -6462,7 +6462,7 @@ public class OllamaApiServer {
             long startNs = System.nanoTime();
             try {
                 long loadStartNs = System.nanoTime();
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
@@ -6509,7 +6509,7 @@ public class OllamaApiServer {
                 return;
             }
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
@@ -6543,7 +6543,7 @@ public class OllamaApiServer {
                 return;
             }
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
                     return;
                 }
@@ -6599,8 +6599,24 @@ public class OllamaApiServer {
     }
 
     /** Calls native embed and parses {"embedding":[...]}; returns null on error (caller holds the slot). */
+    /**
+     * Prepare the model for an embedding request. When the resident embedding fast-lane is
+     * configured, load ONLY the dedicated resident model, leaving the main chat model untouched
+     * (so alternating chat/embedding never reloads the chat model). Otherwise fall back to the
+     * legacy behaviour of switching the main slot to the requested config. Returns false on
+     * load failure; the caller is responsible for sending the appropriate error response.
+     */
+    private boolean loadModelForEmbedding(String model) {
+        if (modelManager.isResidentEmbeddingEnabled()) {
+            return modelManager.ensureEmbeddingModelLoaded();
+        }
+        return modelManager.loadConfiguration(model);
+    }
+
     private float[] computeEmbeddingOrNull(String text) {
-        String json = modelManager.embed(text);
+        String json = modelManager.isResidentEmbeddingEnabled()
+                ? modelManager.embedResident(text)
+                : modelManager.embed(text);
         if (json == null) {
             return null;
         }
