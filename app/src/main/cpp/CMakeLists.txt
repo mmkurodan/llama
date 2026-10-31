@@ -61,6 +61,12 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/build-info.cpp
 )
 
+# v0.8.0: src/llama.cpp now includes "llama-version.h" (generated from .in).
+configure_file(
+    ${LLAMA_ROOT_DIR}/src/llama-version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/llama-version.h
+)
+
 # ---------------------------------------------------------
 # llama core sources
 # ---------------------------------------------------------
@@ -327,6 +333,7 @@ endif()
 target_include_directories(
     llama_jni
     PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}  # generated headers: build-info.cpp, llama-version.h (v0.8.0)
     ${LLAMA_ROOT_DIR}/include
     ${LLAMA_ROOT_DIR}/common
     ${LLAMA_ROOT_DIR}/src
