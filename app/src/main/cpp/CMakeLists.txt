@@ -86,6 +86,11 @@ file(GLOB LLAMA_COMMON_JINJA_FILES CONFIGURE_DEPENDS
     ${LLAMA_ROOT_DIR}/common/jinja/*.cpp
 )
 
+# v0.8.0: chat template parsers moved to common/parsers/ subdirectory
+file(GLOB LLAMA_COMMON_PARSER_FILES CONFIGURE_DEPENDS
+    ${LLAMA_ROOT_DIR}/common/parsers/*.cpp
+)
+
 set(LLAMA_VENDOR_FILES
     ${LLAMA_ROOT_DIR}/vendor/cpp-httplib/httplib.cpp
     # b10621/v0.3.0: mtmd-helper hashes bitmap IDs with hash_sha256_hex (FNV -> SHA-256);
@@ -121,6 +126,7 @@ set(LLAMA_SOURCES
     ${LLAMA_ROOT_FILES}
     ${LLAMA_COMMON_FILES}
     ${LLAMA_COMMON_JINJA_FILES}
+    ${LLAMA_COMMON_PARSER_FILES}
     ${LLAMA_SRC_FILES}
     ${LLAMA_MODEL_FILES}
     ${MTMD_SOURCES}
@@ -147,6 +153,12 @@ set(GGML_SOURCES
     ${GGML_CORE_SOURCES}
     ${GGML_CPU_SOURCES}
 )
+
+# v0.8.0: tiled matmul kernels in ggml-cpu/tiled/
+file(GLOB GGML_CPU_TILED_SOURCES CONFIGURE_DEPENDS
+    ${GGML_ROOT_DIR}/src/ggml-cpu/tiled/*.cpp
+)
+list(APPEND GGML_SOURCES ${GGML_CPU_TILED_SOURCES})
 
 # ---------------------------------------------------------
 # ARM feature flags for the repacked-quant GEMM/GEMV kernels (decode hot path).
@@ -340,6 +352,7 @@ target_include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}  # generated headers: build-info.cpp, llama-version.h (v0.8.0)
     ${LLAMA_ROOT_DIR}/include
     ${LLAMA_ROOT_DIR}/common
+    ${LLAMA_ROOT_DIR}/common/parsers
     ${LLAMA_ROOT_DIR}/src
     ${LLAMA_ROOT_DIR}/vendor
     # sha256.c includes "rotate-bits/rotate-bits.h" relative to vendor/hash.
