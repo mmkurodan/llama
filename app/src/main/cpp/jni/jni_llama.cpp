@@ -106,7 +106,7 @@ static llama_context                   *g_ctx_dft = nullptr; // borrowed from g_
 static common_params                    g_spec_cp;       // kept alive for g_spec
 static common_context_seq_rm_type       g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
 static common_context_seq_rm_type       g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
-static llama_batch                      g_spec_batch = {};   // [id_last, draft...] eval batch
+static common_batch                     g_spec_batch;        // [id_last, draft...] eval batch
 static std::vector<llama_token>         g_spec_prompt;       // committed tokens (draft params .prompt)
 // Per-generation MTP stats (reset before the loop, logged after). g_spec_stat_eval counts
 // every position fed to llama_decode during speculation (incl. rejected drafts + retries);
@@ -741,6 +741,17 @@ static int32_t detokenize_with_resize(
     return n_chars;
 }
 
+// Build a context-free common_batch from a llama_batch. The resulting batch has no
+// llama_batch_ext and cannot be used with get()/llama_process(), but is valid for
+// common_speculative_process() which only reads the tokens[] vector.
+static common_batch llama_batch_to_common_batch(const llama_batch & lb) {
+    common_batch cb;
+    for (int32_t i = 0; i < lb.n_tokens; ++i) {
+        cb.add(lb.token[i], lb.pos[i], lb.seq_id[i][0], lb.logits[i] != 0);
+    }
+    return cb;
+}
+
 struct reusable_token_batch {
     llama_batch batch;
 
@@ -966,10 +977,7 @@ static void release_speculative_locked(const char * log_prefix) {
     g_ctx_dft = nullptr;
     g_ctx_tgt_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
     g_ctx_dft_rm = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
-    if (g_spec_batch.token != nullptr) {
-        llama_batch_free(g_spec_batch);
-        g_spec_batch = {};
-    }
+    g_spec_batch = common_batch{};  // release batch_ext (RAII via unique_ptr)
     g_spec_prompt.clear();
     if (log_prefix != nullptr) {
         log_to_file(std::string(log_prefix) + ": speculative context freed");
@@ -1088,8 +1096,9 @@ static void maybe_init_speculative_locked(const char * log_prefix) {
         g_ctx_tgt_rm = common_context_can_seq_rm(g_ctx);
         g_ctx_dft_rm = common_context_can_seq_rm(g_ctx_dft);
 
-        // Eval batch for [id_last, draft0..draftN-1] (capacity n_max + 1), single sequence.
-        g_spec_batch = llama_batch_init(g_spec_cp.speculative.draft.n_max + 1, 0, 1);
+        // Eval batch for [id_last, draft0..draftN-1], initialized with target ctx
+        // so get() (→ llama_batch_ext) is valid for llama_process().
+        g_spec_batch = common_batch(g_ctx);
 
         std::ostringstream ss;
         ss << log_prefix << ": MTP speculative decoding enabled (draft="
@@ -1120,7 +1129,7 @@ static bool spec_decode_step_locked(
         common_prompt_checkpoint & ckpt,
         std::vector<llama_token> & out_ids) {
     out_ids.clear();
-    if (!g_spec || !smpl || g_spec_batch.token == nullptr) {
+    if (!g_spec || !smpl) {
         return false;
     }
 
@@ -1158,21 +1167,21 @@ static bool spec_decode_step_locked(
         }
 
         // Build [id_last, draft0..draftN-1] and evaluate on the target.
-        common_batch_clear(g_spec_batch);
+        g_spec_batch.clear();
         std::vector<int> idxs;
         idxs.reserve(draft.size() + 1);
-        common_batch_add(g_spec_batch, id_last, n_past, { 0 }, true);
+        g_spec_batch.add(id_last, n_past, { 0 }, true);
         idxs.push_back(0);
         for (size_t k = 0; k < draft.size(); ++k) {
-            common_batch_add(g_spec_batch, draft[k], n_past + 1 + (llama_pos) k, { 0 }, true);
+            g_spec_batch.add(draft[k], n_past + 1 + (llama_pos) k, { 0 }, true);
             idxs.push_back((int) (k + 1));
         }
-        if (llama_decode(g_ctx, g_spec_batch) != 0) {
+        if (llama_process(g_ctx, LLAMA_PROCESS_TYPE_DECODE, g_spec_batch.get()) != 0) {
             log_to_file("spec_decode_step: target decode failed", GGML_LOG_LEVEL_ERROR);
             return false;
         }
 
-        g_spec_stat_eval += (long) g_spec_batch.n_tokens;  // positions actually decoded
+        g_spec_stat_eval += (long) g_spec_batch.size();  // positions actually decoded
 
         // Feed the decoded batch to the MTP speculator (extracts the nextn hidden states).
         common_speculative_process(g_spec, g_spec_batch);
@@ -1561,7 +1570,7 @@ static std::string initialize_optional_multimodal_support_locked(
         mparams_mtmd.print_timings = false;
         mparams_mtmd.n_threads = g_n_threads;
         mparams_mtmd.warmup = true;
-        mparams_mtmd.skip_audio = !enable_audio;
+        // skip_audio removed in v0.8.0; audio support is queried via mtmd_support_audio() after init
 
         mtmd_context * mtmd = mtmd_init_from_file(candidate_path.c_str(), g_model, mparams_mtmd);
         if (!mtmd) {
@@ -3710,7 +3719,7 @@ static bool prefill_text_prompt_locked(
         }
         // MTP: feed every prompt ubatch to the speculator so its head accumulates the
         // target hidden states it drafts from (no-op when MTP is disabled).
-        if (g_spec) { common_speculative_process(g_spec, prompt_batch.batch); }
+        if (g_spec) { common_speculative_process(g_spec, llama_batch_to_common_batch(prompt_batch.batch)); }
     }
 
     log_to_file("generate: prefill complete n_prompt_tokens=" + std::to_string(n_tokens));
@@ -3840,7 +3849,7 @@ static bool prefill_multimodal_prompt_locked(
         // optional video_ctx) and takes a `placeholder` flag. We only decode real
         // image/audio buffers here (video is not fed through this path), so pass
         // placeholder=false and take the bitmap; video_ctx is null for these inputs.
-        mtmd_bitmap * bitmap = mtmd_helper_bitmap_init_from_buf(g_mtmd, file.data(), file.size(), false).bitmap;
+        mtmd_bitmap * bitmap = mtmd_helper_bitmap_init_from_buf(g_mtmd, file.data(), file.size(), false, mtmd_helper_init_opt_default()).bitmap;
         if (!bitmap) {
             error_message = "failed to decode multimodal input";
             cleanup();
@@ -4468,12 +4477,13 @@ static jstring generate_openai_chat_completion_locked(
         }
 
         common_chat_parser_params parser_params(chat_params);
-        parser_params.parse_tool_calls = true;
+        // parse_tool_calls removed in v0.8.0; tool-call parsing is now always active when
+        // the template format supports it (governed by common_chat_format).
         if (!chat_params.parser.empty()) {
-            parser_params.parser.load(chat_params.parser);
+            parser_params.parser = chat_params.parser;  // direct assignment; load() removed in v0.8.0
         }
 
-        const std::string & prompt = chat_params.prompt;
+        const std::string prompt = chat_params.prompt.str();  // common_chat_prompt → string (v0.8.0)
         const auto stop_sequences = build_chat_stop_sequences(chat_params);
 
         if (is_max_debug_mode()) {
@@ -4593,7 +4603,7 @@ static jstring generate_openai_chat_completion_locked(
 
         common_chat_msg parsed_msg;
         try {
-            parsed_msg = common_chat_parse(output, false, parser_params);
+            parsed_msg = common_chat_parse(common_chat_input{output}, false, parser_params);
         } catch (const std::exception & e) {
             log_to_file(std::string("generateOpenAiChatCompletion: parser fallback: ") + e.what(), GGML_LOG_LEVEL_WARN);
             parsed_msg.content = output;
