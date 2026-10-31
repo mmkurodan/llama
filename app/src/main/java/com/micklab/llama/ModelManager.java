@@ -1458,9 +1458,12 @@ public class ModelManager {
             Log.e(TAG, "Resident embedding: failed to load config " + configName, e);
             return false;
         }
-        if (modelPath.equals(residentEmbeddingLoadedPath)) {
-            return true;
-        }
+        // Do NOT short-circuit on the Java-side path cache here: a full native teardown
+        // (llama.free() -> llama_jni_free) frees the resident embedding model without going
+        // through this class, which would leave residentEmbeddingLoadedPath stale and make the
+        // next embedResident() fail with "embedding model not loaded". Always call the native
+        // loader, which is idempotent — it returns "already-loaded" only when the resident
+        // model/context are actually present.
         if (!new File(modelPath).exists()) {
             Log.e(TAG, "Resident embedding: model file not found: " + modelPath);
             return false;
@@ -1616,6 +1619,11 @@ public class ModelManager {
         currentKvCacheTypeK = Integer.MIN_VALUE;
         currentKvCacheTypeV = Integer.MIN_VALUE;
         modelLoaded = false;
+        // A full native teardown (llama.free() -> llama_jni_free) also frees the resident
+        // embedding model, so the cached resident path is no longer valid. Clear it to force a
+        // reload on the next embedding request (prevents the stale-cache 500 "Embedding
+        // generation failed" after a keep_alive=0 unload or model switch).
+        residentEmbeddingLoadedPath = null;
     }
 
     private String normalizeConfigName(String configName) {
