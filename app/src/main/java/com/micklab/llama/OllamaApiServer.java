@@ -100,7 +100,17 @@ public class OllamaApiServer {
         contentTypes.put("swagger.html", "text/html; charset=utf-8");
         WEBUI_CONTENT_TYPES = Collections.unmodifiableMap(contentTypes);
     }
-    
+
+    // CORS header values — centralised so a future settings toggle (enable/disable, allowed-origins)
+    // touches one place without requiring a structural redesign.
+    private static final String CORS_ALLOW_ORIGIN  = "Access-Control-Allow-Origin: *";
+    private static final String CORS_ALLOW_METHODS = "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS";
+    private static final String CORS_ALLOW_HEADERS =
+            "Access-Control-Allow-Headers: Authorization, Content-Type, X-Api-Key, Anthropic-Version";
+    private static final String CORS_MAX_AGE       = "Access-Control-Max-Age: 86400";
+    // SharedPreference key — mirrored in SettingsActivity with the same string value.
+    static final String PREF_CORS_ENABLED = "cors_enabled";
+
     private final Context context;
     private final ConfigurationManager configManager;
     private final ModelManager modelManager;
@@ -2746,7 +2756,7 @@ public class OllamaApiServer {
                     // Start chunked response
                     String header = "HTTP/1.1 200 OK\r\n" +
                             "Content-Type: application/x-ndjson\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n" +
+                            corsOriginHeader() +
                             "Transfer-Encoding: chunked\r\n" +
                             "\r\n";
                     outputStream.write(header.getBytes(StandardCharsets.UTF_8));
@@ -2973,7 +2983,7 @@ public class OllamaApiServer {
             boolean hasSharedToolConfig = hasSharedToolConfig();
             long keepAlive = parseKeepAlive(request);
 
-            if (messages == null || messages.length() == 0) {
+            if (messages == null) {
                 if (!acquireGenerationSlot(outputStream, "/api/chat")) return;
                 try {
                     if (keepAlive != 0 && !modelManager.loadConfiguration(model)) {
@@ -2989,6 +2999,10 @@ public class OllamaApiServer {
                     modelManager.release();
                     if (keepAlive == 0) modelManager.free();
                 }
+                return;
+            }
+            if (messages.length() == 0) {
+                sendErrorResponse(outputStream, 400, "messages must not be empty");
                 return;
             }
             if (request.has("tools") && tools == null) {
@@ -3106,7 +3120,7 @@ public class OllamaApiServer {
                     // Start chunked response
                     String header = "HTTP/1.1 200 OK\r\n" +
                             "Content-Type: application/x-ndjson\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n" +
+                            corsOriginHeader() +
                             "Transfer-Encoding: chunked\r\n" +
                             "\r\n";
                     outputStream.write(header.getBytes(StandardCharsets.UTF_8));
@@ -3452,7 +3466,7 @@ public class OllamaApiServer {
                                     "Content-Type: text/event-stream\r\n" +
                                     "Cache-Control: no-cache\r\n" +
                                     "Connection: keep-alive\r\n" +
-                                    "Access-Control-Allow-Origin: *\r\n" +
+                                    corsOriginHeader() +
                                     "\r\n";
                             outputStream.write(header.getBytes(StandardCharsets.UTF_8));
                             outputStream.flush();
@@ -3512,7 +3526,7 @@ public class OllamaApiServer {
                             "Content-Type: text/event-stream\r\n" +
                             "Cache-Control: no-cache\r\n" +
                             "Connection: keep-alive\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n" +
+                            corsOriginHeader() +
                             "\r\n";
                     outputStream.write(header.getBytes(StandardCharsets.UTF_8));
                     outputStream.flush();
@@ -3945,12 +3959,22 @@ public class OllamaApiServer {
         return null;
     }
 
-    private static String sseHeader() {
+    private boolean isCorsEnabled() {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(PREF_CORS_ENABLED, true);
+    }
+
+    /** Returns "Access-Control-Allow-Origin: *\r\n" when CORS is enabled, "" otherwise. */
+    private String corsOriginHeader() {
+        return isCorsEnabled() ? CORS_ALLOW_ORIGIN + "\r\n" : "";
+    }
+
+    private String sseHeader() {
         return "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: text/event-stream\r\n" +
                 "Cache-Control: no-cache\r\n" +
                 "Connection: keep-alive\r\n" +
-                "Access-Control-Allow-Origin: *\r\n" +
+                corsOriginHeader() +
                 "\r\n";
     }
 
@@ -5048,7 +5072,7 @@ public class OllamaApiServer {
             String model = resolveRequestedModel(modelFromPath);
             if (!acquireGenerationSlot(outputStream, "/v1beta/models:embedContent", false)) return;
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendGeminiErrorResponse(outputStream, 500, "INTERNAL", "Failed to load configuration: " + model);
                     return;
                 }
@@ -6438,7 +6462,7 @@ public class OllamaApiServer {
             long startNs = System.nanoTime();
             try {
                 long loadStartNs = System.nanoTime();
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
@@ -6485,7 +6509,7 @@ public class OllamaApiServer {
                 return;
             }
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
                     return;
                 }
@@ -6519,7 +6543,7 @@ public class OllamaApiServer {
                 return;
             }
             try {
-                if (!modelManager.loadConfiguration(model)) {
+                if (!loadModelForEmbedding(model)) {
                     sendOpenAiErrorResponse(outputStream, 500, "Failed to load configuration: " + model, "server_error");
                     return;
                 }
@@ -6575,8 +6599,24 @@ public class OllamaApiServer {
     }
 
     /** Calls native embed and parses {"embedding":[...]}; returns null on error (caller holds the slot). */
+    /**
+     * Prepare the model for an embedding request. When the resident embedding fast-lane is
+     * configured, load ONLY the dedicated resident model, leaving the main chat model untouched
+     * (so alternating chat/embedding never reloads the chat model). Otherwise fall back to the
+     * legacy behaviour of switching the main slot to the requested config. Returns false on
+     * load failure; the caller is responsible for sending the appropriate error response.
+     */
+    private boolean loadModelForEmbedding(String model) {
+        if (modelManager.isResidentEmbeddingEnabled()) {
+            return modelManager.ensureEmbeddingModelLoaded();
+        }
+        return modelManager.loadConfiguration(model);
+    }
+
     private float[] computeEmbeddingOrNull(String text) {
-        String json = modelManager.embed(text);
+        String json = modelManager.isResidentEmbeddingEnabled()
+                ? modelManager.embedResident(text)
+                : modelManager.embed(text);
         if (json == null) {
             return null;
         }
@@ -6949,23 +6989,28 @@ public class OllamaApiServer {
     }
     
     private void handleCors(OutputStream outputStream) throws IOException {
-        String response = "HTTP/1.1 204 No Content\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
-            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
-            "Access-Control-Allow-Headers: Content-Type\r\n" +
-            "Access-Control-Max-Age: 86400\r\n" +
-            "\r\n";
+        String response;
+        if (isCorsEnabled()) {
+            response = "HTTP/1.1 204 No Content\r\n" +
+                CORS_ALLOW_ORIGIN  + "\r\n" +
+                CORS_ALLOW_METHODS + "\r\n" +
+                CORS_ALLOW_HEADERS + "\r\n" +
+                CORS_MAX_AGE       + "\r\n" +
+                "\r\n";
+        } else {
+            response = "HTTP/1.1 204 No Content\r\n\r\n";
+        }
         outputStream.write(response.getBytes(StandardCharsets.UTF_8));
         outputStream.flush();
     }
     
     private void sendJsonResponse(OutputStream outputStream, int statusCode, String body) throws IOException {
-        String status = statusCode == 200 ? "OK" : (statusCode == 400 ? "Bad Request" : 
+        String status = statusCode == 200 ? "OK" : (statusCode == 400 ? "Bad Request" :
                         (statusCode == 404 ? "Not Found" : (statusCode == 503 ? "Service Unavailable" : "Error")));
-        
+
         String response = "HTTP/1.1 " + statusCode + " " + status + "\r\n" +
             "Content-Type: application/json\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
+            corsOriginHeader() +
             "Content-Length: " + body.getBytes(StandardCharsets.UTF_8).length + "\r\n" +
             "\r\n" +
             body;
@@ -6979,7 +7024,7 @@ public class OllamaApiServer {
         String status = statusCode == 200 ? "OK" : (statusCode == 404 ? "Not Found" : "Error");
         String response = "HTTP/1.1 " + statusCode + " " + status + "\r\n" +
                 "Content-Type: " + contentType + "\r\n" +
-                "Access-Control-Allow-Origin: *\r\n" +
+                corsOriginHeader() +
                 "Content-Length: " + body.length + "\r\n" +
                 "Cross-Origin-Embedder-Policy: require-corp\r\n" +
                 "Cross-Origin-Opener-Policy: same-origin\r\n" +
@@ -7017,7 +7062,7 @@ public class OllamaApiServer {
 
         String header = "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: application/x-ndjson\r\n" +
-                "Access-Control-Allow-Origin: *\r\n" +
+                corsOriginHeader() +
                 "Transfer-Encoding: chunked\r\n" +
                 "\r\n";
         outputStream.write(header.getBytes(StandardCharsets.UTF_8));
@@ -7046,7 +7091,7 @@ public class OllamaApiServer {
 
         String header = "HTTP/1.1 200 OK\r\n" +
                 "Content-Type: application/x-ndjson\r\n" +
-                "Access-Control-Allow-Origin: *\r\n" +
+                corsOriginHeader() +
                 "Transfer-Encoding: chunked\r\n" +
                 "\r\n";
         outputStream.write(header.getBytes(StandardCharsets.UTF_8));
@@ -7238,7 +7283,7 @@ public class OllamaApiServer {
     private void sendStreamingResponse(OutputStream outputStream, String body) throws IOException {
         String response = "HTTP/1.1 200 OK\r\n" +
             "Content-Type: application/x-ndjson\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
+            corsOriginHeader() +
             "Transfer-Encoding: chunked\r\n" +
             "\r\n";
         

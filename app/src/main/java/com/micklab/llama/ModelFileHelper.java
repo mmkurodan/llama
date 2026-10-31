@@ -66,6 +66,24 @@ public final class ModelFileHelper {
         return externalDir != null ? externalDir : context.getFilesDir();
     }
 
+    /**
+     * Returns a model-scoped local filename for an mmproj: {@code <modelStem>-<mmprojFilename>}.
+     * Avoids disk collisions when multiple models share the same generic mmproj basename
+     * (e.g., "mmproj-F16.gguf").  Falls back to the bare mmproj filename when either
+     * reference is empty.
+     */
+    public static String deriveLocalMmprojName(String modelReference, String mmprojReference) {
+        String mmprojFilename = extractFilename(mmprojReference);
+        if (mmprojFilename == null || mmprojFilename.isEmpty()) {
+            return "";
+        }
+        String modelFilename = extractFilename(modelReference);
+        if (modelFilename == null || modelFilename.isEmpty()) {
+            return mmprojFilename;
+        }
+        return stripGgufSuffix(modelFilename) + "-" + mmprojFilename;
+    }
+
     public static File resolveStoredModelFile(Context context, String modelReference) {
         String filename = extractFilename(modelReference);
         if (filename == null || filename.isEmpty()) {

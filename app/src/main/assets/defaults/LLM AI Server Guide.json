@@ -1,5 +1,6 @@
 {
   "name": "LLM AI Server Guide",
+  "description": "Quick reference of this application.\nYou can ask the model how to use LLM AI Server.(English only)",
   "modelUrl": "https:\/\/huggingface.co\/mmkurodan\/LLM-AI-Server\/resolve\/main\/LLM-AI-Serv-F32.gguf?download=true",
   "nCtx": 2048,
   "nThreads": 4,
@@ -40,6 +41,7 @@
   "multimodalProjectorUrl": "",
   "multimodalProjectorManualSelection": false,
   "multimodalProjectorDisabled": false,
+  "multimodalProjectorLocalName": "",
   "loraAdapterUrl": "",
   "loraAdapterScale": 1,
   "mtpEnabled": false,

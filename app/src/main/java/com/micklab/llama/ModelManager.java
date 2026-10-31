@@ -81,6 +81,9 @@ public class ModelManager {
     private static final String DEFAULT_CONFIG_NAME = "default";
     private static final String PREFS_NAME = "ollama_prefs";
     private static final String PREF_LOG_LEVEL = "log_level";
+    // Name of the configuration whose model is held resident in the dedicated embedding slot
+    // (hybrid fast-lane). Empty/absent = feature off (embeddings fall back to the main model).
+    private static final String PREF_RESIDENT_EMBEDDING_CONFIG = "resident_embedding_config";
     private static final int DEFAULT_LOG_LEVEL_INFO = 2;
     private static final int DEFAULT_N_CTX = 2048;
     private static final int DEFAULT_N_THREADS = 2;
@@ -118,6 +121,11 @@ public class ModelManager {
     private volatile String currentConfigName = null;
     private volatile String currentModelPath = null;
     private volatile ConfigurationManager.Configuration lastLoadedConfig = null;
+    // Resident embedding model (hybrid fast-lane). residentEmbeddingConfigName is the
+    // user-selected config (persisted); residentEmbeddingLoadedPath is the model file path
+    // currently loaded into the native resident slot ("" = none), used to skip redundant loads.
+    private volatile String residentEmbeddingConfigName = null;
+    private volatile String residentEmbeddingLoadedPath = null;
     private volatile String currentConfiguredMmprojPath = null;
     // (model, mmproj) pairs whose projector failed to activate at native init in this session
     // (init returned "ok" but the model came up text-only — i.e. the mmproj is incompatible).
@@ -242,6 +250,11 @@ public class ModelManager {
         llama.setLogLevel(savedLogLevel);
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Initial log level set to " + savedLogLevel);
+        }
+
+        String savedResidentEmbd = prefs.getString(PREF_RESIDENT_EMBEDDING_CONFIG, null);
+        if (savedResidentEmbd != null && !savedResidentEmbd.trim().isEmpty()) {
+            residentEmbeddingConfigName = savedResidentEmbd.trim();
         }
     }
     
@@ -1372,6 +1385,124 @@ public class ModelManager {
         }
     }
 
+    // ==================== Resident embedding model (hybrid fast-lane) ====================
+
+    /** Config name whose model is held resident in the dedicated embedding slot, or null if off. */
+    public String getResidentEmbeddingConfigName() {
+        return residentEmbeddingConfigName;
+    }
+
+    /** True when a resident embedding model is configured (embeddings should use the fast-lane). */
+    public boolean isResidentEmbeddingEnabled() {
+        String name = residentEmbeddingConfigName;
+        return name != null && !name.trim().isEmpty();
+    }
+
+    /**
+     * Select (and persist) the configuration whose model is held resident for embeddings, or pass
+     * null/empty to disable the feature. Disabling immediately frees the native resident slot.
+     * The model itself is (re)loaded lazily on the next {@link #embedResident(String)} call so this
+     * never blocks on a model load.
+     */
+    public void setResidentEmbeddingConfigName(String configName) {
+        String normalized = (configName == null || configName.trim().isEmpty())
+                ? null : configName.trim();
+        residentEmbeddingConfigName = normalized;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            if (normalized == null) {
+                prefs.edit().remove(PREF_RESIDENT_EMBEDDING_CONFIG).apply();
+            } else {
+                prefs.edit().putString(PREF_RESIDENT_EMBEDDING_CONFIG, normalized).apply();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to persist resident embedding config", t);
+        }
+        if (normalized == null) {
+            unloadResidentEmbeddingModel();
+        }
+    }
+
+    /** Frees the native resident embedding slot (if any) and clears the loaded-path cache. */
+    public void unloadResidentEmbeddingModel() {
+        try {
+            llama.unloadEmbeddingModel();
+        } catch (Throwable t) {
+            Log.w(TAG, "unloadEmbeddingModel failed", t);
+        }
+        residentEmbeddingLoadedPath = null;
+    }
+
+    /**
+     * Ensure the configured resident embedding model is loaded into the native resident slot.
+     * Resolves the config's model file (must already be present on disk — this path never
+     * downloads) and loads it CPU-only. No-op when the same model is already resident. Returns
+     * false when the feature is off, the config/model file is missing, or the native load fails
+     * (e.g. the model exceeds the ~1B resident-size guard). Caller holds the busy lock.
+     */
+    public boolean ensureEmbeddingModelLoaded() {
+        String configName = residentEmbeddingConfigName;
+        if (configName == null || configName.trim().isEmpty()) {
+            return false;
+        }
+        String modelPath;
+        try {
+            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+            String filename = extractFilenameFromUrl(config.modelUrl);
+            if (filename == null || filename.isEmpty()) {
+                Log.e(TAG, "Resident embedding: cannot determine filename for config " + configName);
+                return false;
+            }
+            modelPath = new File(getModelStorageDir(), filename).getAbsolutePath();
+        } catch (IOException | JSONException e) {
+            Log.e(TAG, "Resident embedding: failed to load config " + configName, e);
+            return false;
+        }
+        // Do NOT short-circuit on the Java-side path cache here: a full native teardown
+        // (llama.free() -> llama_jni_free) frees the resident embedding model without going
+        // through this class, which would leave residentEmbeddingLoadedPath stale and make the
+        // next embedResident() fail with "embedding model not loaded". Always call the native
+        // loader, which is idempotent — it returns "already-loaded" only when the resident
+        // model/context are actually present.
+        if (!new File(modelPath).exists()) {
+            Log.e(TAG, "Resident embedding: model file not found: " + modelPath);
+            return false;
+        }
+        try {
+            String result = llama.loadEmbeddingModel(modelPath);
+            if ("ok".equals(result) || "already-loaded".equals(result)) {
+                residentEmbeddingLoadedPath = modelPath;
+                DiagnosticsLogger.logEvent(context, "resident-embedding-load",
+                        "config=" + configName + " path=" + modelPath + " result=" + result);
+                return true;
+            }
+            Log.e(TAG, "Resident embedding load failed (" + configName + "): " + result);
+            residentEmbeddingLoadedPath = null;
+            return false;
+        } catch (Throwable t) {
+            Log.e(TAG, "loadEmbeddingModel failed", t);
+            residentEmbeddingLoadedPath = null;
+            return false;
+        }
+    }
+
+    /**
+     * Compute a sentence embedding using the resident embedding model, loading it on demand.
+     * Returns the native JSON string, or {@code {"error":...}} if the resident model is
+     * unavailable. Does NOT touch the main chat model. Caller holds the busy lock.
+     */
+    public String embedResident(String text) {
+        if (!ensureEmbeddingModelLoaded()) {
+            return "{\"error\":\"resident embedding model unavailable\"}";
+        }
+        try {
+            return llama.embedResident(text == null ? "" : text);
+        } catch (Throwable t) {
+            Log.e(TAG, "embedResident failed", t);
+            return "{\"error\":\"embed exception\"}";
+        }
+    }
+
     private void clearTransientLoadReferences() {
         try {
             llama.setTokenListener(null);
@@ -1488,6 +1619,11 @@ public class ModelManager {
         currentKvCacheTypeK = Integer.MIN_VALUE;
         currentKvCacheTypeV = Integer.MIN_VALUE;
         modelLoaded = false;
+        // A full native teardown (llama.free() -> llama_jni_free) also frees the resident
+        // embedding model, so the cached resident path is no longer valid. Clear it to force a
+        // reload on the next embedding request (prevents the stale-cache 500 "Embedding
+        // generation failed" after a keep_alive=0 unload or model switch).
+        residentEmbeddingLoadedPath = null;
     }
 
     private String normalizeConfigName(String configName) {
@@ -1543,10 +1679,26 @@ public class ModelManager {
      * {@code null} on failure. The caller is responsible for the busy lock (as with other downloads).
      */
     public String downloadStandaloneFile(String url) {
+        return downloadStandaloneFile(url, "");
+    }
+
+    /**
+     * Downloads {@code url} into the model storage directory and returns the saved filename.
+     * When {@code pairedModelUrl} is non-empty and {@code url} is a remote reference, the file
+     * is saved as {@code <modelStem>-<mmprojFilename>} so that projectors from different
+     * repositories with identical generic basenames (e.g., "mmproj-F16.gguf") don't collide.
+     */
+    public String downloadStandaloneFile(String url, String pairedModelUrl) {
         if (url == null || url.trim().isEmpty()) {
             return null;
         }
-        String base = extractFilenameFromUrl(url);
+        String base;
+        if (pairedModelUrl != null && !pairedModelUrl.isEmpty()
+                && ModelFileHelper.isRemoteModelReference(url)) {
+            base = ModelFileHelper.deriveLocalMmprojName(pairedModelUrl, url);
+        } else {
+            base = extractFilenameFromUrl(url);
+        }
         if (base == null || base.isEmpty()) {
             base = "download.gguf";
         }
@@ -1660,7 +1812,12 @@ public class ModelManager {
                     "Configured mmproj is incompatible with the selected model. Open Settings and choose a matching mmproj.");
         }
 
-        File configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+        File configuredFile;
+        if (config.multimodalProjectorLocalName != null && !config.multimodalProjectorLocalName.isEmpty()) {
+            configuredFile = new File(ModelFileHelper.getModelStorageDir(context), config.multimodalProjectorLocalName);
+        } else {
+            configuredFile = ModelFileHelper.resolveStoredModelFile(context, config.multimodalProjectorUrl);
+        }
         if (configuredFile == null) {
             return new MultimodalProjectorResolution(
                     null,

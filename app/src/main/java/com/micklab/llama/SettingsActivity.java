@@ -77,6 +77,7 @@ public class SettingsActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_PERF_METRICS = "show_perf_metrics";
+    private static final String PREF_CORS_ENABLED = OllamaApiServer.PREF_CORS_ENABLED;
     // Busy-queue max wait (seconds) a queued API request waits for the model slot. Must match
     // OllamaApiServer's key. 0 = unlimited (wait forever); otherwise clamped to [30, 600].
     private static final String PREF_BUSY_QUEUE_WAIT_SECONDS = "busy_queue_wait_seconds";
@@ -94,6 +95,7 @@ public class SettingsActivity extends Activity {
     
     // UI elements
     private AutoCompleteTextView configNameInput;
+    private EditText profileDescriptionInput;
     private EditText modelUrlInput;
     private TextView multimodalProjectorInfo;
     private Button selectProjectorButton;
@@ -182,6 +184,7 @@ public class SettingsActivity extends Activity {
     private EditText customChatTemplateInput;
     
     // API Server settings
+    private Switch corsEnabledSwitch;
     private EditText apiPortInput;
     private TextView apiLoopbackUrlView;
     private LinearLayout apiWifiUrlContainer;
@@ -202,6 +205,10 @@ public class SettingsActivity extends Activity {
     private Spinner languageSpinner;
     private Switch darkModeSwitch;
     private Spinner logLevelSpinner;
+    private Spinner residentEmbeddingSpinner;
+    // Config names backing residentEmbeddingSpinner, aligned to spinner positions. Index 0 is a
+    // synthetic "(Off)" entry mapped to null; subsequent entries are real config names.
+    private final List<String> residentEmbeddingConfigNames = new ArrayList<>();
     private Button licenseButton;
     private Button documentsButton;
     private Button saveConfigButton;
@@ -326,6 +333,7 @@ public class SettingsActivity extends Activity {
     
     private void initViews() {
         configNameInput = findViewById(R.id.configNameInput);
+        profileDescriptionInput = findViewById(R.id.profileDescriptionInput);
         modelUrlInput = findViewById(R.id.modelUrlInput);
         multimodalProjectorInfo = findViewById(R.id.multimodalProjectorInfo);
         selectProjectorButton = findViewById(R.id.selectProjectorButton);
@@ -487,6 +495,17 @@ public class SettingsActivity extends Activity {
             }
         }
 
+        // CORS toggle — controls browser cross-origin access to the API.
+        corsEnabledSwitch = findViewById(R.id.corsEnabledSwitch);
+        if (corsEnabledSwitch != null) {
+            corsEnabledSwitch.setText(localizedText(
+                    "CORS有効化（ブラウザアクセス許可）",
+                    "Enable CORS (browser access)"));
+            corsEnabledSwitch.setChecked(
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                            .getBoolean(PREF_CORS_ENABLED, true));
+        }
+
         // Background execution: keep-awake toggle + battery-optimization exemption.
         keepAwakeSwitch = findViewById(R.id.keepAwakeSwitch);
         if (keepAwakeSwitch != null) {
@@ -588,7 +607,8 @@ public class SettingsActivity extends Activity {
         setupLanguageSpinner();
         setupDarkModeSwitch();
         setupLogLevelSpinner(savedLogLevel);
-        
+        setupResidentEmbeddingSpinner();
+
         saveConfigButton = findViewById(R.id.saveConfigButton);
         loadConfigButton = findViewById(R.id.loadConfigButton);
         deleteConfigButton = findViewById(R.id.deleteConfigButton);
@@ -924,6 +944,7 @@ public class SettingsActivity extends Activity {
     private String settingsHintJa(String hint) {
         switch (hint) {
             case "Enter configuration name": return "設定名を入力";
+            case "Describe this profile (optional)": return "このプロファイルの説明（任意）";
             case "https://... or filename.gguf": return "https://... または filename.gguf";
             case "Enter system prompt (optional)": return "システムプロンプトを入力（任意）";
             case "Enter custom chat template (optional)": return "カスタムチャットテンプレートを入力（任意）";
@@ -941,6 +962,7 @@ public class SettingsActivity extends Activity {
             case "Display Language": return "表示言語";
             case "Dark Mode": return "ダークモード";
             case "Profile:": return "プロファイル:";
+            case "Profile Description:": return "プロファイルの説明:";
             case "Configuration Name:": return "設定名:";
             case "Save Config": return "設定を保存";
             case "Delete Config": return "設定を削除";
@@ -1021,6 +1043,7 @@ public class SettingsActivity extends Activity {
             case "Based on custom template or model family detection.": return "カスタムテンプレートまたはモデル種別判定に基づきます。";
             case "(auto-selected template will appear here)": return "（自動選択されたテンプレートがここに表示されます）";
             case "Llama API Server": return "Llama APIサーバー";
+            case "Enable CORS (browser access)": return "CORS有効化（ブラウザアクセス許可）";
             case "Server Port (default: 11434):": return "サーバーポート (既定: 11434):";
             case "Local URL (tap to open / long-press to copy):": return "ローカルURL（タップで起動・長押しでコピー）:";
             case "LAN URL (tap to open / long-press to copy):": return "LAN URL（タップで起動・長押しでコピー）:";
@@ -1265,6 +1288,82 @@ public class SettingsActivity extends Activity {
         });
     }
 
+    /**
+     * Populate the "resident embedding model" picker with "(Off)" + all configuration names and
+     * wire selection to {@link ModelManager#setResidentEmbeddingConfigName(String)}. Selecting a
+     * config keeps that (small, ≤1B) model resident so embedding requests never reload the main
+     * chat model; "(Off)" frees the resident slot and falls back to embedding with the main model.
+     */
+    private void setupResidentEmbeddingSpinner() {
+        residentEmbeddingSpinner = findViewById(R.id.residentEmbeddingSpinner);
+        if (residentEmbeddingSpinner == null) {
+            return;
+        }
+        TextView label = findViewById(R.id.residentEmbeddingLabel);
+        if (label != null) {
+            label.setText(localizedText("常駐埋め込みモデル（高速処理）:",
+                    "Resident embedding model (fast-lane):"));
+        }
+        TextView hint = findViewById(R.id.residentEmbeddingHint);
+        if (hint != null) {
+            hint.setText(localizedText(
+                    "小さな（1B以下の）埋め込みモデルを常駐させ、埋め込み処理のたびにチャットモデルを再読み込みしないようにします。",
+                    "Keep a small (≤1B) embedding model in memory so embedding requests never reload the chat model."));
+        }
+
+        String offLabel = localizedText("無効", "Off");
+        residentEmbeddingConfigNames.clear();
+        residentEmbeddingConfigNames.add(null); // position 0 = Off
+        List<String> labels = new ArrayList<>();
+        labels.add(offLabel);
+        try {
+            for (String name : configManager.listConfigurations()) {
+                residentEmbeddingConfigNames.add(name);
+                labels.add(name);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to list configurations for resident embedding spinner", t);
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        residentEmbeddingSpinner.setAdapter(adapter);
+
+        String current = modelManager.getResidentEmbeddingConfigName();
+        int selected = 0;
+        if (current != null) {
+            int idx = residentEmbeddingConfigNames.indexOf(current);
+            if (idx >= 0) {
+                selected = idx;
+            }
+        }
+        residentEmbeddingSpinner.setSelection(selected, false);
+
+        residentEmbeddingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
+                if (position < 0 || position >= residentEmbeddingConfigNames.size()) {
+                    return;
+                }
+                String chosen = residentEmbeddingConfigNames.get(position);
+                String existing = modelManager.getResidentEmbeddingConfigName();
+                if (java.util.Objects.equals(chosen, existing)) {
+                    return;
+                }
+                modelManager.setResidentEmbeddingConfigName(chosen);
+                showToast(chosen == null
+                        ? localizedText("常駐埋め込みモデルを無効化しました", "Resident embedding model disabled")
+                        : localizedText("常駐埋め込みモデルを設定しました: ", "Resident embedding model set: ") + chosen);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // No-op
+            }
+        });
+    }
+
     private void setupDarkModeSwitch() {
         if (darkModeSwitch == null) {
             return;
@@ -1418,6 +1517,9 @@ public class SettingsActivity extends Activity {
     
     private void updateUIFromConfig(ConfigurationManager.Configuration config) {
         configNameInput.setText(config.name, false);
+        if (profileDescriptionInput != null) {
+            profileDescriptionInput.setText(config.description != null ? config.description : "");
+        }
         selectedProjectorReference = normalizeReference(config.multimodalProjectorUrl);
         selectedAdapterReference = normalizeReference(config.loraAdapterUrl);
         if (loraAdapterScaleInput != null) {
@@ -1547,7 +1649,9 @@ public class SettingsActivity extends Activity {
         if (config.name.isEmpty()) {
             config.name = "unnamed";
         }
-        
+        config.description = profileDescriptionInput != null
+                ? profileDescriptionInput.getText().toString() : "";
+
         config.modelUrl = modelUrlInput.getText().toString().trim();
         
         try {
@@ -1600,6 +1704,15 @@ public class SettingsActivity extends Activity {
         // Only meaningful when no projector is configured: true = user cleared it, suppress auto-discovery.
         config.multimodalProjectorDisabled =
                 config.multimodalProjectorUrl.isEmpty() && selectedProjectorDisabled;
+        // Derive a model-scoped local filename when both references are remote HF URLs so that
+        // projectors with generic basenames (e.g., "mmproj-F16.gguf") don't collide across models.
+        if (ModelFileHelper.isRemoteModelReference(config.multimodalProjectorUrl)
+                && !config.modelUrl.isEmpty()) {
+            config.multimodalProjectorLocalName =
+                    ModelFileHelper.deriveLocalMmprojName(config.modelUrl, config.multimodalProjectorUrl);
+        } else {
+            config.multimodalProjectorLocalName = "";
+        }
         config.mtpEnabled = mtpEnableToggle != null && mtpEnableToggle.isChecked();
         config.mtpModelReference = normalizeReference(selectedMtpReference);
         config.mtpNDraft = parseMtpNDraft();
@@ -1893,6 +2006,8 @@ public class SettingsActivity extends Activity {
         prefs.edit()
                 .putInt(PREF_API_PORT, resolveApiPortFromUi())
                 .putInt(PREF_BUSY_QUEUE_WAIT_SECONDS, resolveBusyTimeoutFromUi())
+                .putBoolean(PREF_CORS_ENABLED,
+                        corsEnabledSwitch == null || corsEnabledSwitch.isChecked())
                 .putBoolean(OllamaForegroundService.PREF_KEEP_AWAKE,
                         keepAwakeSwitch != null && keepAwakeSwitch.isChecked())
                 .putBoolean(PREF_SHOW_PERF_METRICS, showPerfMetricsSwitch != null && showPerfMetricsSwitch.isChecked())
@@ -2619,6 +2734,10 @@ public class SettingsActivity extends Activity {
                     config.multimodalProjectorUrl = newName;
                     changed = true;
                 }
+                if (oldName.equals(config.multimodalProjectorLocalName)) {
+                    config.multimodalProjectorLocalName = newName;
+                    changed = true;
+                }
                 if (changed) {
                     configManager.saveConfiguration(config);
                     updated++;
@@ -3045,6 +3164,7 @@ public class SettingsActivity extends Activity {
             return;
         }
         final String url = projector.getDownloadUrl();
+        final String pairedModelUrl = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
         modelFileInfo.setText(localizedText("mmproj をダウンロード中: ", "Downloading mmproj: ")
                 + projector.getFilename());
         modelProgressBar.setIndeterminate(true);
@@ -3055,7 +3175,7 @@ public class SettingsActivity extends Activity {
             }
             String savedName = null;
             try {
-                savedName = modelManager.downloadStandaloneFile(url);
+                savedName = modelManager.downloadStandaloneFile(url, pairedModelUrl);
             } catch (Throwable t) {
                 Log.e(TAG, "mmproj download error", t);
             } finally {

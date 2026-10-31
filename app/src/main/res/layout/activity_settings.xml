@@ -63,6 +63,21 @@
             android:drawableEnd="@drawable/ic_arrow_drop_down"
             android:drawablePadding="8dp" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Profile Description:"
+            android:paddingTop="8dp" />
+
+        <EditText
+            android:id="@+id/profileDescriptionInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Describe this profile (optional)"
+            android:inputType="textMultiLine"
+            android:minLines="3"
+            android:gravity="top|start" />
+
         <Button
             style="@style/PrimaryButton" android:id="@+id/loadConfigButton"
             android:layout_width="match_parent"
@@ -1169,6 +1184,36 @@
                 android:paddingTop="4dp"
                 android:gravity="center" />
         </LinearLayout>
+
+        <Switch
+            android:id="@+id/corsEnabledSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:checked="true"
+            android:text="Enable CORS (browser access)" />
+
+        <TextView
+            android:id="@+id/residentEmbeddingLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="12dp"
+            android:text="Resident embedding model (fast-lane):" />
+
+        <TextView
+            android:id="@+id/residentEmbeddingHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="2dp"
+            android:paddingBottom="4dp"
+            android:text="Keep a small (≤1B) embedding model in memory so embedding requests never reload the chat model." />
+
+        <Spinner
+            android:id="@+id/residentEmbeddingSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
 
         <Switch
             android:id="@+id/keepAwakeSwitch"

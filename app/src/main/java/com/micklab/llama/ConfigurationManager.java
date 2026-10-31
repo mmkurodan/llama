@@ -36,6 +36,7 @@ public class ConfigurationManager {
         private static final int LEGACY_N_BATCH_CEILING = 16;
 
         public String name;
+        public String description;
         public String modelUrl;
         public int nCtx;
         public int nThreads;
@@ -54,6 +55,10 @@ public class ConfigurationManager {
         // "disable vision" from an unset projector: when disabled, no co-located mmproj is
         // auto-detected, so clearing actually takes effect (previously auto-discovery re-applied it).
         public boolean multimodalProjectorDisabled;
+        // Model-scoped local filename for the downloaded mmproj (e.g., "Qwen3VL-Q4KM-mmproj-F16.gguf").
+        // Prevents collisions when multiple models share identical generic mmproj basenames.
+        // Empty = use filename derived from multimodalProjectorUrl (backward compat).
+        public String multimodalProjectorLocalName;
         public String loraAdapterUrl;        // Optional LoRA adapter (別GGUF) reference（mmproj同様の保存済み参照）
         public float loraAdapterScale;       // 実効スケール（通常 1.0）
 
@@ -127,6 +132,7 @@ public class ConfigurationManager {
         public Configuration() {
             // Default values - Gemma 1B assistant
             name = DEFAULT_CONFIG_NAME;
+            description = "";
             modelUrl = "https://huggingface.co/vinhnx90/gemma-3-1b-thinking-v2-Q4_K_M-GGUF/resolve/main/gemma-3-1b-thinking-v2-q4_k_m.gguf?download=true";
             nCtx = 2048;
             nThreads = 4;
@@ -182,6 +188,7 @@ public class ConfigurationManager {
             multimodalProjectorUrl = ""; // Empty by default (use auto-discovery)
             multimodalProjectorManualSelection = false;
             multimodalProjectorDisabled = false; // Auto-discovery allowed until the user explicitly clears
+            multimodalProjectorLocalName = "";
             loraAdapterUrl = "";         // Empty by default (no adapter)
             loraAdapterScale = 1.0f;
             mtpEnabled = false;
@@ -201,6 +208,7 @@ public class ConfigurationManager {
         public JSONObject toJSON() throws JSONException {
             JSONObject json = new JSONObject();
             json.put("name", name);
+            json.put("description", description);
             json.put("modelUrl", modelUrl);
             json.put("nCtx", nCtx);
             json.put("nThreads", nThreads);
@@ -257,6 +265,7 @@ public class ConfigurationManager {
             json.put("multimodalProjectorUrl", multimodalProjectorUrl);
             json.put("multimodalProjectorManualSelection", multimodalProjectorManualSelection);
             json.put("multimodalProjectorDisabled", multimodalProjectorDisabled);
+            json.put("multimodalProjectorLocalName", multimodalProjectorLocalName);
             json.put("loraAdapterUrl", loraAdapterUrl);
             json.put("loraAdapterScale", loraAdapterScale);
             json.put("mtpEnabled", mtpEnabled);
@@ -273,6 +282,7 @@ public class ConfigurationManager {
         public static Configuration fromJSON(JSONObject json) throws JSONException {
             Configuration config = new Configuration();
             config.name = json.optString("name", config.name);
+            config.description = json.optString("description", "");
             config.modelUrl = json.optString("modelUrl", config.modelUrl);
             config.nCtx = json.optInt("nCtx", config.nCtx);
             config.nThreads = json.optInt("nThreads", config.nThreads);
@@ -345,6 +355,8 @@ public class ConfigurationManager {
                     json.optBoolean("multimodalProjectorManualSelection", false);
             config.multimodalProjectorDisabled =
                     json.optBoolean("multimodalProjectorDisabled", false);
+            config.multimodalProjectorLocalName =
+                    json.optString("multimodalProjectorLocalName", "");
             config.mtpEnabled = json.optBoolean("mtpEnabled", false);
             config.mtpModelReference = json.optString("mtpModelReference", "");
             config.mtpNDraft = json.optInt("mtpNDraft", 2);
@@ -392,7 +404,22 @@ public class ConfigurationManager {
             String configName = fileName.substring(0, fileName.length() - 5);
             File target = new File(configDir, configName + ".json");
             if (target.exists()) {
-                continue; // Already present — skip (never clobber user edits on version-up).
+                // Profile exists — patch description only if currently empty and asset provides one.
+                try {
+                    String assetContent = readAsset(BUNDLED_DEFAULTS_ASSET_DIR + "/" + fileName);
+                    String assetDesc = new JSONObject(assetContent).optString("description", "").trim();
+                    if (!assetDesc.isEmpty()) {
+                        Configuration saved = loadConfiguration(configName);
+                        if (saved.description == null || saved.description.trim().isEmpty()) {
+                            saved.description = assetDesc;
+                            saveConfiguration(saved);
+                            Log.d(TAG, "Patched description for bundled default: " + configName);
+                        }
+                    }
+                } catch (IOException | JSONException e) {
+                    Log.w(TAG, "Could not patch description for '" + configName + "'", e);
+                }
+                continue;
             }
             try {
                 String content = readAsset(BUNDLED_DEFAULTS_ASSET_DIR + "/" + fileName);
@@ -497,9 +524,9 @@ public class ConfigurationManager {
         if (files != null) {
             for (File file : files) {
                 String name = file.getName();
-                // Remove .json extension
                 configs.add(name.substring(0, name.length() - 5));
             }
+            configs.sort(String.CASE_INSENSITIVE_ORDER);
         }
         return configs;
     }
