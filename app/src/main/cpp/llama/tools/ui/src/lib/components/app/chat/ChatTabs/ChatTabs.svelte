@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChatTabsItem from './ChatTabsItem.svelte';
 	import ChatTabsNewChatButton from './ChatTabsNewChatButton.svelte';
+	import { SquarePen } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { ScrollCarousel } from '$lib/components/app';
 	import {
@@ -12,30 +13,35 @@
 	} from '$lib/constants';
 	import { useScrollCarousel } from '$lib/hooks/use-scroll-carousel.svelte';
 	import { chatStore, conversationsStore, tabsStore, uiStore } from '$lib/stores';
+	import { resolveTabView } from '$lib/utils';
 	import { tick } from 'svelte';
 
 	const carousel = useScrollCarousel();
 
-	let activeId = $derived(page.params.id ?? NEW_CHAT_TAB_ID);
+	let view = $derived(resolveTabView(page, tabsStore.openTabs));
+
+	let activeId = $derived(view.activeId);
 
 	let tabs = $derived(
-		tabsStore.openTabs.map((id) => ({
-			id,
-			isNewChat: id === NEW_CHAT_TAB_ID,
-			name:
-				id === NEW_CHAT_TAB_ID
-					? NEW_CHAT_LABEL
-					: (conversationsStore.conversations.find((c) => c.id === id)?.name ?? UNNAMED_CHAT_LABEL)
-		}))
+		view.ids.map((id) =>
+			id === NEW_CHAT_TAB_ID
+				? { href: view.hrefFor(id), icon: SquarePen, id, name: NEW_CHAT_LABEL }
+				: {
+						href: view.hrefFor(id),
+						id,
+						name:
+							conversationsStore.conversations.find((c) => c.id === id)?.name ?? UNNAMED_CHAT_LABEL
+					}
+		)
 	);
 
 	// hide the New chat button while a new-chat tab is already open
-	let showNewChatButton = $derived(!tabsStore.openTabs.includes(NEW_CHAT_TAB_ID));
+	let showNewChatButton = $derived(!view.ids.includes(NEW_CHAT_TAB_ID));
 
 	let loadingIds = $derived(new Set(chatStore.getAllLoadingChats()));
 
 	function handleClose(id: string) {
-		void tabsStore.close(id, activeId);
+		void tabsStore.close(id, id === activeId, view);
 	}
 
 	function handleStop(id: string, event: MouseEvent) {
@@ -81,32 +87,37 @@
 </script>
 
 <nav
-	class="group sticky pl-1 top-0 z-10 hidden md:block chat-tabs-fade transition-[padding] duration-200 ease-in-out pt-3.25 {uiStore.isSidebarExpanded
-		? CHAT_TABS_MAX_WIDTH.EXPANDED_SIDEBAR
-		: CHAT_TABS_MAX_WIDTH.COLLAPSED_SIDEBAR}"
 	aria-label="Open conversations"
+	class={[
+		'group sticky pl-1 top-0 z-10 hidden md:block chat-top-fade transition-[padding] duration-200 ease-in-out pt-3.25',
+		uiStore.isSidebarExpanded
+			? CHAT_TABS_MAX_WIDTH.EXPANDED_SIDEBAR
+			: CHAT_TABS_MAX_WIDTH.COLLAPSED_SIDEBAR
+	]}
 >
 	<div class="relative">
 		<ScrollCarousel
+			{carousel}
 			class="h-10"
 			containerClass="flex h-10 min-w-0 items-center"
 			innerClass="items-center gap-1.25"
-			{carousel}
 		>
 			{#each tabs as tab (tab.id)}
 				<ChatTabsItem
-					{tab}
 					isActive={tab.id === activeId}
 					isLoading={loadingIds.has(tab.id)}
 					onActivate={(id) => tabsStore.activate(id)}
+					onAuxClick={handleAuxClick}
 					onClose={handleClose}
 					onStop={handleStop}
-					onAuxClick={handleAuxClick}
+					{tab}
 				/>
 			{/each}
 
 			{#if showNewChatButton}
-				<ChatTabsNewChatButton onclick={() => void conversationsStore.openNewChat()} />
+				<ChatTabsNewChatButton
+					onclick={() => void tabsStore.openInNewTab(NEW_CHAT_TAB_ID, { activate: true })}
+				/>
 			{/if}
 		</ScrollCarousel>
 
@@ -115,6 +126,7 @@
 				? 'opacity-100'
 				: 'opacity-0'}"
 		></div>
+
 		<div
 			class="pointer-events-none absolute inset-y-0 right-0 z-[5] w-8 bg-gradient-to-l from-background to-transparent transition-opacity {carousel.canScrollRight
 				? 'opacity-100'
@@ -122,15 +134,3 @@
 		></div>
 	</div>
 </nav>
-
-<style>
-	.chat-tabs-fade {
-		background: linear-gradient(
-			to bottom,
-			color-mix(in srgb, var(--background) 100%, transparent) 25%,
-			color-mix(in srgb, var(--background) 80%, transparent) 50%,
-			color-mix(in srgb, var(--background) 40%, transparent) 75%,
-			transparent 100%
-		);
-	}
-</style>

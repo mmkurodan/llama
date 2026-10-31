@@ -25,16 +25,16 @@ set(GGML_ROOT_DIR  ${LLAMA_ROOT_DIR}/ggml)
 #   @BUILD_COMPILER@
 #   @BUILD_TARGET@
 # ---------------------------------------------------------
-set(LLAMA_BUILD_NUMBER 10621 CACHE STRING "")
-set(LLAMA_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
+set(LLAMA_BUILD_NUMBER 31309 CACHE STRING "")
+set(LLAMA_BUILD_COMMIT "8642541b255bfb5dc39cd351a178be09013a55d6" CACHE STRING "")
 # llama.cpp switched to semantic versioning at v0.3.0; llama_version() needs this string.
-set(LLAMA_VERSION      "0.3.0"  CACHE STRING "")
+set(LLAMA_VERSION      "0.8.0"  CACHE STRING "")
 set(BUILD_COMPILER     "Clang"   CACHE STRING "")
 set(BUILD_TARGET       "android" CACHE STRING "")
 
 # ggml.c expects these string macros to be defined at compile time.
-set(GGML_VERSION      "0.22.0" CACHE STRING "")
-set(GGML_BUILD_COMMIT "c1d0e7a004015f23bc0233470b747b596f29b264" CACHE STRING "")
+set(GGML_VERSION      "0.28.0" CACHE STRING "")
+set(GGML_BUILD_COMMIT "8642541b255bfb5dc39cd351a178be09013a55d6" CACHE STRING "")
 
 # ---------------------------------------------------------
 # embedded license text for --license in common/arg.cpp
@@ -102,6 +102,7 @@ set(MTMD_SOURCES
     ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-audio.cpp
     ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-image.cpp
     ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-helper.cpp
+    ${LLAMA_ROOT_DIR}/tools/mtmd/mtmd-helper-gen.cpp
     ${LLAMA_ROOT_DIR}/tools/mtmd/clip.cpp
     ${MTMD_MODEL_SOURCES}
 )

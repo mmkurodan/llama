@@ -23,7 +23,11 @@ export enum ScrollCarouselVariant {
  * Sidebar icon strip actions handled directly by the sidebar.
  */
 export enum SidebarAction {
-	NEW_CHAT = 'new-chat'
+	MANAGE_MODELS = 'manage-models',
+	MCP = 'mcp',
+	NEW_CHAT = 'new-chat',
+	SEARCH = 'search',
+	SETTINGS = 'settings'
 }
 
 /**
