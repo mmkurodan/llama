@@ -61,10 +61,14 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/build-info.cpp
 )
 
-# v0.8.0: src/llama.cpp now includes "llama-version.h" (generated from .in).
+# v0.8.0: src/llama.cpp and ggml/src/ggml.c now include generated version headers.
 configure_file(
     ${LLAMA_ROOT_DIR}/src/llama-version.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/llama-version.h
+)
+configure_file(
+    ${GGML_ROOT_DIR}/src/ggml-version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/ggml-version.h
 )
 
 # ---------------------------------------------------------
