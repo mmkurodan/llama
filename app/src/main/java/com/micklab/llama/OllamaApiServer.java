@@ -1173,7 +1173,9 @@ public class OllamaApiServer {
             }
             Map<String, String> queryParams = parseQueryParameters(query);
             
-            Log.d(TAG, "Request: " + method + " " + path);
+            if (!isEmbeddingPath(path)) {
+                Log.d(TAG, "Request: " + method + " " + path);
+            }
             if (listener != null) {
                 listener.onRequest(method, path);
             }
@@ -1240,11 +1242,14 @@ public class OllamaApiServer {
             }
 
             // Avoid dumping an entire (possibly multi-MB base64 image) body into logcat.
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Raw request body (" + body.length() + " chars):\n"
-                        + (body.length() > 2048 ? body.substring(0, 2048) + "…[truncated]" : body));
+            // Embedding endpoints are called at high frequency — skip body logging for them.
+            if (!isEmbeddingPath(path)) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Raw request body (" + body.length() + " chars):\n"
+                            + (body.length() > 2048 ? body.substring(0, 2048) + "…[truncated]" : body));
+                }
+                logMaxDebugPayload("api.request.body", body);
             }
-            logMaxDebugPayload("api.request.body", body);
             
             // Route request
             if ("POST".equals(method)) {
@@ -6952,6 +6957,13 @@ public class OllamaApiServer {
         String message = "Prompt template selection (" + contextLabel + "): " + selection.reason;
         Log.i(TAG, message);
         sendProcessingLog(message);
+    }
+
+    private static boolean isEmbeddingPath(String path) {
+        return "/api/embed".equals(path)
+                || "/api/embeddings".equals(path)
+                || "/v1/embeddings".equals(path)
+                || (path != null && (path.endsWith(":embedContent") || path.endsWith(":batchEmbedContents")));
     }
 
     private boolean isMaxDebugEnabled() {

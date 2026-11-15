@@ -205,9 +205,9 @@ public class SettingsActivity extends Activity {
     private Spinner languageSpinner;
     private Switch darkModeSwitch;
     private Spinner logLevelSpinner;
+    private Switch embedEnableSwitch;
     private Spinner residentEmbeddingSpinner;
-    // Config names backing residentEmbeddingSpinner, aligned to spinner positions. Index 0 is a
-    // synthetic "(Off)" entry mapped to null; subsequent entries are real config names.
+    // Config names backing residentEmbeddingSpinner, aligned to spinner positions (no Off entry).
     private final List<String> residentEmbeddingConfigNames = new ArrayList<>();
     private Button licenseButton;
     private Button documentsButton;
@@ -357,6 +357,7 @@ public class SettingsActivity extends Activity {
             });
         }
         updateLoraAdapterInfoDisplay(); // 選択中のアダプタを表示に反映
+        setupResidentEmbeddingSpinner();
         mtpModelButton = findViewById(R.id.mtpModelButton);
         mtpEnableToggle = findViewById(R.id.mtpEnableToggle);
         mtpNDraftInput = findViewById(R.id.mtpNDraftInput);
@@ -607,7 +608,6 @@ public class SettingsActivity extends Activity {
         setupLanguageSpinner();
         setupDarkModeSwitch();
         setupLogLevelSpinner(savedLogLevel);
-        setupResidentEmbeddingSpinner();
 
         saveConfigButton = findViewById(R.id.saveConfigButton);
         loadConfigButton = findViewById(R.id.loadConfigButton);
@@ -1288,34 +1288,42 @@ public class SettingsActivity extends Activity {
         });
     }
 
+    private static final String DEFAULT_EMBED_CONFIG = "default embed";
+
     /**
-     * Populate the "resident embedding model" picker with "(Off)" + all configuration names and
-     * wire selection to {@link ModelManager#setResidentEmbeddingConfigName(String)}. Selecting a
-     * config keeps that (small, ≤1B) model resident so embedding requests never reload the main
-     * chat model; "(Off)" frees the resident slot and falls back to embedding with the main model.
+     * Wire up the collapsible "Fast Embed" subsection in the Model Loading section.
+     * Toggle enable/disable; spinner selects the resident config (defaults to "default embed").
      */
     private void setupResidentEmbeddingSpinner() {
+        // Collapsible section header
+        final TextView embedSectionHeader = findViewById(R.id.embedSectionHeader);
+        final View embedSectionBody = findViewById(R.id.embedSectionBody);
+        if (embedSectionHeader != null && embedSectionBody != null) {
+            embedSectionHeader.setText("▶ " + localizedText("高速埋め込みモデル", "Fast Embed model")
+                    + localizedText("（タップで開く）", " (tap to open)"));
+            embedSectionHeader.setOnClickListener(v -> {
+                boolean open = embedSectionBody.getVisibility() == View.VISIBLE;
+                embedSectionBody.setVisibility(open ? View.GONE : View.VISIBLE);
+                embedSectionHeader.setText((open ? "▶ " : "▼ ")
+                        + localizedText("高速埋め込みモデル", "Fast Embed model")
+                        + (open ? localizedText("（タップで開く）", " (tap to open)") : ""));
+            });
+        }
+
+        embedEnableSwitch = findViewById(R.id.embedEnableSwitch);
         residentEmbeddingSpinner = findViewById(R.id.residentEmbeddingSpinner);
         if (residentEmbeddingSpinner == null) {
             return;
         }
-        TextView label = findViewById(R.id.residentEmbeddingLabel);
-        if (label != null) {
-            label.setText(localizedText("常駐埋め込みモデル（高速処理）:",
-                    "Resident embedding model (fast-lane):"));
-        }
-        TextView hint = findViewById(R.id.residentEmbeddingHint);
-        if (hint != null) {
-            hint.setText(localizedText(
-                    "小さな（1B以下の）埋め込みモデルを常駐させ、埋め込み処理のたびにチャットモデルを再読み込みしないようにします。",
-                    "Keep a small (≤1B) embedding model in memory so embedding requests never reload the chat model."));
+
+        TextView modelLabel = findViewById(R.id.embedModelLabel);
+        if (modelLabel != null) {
+            modelLabel.setText(localizedText("埋め込みモデル:", "Embedding model:"));
         }
 
-        String offLabel = localizedText("無効", "Off");
+        // Build spinner entries from available configs
         residentEmbeddingConfigNames.clear();
-        residentEmbeddingConfigNames.add(null); // position 0 = Off
         List<String> labels = new ArrayList<>();
-        labels.add(offLabel);
         try {
             for (String name : configManager.listConfigurations()) {
                 residentEmbeddingConfigNames.add(name);
@@ -1331,18 +1339,45 @@ public class SettingsActivity extends Activity {
         residentEmbeddingSpinner.setAdapter(adapter);
 
         String current = modelManager.getResidentEmbeddingConfigName();
-        int selected = 0;
-        if (current != null) {
+        boolean enabled = current != null;
+
+        // Default to "default embed" when no config is set
+        if (!enabled) {
+            int defaultIdx = residentEmbeddingConfigNames.indexOf(DEFAULT_EMBED_CONFIG);
+            residentEmbeddingSpinner.setSelection(Math.max(0, defaultIdx), false);
+        } else {
             int idx = residentEmbeddingConfigNames.indexOf(current);
-            if (idx >= 0) {
-                selected = idx;
-            }
+            residentEmbeddingSpinner.setSelection(Math.max(0, idx), false);
         }
-        residentEmbeddingSpinner.setSelection(selected, false);
+        residentEmbeddingSpinner.setEnabled(enabled);
+        residentEmbeddingSpinner.setAlpha(enabled ? 1.0f : 0.4f);
+
+        if (embedEnableSwitch != null) {
+            embedEnableSwitch.setText(localizedText("有効", "Enable"));
+            embedEnableSwitch.setChecked(enabled);
+            embedEnableSwitch.setOnCheckedChangeListener((btn, checked) -> {
+                residentEmbeddingSpinner.setEnabled(checked);
+                residentEmbeddingSpinner.setAlpha(checked ? 1.0f : 0.4f);
+                if (!checked) {
+                    modelManager.setResidentEmbeddingConfigName(null);
+                    showToast(localizedText("高速埋め込みを無効にしました", "Fast embed disabled"));
+                } else {
+                    int pos = residentEmbeddingSpinner.getSelectedItemPosition();
+                    if (pos >= 0 && pos < residentEmbeddingConfigNames.size()) {
+                        String chosen = residentEmbeddingConfigNames.get(pos);
+                        modelManager.setResidentEmbeddingConfigName(chosen);
+                        showToast(localizedText("高速埋め込みを有効にしました: ", "Fast embed enabled: ") + chosen);
+                    }
+                }
+            });
+        }
 
         residentEmbeddingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
+                if (!residentEmbeddingSpinner.isEnabled()) {
+                    return;
+                }
                 if (position < 0 || position >= residentEmbeddingConfigNames.size()) {
                     return;
                 }
@@ -1352,9 +1387,7 @@ public class SettingsActivity extends Activity {
                     return;
                 }
                 modelManager.setResidentEmbeddingConfigName(chosen);
-                showToast(chosen == null
-                        ? localizedText("常駐埋め込みモデルを無効化しました", "Resident embedding model disabled")
-                        : localizedText("常駐埋め込みモデルを設定しました: ", "Resident embedding model set: ") + chosen);
+                showToast(localizedText("埋め込みモデルを設定しました: ", "Embedding model set: ") + chosen);
             }
 
             @Override

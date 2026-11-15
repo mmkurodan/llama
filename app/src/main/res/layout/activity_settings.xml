@@ -256,6 +256,45 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Fast Embed: collapsible subsection (default=closed), same pattern as LoRA -->
+        <TextView
+            android:id="@+id/embedSectionHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="▶ 高速埋め込みモデル（タップで開く）"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:paddingTop="12dp"
+            android:paddingBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/embedSectionBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Switch
+                android:id="@+id/embedEnableSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="有効 / Enable"
+                android:paddingBottom="6dp" />
+
+            <TextView
+                android:id="@+id/embedModelLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="埋め込みモデル:"
+                android:paddingTop="2dp" />
+
+            <Spinner
+                android:id="@+id/residentEmbeddingSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp" />
+        </LinearLayout>
+
         <!-- Model Management Section -->
         <TextView
             android:id="@+id/modelManagementHeader"
@@ -1192,28 +1231,6 @@
             android:paddingTop="12dp"
             android:checked="true"
             android:text="Enable CORS (browser access)" />
-
-        <TextView
-            android:id="@+id/residentEmbeddingLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="12dp"
-            android:text="Resident embedding model (fast-lane):" />
-
-        <TextView
-            android:id="@+id/residentEmbeddingHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:paddingTop="2dp"
-            android:paddingBottom="4dp"
-            android:text="Keep a small (≤1B) embedding model in memory so embedding requests never reload the chat model." />
-
-        <Spinner
-            android:id="@+id/residentEmbeddingSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp" />
 
         <Switch
             android:id="@+id/keepAwakeSwitch"

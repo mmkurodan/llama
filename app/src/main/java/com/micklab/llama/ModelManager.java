@@ -1445,29 +1445,36 @@ public class ModelManager {
         if (configName == null || configName.trim().isEmpty()) {
             return false;
         }
-        String modelPath;
+        ConfigurationManager.Configuration config;
+        File modelFile;
         try {
-            ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
+            config = configManager.loadConfiguration(configName);
             String filename = extractFilenameFromUrl(config.modelUrl);
             if (filename == null || filename.isEmpty()) {
                 Log.e(TAG, "Resident embedding: cannot determine filename for config " + configName);
                 return false;
             }
-            modelPath = new File(getModelStorageDir(), filename).getAbsolutePath();
+            modelFile = new File(getModelStorageDir(), filename);
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Resident embedding: failed to load config " + configName, e);
             return false;
         }
+        // Auto-download if the model file is missing — mirrors loadConfiguration() behaviour.
+        if (!modelFile.exists() || modelFile.length() == 0) {
+            Log.i(TAG, "Resident embedding: model not found, downloading: " + modelFile.getName());
+            String availErr = ensureModelFilesAvailable(config, modelFile);
+            if (availErr != null) {
+                Log.e(TAG, "Resident embedding: " + availErr);
+                return false;
+            }
+        }
+        String modelPath = modelFile.getAbsolutePath();
         // Do NOT short-circuit on the Java-side path cache here: a full native teardown
         // (llama.free() -> llama_jni_free) frees the resident embedding model without going
         // through this class, which would leave residentEmbeddingLoadedPath stale and make the
         // next embedResident() fail with "embedding model not loaded". Always call the native
         // loader, which is idempotent — it returns "already-loaded" only when the resident
         // model/context are actually present.
-        if (!new File(modelPath).exists()) {
-            Log.e(TAG, "Resident embedding: model file not found: " + modelPath);
-            return false;
-        }
         try {
             String result = llama.loadEmbeddingModel(modelPath);
             if ("ok".equals(result) || "already-loaded".equals(result)) {
