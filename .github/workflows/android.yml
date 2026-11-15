@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      native_only:
+        description: "Build only the native libs (JNI .so) and upload them as the native-libs artifact (no APK/AAB)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -209,12 +214,44 @@ jobs:
         run: gradle wrapper --gradle-version 8.11.1
 
       # ── APK ビルド ──────────────────────────────────────────────────────────
+      # ── ネイティブのみ (workflow_dispatch native_only=true) ────────────────────
+      # Gradle のネイティブ段 (CMake build → merge → strip) だけを回し、APK に入るのと同じ
+      # stripped .so を artifact 化する。APK はローカル (build-local.sh --artifact native-libs) で組み立てる。
+      - name: Build native libs only
+        if: inputs.native_only == true
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:stripReleaseDebugSymbols --stacktrace
+          OUT=native-libs/arm64-v8a
+          mkdir -p "$OUT"
+          find app/build/intermediates/stripped_native_libs/release -path '*arm64-v8a*' -name '*.so' \
+            ! -name 'libOpenCL.so' -exec cp -v {} "$OUT"/ \;
+          ls -la "$OUT"
+          [ -f "$OUT/libllama_jni.so" ] || { echo "::error::libllama_jni.so not produced"; exit 1; }
+          READELF="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          FAIL=0
+          for so in "$OUT"/*.so; do
+            if "$READELF" -l "$so" | awk '/LOAD/ { if ($0 !~ /0x4000[[:space:]]*$/) bad=1 } END { exit bad }'; then
+              echo "✅ $so"; else echo "❌ $so: 0x4000 alignment NG"; FAIL=1; fi
+          done
+          exit $FAIL
+
+      - name: Upload native libs
+        if: inputs.native_only == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libs
+          path: native-libs
+
       - name: Build debug APK
+        if: inputs.native_only != true
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
       - name: Build release APK
+        if: inputs.native_only != true
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
@@ -225,6 +262,7 @@ jobs:
 
       # ── 16KB page-size 検証 ─────────────────────────────────────────────────
       - name: Verify .so 16KB alignment
+        if: inputs.native_only != true
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
@@ -251,6 +289,7 @@ jobs:
 
       # ── AAB ─────────────────────────────────────────────────────────────────
       - name: Build AAB
+        if: inputs.native_only != true
         run: |
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace
@@ -261,6 +300,7 @@ jobs:
 
       # ── ビルドサマリー ───────────────────────────────────────────────────────
       - name: Build summary
+        if: inputs.native_only != true
         run: |
           echo "## Build Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
@@ -274,18 +314,21 @@ jobs:
 
       # ── アーティファクトアップロード ─────────────────────────────────────────
       - name: Upload debug APK
+        if: inputs.native_only != true
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload release APK
+        if: inputs.native_only != true
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Upload AAB
+        if: inputs.native_only != true
         uses: actions/upload-artifact@v4
         with:
           name: app-release-aab

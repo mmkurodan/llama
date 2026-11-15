@@ -18,7 +18,7 @@
 #   --fetch        最新の成功 CI run から .so を取得（既定）
 #   --no-fetch     取得せず既存 jniLibs の .so を再利用
 #   --run-id ID    取得元の CI run を明示
-#   --artifact N   取得する artifact 名（既定: app-debug）
+#   --artifact N   取得する artifact 名（既定: app-debug。native_only CI run なら native-libs）
 # ============================================================================
 set -euo pipefail
 
@@ -61,9 +61,16 @@ if [ "$DO_FETCH" -eq 1 ]; then
   TMP="$(mktemp -d)"
   gh run download "$RUN_ID" --repo "$REPO_SLUG" -n "$ARTIFACT" -D "$TMP"
   CI_APK="$(find "$TMP" -name '*.apk' | head -1)"
-  [ -n "$CI_APK" ] || { echo "artifact に APK がありません"; exit 2; }
   mkdir -p "$JNILIBS"
-  unzip -o -j "$CI_APK" 'lib/arm64-v8a/*.so' -d "$JNILIBS" >/dev/null
+  if [ -n "$CI_APK" ]; then
+    unzip -o -j "$CI_APK" 'lib/arm64-v8a/*.so' -d "$JNILIBS" >/dev/null
+  else
+    # native-libs artifact (workflow_dispatch native_only=true): stripped .so files as-is
+    SO_LIST="$(find "$TMP" -path '*arm64-v8a*' -name '*.so' ! -name 'libOpenCL.so')"
+    [ -n "$SO_LIST" ] || { echo "artifact に APK も arm64-v8a .so もありません"; exit 2; }
+    rm -f "$JNILIBS"/libllama_jni.so "$JNILIBS"/libggml-opencl.so
+    printf '%s\n' "$SO_LIST" | while read -r so; do cp -f "$so" "$JNILIBS"/; done
+  fi
   echo "== 配置した .so =="; ls -la "$JNILIBS"
 fi
 [ -n "$(ls -A "$JNILIBS" 2>/dev/null | grep -i '\.so$' || true)" ] || { echo "jniLibs に .so がありません（--fetch してください）"; exit 2; }
