@@ -4247,7 +4247,7 @@ public class SettingsActivity extends Activity {
     private void performBackup() {
         String ts = String.format(Locale.US, "%1$tY-%1$tm-%1$td_%1$tH%1$tM%1$tS", new java.util.Date());
         String folderName = "LlamaBackup_" + ts;
-        showToast(localizedText("バックアップを開始しています...", "Starting backup..."));
+        final TransferProgress progress = new TransferProgress();
         new Thread(() -> {
             try {
                 File configDir = new File(getExternalFilesDir(null), "configs");
@@ -4256,16 +4256,27 @@ public class SettingsActivity extends Activity {
                 int profileCount = 0, modelCount = 0;
                 String settingsJson = buildSharedSettingsJson().toString(2);
 
+                long totalBytes = settingsJson.length();
+                if (configFiles != null) for (File f : configFiles) totalBytes += f.length();
+                for (File f : modelFiles) totalBytes += f.length();
+                int fileTotal = 1 + (configFiles != null ? configFiles.length : 0) + modelFiles.length;
+                progress.show(localizedText("バックアップ中", "Backing up"), totalBytes, fileTotal);
+                int fileNo = 0;
+                progress.startFile("settings.json", ++fileNo);
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     String root = "Download/" + folderName + "/";
                     insertJsonToDownloads(settingsJson, "settings.json", root);
+                    progress.add(settingsJson.length());
                     if (configFiles != null) {
                         for (File f : configFiles) {
-                            if (insertToDownloads(f, root + "profiles/", "application/json")) profileCount++;
+                            progress.startFile(f.getName(), ++fileNo);
+                            if (insertToDownloads(f, root + "profiles/", "application/json", progress)) profileCount++;
                         }
                     }
                     for (File f : modelFiles) {
-                        if (insertToDownloads(f, root + "models/", "application/octet-stream")) modelCount++;
+                        progress.startFile(f.getName(), ++fileNo);
+                        if (insertToDownloads(f, root + "models/", "application/octet-stream", progress)) modelCount++;
                     }
                     final int pc = profileCount, mc = modelCount;
                     showToast(localizedText(
@@ -4279,10 +4290,19 @@ public class SettingsActivity extends Activity {
                     profilesDir.mkdirs();
                     modelsDir.mkdirs();
                     writeTextFile(new File(backupDir, "settings.json"), settingsJson);
+                    progress.add(settingsJson.length());
                     if (configFiles != null) {
-                        for (File f : configFiles) { streamCopyFile(f, new File(profilesDir, f.getName())); profileCount++; }
+                        for (File f : configFiles) {
+                            progress.startFile(f.getName(), ++fileNo);
+                            streamCopyFile(f, new File(profilesDir, f.getName()), progress);
+                            profileCount++;
+                        }
                     }
-                    for (File f : modelFiles) { streamCopyFile(f, new File(modelsDir, f.getName())); modelCount++; }
+                    for (File f : modelFiles) {
+                        progress.startFile(f.getName(), ++fileNo);
+                        streamCopyFile(f, new File(modelsDir, f.getName()), progress);
+                        modelCount++;
+                    }
                     final int pc = profileCount, mc = modelCount;
                     showToast(localizedText(
                         "バックアップ完了: " + backupDir.getAbsolutePath() + " (" + pc + " プロファイル, " + mc + " モデル)",
@@ -4292,6 +4312,8 @@ public class SettingsActivity extends Activity {
             } catch (Exception e) {
                 Log.e(TAG, "Backup failed", e);
                 showToast(localizedText("バックアップに失敗しました: ", "Backup failed: ") + e.getMessage());
+            } finally {
+                progress.dismiss();
             }
         }).start();
     }
@@ -4333,7 +4355,8 @@ public class SettingsActivity extends Activity {
     }
 
     @android.annotation.SuppressLint("InlinedApi")
-    private boolean insertToDownloads(File src, String relativePath, String mimeType) throws IOException {
+    private boolean insertToDownloads(File src, String relativePath, String mimeType,
+                                      TransferProgress progress) throws IOException {
         ContentValues cv = new ContentValues();
         cv.put(MediaStore.Downloads.DISPLAY_NAME, src.getName());
         cv.put(MediaStore.Downloads.RELATIVE_PATH, relativePath);
@@ -4342,7 +4365,7 @@ public class SettingsActivity extends Activity {
         if (uri == null) return false;
         try (OutputStream os = getContentResolver().openOutputStream(uri);
              InputStream is = new FileInputStream(src)) {
-            streamCopy(is, os);
+            streamCopy(is, os, progress);
         }
         return true;
     }
@@ -4372,7 +4395,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void restoreFromTree(Uri treeUri) {
-        showToast(localizedText("復元を開始しています...", "Starting restore..."));
+        final TransferProgress progress = new TransferProgress();
         new Thread(() -> {
             try {
                 int profileCount = 0, modelCount = 0;
@@ -4381,7 +4404,8 @@ public class SettingsActivity extends Activity {
                 String[] proj = {
                     DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                     DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_SIZE
                 };
 
                 String profilesFolderId = null, modelsFolderId = null, settingsDocId = null;
@@ -4394,8 +4418,43 @@ public class SettingsActivity extends Activity {
                     }
                 }
 
+                // Pre-scan to size the overall progress bar (profiles + models that will be copied).
+                java.util.List<String[]> profileEntries = new java.util.ArrayList<>(); // {id, name}
+                java.util.List<String[]> modelEntries = new java.util.ArrayList<>();   // {id, name}
+                long totalBytes = 0;
+                File configDir = new File(getExternalFilesDir(null), "configs");
+                File modelDir = ModelFileHelper.getModelStorageDir(this);
+                if (profilesFolderId != null) {
+                    Uri childUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, profilesFolderId);
+                    try (Cursor c = getContentResolver().query(childUri, proj, null, null, null)) {
+                        while (c != null && c.moveToNext()) {
+                            String name = c.getString(1);
+                            if (name.endsWith(".json")) {
+                                profileEntries.add(new String[]{c.getString(0), name});
+                                totalBytes += c.isNull(3) ? 0 : c.getLong(3);
+                            }
+                        }
+                    }
+                }
+                if (modelsFolderId != null) {
+                    Uri childUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, modelsFolderId);
+                    try (Cursor c = getContentResolver().query(childUri, proj, null, null, null)) {
+                        while (c != null && c.moveToNext()) {
+                            String name = c.getString(1);
+                            if (ModelFileHelper.isGgufFilename(name) && !new File(modelDir, name).exists()) {
+                                modelEntries.add(new String[]{c.getString(0), name});
+                                totalBytes += c.isNull(3) ? 0 : c.getLong(3);
+                            }
+                        }
+                    }
+                }
+                int fileTotal = (settingsDocId != null ? 1 : 0) + profileEntries.size() + modelEntries.size();
+                progress.show(localizedText("復元中", "Restoring"), totalBytes, fileTotal);
+                int fileNo = 0;
+
                 // Restore shared settings
                 if (settingsDocId != null) {
+                    progress.startFile("settings.json", ++fileNo);
                     Uri settingsUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, settingsDocId);
                     try (InputStream is = getContentResolver().openInputStream(settingsUri);
                          java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
@@ -4411,43 +4470,25 @@ public class SettingsActivity extends Activity {
                     }
                 }
 
-                File configDir = new File(getExternalFilesDir(null), "configs");
-                if (profilesFolderId != null) {
-                    Uri childUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, profilesFolderId);
-                    try (Cursor c = getContentResolver().query(childUri, proj, null, null, null)) {
-                        while (c != null && c.moveToNext()) {
-                            String id = c.getString(0), name = c.getString(1);
-                            if (name.endsWith(".json")) {
-                                Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id);
-                                try (InputStream is = getContentResolver().openInputStream(fileUri);
-                                     OutputStream os = new FileOutputStream(new File(configDir, name))) {
-                                    streamCopy(is, os);
-                                }
-                                profileCount++;
-                            }
-                        }
+                for (String[] e : profileEntries) {
+                    progress.startFile(e[1], ++fileNo);
+                    Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, e[0]);
+                    try (InputStream is = getContentResolver().openInputStream(fileUri);
+                         OutputStream os = new FileOutputStream(new File(configDir, e[1]))) {
+                        streamCopy(is, os, progress);
                     }
+                    profileCount++;
                 }
 
-                File modelDir = ModelFileHelper.getModelStorageDir(this);
-                if (modelsFolderId != null) {
-                    Uri childUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, modelsFolderId);
-                    try (Cursor c = getContentResolver().query(childUri, proj, null, null, null)) {
-                        while (c != null && c.moveToNext()) {
-                            String id = c.getString(0), name = c.getString(1);
-                            if (ModelFileHelper.isGgufFilename(name)) {
-                                Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, id);
-                                File dest = new File(modelDir, name);
-                                if (!dest.exists()) {
-                                    try (InputStream is = getContentResolver().openInputStream(fileUri);
-                                         OutputStream os = new FileOutputStream(dest)) {
-                                        streamCopy(is, os);
-                                    }
-                                    modelCount++;
-                                }
-                            }
-                        }
+                for (String[] e : modelEntries) {
+                    progress.startFile(e[1], ++fileNo);
+                    Uri fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, e[0]);
+                    File dest = new File(modelDir, e[1]);
+                    try (InputStream is = getContentResolver().openInputStream(fileUri);
+                         OutputStream os = new FileOutputStream(dest)) {
+                        streamCopy(is, os, progress);
                     }
+                    modelCount++;
                 }
 
                 final int pc = profileCount, mc = modelCount;
@@ -4460,21 +4501,135 @@ public class SettingsActivity extends Activity {
             } catch (Exception e) {
                 Log.e(TAG, "Restore failed", e);
                 showToast(localizedText("復元に失敗しました: ", "Restore failed: ") + e.getMessage());
+            } finally {
+                progress.dismiss();
             }
         }).start();
     }
 
     private void streamCopy(InputStream is, OutputStream os) throws IOException {
-        byte[] buf = new byte[65536];
-        int n;
-        while ((n = is.read(buf)) != -1) os.write(buf, 0, n);
+        streamCopy(is, os, null);
     }
 
-    private void streamCopyFile(File src, File dst) throws IOException {
+    private void streamCopy(InputStream is, OutputStream os, TransferProgress progress) throws IOException {
+        byte[] buf = new byte[65536];
+        int n;
+        while ((n = is.read(buf)) != -1) {
+            os.write(buf, 0, n);
+            if (progress != null) progress.add(n);
+        }
+    }
+
+    private void streamCopyFile(File src, File dst, TransferProgress progress) throws IOException {
         try (InputStream is = new FileInputStream(src);
              OutputStream os = new FileOutputStream(dst)) {
-            streamCopy(is, os);
+            streamCopy(is, os, progress);
         }
+    }
+
+    /**
+     * Determinate progress dialog for backup/restore. Byte-based overall progress (so a single
+     * multi-GB model copy still moves the bar), current file name and "n / m" file counter.
+     * All view access happens on the UI thread; {@link #add(long)} is safe from the worker
+     * thread and throttles UI posts to ~10/s.
+     */
+    private final class TransferProgress {
+        private AlertDialog dialog;
+        private ProgressBar bar;
+        private TextView fileText;
+        private TextView percentText;
+        private volatile long total;
+        private volatile long done;
+        private volatile String currentLabel = "";
+        private volatile int fileIndex;
+        private volatile int fileCount;
+        private long lastPostMs;
+
+        void show(final String title, final long totalBytes, final int files) {
+            total = Math.max(totalBytes, 0);
+            fileCount = files;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                float d = getResources().getDisplayMetrics().density;
+                LinearLayout box = new LinearLayout(SettingsActivity.this);
+                box.setOrientation(LinearLayout.VERTICAL);
+                int pad = (int) (20 * d);
+                box.setPadding(pad, pad, pad, (int) (8 * d));
+                fileText = new TextView(SettingsActivity.this);
+                fileText.setSingleLine(true);
+                fileText.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                box.addView(fileText);
+                bar = new ProgressBar(SettingsActivity.this, null, android.R.attr.progressBarStyleHorizontal);
+                bar.setMax(1000);
+                bar.setIndeterminate(total <= 0);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                lp.topMargin = (int) (12 * d);
+                box.addView(bar, lp);
+                percentText = new TextView(SettingsActivity.this);
+                percentText.setGravity(Gravity.END);
+                box.addView(percentText);
+                dialog = new AlertDialog.Builder(SettingsActivity.this)
+                        .setTitle(title)
+                        .setView(box)
+                        .setCancelable(false)
+                        .create();
+                dialog.show();
+                // Long model copies: keep the screen (and thus the foreground process) alive.
+                if (dialog.getWindow() != null) {
+                    dialog.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                }
+                render();
+            });
+        }
+
+        /** Announce the file about to be processed (1-based index). */
+        void startFile(String label, int index) {
+            currentLabel = label;
+            fileIndex = index;
+            runOnUiThread(this::render);
+        }
+
+        void add(long n) {
+            done += n;
+            long now = android.os.SystemClock.uptimeMillis();
+            if (now - lastPostMs >= 100 || (total > 0 && done >= total)) {
+                lastPostMs = now;
+                runOnUiThread(this::render);
+            }
+        }
+
+        private void render() {
+            if (dialog == null) return;
+            fileText.setText(fileCount > 0
+                    ? "(" + fileIndex + "/" + fileCount + ") " + currentLabel
+                    : currentLabel);
+            if (total > 0) {
+                long dn = Math.min(done, total);
+                bar.setProgress((int) (dn * 1000L / total));
+                percentText.setText(String.format(Locale.US, "%d%%  (%s / %s)",
+                        (int) (dn * 100L / total), formatMb(dn), formatMb(total)));
+            } else {
+                percentText.setText("");
+            }
+        }
+
+        void dismiss() {
+            runOnUiThread(() -> {
+                try {
+                    if (dialog != null && dialog.isShowing()) dialog.dismiss();
+                } catch (Exception ignored) {
+                }
+                dialog = null;
+            });
+        }
+    }
+
+    private static String formatMb(long bytes) {
+        if (bytes >= 1024L * 1024L * 1024L) {
+            return String.format(Locale.US, "%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0));
+        }
+        return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
     }
 
     private void showToast(final String msg) {
