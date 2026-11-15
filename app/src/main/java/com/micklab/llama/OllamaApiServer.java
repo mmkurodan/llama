@@ -353,6 +353,69 @@ public class OllamaApiServer {
         return new PreparedMessages(normalizedMessages, mediaFiles);
     }
 
+    /** Ollama image entry (raw base64 or data URL) → data URL accepted by decodeImageUrl. */
+    private static String ollamaImageToDataUrl(String raw) {
+        String v = raw == null ? "" : raw.trim();
+        return v.startsWith("data:") ? v : "data:image/jpeg;base64," + v;
+    }
+
+    /**
+     * Ollama-native {@code messages[].images:["<base64>", …]} → OpenAI-style content parts
+     * ({image_url…, text}) in place, so the shared media pipeline sees the images.
+     */
+    private static void convertOllamaImagesInMessages(JSONArray messages) throws JSONException {
+        for (int i = 0; i < messages.length(); i++) {
+            JSONObject m = messages.optJSONObject(i);
+            if (m == null) continue;
+            JSONArray images = m.optJSONArray("images");
+            if (images == null || images.length() == 0) {
+                m.remove("images");
+                continue;
+            }
+            JSONArray parts = new JSONArray();
+            for (int k = 0; k < images.length(); k++) {
+                String img = images.optString(k, "");
+                if (img.isEmpty()) continue;
+                JSONObject url = new JSONObject();
+                url.put("url", ollamaImageToDataUrl(img));
+                JSONObject part = new JSONObject();
+                part.put("type", "image_url");
+                part.put("image_url", url);
+                parts.put(part);
+            }
+            Object existing = m.opt("content");
+            if (existing instanceof JSONArray) {
+                JSONArray ea = (JSONArray) existing;
+                for (int k = 0; k < ea.length(); k++) parts.put(ea.get(k));
+            } else if (existing instanceof String && !((String) existing).isEmpty()) {
+                JSONObject t = new JSONObject();
+                t.put("type", "text");
+                t.put("text", (String) existing);
+                parts.put(t);
+            }
+            m.remove("images");
+            if (parts.length() > 0) m.put("content", parts);
+        }
+    }
+
+    private static boolean hasResponsesContentBlocks(Object content) {
+        if (!(content instanceof JSONArray)) {
+            return false;
+        }
+        JSONArray blocks = (JSONArray) content;
+        for (int i = 0; i < blocks.length(); i++) {
+            JSONObject blk = blocks.optJSONObject(i);
+            if (blk == null) {
+                continue;
+            }
+            String t = blk.optString("type", "");
+            if ("input_text".equals(t) || "input_image".equals(t) || "output_text".equals(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static RequestedModalities detectRequestedModalities(JSONArray messages) throws JSONException {
         boolean vision = false;
         boolean audio = false;
@@ -2669,6 +2732,28 @@ public class OllamaApiServer {
                 return;
             }
 
+            // Ollama-native top-level "images": ["<base64>", …] → media for the vision pipeline.
+            final List<byte[]> genMediaList = new ArrayList<>();
+            JSONArray genImages = request.optJSONArray("images");
+            if (genImages != null) {
+                try {
+                    for (int k = 0; k < genImages.length(); k++) {
+                        String img = genImages.optString(k, "");
+                        if (img.isEmpty()) continue;
+                        JSONObject u = new JSONObject();
+                        u.put("url", ollamaImageToDataUrl(img));
+                        genMediaList.add(decodeImageUrl(u));
+                    }
+                } catch (InvalidMediaException e) {
+                    sendErrorResponse(outputStream, 400, e.getMessage());
+                    return;
+                }
+            }
+            final byte[][] genMedia = genMediaList.toArray(new byte[0][]);
+            StringBuilder genMarkers = new StringBuilder();
+            for (int k = 0; k < genMedia.length; k++) genMarkers.append(MTMD_MEDIA_MARKER);
+            final String effPrompt = genMarkers + prompt;
+
             if (!acquireGenerationSlot(outputStream, "/api/generate")) {
                 return;
             }
@@ -2676,8 +2761,12 @@ public class OllamaApiServer {
             try {
                 applyNumCtxOverride(request);
                 // Load model/configuration if needed (will be fast if same config already loaded)
-                if (!modelManager.loadConfiguration(model)) {
+                if (!modelManager.loadConfiguration(model, genMedia.length > 0, false)) {
                     sendErrorResponse(outputStream, 500, "Failed to load configuration: " + model);
+                    return;
+                }
+                if (genMedia.length > 0 && !modelManager.supportsVision()) {
+                    sendErrorResponse(outputStream, 400, "image input is not supported by the current model");
                     return;
                 }
                 if (abortIfResetRequested(outputStream, "/api/generate")) {
@@ -2735,7 +2824,7 @@ public class OllamaApiServer {
                 
                 PromptTemplateManager.PromptBuildResult promptResult =
                         PromptTemplateManager.buildPromptForGenerateWithSelection(
-                                prompt,
+                                effPrompt,
                                 apiSystem,
                                 customTemplate,
                                 ggufChatTemplate,
@@ -2916,7 +3005,7 @@ public class OllamaApiServer {
                     String streamResult = null;
                     try {
                         // This will trigger token callbacks
-                        streamResult = modelManager.generate(promptToUse);
+                        streamResult = genMedia.length > 0 ? modelManager.generate(promptToUse, genMedia) : modelManager.generate(promptToUse);
                     } finally {
                         modelManager.getLlama().setTokenListener(null);
                         if (!errorSent[0] && !clientDisconnected.get()) {
@@ -2934,7 +3023,7 @@ public class OllamaApiServer {
                     }
                 } else {
                     // Non-streaming response
-                    String rawResponse = modelManager.generate(promptToUse);
+                    String rawResponse = genMedia.length > 0 ? modelManager.generate(promptToUse, genMedia) : modelManager.generate(promptToUse);
                     if (ModelManager.isCtxLimitError(rawResponse)) {
                         sendErrorResponse(outputStream, 400, ModelManager.ctxLimitMessage(rawResponse));
                         return;
@@ -3010,6 +3099,7 @@ public class OllamaApiServer {
                 sendErrorResponse(outputStream, 400, "messages must not be empty");
                 return;
             }
+            convertOllamaImagesInMessages(messages);
             if (request.has("tools") && tools == null) {
                 sendErrorResponse(outputStream, 400, "'tools' must be an array");
                 return;
@@ -5947,9 +6037,16 @@ public class OllamaApiServer {
             String type = item.optString("type", "");
 
             if (type.isEmpty()) {
-                // Plain OpenAI chat message — pass through directly.
-                out.put(item);
-                continue;
+                // Typeless {role, content:[…]} is a valid Responses "easy" message. When its
+                // content array uses Responses block types (input_text / input_image /
+                // output_text), convert it like a typed "message" item; otherwise it is a
+                // plain OpenAI chat message — pass through directly.
+                if (item.has("role") && hasResponsesContentBlocks(item.opt("content"))) {
+                    type = "message";
+                } else {
+                    out.put(item);
+                    continue;
+                }
             }
 
             switch (type) {
