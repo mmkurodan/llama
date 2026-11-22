@@ -153,6 +153,8 @@ public class ModelManager {
     // Integer.MIN_VALUE = "unknown" so the first load always initializes.
     private volatile int currentKvCacheTypeK = Integer.MIN_VALUE;
     private volatile int currentKvCacheTypeV = Integer.MIN_VALUE;
+    // The image token budget is passed to mtmd at projector init only, so a change forces a reload.
+    private volatile int currentImageMaxTokens = Integer.MIN_VALUE;
     // Set when settings are saved: force a model reload on the next load so any config
     // change (incl. GPU/NPU backend) takes effect for both direct and API runs.
     private volatile boolean reloadRequested = false;
@@ -403,7 +405,8 @@ public class ModelManager {
                     // use_mmap / KV cache 量子化も同様にロード時にしか効かないため、変更時は再ロードが必要
                     && config.useMmap == currentUseMmap
                     && config.kvCacheTypeK == currentKvCacheTypeK
-                    && config.kvCacheTypeV == currentKvCacheTypeV;
+                    && config.kvCacheTypeV == currentKvCacheTypeV
+                    && config.imageMaxTokens == currentImageMaxTokens;
         }
     }
 
@@ -738,6 +741,7 @@ public class ModelManager {
                     && currentUseMmap == config.useMmap
                     && currentKvCacheTypeK == config.kvCacheTypeK
                     && currentKvCacheTypeV == config.kvCacheTypeV
+                    && currentImageMaxTokens == config.imageMaxTokens
                     && !reloadRequested;
 
             // If same model is already loaded AND the backend is unchanged, just re-apply parameters
@@ -913,6 +917,7 @@ public class ModelManager {
             currentUseMmap = config.useMmap;
             currentKvCacheTypeK = config.kvCacheTypeK;
             currentKvCacheTypeV = config.kvCacheTypeV;
+            currentImageMaxTokens = config.imageMaxTokens;
             reloadRequested = false;   // 反映済み
 
             if (listener != null) {
@@ -1020,6 +1025,9 @@ public class ModelManager {
         // Memory-map toggle (applied at next model init). Disabling helps very large models
         // load reliably when mmap's contiguous address-space reservation intermittently fails.
         llama.setUseMmap(config.useMmap);
+
+        // Per-image token budget for the multimodal projector (applied at next model init).
+        llama.setImageMaxTokens(config.imageMaxTokens);
 
         // Compute backend を JNI へ通知 (ADSP_LIBRARY_PATH 設定含む)
         String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;
@@ -1625,6 +1633,7 @@ public class ModelManager {
         currentUseMmap = true;
         currentKvCacheTypeK = Integer.MIN_VALUE;
         currentKvCacheTypeV = Integer.MIN_VALUE;
+        currentImageMaxTokens = Integer.MIN_VALUE;
         modelLoaded = false;
         // A full native teardown (llama.free() -> llama_jni_free) also frees the resident
         // embedding model, so the cached resident path is no longer valid. Clear it to force a

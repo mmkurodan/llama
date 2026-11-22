@@ -103,6 +103,10 @@ public class LlamaNative {
     // that mmap needs. Applied at the next model init/initWithMmproj.
     public native void setUseMmap(boolean useMmap);
 
+    // Maximum tokens one image may produce in the multimodal projector (mtmd image_max_tokens);
+    // larger images are downscaled to fit. 0 = projector default. Applied at the next initWithMmproj.
+    public native void setImageMaxTokens(int maxTokens);
+
     // LoRA アダプタ（別ファイルのアダプタGGUF）を現在のモデル/コンテキストへ適用する。
     // 戻り値: 成功="", 失敗=エラーメッセージ。scale は実効強度（通常 1.0）。
     public native String applyLoraAdapter(String adapterPath, float scale);

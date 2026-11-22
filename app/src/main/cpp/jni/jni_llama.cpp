@@ -236,6 +236,8 @@ static int   g_n_gpu_layers = 0;
 // native memory, avoiding the single large contiguous virtual-address reservation mmap
 // needs — helps very large models load when address space is fragmented.
 static bool  g_use_mmap   = true;
+// Per-image token budget for mtmd (image_max_tokens); 0 = projector default. See setImageMaxTokens.
+static int   g_image_max_tokens = 0;
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
@@ -1570,6 +1572,9 @@ static std::string initialize_optional_multimodal_support_locked(
         mparams_mtmd.print_timings = false;
         mparams_mtmd.n_threads = g_n_threads;
         mparams_mtmd.warmup = true;
+        if (g_image_max_tokens > 0) {
+            mparams_mtmd.image_max_tokens = g_image_max_tokens;
+        }
         // skip_audio removed in v0.8.0; audio support is queried via mtmd_support_audio() after init
 
         mtmd_context * mtmd = mtmd_init_from_file(candidate_path.c_str(), g_model, mparams_mtmd);
@@ -3002,6 +3007,18 @@ Java_com_micklab_llama_LlamaNative_setUseMmap(
     log_to_file(ss.str());
 }
 
+// Records the per-image token budget for the multimodal projector. Applied at the next
+// initWithMmproj (mtmd_context_params.image_max_tokens); <= 0 keeps the projector default.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setImageMaxTokens(
+        JNIEnv *, jobject, jint maxTokens
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_image_max_tokens = maxTokens > 0 ? static_cast<int>(maxTokens) : 0;
+    log_to_file("setImageMaxTokens: image_max_tokens=" + std::to_string(g_image_max_tokens));
+}
+
 // ---------------- JNI: applyLoraAdapter ----------------
 // 現在ロード中のモデル/コンテキストへ LoRA アダプタGGUF を適用する。
 // 既に別アダプタ適用中なら差し替える。成功="", 失敗=エラーメッセージ。
@@ -3650,6 +3667,25 @@ static bool tokenize_add_special_flag(const llama_vocab * vocab) {
     return true;
 }
 
+// Tokens kept free at the end of the context (MTP drafts, end-of-turn tokens).
+static constexpr int CTX_SAFETY_MARGIN = 32;
+
+// How many tokens may still be generated after a prompt that occupies kv_prompt_tokens KV cells.
+// n_predict (> 0) is honoured but never allowed to run past the context.
+static int generation_token_budget(int kv_prompt_tokens) {
+    const int remaining = g_n_ctx - kv_prompt_tokens - CTX_SAFETY_MARGIN;
+    if (remaining <= 0) return 0;
+    return g_n_predict > 0 ? std::min(g_n_predict, remaining) : remaining;
+}
+
+// CTX_TOO_SMALL message (parsed by ModelManager.CTX_TOO_SMALL_PATTERN) for a prompt that fits the
+// KV cache but leaves no room to generate. need = prompt + safety margin + a minimal answer.
+static std::string ctx_no_room_for_generation_message(int kv_prompt_tokens) {
+    return "CTX_TOO_SMALL need=" + std::to_string(kv_prompt_tokens + CTX_SAFETY_MARGIN + 64)
+         + " have=" + std::to_string(g_n_ctx)
+         + " (prompt leaves no room in context for generation; increase Context Size)";
+}
+
 static bool prefill_text_prompt_locked(
         const llama_vocab * vocab,
         const std::string & prompt,
@@ -4007,7 +4043,6 @@ static jstring generate_locked(
         log_to_file(std::string("generate: prompt=\n") + prompt, GGML_LOG_LEVEL_DEBUG);
     }
 
-    const int max_tokens = (g_n_predict > 0) ? g_n_predict : (g_n_ctx - 32);
     std::string context_error;
     if (!reset_generation_context_locked("generate", context_error)) {
         log_to_file(std::string("generate: ") + context_error, GGML_LOG_LEVEL_ERROR);
@@ -4056,6 +4091,25 @@ static jstring generate_locked(
 
     const llama_pos generation_base_pos = n_past;
     const int n_vocab = llama_vocab_n_tokens(vocab);
+    // KV cells actually occupied by the prompt. For M-RoPE models (Qwen-VL) an image chunk advances
+    // the position (n_past) by far fewer steps than the tokens it writes into the KV cache, so the
+    // context budget must be judged by token count, not by position — otherwise generation runs the
+    // KV cache full and llama_decode fails ("decode failed (generation)").
+    const int kv_prompt_tokens = static_cast<int>(n_prompt_tokens);
+    const int max_tokens = generation_token_budget(kv_prompt_tokens);
+    if (max_tokens <= 0) {
+        // Same structured form as the prefill pre-check, so the Java layer can auto-promote n_ctx
+        // and retry. Not pushed to the token stream (see the prefill failure branch above).
+        const std::string errmsg = ctx_no_room_for_generation_message(kv_prompt_tokens);
+        log_to_file("generate: " + errmsg, GGML_LOG_LEVEL_WARN);
+        return new_java_string_utf8(env, errmsg);
+    }
+    if (has_media) {
+        std::ostringstream ss;
+        ss << "generate: kv_prompt_tokens=" << kv_prompt_tokens << " n_past(pos)=" << n_past
+           << " n_ctx=" << g_n_ctx << " max_tokens=" << max_tokens;
+        log_to_file(ss.str());
+    }
 
     // Structured output: when a grammar is active, use common_sampler — the proven path that
     // correctly applies GBNF / JSON-schema grammars (same as generateOpenAiChatCompletion). A raw
@@ -4268,7 +4322,7 @@ static jstring generate_locked(
         }
 
         out_tokens.push_back(id);
-        if (generation_base_pos + static_cast<llama_pos>(out_tokens.size()) >= g_n_ctx - 32) {
+        if (kv_prompt_tokens + static_cast<int>(out_tokens.size()) >= g_n_ctx - CTX_SAFETY_MARGIN) {
             log_to_file("generate: reached ctx safety limit, stopping early");
             break;
         }
@@ -4531,7 +4585,12 @@ static jstring generate_openai_chat_completion_locked(
         }
 
         const llama_pos generation_base_pos = n_past;
-        const int max_tokens = (g_n_predict > 0) ? g_n_predict : (g_n_ctx - (int)n_past - 32);
+        // Budget by KV tokens, not M-RoPE position (see generate()).
+        const int kv_prompt_tokens = static_cast<int>(n_prompt_tokens);
+        const int max_tokens = generation_token_budget(kv_prompt_tokens);
+        if (max_tokens <= 0) {
+            return build_error(ctx_no_room_for_generation_message(kv_prompt_tokens));
+        }
 
         std::string output;
         output.reserve(std::max(max_tokens, 1) * 4);
@@ -4551,7 +4610,7 @@ static jstring generate_openai_chat_completion_locked(
             }
 
             out_tokens.push_back(id);
-            if (generation_base_pos + static_cast<llama_pos>(out_tokens.size()) >= g_n_ctx - 32) {
+            if (kv_prompt_tokens + static_cast<int>(out_tokens.size()) >= g_n_ctx - CTX_SAFETY_MARGIN) {
                 log_to_file("generateOpenAiChatCompletion: reached ctx safety limit, stopping early");
                 break;
             }

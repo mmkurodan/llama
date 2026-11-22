@@ -120,9 +120,16 @@ public class ConfigurationManager {
         // is smaller) and reload+retry once instead of failing. Default true. User-toggleable next to
         // Context Size in Settings.
         public boolean nCtxAutoExpand;
+        // Upper bound on the tokens one image may produce (mtmd image_max_tokens). Dynamic-resolution
+        // VLMs such as Qwen3-VL otherwise emit thousands of tokens for a large image, which overflows
+        // a small n_ctx; the projector downscales the image to fit this budget instead.
+        // 0 = use the projector's own default (GGUF metadata). Applied at model load.
+        public int imageMaxTokens;
 
         // Compute backend
         // 0=CPU  1=GPU  (NPU/HTP removed — Qualcomm Hexagon SDK redistribution restriction)
+        /** Default image token budget: keeps one image well inside a 2048–4096 n_ctx on device. */
+        public static final int DEFAULT_IMAGE_MAX_TOKENS = 1024;
         public static final int BACKEND_CPU     = 0;
         public static final int BACKEND_GPU     = 1;
         public int  backendType;
@@ -177,6 +184,7 @@ public class ConfigurationManager {
             enableThinking = true;
             useMmap = true;
             nCtxAutoExpand = true;
+            imageMaxTokens = DEFAULT_IMAGE_MAX_TOKENS;
 
             // Backend defaults
             backendType = BACKEND_CPU;
@@ -254,6 +262,7 @@ public class ConfigurationManager {
             json.put("enableThinking", enableThinking);
             json.put("useMmap", useMmap);
             json.put("nCtxAutoExpand", nCtxAutoExpand);
+            json.put("imageMaxTokens", imageMaxTokens);
 
             // Compute backend
             json.put("backendType", backendType);
@@ -337,6 +346,7 @@ public class ConfigurationManager {
             config.enableThinking = json.optBoolean("enableThinking", true);
             config.useMmap = json.optBoolean("useMmap", true);
         config.nCtxAutoExpand = json.optBoolean("nCtxAutoExpand", true);
+            config.imageMaxTokens = Math.max(0, json.optInt("imageMaxTokens", DEFAULT_IMAGE_MAX_TOKENS));
 
             // Compute backend (backward compat: default CPU)
             config.backendType = json.optInt("backendType", Configuration.BACKEND_CPU);
