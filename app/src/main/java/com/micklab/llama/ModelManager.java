@@ -155,6 +155,8 @@ public class ModelManager {
     private volatile int currentKvCacheTypeV = Integer.MIN_VALUE;
     // The image token budget is passed to mtmd at projector init only, so a change forces a reload.
     private volatile int currentImageMaxTokens = Integer.MIN_VALUE;
+    // The Vision encoder backend (CPU/GPU) is also fixed at projector init. null = unknown (force reload).
+    private volatile Boolean currentVisionEncoderGpu = null;
     // Set when settings are saved: force a model reload on the next load so any config
     // change (incl. GPU/NPU backend) takes effect for both direct and API runs.
     private volatile boolean reloadRequested = false;
@@ -406,7 +408,8 @@ public class ModelManager {
                     && config.useMmap == currentUseMmap
                     && config.kvCacheTypeK == currentKvCacheTypeK
                     && config.kvCacheTypeV == currentKvCacheTypeV
-                    && config.imageMaxTokens == currentImageMaxTokens;
+                    && config.imageMaxTokens == currentImageMaxTokens
+                    && Objects.equals(config.visionEncoderGpu, currentVisionEncoderGpu);
         }
     }
 
@@ -742,6 +745,7 @@ public class ModelManager {
                     && currentKvCacheTypeK == config.kvCacheTypeK
                     && currentKvCacheTypeV == config.kvCacheTypeV
                     && currentImageMaxTokens == config.imageMaxTokens
+                    && Objects.equals(currentVisionEncoderGpu, config.visionEncoderGpu)
                     && !reloadRequested;
 
             // If same model is already loaded AND the backend is unchanged, just re-apply parameters
@@ -918,6 +922,7 @@ public class ModelManager {
             currentKvCacheTypeK = config.kvCacheTypeK;
             currentKvCacheTypeV = config.kvCacheTypeV;
             currentImageMaxTokens = config.imageMaxTokens;
+            currentVisionEncoderGpu = config.visionEncoderGpu;
             reloadRequested = false;   // 反映済み
 
             if (listener != null) {
@@ -1028,6 +1033,9 @@ public class ModelManager {
 
         // Per-image token budget for the multimodal projector (applied at next model init).
         llama.setImageMaxTokens(config.imageMaxTokens);
+
+        // Vision encoder (mtmd) backend: CPU by default; GPU only when enabled and the GPU backend is on.
+        llama.setMmprojUseGpu(config.visionEncoderGpu && nGpuLayers != 0);
 
         // Compute backend を JNI へ通知 (ADSP_LIBRARY_PATH 設定含む)
         String nativeLibDir = context.getApplicationInfo().nativeLibraryDir;
@@ -1634,6 +1642,7 @@ public class ModelManager {
         currentKvCacheTypeK = Integer.MIN_VALUE;
         currentKvCacheTypeV = Integer.MIN_VALUE;
         currentImageMaxTokens = Integer.MIN_VALUE;
+        currentVisionEncoderGpu = null;
         modelLoaded = false;
         // A full native teardown (llama.free() -> llama_jni_free) also frees the resident
         // embedding model, so the cached resident path is no longer valid. Clear it to force a

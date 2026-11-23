@@ -239,6 +239,9 @@ static int   g_n_gpu_layers = 0;
 static bool  g_use_mmap   = true;
 // Per-image token budget for mtmd (image_max_tokens); 0 = projector default. See setImageMaxTokens.
 static int   g_image_max_tokens = 0;
+// Run the multimodal projector on the GPU. Default false (CPU): the OpenCL image encode spikes GPU
+// memory past the OEM per-process kill threshold. See setMmprojUseGpu.
+static bool  g_mmproj_use_gpu = false;
 
 // DRY sequence breakers default - MUST match Java ConfigurationManager.Configuration.DEFAULT_DRY_SEQUENCE_BREAKERS
 static const char* DEFAULT_DRY_SEQUENCE_BREAKERS = "\\n,:,\",*";
@@ -753,11 +756,50 @@ static int32_t detokenize_with_resize(
 // cannot continue it; otherwise it masks tokens that start with a stray continuation byte.
 // Only the logits array is edited, so it works with both the manual chain and common_sampler.
 // ---------------------------------------------------------------------------
+// UTF-8 decoder state with the exact validity rules of utf8_to_utf16_lossy (and RFC 3629):
+// no C0/C1/F5-FF leads, and the first continuation byte after E0/ED/F0/F4 is range-limited
+// (E0: A0-BF, ED: 80-9F, F0: 90-BF, F4: 80-8F). The guard must use the same rules as the
+// decoder, otherwise it lets through a sequence that the decoder then turns into U+FFFD.
+struct Utf8State {
+    int need = 0;                 // continuation bytes still required by the current character
+    unsigned char lo = 0x80;      // allowed range of the next continuation byte
+    unsigned char hi = 0xBF;
+};
+
+// Feeds one byte. Returns false when the byte makes the sequence invalid (state is then undefined).
+static inline bool utf8_step(Utf8State & s, unsigned char b) {
+    if (s.need > 0) {
+        if (b < s.lo || b > s.hi) return false;
+        --s.need;
+        s.lo = 0x80;
+        s.hi = 0xBF;
+        return true;
+    }
+    if (b < 0x80) return true;
+    if (b >= 0xC2 && b <= 0xDF) { s.need = 1; return true; }
+    if (b == 0xE0) { s.need = 2; s.lo = 0xA0; return true; }
+    if ((b >= 0xE1 && b <= 0xEC) || b == 0xEE || b == 0xEF) { s.need = 2; return true; }
+    if (b == 0xED) { s.need = 2; s.hi = 0x9F; return true; }
+    if (b == 0xF0) { s.need = 3; s.lo = 0x90; return true; }
+    if (b >= 0xF1 && b <= 0xF3) { s.need = 3; return true; }
+    if (b == 0xF4) { s.need = 3; s.hi = 0x8F; return true; }
+    return false;  // stray continuation byte, or an invalid lead (C0, C1, F5-FF)
+}
+
+// Whether every byte of piece keeps the sequence valid starting from s (a trailing incomplete
+// character is fine: the next tokens complete it). On success s holds the state after piece.
+static inline bool utf8_feed(Utf8State & s, const std::string & piece) {
+    for (unsigned char b : piece) {
+        if (!utf8_step(s, b)) return false;
+    }
+    return true;
+}
+
 struct Utf8GuardTable {
     const llama_vocab * vocab = nullptr;
     std::vector<std::string> pieces;       // detokenized bytes per token (special=false)
-    std::vector<uint8_t>     lead_cont;    // number of leading continuation bytes (0..4)
-    std::vector<llama_token> cont_tokens;  // tokens with lead_cont > 0
+    std::vector<llama_token> cont_tokens;  // tokens whose first byte is a continuation byte
+    std::vector<llama_token> bad_tokens;   // tokens that are invalid from a clean state (masked when no char is open)
     std::vector<llama_token> fffd_tokens;  // tokens containing U+FFFD (EF BF BD) itself: always masked
 };
 static Utf8GuardTable g_utf8_guard_table;
@@ -771,7 +813,6 @@ static const Utf8GuardTable & utf8_guard_table_for(const llama_vocab * vocab) {
     t.vocab = vocab;
     const int n_vocab = llama_vocab_n_tokens(vocab);
     t.pieces.resize(n_vocab);
-    t.lead_cont.assign(n_vocab, 0);
     char buf[256];
     for (int id = 0; id < n_vocab; ++id) {
         int n = llama_token_to_piece(vocab, id, buf, (int) sizeof(buf), 0, false);
@@ -783,14 +824,14 @@ static const Utf8GuardTable & utf8_guard_table_for(const llama_vocab * vocab) {
             t.pieces[id].assign(buf, n);
         }
         const std::string & p = t.pieces[id];
-        uint8_t c = 0;
-        while (c < p.size() && c < 4 && utf8_is_cont(static_cast<unsigned char>(p[c]))) ++c;
-        t.lead_cont[id] = c;
-        if (c > 0) t.cont_tokens.push_back(id);
+        if (!p.empty() && utf8_is_cont(static_cast<unsigned char>(p[0]))) t.cont_tokens.push_back(id);
+        Utf8State clean;
+        if (!utf8_feed(clean, p)) t.bad_tokens.push_back(id);
         if (p.find("\xEF\xBF\xBD") != std::string::npos) t.fffd_tokens.push_back(id);
     }
     log_to_file("utf8 guard: table built n_vocab=" + std::to_string(n_vocab)
                 + " cont_tokens=" + std::to_string(t.cont_tokens.size())
+                + " bad_tokens=" + std::to_string(t.bad_tokens.size())
                 + " fffd_tokens=" + std::to_string(t.fffd_tokens.size()));
     return t;
 }
@@ -798,8 +839,10 @@ static const Utf8GuardTable & utf8_guard_table_for(const llama_vocab * vocab) {
 struct Utf8Guard {
     const Utf8GuardTable * table = nullptr;
     const llama_vocab * vocab = nullptr;
-    int need = 0;              // continuation bytes still required by the current character
+    Utf8State state;           // byte state of the text generated so far
     int n_masked_steps = 0;    // steps where an incomplete character constrained sampling
+    int n_invalid_accepts = 0; // sampled tokens that still broke the sequence (should stay 0)
+    std::vector<char> allowed; // scratch: allowed[id] while a character is open
 
     explicit Utf8Guard(const llama_vocab * v) : vocab(v) {
         try { table = &utf8_guard_table_for(v); } catch (...) { table = nullptr; }
@@ -813,37 +856,43 @@ struct Utf8Guard {
         const int n_vocab = (int) table->pieces.size();
         // The model can emit the replacement character as a token of its own; never allow it.
         for (llama_token id : table->fffd_tokens) logits[id] = -INFINITY;
-        if (need > 0) {
-            // Allowed: EOG, or a token whose first min(need, len) bytes are continuation bytes.
-            int n_allowed = 0;
-            for (llama_token id : table->cont_tokens) {
-                const int len = (int) table->pieces[id].size();
-                if (table->lead_cont[id] >= std::min(need, len) && std::isfinite(logits[id])) ++n_allowed;
-            }
-            if (n_allowed == 0) return;  // nothing valid to pick: leave sampling untouched
-            for (int id = 0; id < n_vocab; ++id) {
-                const int len = (int) table->pieces[id].size();
-                const bool ok = (len > 0 && table->lead_cont[id] >= std::min(need, len))
-                                || llama_vocab_is_eog(vocab, id);
-                if (!ok) logits[id] = -INFINITY;
-            }
-            ++n_masked_steps;
-        } else {
-            // No character in progress: a leading continuation byte would be a stray byte.
-            for (llama_token id : table->cont_tokens) logits[id] = -INFINITY;
+        if (state.need == 0) {
+            // No character in progress: forbid stray continuation bytes and invalid bytes.
+            for (llama_token id : table->bad_tokens) logits[id] = -INFINITY;
+            return;
         }
+        // A character is open: only a token that continues it validly (with the exact byte
+        // ranges) may follow, or end-of-generation (the incomplete tail is then dropped).
+        allowed.assign(n_vocab, 0);
+        int n_allowed = 0;
+        for (llama_token id : table->cont_tokens) {
+            Utf8State s = state;
+            if (utf8_feed(s, table->pieces[id]) && std::isfinite(logits[id])) {
+                allowed[id] = 1;
+                ++n_allowed;
+            }
+        }
+        if (n_allowed == 0) return;  // nothing valid to pick: leave sampling untouched
+        for (int id = 0; id < n_vocab; ++id) {
+            if (!allowed[id] && !llama_vocab_is_eog(vocab, id)) logits[id] = -INFINITY;
+        }
+        ++n_masked_steps;
     }
 
     // Advance the byte state with the sampled token.
     void accept(llama_token id) {
         if (!table || id < 0 || id >= (llama_token) table->pieces.size()) return;
+        Utf8State s = state;
+        if (utf8_feed(s, table->pieces[id])) {
+            state = s;
+            return;
+        }
+        // Should not happen once apply() ran; resync from a clean state so one bad token
+        // does not keep constraining the rest of the generation.
+        ++n_invalid_accepts;
+        state = Utf8State{};
         for (unsigned char b : table->pieces[id]) {
-            if (need > 0 && utf8_is_cont(b)) { --need; continue; }
-            if      (b < 0x80)           need = 0;
-            else if ((b & 0xE0) == 0xC0) need = 1;
-            else if ((b & 0xF0) == 0xE0) need = 2;
-            else if ((b & 0xF8) == 0xF0) need = 3;
-            else                         need = 0;  // stray continuation / invalid lead
+            if (!utf8_step(state, b)) state = Utf8State{};
         }
     }
 };
@@ -1673,7 +1722,7 @@ static std::string initialize_optional_multimodal_support_locked(
         log_to_file(start_ss.str());
 
         mtmd_context_params mparams_mtmd = mtmd_context_params_default();
-        mparams_mtmd.use_gpu = g_n_gpu_layers != 0;
+        mparams_mtmd.use_gpu = g_n_gpu_layers != 0 && g_mmproj_use_gpu;
         mparams_mtmd.print_timings = false;
         mparams_mtmd.n_threads = g_n_threads;
         mparams_mtmd.warmup = true;
@@ -3124,6 +3173,17 @@ Java_com_micklab_llama_LlamaNative_setImageMaxTokens(
     log_to_file("setImageMaxTokens: image_max_tokens=" + std::to_string(g_image_max_tokens));
 }
 
+// ---------------- JNI: setMmprojUseGpu ----------------
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_micklab_llama_LlamaNative_setMmprojUseGpu(
+        JNIEnv *, jobject, jboolean useGpu
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_mmproj_use_gpu = (useGpu == JNI_TRUE);
+    log_to_file(std::string("setMmprojUseGpu: mmproj_use_gpu=") + (g_mmproj_use_gpu ? "true" : "false"));
+}
+
 // ---------------- JNI: applyLoraAdapter ----------------
 // 現在ロード中のモデル/コンテキストへ LoRA アダプタGGUF を適用する。
 // 既に別アダプタ適用中なら差し替える。成功="", 失敗=エラーメッセージ。
@@ -4512,8 +4572,9 @@ static jstring generate_locked(
     }
 
     log_generation_perf("generate");
-    if (utf8_guard.n_masked_steps > 0) {
-        log_to_file("generate: utf8 guard constrained " + std::to_string(utf8_guard.n_masked_steps) + " step(s)");
+    if (utf8_guard.n_masked_steps > 0 || utf8_guard.n_invalid_accepts > 0) {
+        log_to_file("generate: utf8 guard constrained " + std::to_string(utf8_guard.n_masked_steps) + " step(s)"
+                    + " invalid_accepts=" + std::to_string(utf8_guard.n_invalid_accepts));
     }
     if (use_spec) {
         // llama_perf attributes MTP's multi-token draft batches to prompt-eval (n_p_eval),

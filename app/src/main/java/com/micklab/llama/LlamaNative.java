@@ -107,6 +107,9 @@ public class LlamaNative {
     // larger images are downscaled to fit. 0 = projector default. Applied at the next initWithMmproj.
     public native void setImageMaxTokens(int maxTokens);
 
+    /** Run the multimodal projector (Vision encoder) on the GPU (only when GPU layers are enabled). Applied at the next init. */
+    public native void setMmprojUseGpu(boolean useGpu);
+
     // LoRA アダプタ（別ファイルのアダプタGGUF）を現在のモデル/コンテキストへ適用する。
     // 戻り値: 成功="", 失敗=エラーメッセージ。scale は実効強度（通常 1.0）。
     public native String applyLoraAdapter(String adapterPath, float scale);

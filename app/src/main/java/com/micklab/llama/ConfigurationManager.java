@@ -125,6 +125,11 @@ public class ConfigurationManager {
         // a small n_ctx; the projector downscales the image to fit this budget instead.
         // 0 = use the projector's own default (GGUF metadata). Applied at model load.
         public int imageMaxTokens;
+        // Run the multimodal projector (Vision encoder, mtmd) on the GPU. Default false = CPU:
+        // on the Adreno/OpenCL backend the image encode spikes GPU memory by ~3 GB, which makes the
+        // OEM per-process memory killer (ZTE DEBUG_HUGE_PROC, ~3.84 GB) SIGKILL the server.
+        // Only effective when the GPU backend is enabled. Applied at model load.
+        public boolean visionEncoderGpu;
 
         // Compute backend
         // 0=CPU  1=GPU  (NPU/HTP removed — Qualcomm Hexagon SDK redistribution restriction)
@@ -185,6 +190,7 @@ public class ConfigurationManager {
             useMmap = true;
             nCtxAutoExpand = true;
             imageMaxTokens = DEFAULT_IMAGE_MAX_TOKENS;
+            visionEncoderGpu = false;
 
             // Backend defaults
             backendType = BACKEND_CPU;
@@ -263,6 +269,7 @@ public class ConfigurationManager {
             json.put("useMmap", useMmap);
             json.put("nCtxAutoExpand", nCtxAutoExpand);
             json.put("imageMaxTokens", imageMaxTokens);
+            json.put("visionEncoderGpu", visionEncoderGpu);
 
             // Compute backend
             json.put("backendType", backendType);
@@ -347,6 +354,7 @@ public class ConfigurationManager {
             config.useMmap = json.optBoolean("useMmap", true);
         config.nCtxAutoExpand = json.optBoolean("nCtxAutoExpand", true);
             config.imageMaxTokens = Math.max(0, json.optInt("imageMaxTokens", DEFAULT_IMAGE_MAX_TOKENS));
+            config.visionEncoderGpu = json.optBoolean("visionEncoderGpu", false);
 
             // Compute backend (backward compat: default CPU)
             config.backendType = json.optInt("backendType", Configuration.BACKEND_CPU);

@@ -178,6 +178,9 @@ public class SettingsActivity extends Activity {
     private Switch nCtxAutoExpandSwitch;
     // Compute backend (backendType is derived from this switch; off = CPU, on = GPU)
     private Switch  gpuEnabledSwitch;
+    // Vision encoder (mtmd projector) on GPU. Default OFF = CPU; only effective while the GPU is enabled.
+    private Switch  visionEncoderGpuSwitch;
+    private TextView visionEncoderGpuLabel;
 
     // New prompt settings
     private EditText systemPromptInput;
@@ -449,6 +452,8 @@ public class SettingsActivity extends Activity {
         };
         if (gpuEnabledSwitch != null) gpuEnabledSwitch.setOnCheckedChangeListener(backendToggleListener);
 
+        visionEncoderGpuSwitch = findViewById(R.id.visionEncoderGpuSwitch);
+        visionEncoderGpuLabel = findViewById(R.id.visionEncoderGpuLabel);
         gpuLayersSeekBar = findViewById(R.id.gpuLayersSeekBar);
         gpuLayersValue = findViewById(R.id.gpuLayersValue);
         gpuLayersSeekBar.setMax(40);
@@ -775,6 +780,9 @@ public class SettingsActivity extends Activity {
 
         if (gpuLayersSeekBar != null) gpuLayersSeekBar.setEnabled(offloadActive);
         if (gpuLayersValue   != null) gpuLayersValue.setEnabled(offloadActive);
+        // Vision エンコーダの GPU 実行は GPU 有効時のみ意味がある（OFF のときは常に CPU）。
+        if (visionEncoderGpuSwitch != null) visionEncoderGpuSwitch.setEnabled(offloadActive);
+        if (visionEncoderGpuLabel  != null) visionEncoderGpuLabel.setEnabled(offloadActive);
     }
 
     private void openDocuments() {
@@ -1002,6 +1010,7 @@ public class SettingsActivity extends Activity {
             case "Compute Backend (off = CPU):": return "計算バックエンド (OFF = CPU):";
             case "GPU (OpenCL/Adreno) Enabled:": return "GPU (OpenCL/Adreno) 有効:";
             case "Offload Layers (GPU):": return "オフロード層 (GPU):";
+            case "Vision Encoder on GPU:": return "Vision エンコーダを GPU で実行:";
             case "Temperature (temp):": return "温度 (temp):";
             case "Top-p (top_p):": return "Top-p (top_p):";
             case "Top-k (top_k):": return "Top-k (top_k):";
@@ -1637,6 +1646,7 @@ public class SettingsActivity extends Activity {
         // Compute backend: backendType を GPU トグルへ分解 (GPU=ON, それ以外=OFF=CPU)
         boolean gpuOn = (config.backendType == ConfigurationManager.Configuration.BACKEND_GPU);
         if (gpuEnabledSwitch != null) gpuEnabledSwitch.setChecked(gpuOn);
+        if (visionEncoderGpuSwitch != null) visionEncoderGpuSwitch.setChecked(config.visionEncoderGpu);
         updateBackendDependentUi();
 
         // GPU stabilization
@@ -1892,6 +1902,9 @@ public class SettingsActivity extends Activity {
         config.enableThinking = enableThinkingSwitch.isChecked();
         if (useMmapSwitch != null) {
             config.useMmap = useMmapSwitch.isChecked();
+        }
+        if (visionEncoderGpuSwitch != null) {
+            config.visionEncoderGpu = visionEncoderGpuSwitch.isChecked();
         }
 
         // Compute backend: GPU トグルから backendType を導出 (OFF = CPU)
