@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 #include <mutex>
@@ -742,6 +743,110 @@ static int32_t detokenize_with_resize(
     out_text.resize(n_chars);
     return n_chars;
 }
+
+// ---------------------------------------------------------------------------
+// UTF-8 continuity guard (sampling-time constraint).
+// Byte-level BPE splits rare characters into a multi-byte token plus byte-fallback tokens
+// (e.g. 黒 = [E9 BB][92]). On the OpenCL backend the model sometimes picks a non-continuation
+// token after the first part, leaving an incomplete sequence that later decodes to U+FFFD.
+// While a character is incomplete, this guard masks (logit = -inf) every token whose bytes
+// cannot continue it; otherwise it masks tokens that start with a stray continuation byte.
+// Only the logits array is edited, so it works with both the manual chain and common_sampler.
+// ---------------------------------------------------------------------------
+struct Utf8GuardTable {
+    const llama_vocab * vocab = nullptr;
+    std::vector<std::string> pieces;       // detokenized bytes per token (special=false)
+    std::vector<uint8_t>     lead_cont;    // number of leading continuation bytes (0..4)
+    std::vector<llama_token> cont_tokens;  // tokens with lead_cont > 0
+    std::vector<llama_token> fffd_tokens;  // tokens containing U+FFFD (EF BF BD) itself: always masked
+};
+static Utf8GuardTable g_utf8_guard_table;
+
+static inline bool utf8_is_cont(unsigned char b) { return (b & 0xC0) == 0x80; }
+
+static const Utf8GuardTable & utf8_guard_table_for(const llama_vocab * vocab) {
+    Utf8GuardTable & t = g_utf8_guard_table;
+    if (t.vocab == vocab && !t.pieces.empty()) return t;
+    t = Utf8GuardTable{};
+    t.vocab = vocab;
+    const int n_vocab = llama_vocab_n_tokens(vocab);
+    t.pieces.resize(n_vocab);
+    t.lead_cont.assign(n_vocab, 0);
+    char buf[256];
+    for (int id = 0; id < n_vocab; ++id) {
+        int n = llama_token_to_piece(vocab, id, buf, (int) sizeof(buf), 0, false);
+        if (n < 0) {
+            std::string big(static_cast<size_t>(-n), '\0');
+            n = llama_token_to_piece(vocab, id, &big[0], (int) big.size(), 0, false);
+            if (n > 0) { big.resize(n); t.pieces[id] = std::move(big); }
+        } else if (n > 0) {
+            t.pieces[id].assign(buf, n);
+        }
+        const std::string & p = t.pieces[id];
+        uint8_t c = 0;
+        while (c < p.size() && c < 4 && utf8_is_cont(static_cast<unsigned char>(p[c]))) ++c;
+        t.lead_cont[id] = c;
+        if (c > 0) t.cont_tokens.push_back(id);
+        if (p.find("\xEF\xBF\xBD") != std::string::npos) t.fffd_tokens.push_back(id);
+    }
+    log_to_file("utf8 guard: table built n_vocab=" + std::to_string(n_vocab)
+                + " cont_tokens=" + std::to_string(t.cont_tokens.size())
+                + " fffd_tokens=" + std::to_string(t.fffd_tokens.size()));
+    return t;
+}
+
+struct Utf8Guard {
+    const Utf8GuardTable * table = nullptr;
+    const llama_vocab * vocab = nullptr;
+    int need = 0;              // continuation bytes still required by the current character
+    int n_masked_steps = 0;    // steps where an incomplete character constrained sampling
+
+    explicit Utf8Guard(const llama_vocab * v) : vocab(v) {
+        try { table = &utf8_guard_table_for(v); } catch (...) { table = nullptr; }
+    }
+
+    // Mask the logits of the next position (idx -1) before sampling.
+    void apply(llama_context * ctx) {
+        if (!table || table->pieces.empty()) return;
+        float * logits = llama_get_logits_ith(ctx, -1);
+        if (!logits) return;
+        const int n_vocab = (int) table->pieces.size();
+        // The model can emit the replacement character as a token of its own; never allow it.
+        for (llama_token id : table->fffd_tokens) logits[id] = -INFINITY;
+        if (need > 0) {
+            // Allowed: EOG, or a token whose first min(need, len) bytes are continuation bytes.
+            int n_allowed = 0;
+            for (llama_token id : table->cont_tokens) {
+                const int len = (int) table->pieces[id].size();
+                if (table->lead_cont[id] >= std::min(need, len) && std::isfinite(logits[id])) ++n_allowed;
+            }
+            if (n_allowed == 0) return;  // nothing valid to pick: leave sampling untouched
+            for (int id = 0; id < n_vocab; ++id) {
+                const int len = (int) table->pieces[id].size();
+                const bool ok = (len > 0 && table->lead_cont[id] >= std::min(need, len))
+                                || llama_vocab_is_eog(vocab, id);
+                if (!ok) logits[id] = -INFINITY;
+            }
+            ++n_masked_steps;
+        } else {
+            // No character in progress: a leading continuation byte would be a stray byte.
+            for (llama_token id : table->cont_tokens) logits[id] = -INFINITY;
+        }
+    }
+
+    // Advance the byte state with the sampled token.
+    void accept(llama_token id) {
+        if (!table || id < 0 || id >= (llama_token) table->pieces.size()) return;
+        for (unsigned char b : table->pieces[id]) {
+            if (need > 0 && utf8_is_cont(b)) { --need; continue; }
+            if      (b < 0x80)           need = 0;
+            else if ((b & 0xE0) == 0xC0) need = 1;
+            else if ((b & 0xF0) == 0xE0) need = 2;
+            else if ((b & 0xF8) == 0xF0) need = 3;
+            else                         need = 0;  // stray continuation / invalid lead
+        }
+    }
+};
 
 // Build a context-free common_batch from a llama_batch. The resulting batch has no
 // llama_batch_ext and cannot be used with get()/llama_process(), but is valid for
@@ -4270,6 +4375,7 @@ static jstring generate_locked(
     std::vector<llama_token> out_tokens;
     out_tokens.reserve(max_tokens);
     std::string prev_text;
+    Utf8Guard utf8_guard(vocab);
     bool logged_first_sampling_step = false;
     bool logged_first_decode_step = false;
     const int64_t gen_wall_t0_us = ggml_time_us();  // wall-clock start of generation
@@ -4289,6 +4395,7 @@ static jstring generate_locked(
             if (spec_bootstrap) {
                 // First output token: sample from the prefill logits. Its id seeds the
                 // first speculative step (which decodes it), so it is NOT decoded here.
+                utf8_guard.apply(g_ctx);
                 id = common_sampler_sample(gsmpl.get(), g_ctx, -1);
                 common_sampler_accept(gsmpl.get(), id, true);
                 spec_id_last = id;
@@ -4306,6 +4413,7 @@ static jstring generate_locked(
                 id = spec_buf[spec_pos++];
             }
         } else {
+            utf8_guard.apply(g_ctx);
             id = gsmpl ? common_sampler_sample(gsmpl.get(), g_ctx, -1)
                        : llama_sampler_sample(smpl, g_ctx, -1);
             if (gsmpl) {
@@ -4314,6 +4422,7 @@ static jstring generate_locked(
                 llama_sampler_accept(smpl, id);
             }
         }
+        utf8_guard.accept(id);
         if (i == 0) {
             log_to_file("generate: first token sampled id=" + std::to_string(id));
         }
@@ -4403,6 +4512,9 @@ static jstring generate_locked(
     }
 
     log_generation_perf("generate");
+    if (utf8_guard.n_masked_steps > 0) {
+        log_to_file("generate: utf8 guard constrained " + std::to_string(utf8_guard.n_masked_steps) + " step(s)");
+    }
     if (use_spec) {
         // llama_perf attributes MTP's multi-token draft batches to prompt-eval (n_p_eval),
         // so its gen tok/s reads ~0. Report/store the real wall-clock generation speed.
@@ -4597,14 +4709,17 @@ static jstring generate_openai_chat_completion_locked(
         std::vector<llama_token> out_tokens;
         out_tokens.reserve(std::max(max_tokens, 1));
         std::string prev_text;
+        Utf8Guard utf8_guard(vocab);
 
         for (int i = 0; i < max_tokens; ++i) {
             if (g_cancel_generation.load()) {
                 break;
             }
 
+            utf8_guard.apply(g_ctx);
             const llama_token id = common_sampler_sample(sampler.get(), g_ctx, -1);
             common_sampler_accept(sampler.get(), id, true);
+            utf8_guard.accept(id);
             if (llama_vocab_is_eog(vocab, id)) {
                 break;
             }
