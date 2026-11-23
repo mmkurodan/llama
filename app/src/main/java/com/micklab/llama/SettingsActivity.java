@@ -265,6 +265,24 @@ public class SettingsActivity extends Activity {
         }
     };
     private volatile int lastDownloadProgress = 0;
+    private DownloadUi.ProgressPopup downloadPopup;
+    /** Pending downloads (with sizes) resolved for the model action currently being confirmed. */
+    private java.util.List<ModelManager.PendingDownload> lastPendingDownloads = new java.util.ArrayList<>();
+    private final ModelManager.DownloadStateListener inlineDownloadListener = state -> {
+        if (!state.active) {
+            return;
+        }
+        int percent = state.percent;
+        if (percent == lastDownloadProgress) {
+            return;
+        }
+        lastDownloadProgress = percent;
+        runOnUiThread(() -> {
+            modelProgressBar.setIndeterminate(false);
+            modelProgressBar.setProgress(percent);
+            modelFileInfo.setText(localizedText("モデルをダウンロード中... ", "Downloading model... ") + percent + "%");
+        });
+    };
     private ConnectivityManager connectivityManager;
     private boolean networkCallbackRegistered = false;
 
@@ -313,23 +331,15 @@ public class SettingsActivity extends Activity {
 
         // Register download progress listener after views are initialized to avoid NPE if native
         // code emits progress immediately.
-        modelManager.getLlama().setDownloadProgressListener(percent -> {
-            if (percent == lastDownloadProgress) {
-                return;
-            }
-            lastDownloadProgress = percent;
-            runOnUiThread(() -> {
-                modelProgressBar.setProgress(percent);
-                modelFileInfo.setText(localizedText("モデルをダウンロード中... ", "Downloading model... ") + percent + "%");
-            });
-        });
+        modelManager.addDownloadStateListener(inlineDownloadListener);
+        downloadPopup = new DownloadUi.ProgressPopup(this, modelManager);
         
         loadConfigList();
         
         // Load configuration from intent or default
         String configName = getIntent().getStringExtra(EXTRA_CONFIG_NAME);
         if (configName == null || configName.isEmpty()) {
-            configName = "default";
+            configName = configManager.getInitialConfigName();
         }
         loadConfigurationByName(configName);
     }
@@ -3209,6 +3219,23 @@ public class SettingsActivity extends Activity {
             showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
+        final String confirmUrl = projector.getDownloadUrl();
+        new Thread(() -> {
+            ModelManager.PendingDownload pd = new ModelManager.PendingDownload(projector.getFilename(), confirmUrl, true);
+            pd.sizeBytes = modelManager.fetchRemoteSize(confirmUrl);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                DownloadUi.showConfirmDialog(this, java.util.Collections.singletonList(pd),
+                        () -> startProjectorFileDownload(projector), null);
+            });
+        }, "mmproj-size-check").start();
+    }
+
+    private void startProjectorFileDownload(HuggingFaceApiClient.GgufFileInfo projector) {
+        if (modelManager.isBusy()) {
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
+            return;
+        }
         final String url = projector.getDownloadUrl();
         final String pairedModelUrl = modelUrlInput != null ? modelUrlInput.getText().toString().trim() : "";
         modelFileInfo.setText(localizedText("mmproj をダウンロード中: ", "Downloading mmproj: ")
@@ -3978,7 +4005,11 @@ public class SettingsActivity extends Activity {
     private void startModelAction(boolean loadAfterDownload, Runnable onCancel) {
         ConfigurationManager.Configuration config = getConfigFromUI();
         if (requiresRemoteDownload(config)) {
-            showRemoteDownloadDecisionDialog(loadAfterDownload, onCancel);
+            // Look up the files and their sizes first so the dialog can show them.
+            DownloadUi.resolvePendingAsync(this, modelManager, config, true, pending -> {
+                lastPendingDownloads = pending;
+                showRemoteDownloadDecisionDialog(loadAfterDownload, onCancel);
+            });
             return;
         }
 
@@ -3999,6 +4030,13 @@ public class SettingsActivity extends Activity {
         }
 
         String mmprojName = extractFilenameFromUrl(config.multimodalProjectorUrl);
+        if (lastPendingDownloads != null) {
+            for (ModelManager.PendingDownload d : lastPendingDownloads) {
+                if (d.projector && d.sizeBytes >= 0) {
+                    mmprojName = mmprojName + ", " + ModelManager.formatDownloadSize(d.sizeBytes);
+                }
+            }
+        }
         new AlertDialog.Builder(this)
                 .setTitle(localizedText("mmproj をダウンロード", "Download mmproj"))
                 .setMessage(localizedText("このマルチモーダルモデルは mmproj (", "This multimodal model also uses an mmproj (")
@@ -4054,6 +4092,10 @@ public class SettingsActivity extends Activity {
             message = localizedText(
                     "この操作では Web からモデルをダウンロードします。ダウンロード後にすぐロードしますか？",
                     "This will download the model from the web. Load it immediately after the download?");
+        }
+
+        if (lastPendingDownloads != null && !lastPendingDownloads.isEmpty()) {
+            message = message + "\n\n" + DownloadUi.describe(this, lastPendingDownloads);
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this)
@@ -4667,18 +4709,25 @@ public class SettingsActivity extends Activity {
         updateApiServerUrlViews();
         // 選択中の LoRA アダプタを表示へ反映
         updateLoraAdapterInfoDisplay();
+        if (downloadPopup != null) {
+            downloadPopup.start();
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         unregisterNetworkCallback();
+        if (downloadPopup != null) {
+            downloadPopup.stop();
+        }
     }
 
     @Override
     protected void onDestroy() {
         if (modelManager != null) {
             modelManager.removeBusyStateListener(busyStateListener);
+            modelManager.removeDownloadStateListener(inlineDownloadListener);
         }
         super.onDestroy();
     }

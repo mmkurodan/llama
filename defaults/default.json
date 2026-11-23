@@ -1,6 +1,6 @@
 {
   "name": "default",
-  "description": "Light and fast LLM model. Recommended for the first model to try on any device.",
+  "description": "Basic LLM model. Recommended for general purposes.",
   "modelUrl": "https:\/\/huggingface.co\/vinhnx90\/gemma-3-1b-thinking-v2-Q4_K_M-GGUF\/resolve\/main\/gemma-3-1b-thinking-v2-q4_k_m.gguf?download=true",
   "nCtx": 2048,
   "nThreads": 4,
@@ -34,6 +34,8 @@
   "enableThinking": true,
   "useMmap": true,
   "nCtxAutoExpand": true,
+  "imageMaxTokens": 1024,
+  "visionEncoderGpu": false,
   "backendType": 0,
   "npuEnabled": false,
   "systemPrompt": "",

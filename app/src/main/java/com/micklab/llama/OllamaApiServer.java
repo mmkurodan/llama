@@ -98,6 +98,8 @@ public class OllamaApiServer {
         contentTypes.put("icon-512.png", "image/png");
         contentTypes.put("icon-512-maskable.png", "image/png");
         contentTypes.put("swagger.html", "text/html; charset=utf-8");
+        // App extensions for the WebUI: download confirm/progress + UI translation
+        contentTypes.put("app-ext.js", "application/javascript; charset=utf-8");
         WEBUI_CONTENT_TYPES = Collections.unmodifiableMap(contentTypes);
     }
 
@@ -1393,6 +1395,12 @@ public class OllamaApiServer {
                     handleSlots(outputStream, queryParams);
                 } else if ("/api/diagnostics".equals(path)) {
                     handleDiagnostics(outputStream, queryParams);
+                } else if ("/api/download/check".equals(path)) {
+                    handleDownloadCheck(outputStream, queryParams);
+                } else if ("/api/download/status".equals(path)) {
+                    handleDownloadStatus(outputStream);
+                } else if ("/api/ui/language".equals(path)) {
+                    handleUiLanguage(outputStream);
                 } else if (isWebUiPath(path)) {
                     handleWebUi(outputStream, path);
                 } else {
@@ -1487,6 +1495,10 @@ public class OllamaApiServer {
         }
 
         List<String> configs = configManager.listConfigurations();
+        String initial = configManager.getInitialConfigName();
+        if (configs.contains(initial)) {
+            return initial;
+        }
         if (configs.contains(DEFAULT_CONFIG_NAME)) {
             return DEFAULT_CONFIG_NAME;
         }
@@ -2640,6 +2652,66 @@ public class OllamaApiServer {
         }
         if (request.has("mirostat_eta")) {
             config.mirostatEta = request.optDouble("mirostat_eta", config.mirostatEta);
+        }
+    }
+
+    /**
+     * WebUI pre-flight: would using {@code model} download files first? Lists each file with its
+     * size so the WebUI can ask the user before sending the request that triggers the download.
+     */
+    private void handleDownloadCheck(OutputStream outputStream, Map<String, String> queryParams) throws IOException {
+        try {
+            String model = resolveRequestedModel(queryParams.get("model"));
+            List<ModelManager.PendingDownload> pending = modelManager.getPendingDownloads(model, true);
+            modelManager.resolveDownloadSizes(pending);
+            JSONObject response = new JSONObject();
+            response.put("model", model);
+            response.put("needs_download", !pending.isEmpty());
+            JSONArray files = new JSONArray();
+            for (ModelManager.PendingDownload d : pending) {
+                JSONObject f = new JSONObject();
+                f.put("name", d.fileName);
+                f.put("size", d.sizeBytes);
+                f.put("projector", d.projector);
+                files.put(f);
+            }
+            response.put("files", files);
+            response.put("total_bytes", ModelManager.totalDownloadBytes(pending));
+            ModelManager.DownloadState state = modelManager.getDownloadState();
+            response.put("download_active", state.active);
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 500, "Failed to build download check");
+        }
+    }
+
+    /** Progress of the model download in progress (polled by the WebUI progress popup). */
+    private void handleDownloadStatus(OutputStream outputStream) throws IOException {
+        try {
+            ModelManager.DownloadState state = modelManager.getDownloadState();
+            JSONObject response = new JSONObject();
+            response.put("active", state.active);
+            response.put("file", state.fileName != null ? state.fileName : "");
+            response.put("model", state.configName != null ? state.configName : "");
+            response.put("percent", state.percent);
+            response.put("total_bytes", state.totalBytes);
+            response.put("downloaded_bytes", state.downloadedBytes());
+            response.put("busy", modelManager.isBusy());
+            response.put("model_loaded", modelManager.isModelLoaded());
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 500, "Failed to build download status");
+        }
+    }
+
+    /** The app's display language, so the WebUI can follow it. */
+    private void handleUiLanguage(OutputStream outputStream) throws IOException {
+        try {
+            JSONObject response = new JSONObject();
+            response.put("language", AppLanguageManager.getOrInitDisplayLanguage(context));
+            sendJsonResponse(outputStream, 200, response.toString());
+        } catch (JSONException e) {
+            sendErrorResponse(outputStream, 500, "Failed to read language");
         }
     }
 

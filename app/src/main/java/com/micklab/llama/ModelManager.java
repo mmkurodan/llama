@@ -20,7 +20,12 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -260,6 +265,244 @@ public class ModelManager {
         if (savedResidentEmbd != null && !savedResidentEmbd.trim().isEmpty()) {
             residentEmbeddingConfigName = savedResidentEmbd.trim();
         }
+
+        // Single native progress sink; fanned out to UI listeners (app popup, Settings, WebUI status).
+        llama.setDownloadProgressListener(this::onNativeDownloadProgress);
+    }
+
+    // ---- Download confirmation / progress -------------------------------------------------------
+
+    /** One remote file that a configuration still needs to download before it can load. */
+    public static final class PendingDownload {
+        public final String fileName;
+        public final String url;
+        public final boolean projector;
+        /** Remote size in bytes, or -1 when unknown (filled by {@link #resolveDownloadSizes}). */
+        public volatile long sizeBytes = -1;
+
+        public PendingDownload(String fileName, String url, boolean projector) {
+            this.fileName = fileName;
+            this.url = url;
+            this.projector = projector;
+        }
+    }
+
+    /** Snapshot of the model download currently in progress (immutable). */
+    public static final class DownloadState {
+        public static final DownloadState IDLE = new DownloadState(false, null, 0, -1, null);
+        public final boolean active;
+        public final String fileName;
+        public final int percent;
+        public final long totalBytes;
+        /** Configuration whose load triggered the download, or null (standalone download). */
+        public final String configName;
+
+        DownloadState(boolean active, String fileName, int percent, long totalBytes, String configName) {
+            this.active = active;
+            this.fileName = fileName;
+            this.percent = percent;
+            this.totalBytes = totalBytes;
+            this.configName = configName;
+        }
+
+        public long downloadedBytes() {
+            return totalBytes > 0 ? totalBytes * Math.max(0, Math.min(100, percent)) / 100 : -1;
+        }
+    }
+
+    public interface DownloadStateListener {
+        /** Called on the download thread; post to the UI thread as needed. */
+        void onDownloadStateChanged(DownloadState state);
+    }
+
+    private final CopyOnWriteArrayList<DownloadStateListener> downloadStateListeners = new CopyOnWriteArrayList<>();
+    private volatile DownloadState downloadState = DownloadState.IDLE;
+    private volatile String downloadingConfigName;
+    private final Map<String, Long> remoteSizeCache = new ConcurrentHashMap<>();
+
+    public DownloadState getDownloadState() {
+        return downloadState;
+    }
+
+    public void addDownloadStateListener(DownloadStateListener l) {
+        if (l != null) {
+            downloadStateListeners.addIfAbsent(l);
+        }
+    }
+
+    public void removeDownloadStateListener(DownloadStateListener l) {
+        if (l != null) {
+            downloadStateListeners.remove(l);
+        }
+    }
+
+    private void publishDownloadState(DownloadState state) {
+        downloadState = state;
+        for (DownloadStateListener l : downloadStateListeners) {
+            try {
+                l.onDownloadStateChanged(state);
+            } catch (Throwable t) {
+                Log.w(TAG, "Download state listener failed", t);
+            }
+        }
+    }
+
+    private void onNativeDownloadProgress(int percent) {
+        DownloadState cur = downloadState;
+        if (!cur.active || cur.percent == percent) {
+            return;
+        }
+        publishDownloadState(new DownloadState(true, cur.fileName, percent, cur.totalBytes, cur.configName));
+    }
+
+    /**
+     * Remote files {@code configName} still needs (model incl. missing split shards, and — when
+     * {@code includeProjector} — a configured remote mmproj). Empty when everything is on the
+     * device or the profile uses only imported local files. Does no network I/O.
+     */
+    public List<PendingDownload> getPendingDownloads(String configName, boolean includeProjector) {
+        ConfigurationManager.Configuration config;
+        try {
+            config = configManager.loadConfiguration(normalizeConfigName(configName));
+        } catch (IOException | JSONException e) {
+            return new ArrayList<>();
+        }
+        return getPendingDownloads(config, includeProjector);
+    }
+
+    /** Same as {@link #getPendingDownloads(String, boolean)} for an (unsaved) configuration object. */
+    public List<PendingDownload> getPendingDownloads(ConfigurationManager.Configuration config, boolean includeProjector) {
+        List<PendingDownload> result = new ArrayList<>();
+        if (config == null) {
+            return result;
+        }
+        String modelUrl = config.modelUrl;
+        String filename = extractFilenameFromUrl(modelUrl);
+        if (filename != null && !filename.isEmpty() && ModelFileHelper.isRemoteModelReference(modelUrl)) {
+            File destFile = new File(getModelStorageDir(), filename);
+            boolean missing = !destFile.exists() || destFile.length() == 0;
+            Matcher split = SPLIT_GGUF_PATTERN.matcher(filename);
+            if (split.matches()) {
+                int count = Integer.parseInt(split.group(3));
+                String token = "-" + split.group(2) + "-of-" + split.group(3) + ".gguf";
+                for (int i = 1; i <= count; i++) {
+                    String shardToken = String.format(Locale.US, "-%05d-of-%s.gguf", i, split.group(3));
+                    String shardName = filename.replace(token, shardToken);
+                    File shard = new File(getModelStorageDir(), shardName);
+                    if (!shard.exists() || shard.length() == 0) {
+                        result.add(new PendingDownload(shardName, modelUrl.replace(token, shardToken), false));
+                    }
+                }
+            } else if (missing) {
+                result.add(new PendingDownload(filename, modelUrl, false));
+            }
+        }
+        if (includeProjector) {
+            MultimodalProjectorResolution projector = resolveMultimodalProjectorPath(config, false, false);
+            String mmprojUrl = config.multimodalProjectorUrl;
+            if (projector.errorMessage == null && projector.projectorPath != null
+                    && mmprojUrl != null && ModelFileHelper.isRemoteModelReference(mmprojUrl)) {
+                File mmproj = new File(projector.projectorPath);
+                if (!mmproj.exists() || mmproj.length() == 0) {
+                    result.add(new PendingDownload(mmproj.getName(), mmprojUrl.trim(), true));
+                }
+            }
+        }
+        return result;
+    }
+
+    /** Fill {@link PendingDownload#sizeBytes} via HTTP HEAD. Blocking — call off the UI thread. */
+    public void resolveDownloadSizes(List<PendingDownload> downloads) {
+        if (downloads == null) {
+            return;
+        }
+        for (PendingDownload d : downloads) {
+            d.sizeBytes = fetchRemoteSize(d.url);
+        }
+    }
+
+    /** Sum of known sizes, or -1 if any size is unknown. */
+    public static long totalDownloadBytes(List<PendingDownload> downloads) {
+        long total = 0;
+        for (PendingDownload d : downloads) {
+            if (d.sizeBytes < 0) {
+                return -1;
+            }
+            total += d.sizeBytes;
+        }
+        return total;
+    }
+
+    /**
+     * Size of a remote file in bytes, or -1 when it cannot be determined. Hugging Face "resolve"
+     * URLs redirect to a CDN; the first response already carries {@code X-Linked-Size}.
+     */
+    public long fetchRemoteSize(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return -1;
+        }
+        Long cached = remoteSizeCache.get(url);
+        if (cached != null) {
+            return cached;
+        }
+        long size = -1;
+        String current = url.trim();
+        for (int hop = 0; hop < 6 && current != null; hop++) {
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(current).openConnection();
+                conn.setInstanceFollowRedirects(false);
+                conn.setRequestMethod("HEAD");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("Accept-Encoding", "identity");
+                int code = conn.getResponseCode();
+                String linked = conn.getHeaderField("X-Linked-Size");
+                if (linked != null) {
+                    try {
+                        size = Long.parseLong(linked.trim());
+                        break;
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                if (code >= 300 && code < 400) {
+                    String location = conn.getHeaderField("Location");
+                    current = location != null ? new URL(new URL(current), location).toString() : null;
+                    continue;
+                }
+                if (code >= 200 && code < 300) {
+                    long len = conn.getContentLengthLong();
+                    size = len > 0 ? len : -1;
+                }
+                break;
+            } catch (Exception e) {
+                Log.w(TAG, "HEAD failed for " + current + ": " + e);
+                break;
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+        }
+        if (size > 0) {
+            remoteSizeCache.put(url, size);
+        }
+        return size;
+    }
+
+    /** "1.23 GB" / "456 MB" / "?" (unknown). */
+    public static String formatDownloadSize(long bytes) {
+        if (bytes < 0) {
+            return "?";
+        }
+        double v = bytes;
+        String[] units = {"B", "KB", "MB", "GB", "TB"};
+        int u = 0;
+        while (v >= 1000 && u < units.length - 1) {
+            v /= 1000;
+            u++;
+        }
+        return u == 0 ? (bytes + " B") : String.format(Locale.US, v >= 100 ? "%.0f %s" : "%.2f %s", v, units[u]);
     }
     
     public static synchronized ModelManager getInstance(Context context) {
@@ -549,6 +792,7 @@ public class ModelManager {
 
     public boolean downloadConfigurationAssets(String configName, boolean allowProjectorDownload) {
         boolean shouldClearPendingLoad = false;
+        downloadingConfigName = configName;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
             DiagnosticsLogger.logEvent(context, "model-download", "Downloading configuration assets: " + configName);
@@ -642,6 +886,7 @@ public class ModelManager {
             boolean allowProjectorDownload) {
         lastDisabledMmprojMessage = null;
         boolean shouldClearPendingLoad = false;
+        downloadingConfigName = configName;
         try {
             ConfigurationManager.Configuration config = configManager.loadConfiguration(configName);
             // Apply per-request n_ctx override (from options.num_ctx) if set.
@@ -879,6 +1124,7 @@ public class ModelManager {
                 }
 
                 currentModelPath = modelPath;
+                updateHarmonyOutputMode(modelPath);
                 currentConfiguredMmprojPath = mmprojPath;
                 currentSupportsVision = llama.supportsVision();
                 currentSupportsAudio = llama.supportsAudio();
@@ -1362,11 +1608,32 @@ public class ModelManager {
             break;
         }
 
+        // gpt-oss (harmony): rewrite analysis/final channels to <think>…</think>answer.
+        if (llama.isHarmonyOutput() && result != null && !isCtxLimitError(result)) {
+            result = HarmonyFormat.toThinkFormat(result);
+        }
+
         if (listener != null) {
             listener.onGenerationComplete(currentConfigName, result);
         }
 
         return result;
+    }
+
+    private void updateHarmonyOutputMode(String modelPath) {
+        boolean harmony = HarmonyFormat.isHarmonyModelPath(modelPath != null ? new File(modelPath).getName() : null);
+        if (!harmony) {
+            try {
+                harmony = HarmonyFormat.looksLikeHarmonyTemplate(llama.getChatTemplate());
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not read chat template for harmony detection", t);
+            }
+        }
+        llama.setHarmonyOutput(harmony);
+        if (harmony) {
+            DiagnosticsLogger.logEvent(context, "harmony", "gpt-oss harmony output conversion enabled: "
+                    + (modelPath != null ? new File(modelPath).getName() : "?"));
+        }
     }
 
     /**
@@ -1630,6 +1897,7 @@ public class ModelManager {
 
     private void clearLoadedModelState() {
         currentModelPath = null;
+        llama.setHarmonyOutput(false);
         currentConfiguredMmprojPath = null;
         currentMmprojPath = null;
         currentSupportsVision = false;
@@ -1667,6 +1935,16 @@ public class ModelManager {
      * The wake lock has a long safety timeout and is always released in the finally block.
      */
     private String downloadWithWakeLock(String url, String destPath) {
+        publishDownloadState(new DownloadState(true, new File(destPath).getName(), 0,
+                fetchRemoteSize(url), downloadingConfigName));
+        try {
+            return downloadWithWakeLockInner(url, destPath);
+        } finally {
+            publishDownloadState(DownloadState.IDLE);
+        }
+    }
+
+    private String downloadWithWakeLockInner(String url, String destPath) {
         PowerManager.WakeLock wakeLock = null;
         try {
             PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
@@ -1735,6 +2013,7 @@ public class ModelManager {
             return null;
         }
         File dest = uniqueDestinationFile(getModelStorageDir(), base);
+        downloadingConfigName = null;
         String result = downloadWithWakeLock(url.trim(), dest.getAbsolutePath());
         boolean ok = "ok".equals(result) || (dest.isFile() && dest.length() > 0);
         return ok ? dest.getName() : null;

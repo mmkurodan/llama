@@ -73,7 +73,6 @@ public class MainActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
-    private static final String PREF_SHOW_API_ENABLE_PROMPT = "show_api_enable_prompt";
     private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
             "show_startup_message",
             "show_quick_start"
@@ -139,6 +138,9 @@ public class MainActivity extends Activity {
     private boolean isServiceRunning = false;
     private boolean pendingApiStartAfterPermission = false;
     private boolean continueStartupDialogsAfterPermission = false;
+    // Open the Web UI once the API server (auto-started by the Web UI button) is reachable.
+    private boolean pendingOpenWebUiAfterApiStart = false;
+    private DownloadUi.ProgressPopup downloadPopup;
     private final AtomicInteger directGenerationSessionId = new AtomicInteger(0);
     private final ApiConnectivityProber apiProber = new ApiConnectivityProber();
     private String bestProbeUrl = null;
@@ -245,9 +247,9 @@ public class MainActivity extends Activity {
         // Initialize configuration manager
         configManager = new ConfigurationManager(this);
         
-        // Load default configuration
+        // Load the initial configuration ("default Light" when bundled, else "default")
         try {
-            currentConfig = configManager.loadConfiguration("default");
+            currentConfig = configManager.loadConfiguration(configManager.getInitialConfigName());
         } catch (IOException | JSONException e) {
             Log.e(TAG, "Failed to load default config", e);
             currentConfig = new ConfigurationManager.Configuration();
@@ -313,7 +315,10 @@ public class MainActivity extends Activity {
         if (exitButton != null) {
             exitButton.setOnClickListener(v -> confirmExitApp());
         }
-        initModelButton.setOnClickListener(v -> reinitializeModel());
+        // Re-initializing may download the model first: confirm (with sizes) before that happens.
+        initModelButton.setOnClickListener(v -> DownloadUi.confirmConfigDownloadThen(
+                this, modelManager, resolveDirectInputConfigName(), true, this::reinitializeModel));
+        downloadPopup = new DownloadUi.ProgressPopup(this, modelManager);
         viewLogButton.setOnClickListener(v -> toggleViewLog());
         clearLogButton.setOnClickListener(v -> clearLogFile());
         apiServerButton.setOnClickListener(v -> toggleApiServer());
@@ -347,35 +352,72 @@ public class MainActivity extends Activity {
                 showToast("Please enter a prompt");
                 return;
             }
-            // First-run guard: if the model still needs downloading, confirm before starting
-            // (the download then happens as part of loading the configuration).
-            if (!isCurrentModelDownloaded()) {
-                confirmFirstModelDownloadThen(() -> startDirectGeneration(userPrompt));
-            } else {
-                startDirectGeneration(userPrompt);
-            }
+            // If the profile's model (or mmproj) still needs downloading, confirm first and show
+            // the sizes (the download then happens as part of loading the configuration).
+            DownloadUi.confirmConfigDownloadThen(this, modelManager, resolveDirectInputConfigName(), true,
+                    () -> startDirectGeneration(userPrompt));
         });
 
         showStartupDialogs();
     }
     
-    // True when the active configuration's model file is already on the device (or there is
-    // nothing to download). Used to gate Send / Open-in-browser behind a first-download notice.
-    private boolean isCurrentModelDownloaded() {
-        String modelReference = (currentConfig != null) ? currentConfig.modelUrl : null;
-        return modelManager == null || modelManager.isModelReferenceDownloaded(modelReference);
+    /**
+     * Web UI button: start the API/WebUI server automatically when it is not running, wait until it
+     * answers, then open the browser. (Model downloads are confirmed inside the Web UI itself.)
+     */
+    private void openWebUiWithAutoStart() {
+        if (isServiceRunning) {
+            openWebUiInBrowser();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pendingApiStartAfterPermission = true;
+            pendingOpenWebUiAfterApiStart = true;
+            requestNotificationPermission();
+            return;
+        }
+        startApiServiceAndOpenWebUi();
     }
 
-    // First-run notice: downloading the default model takes time and a large amount of data.
-    private void confirmFirstModelDownloadThen(Runnable onConfirm) {
-        new AlertDialog.Builder(this)
-                .setTitle(localizedText("モデルのダウンロード", "Download model"))
-                .setMessage(localizedText(
-                        "初回のみ、モデルのダウンロードに長時間と大容量の通信（数GBになる場合があります）が発生します。可能な限り Wi-Fi での実行を推奨します。続行しますか？",
-                        "The model will be downloaded now. The first time only, this takes time and a large amount of data (possibly several GB). Wi-Fi is strongly recommended. Continue?"))
-                .setPositiveButton(localizedText("続行", "Continue"), (d, w) -> onConfirm.run())
-                .setNegativeButton(localizedText("キャンセル", "Cancel"), null)
-                .show();
+    private void startApiServiceAndOpenWebUi() {
+        if (!isServiceRunning) {
+            startApiService();
+        }
+        showToast(localizedText("API/WebUI サーバーを起動しています...", "Starting the API/WebUI server..."));
+        final int port = apiPort;
+        new Thread(() -> {
+            long deadline = System.currentTimeMillis() + 15000;
+            while (System.currentTimeMillis() < deadline) {
+                if (isLocalServerReachable(port)) {
+                    break;
+                }
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    openWebUiInBrowser();
+                }
+            });
+        }, "webui-autostart").start();
+    }
+
+    private static boolean isLocalServerReachable(int port) {
+        java.net.HttpURLConnection conn = null;
+        try {
+            conn = (java.net.HttpURLConnection) new java.net.URL("http://127.0.0.1:" + port + "/api").openConnection();
+            conn.setConnectTimeout(500);
+            conn.setReadTimeout(1000);
+            return conn.getResponseCode() == 200;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     private void openWebUiInBrowser() {
@@ -1083,15 +1125,9 @@ public class MainActivity extends Activity {
             webChatTitle.setText(localizedText("Web AI チャット", "Web AI Chat"));
         }
         openWebUiButton.setText(localizedText("ブラウザで開く", "Open in browser"));
-        openWebUiButton.setOnClickListener(v -> {
-            // The WebUI downloads the model on the first chat message; warn up front if the
-            // default model is not on the device yet, then just open the browser.
-            if (!isCurrentModelDownloaded()) {
-                confirmFirstModelDownloadThen(this::openWebUiInBrowser);
-            } else {
-                openWebUiInBrowser();
-            }
-        });
+        // Starts the API/WebUI server automatically when needed; the Web UI itself asks before any
+        // model download (with the size) and shows the progress.
+        openWebUiButton.setOnClickListener(v -> openWebUiWithAutoStart());
         updateWebUiUrl();
     }
 
@@ -1099,8 +1135,8 @@ public class MainActivity extends Activity {
         if (openWebUiButton == null) {
             return;
         }
-        // The Web UI is only reachable while the server is running.
-        openWebUiButton.setEnabled(isServiceRunning);
+        // Always enabled: pressing it starts the server automatically when it is not running.
+        openWebUiButton.setEnabled(true);
     }
 
     private String buildWebUiUrl() {
@@ -1559,80 +1595,8 @@ public class MainActivity extends Activity {
     }
 
     private void showStartupDialogs() {
-        showApiEnablePromptIfNeeded();
-    }
-
-    private boolean shouldShowApiEnablePrompt(SharedPreferences prefs) {
-        if (prefs.contains(PREF_SHOW_API_ENABLE_PROMPT)) {
-            return prefs.getBoolean(PREF_SHOW_API_ENABLE_PROMPT, true);
-        }
-        return true;
-    }
-
-    private void showApiEnablePromptIfNeeded() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        if (!shouldShowApiEnablePrompt(prefs)) {
-            continueStartupDialogsAfterApiPrompt();
-            return;
-        }
-
-        if (isServiceRunning) {
-            continueStartupDialogsAfterApiPrompt();
-            return;
-        }
-
-        String message = localizedText(
-                "ローカルAPI/WebUIサーバーを有効化しますか？\n\n有効化すると、この端末や同一ローカルネットワークから API と WebUI を利用できます。WebUIはブラウザで http://<端末IP>:",
-                "Enable the local API/WebUI server?\n\nIf enabled, the API and WebUI can be used from this device or the same local network. The WebUI is available in a browser at http://<device-ip>:")
-                + apiPort
-                + localizedText(
-                "/ から開けます。後からメイン画面でも切り替えられます。",
-                "/ . You can also change this later from the main screen.");
-
-        TextView messageView = new TextView(this);
-        messageView.setText(message);
-        messageView.setTextSize(14f);
-        messageView.setLineSpacing(0f, 1.1f);
-
-        CheckBox doNotShowAgainCheckBox = new CheckBox(this);
-        doNotShowAgainCheckBox.setText(localizedText("次回以降は表示しない", "Don't show next time"));
-        doNotShowAgainCheckBox.setPadding(0, 24, 0, 0);
-
-        LinearLayout dialogContentLayout = new LinearLayout(this);
-        dialogContentLayout.setOrientation(LinearLayout.VERTICAL);
-        dialogContentLayout.setPadding(48, 32, 48, 16);
-        dialogContentLayout.addView(messageView);
-        dialogContentLayout.addView(doNotShowAgainCheckBox);
-
-        ScrollView dialogScrollView = new ScrollView(this);
-        dialogScrollView.setFillViewport(true);
-        dialogScrollView.addView(dialogContentLayout);
-
-        new AlertDialog.Builder(this)
-                .setTitle(localizedText("API/WebUI有効化", "Enable API/WebUI"))
-                .setView(dialogScrollView)
-                .setCancelable(false)
-                .setPositiveButton(localizedText("有効化", "Enable"), (dialog, which) -> {
-                    if (doNotShowAgainCheckBox.isChecked()) {
-                        prefs.edit().putBoolean(PREF_SHOW_API_ENABLE_PROMPT, false).apply();
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                        pendingApiStartAfterPermission = true;
-                        continueStartupDialogsAfterPermission = true;
-                        requestNotificationPermission();
-                        return;
-                    }
-                    startApiService();
-                    continueStartupDialogsAfterApiPrompt();
-                })
-                .setNegativeButton(localizedText("今回は無効", "Not now"), (dialog, which) -> {
-                    if (doNotShowAgainCheckBox.isChecked()) {
-                        prefs.edit().putBoolean(PREF_SHOW_API_ENABLE_PROMPT, false).apply();
-                    }
-                    continueStartupDialogsAfterApiPrompt();
-                })
-                .show();
+        // No "enable API/WebUI?" prompt any more: the Web UI button starts the server on demand.
+        continueStartupDialogsAfterApiPrompt();
     }
 
     private void continueStartupDialogsAfterApiPrompt() {
@@ -1919,11 +1883,17 @@ public class MainActivity extends Activity {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (granted) {
                 appendMessage("Notification permission granted");
-                if (pendingApiStartAfterPermission && !isServiceRunning) {
+                if (pendingApiStartAfterPermission && !isServiceRunning && !pendingOpenWebUiAfterApiStart) {
                     startApiService();
                 }
             } else {
                 appendMessage("Notification permission denied - background service may not show notifications");
+            }
+            if (pendingOpenWebUiAfterApiStart) {
+                // The Web UI button asked for the server: start it even without the notification
+                // permission (the service still runs; only its notification is hidden).
+                pendingOpenWebUiAfterApiStart = false;
+                startApiServiceAndOpenWebUi();
             }
             pendingApiStartAfterPermission = false;
             if (continueStartupDialogsAfterPermission) {
@@ -2144,11 +2114,17 @@ public class MainActivity extends Activity {
         updateSettingsButtonForBusyState();
         busyStateHandler.post(busyStateUpdater);
         busyStateHandler.post(statsUpdater);
+        if (downloadPopup != null) {
+            downloadPopup.start();
+        }
     }
     
     @Override
     protected void onPause() {
         super.onPause();
+        if (downloadPopup != null) {
+            downloadPopup.stop();
+        }
         // Unregister broadcast receiver
         try {
             unregisterReceiver(serviceReceiver);

@@ -14,12 +14,26 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 public class ConfigurationManager {
     private static final String TAG = "ConfigurationManager";
     private static final String CONFIG_DIR = "configs";
     private static final String DEFAULT_CONFIG_NAME = "default";
+    /** Profile selected initially (fresh start / API fallback): the small, fast bundled model. */
+    public static final String INITIAL_CONFIG_NAME = "default Light";
+
+    // Descriptions that earlier app versions seeded for a bundled profile and that a newer bundle
+    // replaced. An installed profile still carrying one of these (i.e. never edited by the user) is
+    // updated to the current bundled description.
+    private static final Map<String, String[]> SUPERSEDED_BUNDLED_DESCRIPTIONS = new HashMap<>();
+    static {
+        SUPERSEDED_BUNDLED_DESCRIPTIONS.put("default", new String[]{
+                "Light and fast LLM model. Recommended for the first model to try on any device."
+        });
+    }
     
     private final Context context;
     private final File configDir;
@@ -428,7 +442,8 @@ public class ConfigurationManager {
                     String assetDesc = new JSONObject(assetContent).optString("description", "").trim();
                     if (!assetDesc.isEmpty()) {
                         Configuration saved = loadConfiguration(configName);
-                        if (saved.description == null || saved.description.trim().isEmpty()) {
+                        if (saved.description == null || saved.description.trim().isEmpty()
+                                || isSupersededBundledDescription(configName, saved.description, assetDesc)) {
                             saved.description = assetDesc;
                             saveConfiguration(saved);
                             Log.d(TAG, "Patched description for bundled default: " + configName);
@@ -451,6 +466,30 @@ public class ConfigurationManager {
                 Log.e(TAG, "Failed to seed bundled default '" + configName + "'", e);
             }
         }
+    }
+
+    private static boolean isSupersededBundledDescription(String configName, String saved, String assetDesc) {
+        String[] old = SUPERSEDED_BUNDLED_DESCRIPTIONS.get(configName);
+        if (old == null || saved == null || saved.trim().equals(assetDesc)) {
+            return false;
+        }
+        for (String o : old) {
+            if (o.equals(saved.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Name of the profile to select when nothing else is chosen: {@link #INITIAL_CONFIG_NAME}
+     * ("default Light") when it exists, otherwise "default".
+     */
+    public String getInitialConfigName() {
+        if (new File(configDir, INITIAL_CONFIG_NAME + ".json").exists()) {
+            return INITIAL_CONFIG_NAME;
+        }
+        return DEFAULT_CONFIG_NAME;
     }
 
     private String readAsset(String path) throws IOException {

@@ -328,7 +328,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. メイン画面\n");
         sb.append("- 最上部ステータス: 直近に実行された推論（ダイレクト/API問わず）のモデル名・生成速度(tok/s)・デバイス温度・実行中の計算バックエンド(CPU/GPU)を表示し、自動更新します。\n");
         sb.append("- 操作ボタン（縦並び）: 「API/WebUI開始・停止」「リセット」「設定」。リセットは進行中の生成を停止し、現在のプロファイルでモデルを再初期化します。設定は推論中（Busy）は自動的に無効化され、完了後に再有効化されます。\n");
-        sb.append("- Web AI チャット: 「ブラウザで開く」ボタンで内蔵WebUIを既定ブラウザで開きます（API/WebUIサーバー稼働中のみ有効）。モデルが未ダウンロードの場合は、初回のみ長時間・大容量の通信が発生する旨の確認が表示され、WebUIで最初のメッセージを送信したタイミングでモデルがダウンロードされます。\n");
+        sb.append("- Web AI チャット: 「ブラウザで開く」ボタンで内蔵WebUIを既定ブラウザで開きます。API/WebUIサーバーが停止中の場合は自動的に起動してから開きます。モデルのダウンロードが必要な場合は、WebUIでの送信時やアプリでの実行時にファイルサイズを表示して確認し、ダウンロード中は進捗率をポップアップで表示します。\n");
         sb.append("- 処理状況/ログ（見出しタップで開閉・既定で開）: タイムスタンプ付きの処理ログを表示します。\n");
         sb.append("  ・ログ表示 / 状況に戻る: 処理状況欄に保存済みログファイルの最新行を表示し、もう一度押すと処理状況の表示へ戻ります。\n");
         sb.append("  ・更新: ログ表示中の内容を最新化。消去: ログファイルを空に。保存: 表示中のログ全文を保存します。\n");
@@ -476,7 +476,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. Main Screen\n");
         sb.append("- Top status: Shows the most recent run (direct OR API) — model name, generation speed (tok/s), device temperature, and the active compute backend (CPU/GPU). It auto-updates.\n");
         sb.append("- Action buttons (stacked): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset stops the active generation and reinitializes the current profile. Settings is disabled while inference is busy and re-enabled when it completes.\n");
-        sb.append("- Web AI Chat: An \"Open in browser\" button opens the bundled WebUI in your default browser; it is enabled once the API/WebUI server is running. On first use, if the model is not on the device yet, a notice warns that the first download takes a long time and a large amount of data — the WebUI then downloads the model when you send the first chat message.\n");
+        sb.append("- Web AI Chat: The \"Open in browser\" button opens the bundled WebUI in your default browser, starting the API/WebUI server automatically if it is not running. Whenever a model must be downloaded (from the WebUI or the app), you are asked first with the file sizes, and a popup shows the download progress.\n");
         sb.append("- Processing Status/Logs (collapsible header, expanded by default): Shows timestamped processing logs.\n");
         sb.append("  - View Log / Show Status: Show the latest lines of the saved log file in the processing area; tap again to return to the live status.\n");
         sb.append("  - Update: refresh the shown log. Clear: empty the log file. Download: save the shown log.\n");
@@ -624,7 +624,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. Écran principal\n");
         sb.append("- État en haut : affiche l'exécution la plus récente (directe OU API) — nom du modèle, vitesse de génération (tok/s), température de l'appareil et backend de calcul actif (CPU/GPU). Mise à jour automatique.\n");
         sb.append("- Boutons d'action (empilés) : \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset arrête la génération en cours et réinitialise le profil actuel. Settings est désactivé pendant l'inférence et réactivé à la fin.\n");
-        sb.append("- Web AI Chat : un bouton « Ouvrir dans le navigateur » ouvre la WebUI intégrée dans votre navigateur par défaut ; il est activé une fois le serveur API/WebUI démarré. À la première utilisation, si le modèle n'est pas encore sur l'appareil, un avis prévient que le premier téléchargement prend du temps et une grande quantité de données — la WebUI télécharge ensuite le modèle lorsque vous envoyez le premier message.\n");
+        sb.append("- Web AI Chat : le bouton « Ouvrir dans le navigateur » ouvre la WebUI intégrée dans votre navigateur par défaut et démarre automatiquement le serveur API/WebUI s'il est arrêté. Lorsqu'un modèle doit être téléchargé (depuis la WebUI ou l'application), une confirmation avec la taille des fichiers est demandée, puis une fenêtre affiche la progression.\n");
         sb.append("- État du traitement/Journaux (en-tête repliable, déplié par défaut) : affiche les journaux de traitement horodatés.\n");
         sb.append("  - View Log / Show Status : affiche les dernières lignes du fichier journal enregistré dans la zone de traitement ; appuyez à nouveau pour revenir à l'état en direct.\n");
         sb.append("  - Update : actualise le journal affiché. Clear : vide le fichier journal. Download : enregistre le journal affiché.\n");
@@ -772,7 +772,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. Pantalla principal\n");
         sb.append("- Estado superior: muestra la ejecución más reciente (directa O por API): nombre del modelo, velocidad de generación (tok/s), temperatura del dispositivo y el backend de cómputo activo (CPU/GPU). Se actualiza automáticamente.\n");
         sb.append("- Botones de acción (apilados): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset detiene la generación activa y reinicializa el perfil actual. Settings se desactiva durante la inferencia y se reactiva al terminar.\n");
-        sb.append("- Web AI Chat: un botón «Abrir en el navegador» abre la WebUI integrada en su navegador predeterminado; se habilita una vez que el servidor API/WebUI está en ejecución. En el primer uso, si el modelo aún no está en el dispositivo, un aviso advierte que la primera descarga lleva tiempo y una gran cantidad de datos; la WebUI descarga el modelo cuando envía el primer mensaje.\n");
+        sb.append("- Web AI Chat: el botón «Abrir en el navegador» abre la WebUI integrada en su navegador predeterminado e inicia automáticamente el servidor API/WebUI si no está en ejecución. Cuando hay que descargar un modelo (desde la WebUI o la app), se pide confirmación mostrando el tamaño de los archivos y una ventana muestra el progreso.\n");
         sb.append("- Estado del procesamiento/Registros (encabezado plegable, expandido por defecto): muestra los registros de procesamiento con marca de tiempo.\n");
         sb.append("  - View Log / Show Status: muestra las últimas líneas del archivo de registro guardado en el área de procesamiento; toque de nuevo para volver al estado en vivo.\n");
         sb.append("  - Update: actualiza el registro mostrado. Clear: vacía el archivo de registro. Download: guarda el registro mostrado.\n");
@@ -920,7 +920,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. Tela principal\n");
         sb.append("- Status no topo: mostra a execução mais recente (direta OU via API) — nome do modelo, velocidade de geração (tok/s), temperatura do dispositivo e o backend de computação ativo (CPU/GPU). Atualiza automaticamente.\n");
         sb.append("- Botões de ação (empilhados): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset interrompe a geração ativa e reinicializa o perfil atual. Settings fica desativado durante a inferência e é reativado ao terminar.\n");
-        sb.append("- Web AI Chat: um botão \"Abrir no navegador\" abre a WebUI integrada no seu navegador padrão; ele é ativado quando o servidor API/WebUI está em execução. No primeiro uso, se o modelo ainda não estiver no dispositivo, um aviso alerta que o primeiro download leva tempo e uma grande quantidade de dados — a WebUI então baixa o modelo quando você envia a primeira mensagem.\n");
+        sb.append("- Web AI Chat: o botão \"Abrir no navegador\" abre a WebUI integrada no seu navegador padrão e inicia automaticamente o servidor API/WebUI se ele não estiver em execução. Quando for preciso baixar um modelo (pela WebUI ou pelo app), é pedida confirmação com o tamanho dos arquivos e uma janela mostra o progresso.\n");
         sb.append("- Status do processamento/Registros (cabeçalho recolhível, expandido por padrão): mostra os registros de processamento com data e hora.\n");
         sb.append("  - View Log / Show Status: mostra as últimas linhas do arquivo de registro salvo na área de processamento; toque novamente para voltar ao status ao vivo.\n");
         sb.append("  - Update: atualiza o registro mostrado. Clear: esvazia o arquivo de registro. Download: salva o registro mostrado.\n");
@@ -1068,7 +1068,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. Hauptbildschirm\n");
         sb.append("- Status oben: zeigt die letzte Ausführung (direkt ODER API) — Modellname, Generierungsgeschwindigkeit (tok/s), Gerätetemperatur und das aktive Rechen-Backend (CPU/GPU). Aktualisiert sich automatisch.\n");
         sb.append("- Aktionsschaltflächen (gestapelt): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset stoppt die laufende Generierung und initialisiert das aktuelle Profil neu. Settings ist während der Inferenz deaktiviert und wird nach Abschluss wieder aktiviert.\n");
-        sb.append("- Web AI Chat: Eine Schaltfläche \"Im Browser öffnen\" öffnet die integrierte WebUI im Standardbrowser; sie ist aktiv, sobald der API/WebUI-Server läuft. Bei der ersten Nutzung, wenn das Modell noch nicht auf dem Gerät ist, warnt ein Hinweis, dass der erste Download lange dauert und eine große Datenmenge benötigt — die WebUI lädt das Modell dann herunter, wenn Sie die erste Nachricht senden.\n");
+        sb.append("- Web AI Chat: Die Schaltfläche \"Im Browser öffnen\" öffnet die integrierte WebUI im Standardbrowser und startet den API/WebUI-Server automatisch, falls er nicht läuft. Muss ein Modell heruntergeladen werden (aus der WebUI oder der App), wird vorher mit Angabe der Dateigrößen nachgefragt; ein Fenster zeigt den Fortschritt.\n");
         sb.append("- Verarbeitungsstatus/Protokolle (einklappbare Kopfzeile, standardmäßig ausgeklappt): zeigt die Verarbeitungsprotokolle mit Zeitstempel.\n");
         sb.append("  - View Log / Show Status: zeigt die neuesten Zeilen der gespeicherten Protokolldatei im Verarbeitungsbereich; erneut tippen, um zum Live-Status zurückzukehren.\n");
         sb.append("  - Update: aktualisiert das angezeigte Protokoll. Clear: leert die Protokolldatei. Download: speichert das angezeigte Protokoll.\n");
@@ -1216,7 +1216,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. Schermata principale\n");
         sb.append("- Stato in alto: mostra l'esecuzione più recente (diretta O tramite API) — nome del modello, velocità di generazione (tok/s), temperatura del dispositivo e il backend di calcolo attivo (CPU/GPU). Si aggiorna automaticamente.\n");
         sb.append("- Pulsanti di azione (impilati): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset interrompe la generazione attiva e reinizializza il profilo corrente. Settings è disattivato durante l'inferenza e riattivato al termine.\n");
-        sb.append("- Web AI Chat: un pulsante \"Apri nel browser\" apre la WebUI integrata nel browser predefinito; è attivo una volta che il server API/WebUI è in esecuzione. Al primo utilizzo, se il modello non è ancora sul dispositivo, un avviso segnala che il primo download richiede tempo e una grande quantità di dati — la WebUI scarica poi il modello quando invii il primo messaggio.\n");
+        sb.append("- Web AI Chat: il pulsante \"Apri nel browser\" apre la WebUI integrata nel browser predefinito e avvia automaticamente il server API/WebUI se non è in esecuzione. Quando occorre scaricare un modello (dalla WebUI o dall'app), viene chiesta conferma mostrando la dimensione dei file e una finestra mostra l'avanzamento.\n");
         sb.append("- Stato elaborazione/Log (intestazione comprimibile, espansa per impostazione predefinita): mostra i log di elaborazione con marca temporale.\n");
         sb.append("  - View Log / Show Status: mostra le ultime righe del file di log salvato nell'area di elaborazione; tocca di nuovo per tornare allo stato in tempo reale.\n");
         sb.append("  - Update: aggiorna il log mostrato. Clear: svuota il file di log. Download: salva il log mostrato.\n");
@@ -1364,7 +1364,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. 主界面\n");
         sb.append("- 顶部状态：显示最近一次运行（直接运行或 API）——模型名称、生成速度（tok/s）、设备温度以及当前计算后端（CPU/GPU）。会自动更新。\n");
         sb.append("- 操作按钮（堆叠）：\"Start/Stop API/WebUI\"、\"Reset\"、\"Settings\"。Reset 会停止进行中的生成并重新初始化当前配置文件。推理繁忙时 Settings 被禁用，完成后重新启用。\n");
-        sb.append("- Web AI 聊天：\"在浏览器中打开\"按钮会在默认浏览器中打开内置 WebUI（API/WebUI 服务器运行后可用）。首次使用时，若模型尚未下载到设备，会提示首次下载将耗时并产生大量流量——之后在 WebUI 中发送第一条消息时下载模型。\n");
+        sb.append("- Web AI 聊天：\"在浏览器中打开\"按钮会在默认浏览器中打开内置 WebUI；若 API/WebUI 服务器未运行，会先自动启动。需要下载模型时（无论在 WebUI 还是应用中），会先显示文件大小并请求确认，下载过程中以弹窗显示进度。\n");
         sb.append("- 处理状态/日志（可折叠标题，默认展开）：显示带时间戳的处理日志。\n");
         sb.append("  - View Log / Show Status：在处理区域显示所保存日志文件的最新几行；再次点按返回实时状态。\n");
         sb.append("  - Update：刷新所显示的日志。Clear：清空日志文件。Download：保存所显示的日志。\n");
@@ -1512,7 +1512,7 @@ public class DocumentsActivity extends Activity {
         sb.append("3. 메인 화면\n");
         sb.append("- 상단 상태: 가장 최근 실행(직접 또는 API)을 표시합니다 — 모델 이름, 생성 속도(tok/s), 기기 온도, 활성 연산 백엔드(CPU/GPU). 자동으로 갱신됩니다.\n");
         sb.append("- 작업 버튼(세로 배치): \"Start/Stop API/WebUI\", \"Reset\", \"Settings\". Reset은 진행 중인 생성을 멈추고 현재 프로필을 다시 초기화합니다. Settings는 추론 중에는 비활성화되고 완료되면 다시 활성화됩니다.\n");
-        sb.append("- 웹 AI 채팅: \"브라우저에서 열기\" 버튼이 내장 WebUI를 기본 브라우저에서 엽니다(API/WebUI 서버가 실행 중일 때 활성화). 최초 사용 시 모델이 아직 기기에 없으면 첫 다운로드에 시간이 오래 걸리고 대용량 데이터가 발생한다는 안내가 표시되며, WebUI에서 첫 메시지를 보낼 때 모델을 다운로드합니다.\n");
+        sb.append("- 웹 AI 채팅: \"브라우저에서 열기\" 버튼이 내장 WebUI를 기본 브라우저에서 엽니다. API/WebUI 서버가 실행 중이 아니면 자동으로 시작합니다. 모델 다운로드가 필요하면(WebUI 또는 앱) 파일 크기를 표시하고 확인을 요청하며, 다운로드 중에는 팝업으로 진행률을 표시합니다.\n");
         sb.append("- 처리 상태/로그(접을 수 있는 헤더, 기본 펼침): 타임스탬프가 있는 처리 로그를 표시합니다.\n");
         sb.append("  - View Log / Show Status: 저장된 로그 파일의 최신 줄을 처리 영역에 표시하며, 다시 누르면 실시간 상태로 돌아갑니다.\n");
         sb.append("  - Update: 표시된 로그를 새로 고칩니다. Clear: 로그 파일을 비웁니다. Download: 표시된 로그를 저장합니다.\n");

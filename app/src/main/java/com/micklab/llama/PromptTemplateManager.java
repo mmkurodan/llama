@@ -37,7 +37,8 @@ public class PromptTemplateManager {
         PHI,
         BONSAI,
         ZEPHYR,
-        HERMES
+        HERMES,
+        GPT_OSS    // OpenAI gpt-oss "harmony" format (<|start|>role<|channel|>…<|message|>…<|end|>)
     }
 
     /**
@@ -194,6 +195,29 @@ public class PromptTemplateManager {
         "<|im_start|>user\n{USER}<|im_end|>\n" +
         "<|im_start|>assistant\n";
 
+    // gpt-oss (harmony). The model always reasons in the "analysis" channel and then answers in a
+    // separate "final" message; HarmonyFormat converts that output to <think>…</think>answer.
+    static final String GPT_OSS_REASONING_DEFAULT = "Reasoning: medium";
+    static final String GPT_OSS_REASONING_LOW = "Reasoning: low";
+    private static final String GPT_OSS_SYSTEM_HEADER =
+        "<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\n" +
+        "Knowledge cutoff: 2024-06\n\n" +
+        GPT_OSS_REASONING_DEFAULT + "\n\n" +
+        "# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|>";
+    static final String GPT_OSS_ASSISTANT_START = "<|start|>assistant";
+    static final String GPT_OSS_FINAL_PREFILL = "<|channel|>final<|message|>";
+
+    private static final String GPT_OSS_TEMPLATE =
+        GPT_OSS_SYSTEM_HEADER +
+        "<|start|>developer<|message|># Instructions\n\n{SYSTEM}<|end|>" +
+        "<|start|>user<|message|>{USER}<|end|>" +
+        GPT_OSS_ASSISTANT_START;
+
+    private static final String GPT_OSS_TEMPLATE_NO_SYSTEM =
+        GPT_OSS_SYSTEM_HEADER +
+        "<|start|>user<|message|>{USER}<|end|>" +
+        GPT_OSS_ASSISTANT_START;
+
     private static final String NO_THINKING_BLOCK = "<think>\n\n</think>\n\n";
 
     // WebUI internal markers for reasoning content (llama.cpp WebUI convention)
@@ -261,7 +285,9 @@ public class PromptTemplateManager {
         
         String lowerPath = modelPath.toLowerCase(Locale.US);
         
-        if (lowerPath.contains("gemma")) {
+        if (HarmonyFormat.isHarmonyModelPath(lowerPath)) {
+            return ModelFamily.GPT_OSS;
+        } else if (lowerPath.contains("gemma")) {
             return ModelFamily.GEMMA;
         } else if (lowerPath.contains("qwen")) {
             return ModelFamily.QWEN;
@@ -398,6 +424,8 @@ public class PromptTemplateManager {
                 return hasSystem ? ZEPHYR_TEMPLATE : ZEPHYR_TEMPLATE_NO_SYSTEM;
             case HERMES:
                 return hasSystem ? HERMES_TEMPLATE : HERMES_TEMPLATE_NO_SYSTEM;
+            case GPT_OSS:
+                return hasSystem ? GPT_OSS_TEMPLATE : GPT_OSS_TEMPLATE_NO_SYSTEM;
             case CHATML:
             default:
                 return hasSystem ? CHATML_TEMPLATE : CHATML_TEMPLATE_NO_SYSTEM;
@@ -432,6 +460,11 @@ public class PromptTemplateManager {
 
         String lowerTemplate = ggufChatTemplate.toLowerCase(Locale.US);
         ModelFamily pathFamily = detectModelFamily(modelPath);
+
+        // Must precede the <|end|> checks below: harmony templates also use <|end|>.
+        if (HarmonyFormat.looksLikeHarmonyTemplate(lowerTemplate)) {
+            return ModelFamily.GPT_OSS;
+        }
 
         if (lowerTemplate.contains("<start_of_turn>") && lowerTemplate.contains("<end_of_turn>")) {
             return ModelFamily.GEMMA;
@@ -564,6 +597,11 @@ public class PromptTemplateManager {
         }
         if ("custom".equals(selection.source)) {
             return prompt;
+        }
+        // gpt-oss cannot turn reasoning off; use the lowest effort and start directly in the
+        // "final" channel so no analysis is generated.
+        if (prompt.endsWith(GPT_OSS_ASSISTANT_START)) {
+            return prompt.replace(GPT_OSS_REASONING_DEFAULT, GPT_OSS_REASONING_LOW) + GPT_OSS_FINAL_PREFILL;
         }
         // Suppress thinking for ALL ChatML/im_start models (Qwen, DeepSeek-R1, LLaMA-thinking, etc.)
         if (prompt.endsWith("<|im_start|>assistant\n")) {
@@ -1020,12 +1058,35 @@ public class PromptTemplateManager {
                 return buildMultiTurnBonsai(systemPrompt, history);
             case ZEPHYR:
                 return buildMultiTurnZephyr(systemPrompt, history);
+            case GPT_OSS:
+                return buildMultiTurnGptOss(systemPrompt, history);
             case QWEN:
             case HERMES:
             case CHATML:
             default:
                 return buildMultiTurnChatML(systemPrompt, history);
         }
+    }
+
+    // gpt-oss (harmony) multi-turn. Earlier assistant turns are replayed as "final" messages only:
+    // the harmony convention drops previous analysis (reasoning) from the context.
+    private static String buildMultiTurnGptOss(String system, List<Message> history) {
+        StringBuilder sb = new StringBuilder(GPT_OSS_SYSTEM_HEADER);
+        if (system != null && !system.isEmpty()) {
+            sb.append("<|start|>developer<|message|># Instructions\n\n").append(system).append("<|end|>");
+        }
+        for (Message msg : history) {
+            String content = msg.content != null ? msg.content : "";
+            if ("assistant".equals(msg.role)) {
+                String[] split = extractThinkingContent(content);
+                String answer = split != null && split.length > 1 && split[1] != null ? split[1] : content;
+                sb.append("<|start|>assistant<|channel|>final<|message|>").append(answer).append("<|end|>");
+            } else if ("user".equals(msg.role)) {
+                sb.append("<|start|>user<|message|>").append(content).append("<|end|>");
+            }
+        }
+        sb.append(GPT_OSS_ASSISTANT_START);
+        return sb.toString();
     }
 
     // ChatML / Qwen / Hermes multi-turn

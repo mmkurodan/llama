@@ -119,7 +119,29 @@ public class LlamaNative {
     public native String getLoraAdapterInfo();
 
     // Token listener registration (native will keep a global ref)
-    public native void setTokenListener(TokenListener listener);
+    private native void nativeSetTokenListener(TokenListener listener);
+
+    // gpt-oss (harmony) output mode for the loaded model; set by ModelManager after each load.
+    private volatile boolean harmonyOutput;
+
+    public void setHarmonyOutput(boolean harmony) {
+        this.harmonyOutput = harmony;
+    }
+
+    public boolean isHarmonyOutput() {
+        return harmonyOutput;
+    }
+
+    /**
+     * Register the streaming token listener. For harmony (gpt-oss) models the stream is first
+     * rewritten to the {@code <think>…</think>answer} shape the rest of the app understands.
+     */
+    public void setTokenListener(TokenListener listener) {
+        if (listener != null && harmonyOutput && !(listener instanceof HarmonyFormat.ConvertingTokenListener)) {
+            listener = new HarmonyFormat.ConvertingTokenListener(listener);
+        }
+        nativeSetTokenListener(listener);
+    }
 
     // 新しく追加したネイティブ: JNI 側のログファイルパスを設定する
     public native void setLogPath(String path);

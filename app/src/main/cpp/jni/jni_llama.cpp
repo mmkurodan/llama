@@ -628,10 +628,44 @@ static jstring new_java_string_utf8(JNIEnv * env, const char * text) {
     return new_java_string_utf8(env, text != nullptr ? std::string(text) : std::string());
 }
 
+// GPT-OSS ("harmony" chat format): every message - including the analysis (reasoning) channel -
+// ends with <|end|>, and the final answer follows in a separate "<|start|>assistant<|channel|>final"
+// message terminated by the EOG token <|return|>. Treating <|end|> as a stop sequence therefore cut
+// generation right after the reasoning ("ends in Thinking"). Set at model load from the vocab.
+static bool g_harmony_format = false;
+
+static bool is_suppressed_stop_sequence(const std::string & seq) {
+    return g_harmony_format && seq == "<|end|>";
+}
+
+static bool vocab_has_single_token(const llama_vocab * vocab, const char * text) {
+    if (vocab == nullptr) {
+        return false;
+    }
+    try {
+        return common_tokenize(vocab, text, false, true).size() == 1;
+    } catch (...) {
+        return false;
+    }
+}
+
+static void update_harmony_format_locked(const char * log_prefix) {
+    const llama_vocab * vocab = g_model ? llama_model_get_vocab(g_model) : nullptr;
+    g_harmony_format = vocab_has_single_token(vocab, "<|channel|>")
+            && vocab_has_single_token(vocab, "<|message|>")
+            && vocab_has_single_token(vocab, "<|return|>");
+    if (g_harmony_format && log_prefix != nullptr) {
+        log_to_file(std::string(log_prefix) + ": harmony (GPT-OSS) chat format detected; <|end|> is not a stop sequence");
+    }
+}
+
 static bool find_stop_sequence(const std::string& text, size_t * stop_pos, std::string * stop_seq) {
     size_t earliest = std::string::npos;
     std::string found;
     for (const auto& seq : DEFAULT_STOP_SEQUENCES) {
+        if (is_suppressed_stop_sequence(seq)) {
+            continue;
+        }
         size_t pos = text.find(seq);
         if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
             earliest = pos;
@@ -1161,6 +1195,7 @@ static void release_model_locked(const char * log_prefix) {
     }
     llama_model_free(g_model);
     g_model = nullptr;
+    g_harmony_format = false;
     g_current_model_path.clear();
     // アダプタは model に紐づき、model_free で自動解放される。ハンドルを無効化するだけ。
     g_lora = nullptr;
@@ -1823,7 +1858,7 @@ static bool find_stop_sequence_in_list(
     size_t earliest = std::string::npos;
     std::string found;
     for (const auto & seq : stop_sequences) {
-        if (seq.empty()) {
+        if (seq.empty() || is_suppressed_stop_sequence(seq)) {
             continue;
         }
         size_t pos = text.find(seq);
@@ -2772,6 +2807,7 @@ Java_com_micklab_llama_LlamaNative_init(
             } else {
                 ss << "init: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
+                update_harmony_format_locked("init");
             }
         }
         {
@@ -2994,6 +3030,7 @@ Java_com_micklab_llama_LlamaNative_initWithMmproj(
             } else {
                 ss << "initWithMmproj: model loaded successfully in " << ms << " ms";
                 log_to_file(ss.str());
+                update_harmony_format_locked("initWithMmproj");
             }
         }
         {
@@ -3361,7 +3398,7 @@ Java_com_micklab_llama_LlamaNative_setParameters(
 // ---------------- JNI: setTokenListener ----------------
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_micklab_llama_LlamaNative_setTokenListener(
+Java_com_micklab_llama_LlamaNative_nativeSetTokenListener(
         JNIEnv *env, jobject /*thiz*/, jobject listener) {
     std::lock_guard<std::mutex> lock(g_mutex);
     // Ensure JavaVM stored

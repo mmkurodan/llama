@@ -3,12 +3,13 @@
  * Caches the static app shell so the UI is installable and loads offline.
  * API traffic (/api, /v1, streaming, non-GET) is never intercepted.
  */
-const CACHE_VERSION = 'llm-webui-v8';
+const CACHE_VERSION = 'llm-webui-v9';
 const APP_SHELL = [
 	'./',
 	'./index.html',
 	'./bundle.js',
 	'./bundle.css',
+	'./app-ext.js',
 	'./manifest.webmanifest',
 	'./icon-192.png',
 	'./icon-512.png',
