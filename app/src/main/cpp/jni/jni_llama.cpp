@@ -842,7 +842,15 @@ static inline bool utf8_is_cont(unsigned char b) { return (b & 0xC0) == 0x80; }
 
 static const Utf8GuardTable & utf8_guard_table_for(const llama_vocab * vocab) {
     Utf8GuardTable & t = g_utf8_guard_table;
-    if (t.vocab == vocab && !t.pieces.empty()) return t;
+    // The vocab pointer alone is not a safe key: after a model is freed the next model's
+    // llama_vocab can be allocated at the same address, and a stale table sized for the old
+    // vocab then makes apply() write -INFINITY past the end of the new logits buffer (SIGSEGV
+    // right after prefill on a gemma(262k) → Qwen3VL(152k)/Qwen3.5(248k) switch). The table is
+    // also dropped in release_model_locked(); the n_vocab check is a second line of defence.
+    if (t.vocab == vocab && !t.pieces.empty()
+            && (int) t.pieces.size() == llama_vocab_n_tokens(vocab)) {
+        return t;
+    }
     t = Utf8GuardTable{};
     t.vocab = vocab;
     const int n_vocab = llama_vocab_n_tokens(vocab);
@@ -1195,6 +1203,9 @@ static void release_model_locked(const char * log_prefix) {
     }
     llama_model_free(g_model);
     g_model = nullptr;
+    // The UTF-8 guard table caches per-token pieces of this model's vocab (keyed by the vocab
+    // pointer, which the next model may reuse): drop it so it is rebuilt for the next model.
+    g_utf8_guard_table = Utf8GuardTable{};
     g_harmony_format = false;
     g_current_model_path.clear();
     // アダプタは model に紐づき、model_free で自動解放される。ハンドルを無効化するだけ。
