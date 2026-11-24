@@ -977,6 +977,12 @@ public class SettingsActivity extends Activity {
     private String settingsTextJa(String text) {
         switch (text) {
             case "Configuration Management": return "設定管理";
+            case "GGUF Generator Link": return "GGUF 生成ツールへのリンク";
+            case "MTP speculative decoding (experimental)": return "MTP 投機的デコード（実験的）";
+            case "n_draft:": return "n_draft:";
+            case "MTP draft model (default: own head)": return "MTP ドラフトモデル（既定: 自身のヘッド）";
+            case "Enable": return "有効";
+            case "Recycle interval (min):": return "再起動の間隔（分）:";
             case "Display Language": return "表示言語";
             case "Dark Mode": return "ダークモード";
             case "Profile:": return "プロファイル:";

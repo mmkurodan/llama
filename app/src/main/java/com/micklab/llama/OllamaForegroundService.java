@@ -172,7 +172,7 @@ public class OllamaForegroundService extends Service {
         // background contexts (e.g. BOOT_COMPLETED) can be disallowed; degrade gracefully rather than
         // crash so a later foreground launch can re-assert.
         try {
-            Notification notification = createNotification("Llama API + WebUI Server", "Starting...");
+            Notification notification = createNotification(tr("Llama API + WebUI サーバー", "Llama API + WebUI Server"), tr("起動中...", "Starting..."));
             startForeground(NOTIFICATION_ID, notification);
         } catch (Exception e) {
             Log.w(TAG, "startForeground not allowed in this context; will retry on next launch", e);
@@ -287,10 +287,10 @@ public class OllamaForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Llama API + WebUI Server",
+                tr("Llama API + WebUI サーバー", "Llama API + WebUI Server"),
                 NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Keeps the Llama API/WebUI server running in the background");
+            channel.setDescription(tr("Llama API/WebUI サーバーをバックグラウンドで動作させ続けます", "Keeps the Llama API/WebUI server running in the background"));
             channel.setShowBadge(false);
             
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -300,6 +300,10 @@ public class OllamaForegroundService extends Service {
         }
     }
     
+    private String tr(String ja, String en) {
+        return Translations.get(this, ja, en);
+    }
+
     private Notification createNotification(String title, String content) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
@@ -333,14 +337,14 @@ public class OllamaForegroundService extends Service {
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopPendingIntent)
-            .addAction(android.R.drawable.ic_delete, "Exit", exitPendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, tr("停止", "Stop"), stopPendingIntent)
+            .addAction(android.R.drawable.ic_delete, tr("終了", "Exit"), exitPendingIntent)
             .setOngoing(true)
             .build();
     }
     
     private void updateNotification(String content) {
-        Notification notification = createNotification("Llama API + WebUI Server", content);
+        Notification notification = createNotification(tr("Llama API + WebUI サーバー", "Llama API + WebUI Server"), content);
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {
             manager.notify(NOTIFICATION_ID, notification);
@@ -359,7 +363,7 @@ public class OllamaForegroundService extends Service {
             @Override
             public void onServerStarted(int port) {
                 Log.i(TAG, "API/WebUI server started on port " + port);
-                updateNotification("API + WebUI on port " + port);
+                updateNotification(tr("API + WebUI 稼働中 ポート ", "API + WebUI on port ") + port);
                 sendLog("API/WebUI server started on port " + port + " (WebUI: /)");
                 sendStatusChanged("running", port);
             }
@@ -367,7 +371,7 @@ public class OllamaForegroundService extends Service {
             @Override
             public void onServerStopped() {
                 Log.i(TAG, "API/WebUI server stopped");
-                updateNotification("Stopped");
+                updateNotification(tr("停止中", "Stopped"));
                 sendLog("API/WebUI server stopped");
                 sendStatusChanged("stopped", port);
             }
@@ -375,7 +379,7 @@ public class OllamaForegroundService extends Service {
             @Override
             public void onServerError(String error) {
                 Log.e(TAG, "API/WebUI server error: " + error);
-                updateNotification("Error: " + error);
+                updateNotification(tr("エラー: ", "Error: ") + error);
                 sendLog("API/WebUI Server Error: " + error);
             }
             
@@ -387,19 +391,19 @@ public class OllamaForegroundService extends Service {
             
             @Override
             public void onModelLoading(String configName) {
-                updateNotification("Loading: " + configName);
+                updateNotification(tr("読み込み中: ", "Loading: ") + configName);
                 sendLog("API/WebUI: Loading configuration: " + configName);
             }
             
             @Override
             public void onModelLoaded(String configName) {
-                updateNotification("Ready: " + configName);
+                updateNotification(tr("準備完了: ", "Ready: ") + configName);
                 sendLog("API/WebUI: Model loaded for configuration: " + configName);
             }
             
             @Override
             public void onGenerating(String configName) {
-                updateNotification("Generating...");
+                updateNotification(tr("生成中...", "Generating..."));
                 sendLog("API/WebUI: Generating with configuration: " + configName);
             }
         });

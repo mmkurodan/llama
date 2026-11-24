@@ -354,7 +354,7 @@ public class MainActivity extends Activity {
         sendButton.setOnClickListener(v -> {
             final String userPrompt = promptInput.getText().toString();
             if (userPrompt == null || userPrompt.trim().isEmpty()) {
-                showToast("Please enter a prompt");
+                showToast(localizedText("プロンプトを入力してください", "Please enter a prompt"));
                 return;
             }
             // If the profile's model (or mmproj) still needs downloading, confirm first and show
@@ -491,7 +491,7 @@ public class MainActivity extends Activity {
 
         // Check if busy
         if (!modelManager.tryAcquire()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
         updateSettingsButtonForBusyState();
@@ -508,7 +508,7 @@ public class MainActivity extends Activity {
                     boolean loadSuccess = modelManager.loadConfiguration(configName);
                     if (!loadSuccess) {
                         modelManager.release();
-                        showToast("Failed to load model. Please check Settings.");
+                        showToast(localizedText("モデルの読み込みに失敗しました。設定を確認してください。", "Failed to load model. Please check Settings."));
                         appendMessage("Model load failed.");
                         return;
                     }
@@ -524,7 +524,7 @@ public class MainActivity extends Activity {
                 } catch (Throwable t) {
                     modelManager.release();
                     appendException("Model load error", t);
-                    showToast("Model load error: " + t.getMessage());
+                    showToast(localizedText("モデル読み込みエラー: ", "Model load error: ") + t.getMessage());
                 }
             }).start();
             return;
@@ -596,7 +596,7 @@ public class MainActivity extends Activity {
                 chatPrompt = applyPromptTemplate(userPrompt);
             } catch (RuntimeException e) {
                 appendException("Prompt build error", e);
-                showToast("Prompt build error: " + (e.getMessage() != null ? e.getMessage() : "unknown"));
+                showToast(localizedText("プロンプト作成エラー: ", "Prompt build error: ") + (e.getMessage() != null ? e.getMessage() : "unknown"));
                 return;
             }
             if (!shouldContinueDirectGeneration(generationSessionId)) {
@@ -688,7 +688,7 @@ public class MainActivity extends Activity {
         } catch (Throwable t) {
             if (shouldContinueDirectGeneration(generationSessionId)) {
                 appendException("generate() threw", t);
-                showToast("Generate error: " + t.getMessage());
+                showToast(localizedText("生成エラー: ", "Generate error: ") + t.getMessage());
             }
         } finally {
             modelManager.getLlama().setTokenListener(null);
@@ -712,7 +712,7 @@ public class MainActivity extends Activity {
     
     private void openSettings() {
         if (modelManager != null && modelManager.isBusy()) {
-            showToast("Model is busy processing another request");
+            showToast(localizedText("他のリクエストを処理中です", "Model is busy processing another request"));
             return;
         }
         Intent intent = new Intent(this, SettingsActivity.class);
@@ -799,17 +799,17 @@ public class MainActivity extends Activity {
                 ModelManager.ForceReinitializeResult result = modelManager.forceReinitializeConfiguration(configName);
                 if (result == ModelManager.ForceReinitializeResult.SUCCESS) {
                     appendMessage("Model re-initialized successfully.");
-                    showToast("Model re-initialized successfully");
+                    showToast(localizedText("モデルを再初期化しました", "Model re-initialized successfully"));
                 } else if (result == ModelManager.ForceReinitializeResult.ALREADY_PENDING) {
                     appendMessage("Model re-initialization is already in progress.");
-                    showToast("Model re-initialization is already in progress");
+                    showToast(localizedText("モデルの再初期化は既に実行中です", "Model re-initialization is already in progress"));
                 } else {
                     appendMessage("Model re-initialization failed.");
-                    showToast("Model re-initialization failed");
+                    showToast(localizedText("モデルの再初期化に失敗しました", "Model re-initialization failed"));
                 }
             } catch (Throwable t) {
                 appendException("Model re-initialization error", t);
-                showToast("Model re-initialization error: " + (t.getMessage() != null ? t.getMessage() : "unknown"));
+                showToast(localizedText("モデル再初期化エラー: ", "Model re-initialization error: ") + (t.getMessage() != null ? t.getMessage() : "unknown"));
             } finally {
                 runOnUiThread(this::updateSettingsButtonForBusyState);
             }
@@ -858,7 +858,7 @@ public class MainActivity extends Activity {
         File appFilesDir = getAppFilesBaseDir();
         File logFile = new File(appFilesDir, "ollama.log");
         if (!logFile.exists()) {
-            showToast("Log file does not exist");
+            showToast(localizedText("ログファイルがありません", "Log file does not exist"));
             return;
         }
 
@@ -875,7 +875,7 @@ public class MainActivity extends Activity {
                 });
             } catch (IOException e) {
                 Log.e(TAG, "Failed to read log file", e);
-                showToast("Failed to read log file: " + e.getMessage());
+                showToast(localizedText("ログファイルの読み込みに失敗しました: ", "Failed to read log file: ") + e.getMessage());
             }
         }).start();
     }
@@ -1841,7 +1841,7 @@ public class MainActivity extends Activity {
                     content = readDisplayLogContent(appFilesDir);
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to read log file", e);
-                    showToast("Failed to read log file: " + e.getMessage());
+                    showToast(localizedText("ログファイルの読み込みに失敗しました: ", "Failed to read log file: ") + e.getMessage());
                     return;
                 }
             }
@@ -1853,7 +1853,7 @@ public class MainActivity extends Activity {
                     content = readDisplayLogContent(appFilesDir);
                 } catch (IOException e) {
                     Log.e(TAG, "Failed to read log file", e);
-                    showToast("Failed to read log file: " + e.getMessage());
+                    showToast(localizedText("ログファイルの読み込みに失敗しました: ", "Failed to read log file: ") + e.getMessage());
                     return;
                 }
             } else {
@@ -1866,7 +1866,7 @@ public class MainActivity extends Activity {
         }
 
         if (content == null || content.trim().isEmpty()) {
-            showToast("No log or response content to download");
+            showToast(localizedText("ダウンロードするログや応答がありません", "No log or response content to download"));
             return;
         }
 
@@ -1886,26 +1886,26 @@ public class MainActivity extends Activity {
         Uri destinationUri = data.getData();
         if (destinationUri == null) {
             pendingLogDownloadContent = null;
-            showToast("No destination selected");
+            showToast(localizedText("保存先が選択されていません", "No destination selected"));
             return;
         }
         String content = pendingLogDownloadContent;
         pendingLogDownloadContent = null;
         if (content == null || content.isEmpty()) {
-            showToast("No log content to save");
+            showToast(localizedText("保存するログがありません", "No log content to save"));
             return;
         }
         try (OutputStream outputStream = getContentResolver().openOutputStream(destinationUri)) {
             if (outputStream == null) {
-                showToast("Failed to open destination");
+                showToast(localizedText("保存先を開けませんでした", "Failed to open destination"));
                 return;
             }
             outputStream.write(content.getBytes(StandardCharsets.UTF_8));
             outputStream.flush();
-            showToast("Log saved");
+            showToast(localizedText("ログを保存しました", "Log saved"));
         } catch (IOException | SecurityException e) {
             Log.e(TAG, "Failed to save log file", e);
-            showToast("Failed to save log file: " + e.getMessage());
+            showToast(localizedText("ログファイルの保存に失敗しました: ", "Failed to save log file: ") + e.getMessage());
         }
     }
     
