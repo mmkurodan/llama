@@ -60,52 +60,53 @@ public final class Translations {
             case "ja":
                 return "すぐに始められます。\n\n" +
                         "メイン画面の「ブラウザで開く」を押すと、API/WebUI サーバーが自動的に起動し、Web AI チャットが開きます。\n\n" +
-                        "※ モデルのダウンロードが必要な場合は、ダウンロード前にファイルサイズを表示して確認します。大容量の通信（数GBになる場合があります）が発生するため、可能な限り Wi-Fi をご利用ください。\n\n" +
+                        "※ モデルのダウンロードが必要な場合は、ダウンロード前にファイルサイズを表示して確認します。大量のダウンロードが発生するため、可能な限り Wi-Fi をご利用ください。\n\n" +
                         "このほか、メイン画面の「ダイレクト実行」から端末上で直接プロンプトを試せます。別のモデルの利用や各種機能の有効化は「設定」ボタンから行えます。";
             case "fr":
                 return "Prêt à démarrer.\n\n" +
                         "Appuyez sur « Ouvrir dans le navigateur » sur l'écran principal : le serveur API/WebUI démarre automatiquement et le Web AI Chat s'ouvre.\n\n" +
-                        "Remarque : si un modèle doit être téléchargé, sa taille est affichée et une confirmation vous est demandée avant le téléchargement. Cela consomme beaucoup de données (potentiellement plusieurs Go) ; utilisez le Wi-Fi si possible.\n\n" +
+                        "Remarque : si un modèle doit être téléchargé, sa taille est affichée et une confirmation vous est demandée avant le téléchargement. Cela implique un téléchargement volumineux ; utilisez le Wi-Fi si possible.\n\n" +
                         "Vous pouvez aussi tester des invites directement sur l'appareil via « Exécution directe » sur l'écran principal. Utilisez d'autres modèles et activez d'autres fonctions depuis le bouton « Paramètres ».";
             case "es":
                 return "Listo para empezar.\n\n" +
                         "Toque «Abrir en el navegador» en la pantalla principal: el servidor API/WebUI se inicia automáticamente y se abre el Web AI Chat.\n\n" +
-                        "Nota: si hay que descargar un modelo, se muestra su tamaño y se le pide confirmación antes de la descarga. Consume muchos datos (posiblemente varios GB); use Wi-Fi cuando sea posible.\n\n" +
+                        "Nota: si hay que descargar un modelo, se muestra su tamaño y se le pide confirmación antes de la descarga. Implica una descarga de gran tamaño; use Wi-Fi cuando sea posible.\n\n" +
                         "También puede probar prompts directamente en el dispositivo desde «Ejecución directa» en la pantalla principal. Use otros modelos y active más funciones desde el botón «Configuración».";
             case "pt":
                 return "Pronto para começar.\n\n" +
                         "Toque em \"Abrir no navegador\" na tela principal: o servidor API/WebUI inicia automaticamente e o Web AI Chat é aberto.\n\n" +
-                        "Observação: se for preciso baixar um modelo, o tamanho é exibido e é pedida confirmação antes do download. Isso consome muitos dados (possivelmente vários GB); use Wi-Fi quando possível.\n\n" +
+                        "Observação: se for preciso baixar um modelo, o tamanho é exibido e é pedida confirmação antes do download. Isso envolve um download volumoso; use Wi-Fi quando possível.\n\n" +
                         "Você também pode testar prompts diretamente no dispositivo em \"Execução direta\" na tela principal. Use outros modelos e ative mais recursos pelo botão \"Configurações\".";
             case "de":
                 return "Sofort startklar.\n\n" +
                         "Tippen Sie auf dem Hauptbildschirm auf „Im Browser öffnen“: Der API/WebUI-Server startet automatisch und der Web-KI-Chat öffnet sich.\n\n" +
-                        "Hinweis: Muss ein Modell heruntergeladen werden, wird vorher die Dateigröße angezeigt und um Bestätigung gebeten. Das benötigt viele Daten (möglicherweise mehrere GB); verwenden Sie nach Möglichkeit WLAN.\n\n" +
+                        "Hinweis: Muss ein Modell heruntergeladen werden, wird vorher die Dateigröße angezeigt und um Bestätigung gebeten. Dabei fällt ein großer Download an; verwenden Sie nach Möglichkeit WLAN.\n\n" +
                         "Sie können Eingaben auch direkt auf dem Gerät über „Direktausführung“ auf dem Hauptbildschirm testen. Nutzen Sie andere Modelle und aktivieren Sie weitere Funktionen über die Schaltfläche „Einstellungen“.";
             case "it":
                 return "Pronto per iniziare.\n\n" +
                         "Tocca \"Apri nel browser\" nella schermata principale: il server API/WebUI si avvia automaticamente e si apre il Web AI Chat.\n\n" +
-                        "Nota: se occorre scaricare un modello, ne viene mostrata la dimensione e viene chiesta conferma prima del download. Consuma molti dati (possibilmente diversi GB); usa il Wi-Fi quando possibile.\n\n" +
+                        "Nota: se occorre scaricare un modello, ne viene mostrata la dimensione e viene chiesta conferma prima del download. Comporta un download di grandi dimensioni; usa il Wi-Fi quando possibile.\n\n" +
                         "Puoi anche provare i prompt direttamente sul dispositivo da \"Esecuzione diretta\" nella schermata principale. Usa altri modelli e abilita altre funzioni dal pulsante \"Impostazioni\".";
             case "zh":
                 return "立即开始使用。\n\n" +
                         "在主界面点按“在浏览器中打开”，API/WebUI 服务器会自动启动并打开 Web AI 聊天。\n\n" +
-                        "注意：需要下载模型时，会在下载前显示文件大小并请求确认。下载会产生大量流量（可能达数 GB），请尽量使用 Wi-Fi。\n\n" +
+                        "注意：需要下载模型时，会在下载前显示文件大小并请求确认。这将产生大量下载，请尽量使用 Wi-Fi。\n\n" +
                         "此外，你还可以在主界面的“直接运行”中直接在设备上试用提示。使用其他模型或启用更多功能，可通过“设置”按钮进行。";
             case "ko":
                 return "바로 시작할 수 있습니다.\n\n" +
                         "메인 화면에서 \"브라우저에서 열기\"를 누르면 API/WebUI 서버가 자동으로 시작되고 웹 AI 채팅이 열립니다.\n\n" +
-                        "참고: 모델 다운로드가 필요한 경우 다운로드 전에 파일 크기를 표시하고 확인을 요청합니다. 대용량 데이터(수 GB일 수 있음)가 발생하므로 가능하면 Wi-Fi를 사용하세요.\n\n" +
+                        "참고: 모델 다운로드가 필요한 경우 다운로드 전에 파일 크기를 표시하고 확인을 요청합니다. 대용량 다운로드가 발생하므로 가능하면 Wi-Fi를 사용하세요.\n\n" +
                         "이 밖에도 메인 화면의 \"직접 실행\"에서 기기에서 직접 프롬프트를 시험해 볼 수 있습니다. 다른 모델 사용이나 기능 활성화는 \"설정\" 버튼에서 할 수 있습니다.";
             default:
                 return "Ready to go.\n\n" +
                         "Tap \"Open in browser\" on the main screen: the API/WebUI server starts automatically and the Web AI Chat opens.\n\n" +
-                        "Note: when a model needs to be downloaded, its size is shown and you are asked to confirm first. This uses a large amount of data (possibly several GB); please use Wi-Fi when possible.\n\n" +
+                        "Note: when a model needs to be downloaded, its size is shown and you are asked to confirm first. This involves a large download; please use Wi-Fi when possible.\n\n" +
                         "You can also try prompts directly on the device from \"Direct Run\" on the main screen. Use other models and enable more features from the \"Settings\" button.";
         }
     }
 
     private static void registerAll() {
+        e("Tap here to start the Web AI Chat", "Appuyez ici pour démarrer le Web AI Chat", "Toque aquí para iniciar el Web AI Chat", "Toque aqui para iniciar o Web AI Chat", "Hier tippen, um den Web-KI-Chat zu starten", "Tocca qui per avviare il Web AI Chat", "点按此处开始 Web AI 聊天", "여기를 눌러 웹 AI 채팅을 시작하세요");
         // Model download confirmation / progress (DownloadUi) and Web UI auto-start (MainActivity)
         e("The following files will be downloaded.", "Les fichiers suivants vont être téléchargés.", "Se descargarán los siguientes archivos.", "Os seguintes arquivos serão baixados.", "Die folgenden Dateien werden heruntergeladen.", "Verranno scaricati i seguenti file.", "将下载以下文件。", "다음 파일을 다운로드합니다.");
         e("Total size: ", "Taille totale : ", "Tamaño total: ", "Tamanho total: ", "Gesamtgröße: ", "Dimensione totale: ", "总大小：", "총 크기: ");
@@ -409,7 +410,6 @@ public final class Translations {
         e("Web AI Chat", "Chat IA Web", "Chat IA web", "Chat de IA na Web", "Web-KI-Chat", "Chat IA web", "Web AI 聊天", "웹 AI 채팅");
         e("Open in browser", "Ouvrir dans le navigateur", "Abrir en el navegador", "Abrir no navegador", "Im Browser öffnen", "Apri nel browser", "在浏览器中打开", "브라우저에서 열기");
         e("Continue", "Continuer", "Continuar", "Continuar", "Fortfahren", "Continua", "继续", "계속");
-        e("The model will be downloaded now. The first time only, this takes time and a large amount of data (possibly several GB). Wi-Fi is strongly recommended. Continue?", "Le modèle va maintenant être téléchargé. La première fois uniquement, cela prend du temps et une grande quantité de données (potentiellement plusieurs Go). Le Wi-Fi est fortement recommandé. Continuer ?", "El modelo se descargará ahora. Solo la primera vez, esto lleva tiempo y una gran cantidad de datos (posiblemente varios GB). Se recomienda encarecidamente Wi-Fi. ¿Continuar?", "O modelo será baixado agora. Apenas na primeira vez, isso leva tempo e uma grande quantidade de dados (possivelmente vários GB). Wi-Fi é altamente recomendado. Continuar?", "Das Modell wird jetzt heruntergeladen. Nur beim ersten Mal dauert dies und benötigt eine große Datenmenge (möglicherweise mehrere GB). WLAN wird dringend empfohlen. Fortfahren?", "Il modello verrà scaricato ora. Solo la prima volta, ciò richiede tempo e una grande quantità di dati (possibilmente diversi GB). Il Wi-Fi è vivamente consigliato. Continuare?", "现在将下载模型。仅首次会耗时并产生大量流量（可能达数 GB）。强烈建议使用 Wi-Fi。是否继续？", "이제 모델을 다운로드합니다. 최초 1회에 한해 시간이 걸리고 대용량 데이터(수 GB일 수 있음)가 발생합니다. Wi-Fi를 강력히 권장합니다. 계속할까요?");
         // ---- Hugging Face model-search dialog (family / size / quant notes, ratings, mmproj)
         e("1-bit class; tiny/fastest but experimental quality", "Classe 1 bit ; minuscule/le plus rapide mais qualité expérimentale", "Clase 1 bit; diminuto/el más rápido pero calidad experimental", "Classe 1 bit; minúsculo/mais rápido, mas qualidade experimental", "1-Bit-Klasse; winzig/am schnellsten, aber experimentelle Qualität", "Classe 1 bit; minuscolo/il più veloce ma qualità sperimentale", "1 比特级；极小/最快，但质量为实验性", "1비트급; 초소형/최속이지만 품질은 실험적");
         e("70B+", "70B+", "70B+", "70B+", "70B+", "70B+", "70B 及以上", "70B 이상");

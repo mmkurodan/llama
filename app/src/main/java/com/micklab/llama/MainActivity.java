@@ -73,6 +73,7 @@ public class MainActivity extends Activity {
     private static final String PREF_API_PORT = "api_port";
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
+    private static final String PREF_WEBUI_SPOTLIGHT_SHOWN = "webui_spotlight_shown";
     private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
             "show_startup_message",
             "show_quick_start"
@@ -141,6 +142,7 @@ public class MainActivity extends Activity {
     // Open the Web UI once the API server (auto-started by the Web UI button) is reachable.
     private boolean pendingOpenWebUiAfterApiStart = false;
     private DownloadUi.ProgressPopup downloadPopup;
+    private SpotlightOverlay webUiSpotlight;
     private final AtomicInteger directGenerationSessionId = new AtomicInteger(0);
     private final ApiConnectivityProber apiProber = new ApiConnectivityProber();
     private String bestProbeUrl = null;
@@ -1186,7 +1188,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    /** Collapsible processing-status/log section header toggle (expanded by default). */
+    /** Collapsible processing-status/log section header toggle (collapsed by default). */
     private void setupProcessingSectionToggle() {
         if (processingSectionLabel == null || processingSectionContent == null) {
             return;
@@ -1560,6 +1562,7 @@ public class MainActivity extends Activity {
     private void showStartupInstructionsIfNeeded() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         if (!shouldShowStartupInstructions(prefs)) {
+            showWebUiSpotlightIfNeeded();
             return;
         }
 
@@ -1590,8 +1593,45 @@ public class MainActivity extends Activity {
                     if (doNotShowAgainCheckBox.isChecked()) {
                         prefs.edit().putBoolean(PREF_SHOW_STARTUP_INSTRUCTIONS, false).apply();
                     }
+                    showWebUiSpotlightIfNeeded();
                 })
                 .show();
+    }
+
+    /**
+     * First launch only: dim everything except the Web AI Chat card and point at it ("tap here").
+     * Tapping the card opens the Web UI; tapping elsewhere just closes the hint.
+     */
+    private void showWebUiSpotlightIfNeeded() {
+        final SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (prefs.getBoolean(PREF_WEBUI_SPOTLIGHT_SHOWN, false) || webChatTitle == null
+                || !(webChatTitle.getParent() instanceof View)) {
+            return;
+        }
+        final View card = (View) webChatTitle.getParent();
+        if (mainScrollView != null) {
+            mainScrollView.scrollTo(0, 0);
+        }
+        card.post(() -> {
+            if (isFinishing() || isDestroyed() || card.getWidth() == 0) {
+                return;
+            }
+            prefs.edit().putBoolean(PREF_WEBUI_SPOTLIGHT_SHOWN, true).apply();
+            webUiSpotlight = SpotlightOverlay.show(this, card,
+                    localizedText("ここをタップして Web AI チャットを始めましょう",
+                            "Tap here to start the Web AI Chat"),
+                    this::openWebUiWithAutoStart,
+                    () -> webUiSpotlight = null);
+        });
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webUiSpotlight != null && webUiSpotlight.isShowing()) {
+            webUiSpotlight.dismiss();
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void showStartupDialogs() {

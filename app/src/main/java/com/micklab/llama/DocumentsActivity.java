@@ -309,7 +309,7 @@ public class DocumentsActivity extends Activity {
     private String buildJapaneseManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("操作マニュアル\n\n");
-        sb.append("【重要】モデルのダウンロードには数GB単位の通信が必要になる場合があります。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n");
+        sb.append("【重要】モデルのダウンロードでは大量のダウンロードが発生します。モバイルデータ通信を使用すると高額な通信料が発生する可能性があるため、可能な限りWi-Fi環境でのダウンロードを強く推奨します。\n\n");
         sb.append("1. アプリ概要\n");
         sb.append("アプリ名: LLM AI Server with llama.cpp\n");
         sb.append("Built with Llama (llama.cpp)\n");
@@ -457,7 +457,7 @@ public class DocumentsActivity extends Activity {
     private String buildEnglishManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("User Manual\n\n");
-        sb.append("IMPORTANT: Downloading models may require gigabytes of data. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n");
+        sb.append("IMPORTANT: Downloading models involves a large download. Using mobile/cellular data may incur significant charges; downloading over Wi-Fi is strongly recommended.\n\n");
         sb.append("1. Overview\n");
         sb.append("App name: LLM AI Server with llama.cpp\n");
         sb.append("Built with Llama (llama.cpp).\n");
@@ -605,7 +605,7 @@ public class DocumentsActivity extends Activity {
     private String buildFrenchManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("Manuel d'utilisation\n\n");
-        sb.append("IMPORTANT : le téléchargement des modèles peut nécessiter plusieurs gigaoctets de données. L'utilisation des données mobiles peut entraîner des frais importants ; le téléchargement en Wi-Fi est fortement recommandé.\n\n");
+        sb.append("IMPORTANT : le téléchargement des modèles implique un volume de données important. L'utilisation des données mobiles peut entraîner des frais importants ; le téléchargement en Wi-Fi est fortement recommandé.\n\n");
         sb.append("1. Aperçu\n");
         sb.append("Nom de l'application : LLM AI Server with llama.cpp\n");
         sb.append("Conçu avec Llama (llama.cpp).\n");
@@ -753,7 +753,7 @@ public class DocumentsActivity extends Activity {
     private String buildSpanishManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("Manual de usuario\n\n");
-        sb.append("IMPORTANTE: descargar modelos puede requerir gigabytes de datos. Usar datos móviles puede generar cargos importantes; se recomienda encarecidamente descargar por Wi-Fi.\n\n");
+        sb.append("IMPORTANTE: descargar modelos implica una descarga de gran tamaño. Usar datos móviles puede generar cargos importantes; se recomienda encarecidamente descargar por Wi-Fi.\n\n");
         sb.append("1. Descripción general\n");
         sb.append("Nombre de la aplicación: LLM AI Server with llama.cpp\n");
         sb.append("Creada con Llama (llama.cpp).\n");
@@ -901,7 +901,7 @@ public class DocumentsActivity extends Activity {
     private String buildPortugueseManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("Manual do usuário\n\n");
-        sb.append("IMPORTANTE: baixar modelos pode exigir gigabytes de dados. Usar dados móveis pode gerar cobranças significativas; é altamente recomendável baixar via Wi-Fi.\n\n");
+        sb.append("IMPORTANTE: baixar modelos envolve um download volumoso. Usar dados móveis pode gerar cobranças significativas; é altamente recomendável baixar via Wi-Fi.\n\n");
         sb.append("1. Visão geral\n");
         sb.append("Nome do aplicativo: LLM AI Server with llama.cpp\n");
         sb.append("Desenvolvido com Llama (llama.cpp).\n");
@@ -1049,7 +1049,7 @@ public class DocumentsActivity extends Activity {
     private String buildGermanManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("Benutzerhandbuch\n\n");
-        sb.append("WICHTIG: Das Herunterladen von Modellen kann mehrere Gigabyte an Daten erfordern. Die Nutzung mobiler Daten kann hohe Kosten verursachen; das Herunterladen über WLAN wird dringend empfohlen.\n\n");
+        sb.append("WICHTIG: Beim Herunterladen von Modellen fällt ein großer Download an. Die Nutzung mobiler Daten kann hohe Kosten verursachen; das Herunterladen über WLAN wird dringend empfohlen.\n\n");
         sb.append("1. Überblick\n");
         sb.append("App-Name: LLM AI Server with llama.cpp\n");
         sb.append("Erstellt mit Llama (llama.cpp).\n");
@@ -1197,7 +1197,7 @@ public class DocumentsActivity extends Activity {
     private String buildItalianManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("Manuale utente\n\n");
-        sb.append("IMPORTANTE: il download dei modelli può richiedere gigabyte di dati. L'uso della rete mobile può comportare costi elevati; si consiglia vivamente di scaricare tramite Wi-Fi.\n\n");
+        sb.append("IMPORTANTE: il download dei modelli comporta un download di grandi dimensioni. L'uso della rete mobile può comportare costi elevati; si consiglia vivamente di scaricare tramite Wi-Fi.\n\n");
         sb.append("1. Panoramica\n");
         sb.append("Nome dell'app: LLM AI Server with llama.cpp\n");
         sb.append("Realizzata con Llama (llama.cpp).\n");
@@ -1345,7 +1345,7 @@ public class DocumentsActivity extends Activity {
     private String buildChineseManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("用户手册\n\n");
-        sb.append("【重要】下载模型可能需要数 GB 的流量。使用移动数据可能产生高额费用，强烈建议在 Wi-Fi 环境下下载。\n\n");
+        sb.append("【重要】下载模型会产生大量下载。使用移动数据可能产生高额费用，强烈建议在 Wi-Fi 环境下下载。\n\n");
         sb.append("1. 概述\n");
         sb.append("应用名称：LLM AI Server with llama.cpp\n");
         sb.append("基于 Llama（llama.cpp）构建。\n");
@@ -1493,7 +1493,7 @@ public class DocumentsActivity extends Activity {
     private String buildKoreanManualText() {
         StringBuilder sb = new StringBuilder();
         sb.append("사용 설명서\n\n");
-        sb.append("【중요】모델 다운로드에는 수 GB의 데이터가 필요할 수 있습니다. 모바일 데이터를 사용하면 높은 요금이 발생할 수 있으므로 가능하면 Wi-Fi에서 다운로드하는 것을 강력히 권장합니다.\n\n");
+        sb.append("【중요】모델 다운로드 시 대용량 다운로드가 발생합니다. 모바일 데이터를 사용하면 높은 요금이 발생할 수 있으므로 가능하면 Wi-Fi에서 다운로드하는 것을 강력히 권장합니다.\n\n");
         sb.append("1. 개요\n");
         sb.append("앱 이름: LLM AI Server with llama.cpp\n");
         sb.append("Llama(llama.cpp)로 제작되었습니다.\n");

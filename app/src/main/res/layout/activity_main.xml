@@ -273,7 +273,7 @@
 
         </LinearLayout>
 
-        <!-- ⑤ PROCESSING STATUS / LOG CARD (expanded by default) -->
+        <!-- ⑤ PROCESSING STATUS / LOG CARD (collapsed by default) -->
         <LinearLayout
             style="@style/Card"
             android:layout_width="match_parent"
@@ -285,7 +285,7 @@
                 android:layout_height="wrap_content"
                 android:paddingTop="2dp"
                 android:paddingBottom="2dp"
-                android:text="▼ Processing Status/Logs"
+                android:text="▶ Processing Status/Logs"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold" />
@@ -296,7 +296,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:paddingTop="6dp"
-                android:visibility="visible">
+                android:visibility="gone">
 
                 <LinearLayout
                     android:layout_width="match_parent"
