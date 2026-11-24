@@ -74,6 +74,9 @@ public class MainActivity extends Activity {
     private static final String PREF_LOG_LEVEL = "log_level";
     private static final String PREF_SHOW_STARTUP_INSTRUCTIONS = "show_startup_instructions";
     private static final String PREF_WEBUI_SPOTLIGHT_SHOWN = "webui_spotlight_shown";
+    // Notification permission: asked at least once / "notifications unavailable" notice shown once.
+    private static final String PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked";
+    private static final String PREF_NOTIFICATION_NOTICE_SHOWN = "notification_unavailable_notice_shown";
     private static final String[] LEGACY_PREF_SHOW_STARTUP_INSTRUCTIONS_KEYS = {
             "show_startup_message",
             "show_quick_start"
@@ -372,14 +375,64 @@ public class MainActivity extends Activity {
             openWebUiInBrowser();
             return;
         }
+        startApiServerRequestingNotifications(true);
+    }
+
+    /**
+     * Shared start path for "Start API/WebUI" and "Open in browser". The notification permission
+     * is only for the ongoing status notification (Stop/Exit actions); the server works without it.
+     * So: ask once when the system can still show the prompt, then start the server whatever the
+     * answer. When the permission is permanently denied, start directly and explain once.
+     */
+    private void startApiServerRequestingNotifications(boolean openWebUiAfterStart) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            pendingApiStartAfterPermission = true;
-            pendingOpenWebUiAfterApiStart = true;
-            requestNotificationPermission();
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            boolean askedBefore = prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, false);
+            if (!askedBefore || shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                prefs.edit().putBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, true).apply();
+                pendingApiStartAfterPermission = true;
+                pendingOpenWebUiAfterApiStart = openWebUiAfterStart;
+                requestNotificationPermission();
+                return;
+            }
+            // Permanently denied: the system will not show the prompt any more.
+            showNotificationsUnavailableNoticeOnce();
+        }
+        startApiServerAfterPermissionDecision(openWebUiAfterStart);
+    }
+
+    private void startApiServerAfterPermissionDecision(boolean openWebUiAfterStart) {
+        if (openWebUiAfterStart) {
+            startApiServiceAndOpenWebUi();
+        } else if (!isServiceRunning) {
+            startApiService();
+        }
+    }
+
+    /** One-time explanation of what is missing without the notification permission. */
+    private void showNotificationsUnavailableNoticeOnce() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        if (prefs.getBoolean(PREF_NOTIFICATION_NOTICE_SHOWN, false) || isFinishing() || isDestroyed()) {
             return;
         }
-        startApiServiceAndOpenWebUi();
+        prefs.edit().putBoolean(PREF_NOTIFICATION_NOTICE_SHOWN, true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle(localizedText("通知がオフになっています", "Notifications are off"))
+                .setMessage(localizedText(
+                        "通知が許可されていないため、サーバー稼働中の常駐通知（停止・終了ボタン）は表示されません。API/WebUI サーバーは通常どおり動作します。停止・終了はメイン画面のボタンから行えます。通知は端末の設定からいつでも許可できます。",
+                        "Notifications are not allowed, so the ongoing server notification (with Stop/Exit) is not shown. The API/WebUI server still works normally; stop or exit it from the buttons on the main screen. You can allow notifications in the system settings at any time."))
+                .setPositiveButton("OK", null)
+                .setNeutralButton(localizedText("通知設定を開く", "Open notification settings"), (d, w) -> {
+                    try {
+                        Intent i = new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                        i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                        startActivity(i);
+                    } catch (Exception e) {
+                        showToast(localizedText("通知設定を開けませんでした", "Could not open notification settings"));
+                    }
+                })
+                .show();
     }
 
     private void startApiServiceAndOpenWebUi() {
@@ -1895,16 +1948,8 @@ public class MainActivity extends Activity {
         if (isServiceRunning) {
             stopApiService();
         } else {
-            // Check notification permission before starting service
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    pendingApiStartAfterPermission = true;
-                    showToast("Notification permission required for background service");
-                    requestNotificationPermission();
-                    return;
-                }
-            }
-            startApiService();
+            // Same behaviour as the Web UI button: ask for notifications, but start regardless.
+            startApiServerRequestingNotifications(false);
         }
     }
     
@@ -1923,19 +1968,20 @@ public class MainActivity extends Activity {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             if (granted) {
                 appendMessage("Notification permission granted");
-                if (pendingApiStartAfterPermission && !isServiceRunning && !pendingOpenWebUiAfterApiStart) {
-                    startApiService();
-                }
             } else {
-                appendMessage("Notification permission denied - background service may not show notifications");
+                appendMessage("Notification permission denied - server runs without its status notification");
             }
-            if (pendingOpenWebUiAfterApiStart) {
-                // The Web UI button asked for the server: start it even without the notification
-                // permission (the service still runs; only its notification is hidden).
+            if (pendingApiStartAfterPermission) {
+                // Start the server whatever the answer: the service still runs without the
+                // permission, only its ongoing notification is hidden.
+                boolean openWebUi = pendingOpenWebUiAfterApiStart;
+                pendingApiStartAfterPermission = false;
                 pendingOpenWebUiAfterApiStart = false;
-                startApiServiceAndOpenWebUi();
+                startApiServerAfterPermissionDecision(openWebUi);
+                if (!granted) {
+                    showNotificationsUnavailableNoticeOnce();
+                }
             }
-            pendingApiStartAfterPermission = false;
             if (continueStartupDialogsAfterPermission) {
                 continueStartupDialogsAfterPermission = false;
                 continueStartupDialogsAfterApiPrompt();
