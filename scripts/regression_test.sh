@@ -139,9 +139,13 @@ await_server_ready() {
   echo "  Waiting for server (model: $model)..."
   while [[ $(date +%s) -lt $deadline ]]; do
     local r
-    r=$(curl -s --max-time 30 \
+    # num_predict:1 keeps the probe cheap: the server does not cancel a generation when the
+    # client times out, so an unbounded probe against a Think profile left multi-minute
+    # generations queued server-side every retry (pile-up → cascading failures).
+    # 120s per try covers a heavy (~3GB) model load.
+    r=$(curl -s --max-time 120 \
       -H "Content-Type: application/json" \
-      -d "{\"model\":\"$model\",\"stream\":false,\"messages\":[{\"role\":\"user\",\"content\":\"1\"}]}" \
+      -d "{\"model\":\"$model\",\"stream\":false,\"options\":{\"num_predict\":1},\"messages\":[{\"role\":\"user\",\"content\":\"1\"}]}" \
       "$BASE_URL/api/chat" 2>/dev/null || true)
     if echo "$r" | jq -e '.message' &>/dev/null; then
       echo "  Server ready."
@@ -752,7 +756,9 @@ body=$(jq -n --arg m "$SAMP_M" '{model:$m, stream:false,
   messages:[{role:"user",content:"What is 1+1?"}],
   options:{temperature:0.0, num_predict:20}}')
 resp=$(_post "/api/chat" "$body" 2>/dev/null || true)
-if _has "$resp" '.message.content | type == "string" and length > 0'; then
+# Think-aware: with num_predict=20 a thinking profile (default Chat) spends every token in
+# .message.thinking and leaves .content empty — accept either, as §3 does.
+if _has "$resp" '.message | (.content // "" | length > 0) or (.thinking // "" | length > 0)'; then
   pass "/api/chat temperature=0 num_predict=20 [$SAMP_M]"
 else
   fail "/api/chat temperature=0 [$SAMP_M]" "${resp:0:200}"
