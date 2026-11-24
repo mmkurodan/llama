@@ -2729,7 +2729,34 @@ public class OllamaApiServer {
             sendErrorResponse(outputStream, 404, "Not Found");
             return;
         }
+        if ("index.html".equals(assetName)) {
+            assetBytes = injectWebUiDefaults(assetBytes);
+        }
         sendBinaryResponse(outputStream, 200, WEBUI_CONTENT_TYPES.get(assetName), assetBytes);
+    }
+
+    private static final String WEBUI_EXT_SCRIPT_TAG = "<script src=\"./app-ext.js\"></script>";
+
+    /**
+     * Tell the WebUI which model to pre-select on a new chat when none is loaded yet (the app's
+     * initial profile, "default Light"). Without it the WebUI only auto-selects a loaded model, so
+     * on first launch no model was selected.
+     */
+    private byte[] injectWebUiDefaults(byte[] indexHtml) {
+        try {
+            String html = new String(indexHtml, StandardCharsets.UTF_8);
+            if (!html.contains(WEBUI_EXT_SCRIPT_TAG)) {
+                return indexHtml;
+            }
+            String defaultModel = configManager.getInitialConfigName();
+            String script = "<script>window.__mmDefaultModel=" + JSONObject.quote(defaultModel)
+                    .replace("</", "<\\/") + ";</script>";
+            return html.replace(WEBUI_EXT_SCRIPT_TAG, script + WEBUI_EXT_SCRIPT_TAG)
+                    .getBytes(StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to inject WebUI defaults", e);
+            return indexHtml;
+        }
     }
 
     private String resolveWebUiAssetName(String path) {
